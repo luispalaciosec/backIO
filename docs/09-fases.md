@@ -44,7 +44,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [ ] Webhook recibiendo y aplicando `completed`
 - [ ] Polling de reconciliación cada 30 min
 - [ ] **Test de fuga de texto pasando** (ver `02-visibilidad.md`)
-- [ ] Límite de 60 to-dos por operación implementado
+- [x] Límite de 50 to-dos por operación implementado
 
 ### Fase 2.5
 - [ ] Las 8 reglas de señales implementadas y parametrizables
@@ -89,12 +89,16 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 
 ## Decisiones que bloquean fases
 
-| Decisión | Bloquea | Quién |
-|---|---|---|
-| Product owner de BackIO en Geeks | Todo | Luis |
-| ¿Gantt y Calendario entran al alcance? | Fase 1 | Luis + ejecutivas |
-| ¿El GG aparece en el backlog operativo? | Fase 2.5 | Luis |
-| Canal de notificación (correo vs Slack) | Fase 1 | Marcia |
+Todas tomadas el 03/09/2026:
+
+| Decisión | Resultado |
+|---|---|
+| Product owner de BackIO en Geeks | **Marcia** (jefe de operaciones). Luis solo como último recurso |
+| ¿CoreIO antes de Fase 0? | **No.** Modelo actual: tablas propias + `cliente_id` compartido + webhook de PrometIO. Revisar cuando BackIO esté en uso |
+| ¿Gantt y Calendario entran al alcance? | **Fase 2**, no Fase 1 |
+| ¿El GG aparece en el backlog operativo? | **Opción A: no.** El weekly es de Marcia; Luis no participa. Sus compromisos no entran al backlog operativo |
+| Canal de notificación | **Correo** |
+| Límite de to-dos por operación en Basecamp | **50** |
 
 ---
 

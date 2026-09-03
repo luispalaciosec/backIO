@@ -90,33 +90,16 @@ consecuencias comerciales y una capa MCP con scopes. Planificar con 7-8 semanas.
 
 ---
 
-## Decisiones pendientes (bloquean el arranque)
+## Decisiones tomadas (03/09/2026)
 
-Ninguna es técnica. Las cinco son de Luis.
-
-| # | Decisión | Bloquea |
+| # | Decisión | Resultado |
 |---|---|---|
-| 1 | **Product owner de la suite** — y no debería ser Luis | Todo |
-| 2 | ¿CoreIO se hace antes de Fase 0? | Fase 0 |
-| 3 | ¿Gantt y Calendario entran al alcance? | Fase 1 |
-| 4 | Canal de notificación (correo vs Slack) | Fase 1 |
-| 5 | **¿El Gerente General aparece en el backlog operativo?** | Fase 2.5 |
-
-### Sobre la decisión 5
-
-En el Plan Operativo del 03/08/2026, Luis figura como responsable de 4 tareas de prioridad
-Alta. Resultado: 2 no entregadas, 2 con retraso, 0 a tiempo.
-
-Si el GG está en el backlog, el motor de señales lo marcará cada semana. Eso es correcto y
-necesario. Las dos opciones legítimas:
-
-- **A.** El GG sale del backlog operativo → sus compromisos van a un tablero de dirección
-  con ritual propio. Consistente con la estrategia de extracción.
-- **B.** El GG permanece → Marcia lo marca públicamente igual que a cualquiera. Es lo único
-  que hace que WorkOS sobreviva por adopción.
-
-**Lo que no funciona:** estar en el backlog y ser el único exento. Es precisamente lo que
-hizo fracasar los intentos anteriores de implementar WorkOS.
+| 1 | Product owner | **Marcia**, jefe de operaciones. Luis último recurso |
+| 2 | ¿CoreIO antes de Fase 0? | **No.** Se revisa cuando BackIO esté en uso |
+| 3 | ¿Gantt y Calendario? | **Fase 2** |
+| 4 | Canal de notificación | **Correo** |
+| 5 | ¿El GG en el backlog operativo? | **No (opción A).** El weekly es de Marcia; Luis no participa |
+| 6 | Límite de to-dos por operación en Basecamp | **50** |
 
 ---
 

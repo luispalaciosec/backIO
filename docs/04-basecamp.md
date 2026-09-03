@@ -83,7 +83,7 @@ async function createProjectStructure(proyecto: Proyecto, reqs: Requerimiento[])
 
 | Salvaguarda | Regla |
 |---|---|
-| Límite por operación | Máximo 60 to-dos en una sola creación. Sobre eso, confirmación explícita adicional |
+| Límite por operación | Máximo 50 to-dos en una sola creación (decisión 03/09/2026). Sobre eso, confirmación explícita adicional |
 | Idempotencia | Si `basecamp_todo_id` ya existe, no recrear |
 | Rollback | Si falla a mitad, marcar el proyecto como `sync_incompleto` y ofrecer reintento — nunca dejar estado ambiguo |
 | Sandbox | Toda escritura nueva se prueba primero contra un proyecto Basecamp de pruebas |

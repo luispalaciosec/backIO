@@ -134,9 +134,6 @@ eso, la conversación no tiene sustancia.
 
 ## Decisiones pendientes (bloquean fases específicas)
 
-| Decisión | Bloquea | Quién decide |
-|---|---|---|
-| ¿Gantt y Calendario entran al alcance? | Fase 1 | Luis + ejecutivas |
-| ¿El GG aparece en el backlog operativo? | Fase 2.5 | Luis |
-| Product owner de BackIO en Geeks | Todo | Luis |
-| Canal de notificación (correo vs Slack) | Fase 1 | Marcia |
+Resueltas el 03/09/2026. Ver tabla en `09-fases.md`: product owner Marcia, sin CoreIO por
+ahora, Gantt/Calendario en Fase 2, GG fuera del backlog operativo (opción A), notificaciones
+por correo, límite de 50 to-dos por operación.

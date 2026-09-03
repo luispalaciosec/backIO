@@ -184,4 +184,4 @@ antes de encender el motor:
 **Lo que no funciona:** estar en el backlog y ser el único exento. Es precisamente lo que
 hizo fracasar los intentos anteriores de implementar WorkOS.
 
-Esta decisión debe estar tomada antes de implementar la Fase 2.5.
+**Decisión (03/09/2026): Opción A.** El weekly es de Marcia; Luis no participa ni aparece como responsable en el backlog operativo. No se implementa ninguna exención en el motor: simplemente no se le asignan requerimientos ni acuerdos.
