@@ -52,8 +52,15 @@ Migraciones en `backend/supabase/migrations`. Aplicar en orden con el CLI de Sup
 | `…0004_fase0_api_keys_audit.sql` | API keys, audit_log, planes de agente, caché de resumen, notificaciones | No |
 | `seed.sql` | Tenant Geeks, 5 plantillas, mapeo servicios | No |
 
-Sin la migración 0002 el frontend (rol `authenticated`) no puede leer nada: RLS está
-encendida y no hay políticas. El backend con service role sí opera.
+**Estado al 2026-09-03:** las cuatro migraciones y el seed están aplicados en
+`gckjyjvqvdfayjrtfbmj`. Las 0001 y 0003 se aplicaron vía MCP (quedan registradas en
+`supabase_migrations`); la 0002, la 0004 y el seed se ejecutaron desde el SQL Editor. Antes
+del primer `supabase db push` desde el CLI, marcarlas como aplicadas para que no intente
+repetirlas:
+
+```bash
+npx supabase migration repair --status applied 20260903000002 20260903000004
+```
 
 ## Primer usuario
 
