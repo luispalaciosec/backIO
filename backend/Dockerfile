@@ -7,6 +7,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY shared/package.json shared/
 COPY backend/package.json backend/
+COPY frontend/package.json frontend/
 RUN pnpm install --frozen-lockfile --filter @backio/backend... --prod=false
 
 COPY shared ./shared
