@@ -1,0 +1,15 @@
+{
+  "name": "backio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BackIO · Sistema Operativo de Backlog · Geeks Ecuador",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint"
+  },
+  "engines": { "node": ">=20" }
+}

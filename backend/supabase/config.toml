@@ -1,0 +1,9 @@
+# Supabase CLI · proyecto remoto gckjyjvqvdfayjrtfbmj
+project_id = "gckjyjvqvdfayjrtfbmj"
+
+[db]
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
