@@ -57,6 +57,7 @@ unifica la capa de gestión sin tocar la capa de ejecución.
 | 09 | `docs/09-fases.md` | Plan de ejecución, DoD, riesgos |
 | 10 | `docs/10-core.md` | CoreIO, capa compartida (propuesto) |
 | 11 | `docs/11-setup.md` | Estructura del repo, variables de entorno, cómo correr |
+| 12 | `docs/12-despliegue.md` | Railway (backend) + Vercel (frontend), variables por plataforma |
 
 ---
 
