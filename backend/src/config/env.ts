@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+// Carga backend/.env en desarrollo (Node >= 21). En producción las variables vienen de la plataforma.
+try {
+  if (!process.env.SUPABASE_URL) process.loadEnvFile?.(new URL('../../.env', import.meta.url).pathname);
+} catch {
+  /* sin .env: se validará abajo */
+}
+
 const schema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
