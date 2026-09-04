@@ -67,7 +67,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
   );
 }
 
-function Fila({ r, color, usuarios, onPatch, horas, bloqueada }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean; proyecto?: string }) {
+function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean; proyecto?: string }) {
   const p = (patch: ActualizarRequerimientoInput) => onPatch(r.id, patch);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
   return (
