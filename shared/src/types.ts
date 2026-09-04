@@ -68,6 +68,7 @@ export interface Cliente {
   logo_url: string | null;
   color_primario: string | null;
   basecamp_project_id: number | null;
+  basecamp_importado_at: string | null;
   config: Record<string, unknown>;
   activo: boolean;
   created_at: string;
@@ -167,6 +168,7 @@ export interface Proyecto {
   sync_estado: SyncEstado;
   mesa_id: string | null;
   basecamp_grupos: Record<string, number>;
+  valor_cotizado: number | null;
   portal_token: string | null;
   portal_activo: boolean;
   created_at: string;

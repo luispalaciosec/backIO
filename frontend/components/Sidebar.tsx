@@ -10,6 +10,7 @@ const NAV = [
   { href: '/proyectos', label: 'Proyectos', icon: '▦' },
   { href: '/daily', label: 'Daily', icon: '◔' },
   { href: '/weekly', label: 'Weekly', icon: '◷' },
+  { href: '/huerfanos', label: 'Huérfanos', icon: '⚠' },
 ];
 const ADMIN = [
   { href: '/admin/clientes', label: 'Clientes', icon: '◉' },

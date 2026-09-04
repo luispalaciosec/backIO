@@ -14,6 +14,7 @@ export default function BacklogPage() {
   const [items, setItems] = useState<RequerimientoMetricas[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [horas, setHoras] = useState<Record<string, number>>({});
   const [vista, setVista] = useState<Vista>('tabla');
   const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '' });
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +42,7 @@ export default function BacklogPage() {
   useEffect(() => {
     api<{ items: Cliente[] }>('/clientes').then((r) => setClientes(r.items)).catch(() => {});
     api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {});
+    api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(() => {});
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -120,7 +122,7 @@ export default function BacklogPage() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-x-auto pb-4">
-          <BacklogTable items={items} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={crear} />
+          <BacklogTable items={items} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={crear} horas={horas} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

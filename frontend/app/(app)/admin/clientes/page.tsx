@@ -56,6 +56,14 @@ export default function AdminClientesPage() {
                   catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
                 }}>{(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? '✓ Webhook activo' : 'Activar webhook'}</button>
               )}
+              {c.basecamp_project_id && (
+                <button type="button" className={`${c.basecamp_importado_at ? 'btn-ghost' : 'btn-primary'} text-xs`} title={c.basecamp_importado_at ? `Importado ${new Date(c.basecamp_importado_at).toLocaleString('es-EC')}. Volver a importar trae solo lo nuevo.` : 'Trae las listas y to-dos existentes del proyecto Basecamp (solo títulos, nunca comentarios)'} onClick={async () => {
+                  if (!confirm(`Importar las listas de to-dos de "${c.nombre}" desde Basecamp. Solo entran títulos, fechas, asignados y estado; nunca descripciones ni comentarios. ¿Continuar?`)) return;
+                  setError(null); setOk(null);
+                  try { const r = await api<{ listas: number; proyectos_creados: number; requerimientos_creados: number; ya_enlazados: number; omitidos_completados_viejos: number }>(`/clientes/${c.id}/basecamp/importar`, { method: 'POST' }); setOk(`${c.nombre}: ${r.listas} listas · ${r.proyectos_creados} proyectos nuevos · ${r.requerimientos_creados} to-dos importados · ${r.ya_enlazados} ya enlazados · ${r.omitidos_completados_viejos} completados antiguos omitidos`); await cargar(); }
+                  catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+                }}>{c.basecamp_importado_at ? 'Reimportar' : 'Importar Basecamp'}</button>
+              )}
               {(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id && (
                 <button type="button" className="btn-ghost text-xs" title="Ver entregas recientes del webhook" onClick={async () => {
                   setError(null);

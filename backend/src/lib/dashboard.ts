@@ -12,6 +12,7 @@ import { listClientes } from './db/clientes';
 import { listMesas, alcanceMesa } from './db/mesas';
 import { fechaLocal } from './rituals/daily';
 import { lunesDe } from './builder/plan';
+import { resumenHoras } from './horas';
 
 export interface DashboardKpis {
   activos: number;
@@ -25,15 +26,18 @@ export interface DashboardKpis {
   piezas_activas: number;
   proyectos_activos: number;
   avance_promedio: number;
+  horas_30d: number;
+  huerfanos_pendientes: number;
 }
 
 export interface FilaCliente {
   cliente_id: string; cliente: string; mesa: string | null;
   activos: number; atrasados: number; esperando_cliente: number; sin_movimiento_max: number; completados_30d: number; piezas_activas: number;
   proyectos: number; avance_promedio: number; salud: 'verde' | 'amarillo' | 'rojo';
+  horas_30d: number; valor_cotizado_activo: number;
 }
 
-export interface FilaPersona { usuario_id: string; nombre: string; activos: number; semana_actual: number; atrasados: number; capacidad_semanal: number; pct_semana: number }
+export interface FilaPersona { usuario_id: string; nombre: string; activos: number; semana_actual: number; atrasados: number; capacidad_semanal: number; pct_semana: number; horas_30d: number }
 
 export interface SerieSemana { semana_inicio: string; completados: number; piezas: number; vencian: number; a_tiempo: number }
 
@@ -78,7 +82,8 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   const [mesas, usuarios, clientes, proyectos] = await Promise.all([listMesas(ctx), listUsuarios(ctx), listClientes(ctx, { incluirInactivos: true }), listProyectos(ctx)]);
   const mesa = mesaId ? mesas.find((m) => m.id === mesaId) ?? null : null;
   const alcance = mesa ? await alcanceMesa(ctx, mesa.id) : undefined;
-  const [activos, completados56] = await Promise.all([listBacklog(ctx, { solo_activos: true, mesa: alcance }), completadosDesde(ctx, hace56, alcance)]);
+  const [activos, completados56, horas] = await Promise.all([listBacklog(ctx, { solo_activos: true, mesa: alcance }), completadosDesde(ctx, hace56, alcance), resumenHoras(ctx, hace30, alcance ? { clienteIds: alcance.clienteIds } : {})]);
+  const { count: huerfanosPend } = await ctx.db.from('basecamp_huerfanos').select('id', { count: 'exact', head: true }).eq('tenant_id', ctx.tenantId).is('resuelto_at', null);
   const completados30 = completados56.filter((r) => r.completado_at && r.completado_at >= hace30);
 
   const nombreU = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? null;
@@ -99,6 +104,8 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     piezas_activas: activos.reduce((s, r) => s + (r.piezas || 0), 0),
     proyectos_activos: proyectosActivos.length,
     avance_promedio: proyectosActivos.length ? Math.round(proyectosActivos.reduce((s, p) => s + p.avance, 0) / proyectosActivos.length) : 0,
+    horas_30d: horas.total,
+    huerfanos_pendientes: huerfanosPend ?? 0,
   };
 
   const clientesIds = [...new Set([...activos.map((r) => r.cliente_id), ...completados30.map((r) => r.cliente_id), ...proyectosActivos.map((p) => p.cliente_id)])];
@@ -115,6 +122,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
       activos: act.length, atrasados, esperando_cliente: act.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length,
       sin_movimiento_max: sinMov, completados_30d: comp.length, piezas_activas: act.reduce((s, r) => s + (r.piezas || 0), 0),
       proyectos: proys.length, avance_promedio: proys.length ? Math.round(proys.reduce((s, p) => s + p.avance, 0) / proys.length) : 0, salud,
+      horas_30d: horas.por_cliente[id] ?? 0, valor_cotizado_activo: proys.reduce((s, p) => s + (Number(p.valor_cotizado) || 0), 0),
     };
   }).sort((a, b) => (a.salud === b.salud ? b.activos - a.activos : ['rojo', 'amarillo', 'verde'].indexOf(a.salud) - ['rojo', 'amarillo', 'verde'].indexOf(b.salud)));
 
@@ -124,8 +132,8 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     const mios = activos.filter((r) => r.owner_agencia.includes(u.id));
     const semana = mios.filter((r) => r.fecha_entrega && r.fecha_entrega >= lunes && r.fecha_entrega <= finSemanaIso);
     const totalSemana = activos.filter((r) => r.fecha_entrega && r.fecha_entrega >= lunes && r.fecha_entrega <= finSemanaIso).length || 1;
-    return { usuario_id: u.id, nombre: u.nombre, activos: mios.length, semana_actual: semana.length, atrasados: mios.filter((r) => r.dias_atraso > 0).length, capacidad_semanal: u.capacidad_semanal, pct_semana: Math.round((semana.length / totalSemana) * 100) };
-  }).filter((p) => p.activos > 0).sort((a, b) => b.activos - a.activos);
+    return { usuario_id: u.id, nombre: u.nombre, activos: mios.length, semana_actual: semana.length, atrasados: mios.filter((r) => r.dias_atraso > 0).length, capacidad_semanal: u.capacidad_semanal, pct_semana: Math.round((semana.length / totalSemana) * 100), horas_30d: horas.por_usuario[u.id] ?? 0 };
+  }).filter((p) => p.activos > 0 || p.horas_30d > 0).sort((a, b) => b.activos - a.activos);
 
   const por_estado = ['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'bloqueado', 'reprogramado'].map((estado) => ({ estado, n: activos.filter((r) => r.estado_operativo === estado).length }));
 

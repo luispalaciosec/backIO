@@ -138,6 +138,59 @@ export class BasecampClient {
     await this.request('PUT', `/buckets/${projectId}/todos/${todoId}.json`, input);
   }
 
+  /** GET paginado (Link: rel="next"). Devuelve la unión de páginas. */
+  async requestAll<T>(path: string, maxPages = 20): Promise<T[]> {
+    const out: T[] = [];
+    let url: string | null = `${this.base()}${path}`;
+    for (let i = 0; i < maxPages && url; i++) {
+      await this.refreshIfNeeded();
+      await this.throttle();
+      const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${this.tokens.access_token}`, 'User-Agent': env().BASECAMP_USER_AGENT } });
+      if (!res.ok) throw new Error(`Basecamp ${res.status} GET ${url}: ${await res.text()}`);
+      const page = (await res.json()) as T[];
+      out.push(...(Array.isArray(page) ? page : []));
+      const link = res.headers.get('Link') ?? '';
+      const m = /<([^>]+)>;\s*rel="next"/.exec(link);
+      url = m ? m[1]! : null;
+    }
+    return out;
+  }
+
+  /**
+   * To-dos de una lista o grupo. SOLO campos permitidos (docs/02 + excepción D1 para el título):
+   * id, title, due_on, completed, completed_at, assignee ids, creator id/name, app_url. Nunca description ni comments.
+   */
+  async listTodosSafe(projectId: number, todolistId: number, incluirCompletados = true): Promise<{ id: number; titulo: string; due_on: string | null; completed: boolean; completed_at: string | null; assignee_ids: number[]; creator_id: number | null; creator_nombre: string | null; app_url: string | null; created_at: string | null }[]> {
+    type Raw = { id: number; title?: string; content?: string; due_on?: string | null; completed?: boolean; completed_at?: string | null; assignees?: { id: number }[]; creator?: { id: number; name?: string }; app_url?: string; created_at?: string };
+    const activos = await this.requestAll<Raw>(`/buckets/${projectId}/todolists/${todolistId}/todos.json`);
+    const done = incluirCompletados ? await this.requestAll<Raw>(`/buckets/${projectId}/todolists/${todolistId}/todos.json?completed=true`) : [];
+    const vistos = new Set<number>();
+    return [...activos, ...done].filter((t) => (vistos.has(t.id) ? false : (vistos.add(t.id), true))).map((t) => ({
+      id: t.id,
+      titulo: String(t.title ?? t.content ?? '').replace(/<[^>]+>/g, '').trim().slice(0, 200),
+      due_on: t.due_on ?? null,
+      completed: t.completed === true,
+      completed_at: t.completed_at ?? null,
+      assignee_ids: (t.assignees ?? []).map((a) => a.id),
+      creator_id: t.creator?.id ?? null,
+      creator_nombre: t.creator?.name ?? null,
+      app_url: t.app_url ?? null,
+      created_at: t.created_at ?? null,
+    }));
+  }
+
+  /**
+   * Reporte de timesheet por proyecto y rango (no paginado). SOLO: id, date, hours, person id, parent id/type.
+   * La description de cada entrada es texto de Basecamp y se descarta aquí mismo.
+   */
+  async timesheetSafe(projectId: number, desde: string, hasta: string): Promise<{ id: number; fecha: string; horas: number; person_id: number | null; parent_id: number | null; parent_type: string | null }[]> {
+    type Raw = { id: number; date?: string; hours?: number | string; person?: { id: number }; parent?: { id: number; type?: string } };
+    const raw = await this.request<Raw[]>('GET', `/reports/timesheet.json?bucket_id=${projectId}&start_date=${desde}&end_date=${hasta}`);
+    return (Array.isArray(raw) ? raw : [])
+      .filter((e) => typeof e.id === 'number' && e.date)
+      .map((e) => ({ id: e.id, fecha: String(e.date).slice(0, 10), horas: parseHoras(e.hours), person_id: e.person?.id ?? null, parent_id: e.parent?.id ?? null, parent_type: e.parent?.type ?? null }));
+  }
+
   /** Polling de reconciliación: devuelve el to-do crudo; el llamador DEBE pasar por extractSafeTodo. */
   async getTodoRaw(projectId: number, todoId: number): Promise<unknown> {
     return this.request<unknown>('GET', `/buckets/${projectId}/todos/${todoId}.json`);
@@ -164,4 +217,14 @@ export class BasecampClient {
       types: ['Todo'],
     });
   }
+}
+
+/** "1.5" | "1:30" | 1.5 → horas decimales */
+export function parseHoras(v: unknown): number {
+  if (typeof v === 'number') return v;
+  if (typeof v !== 'string') return 0;
+  const m = /^(\d+):(\d{1,2})$/.exec(v.trim());
+  if (m) return Number(m[1]) + Number(m[2]) / 60;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 }

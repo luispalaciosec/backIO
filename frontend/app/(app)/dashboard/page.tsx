@@ -12,8 +12,8 @@ interface Dashboard {
   generado_at: string;
   mesa: { id: string; nombre: string } | null;
   kpis: Record<string, number>;
-  por_cliente: { cliente_id: string; cliente: string; mesa: string | null; activos: number; atrasados: number; esperando_cliente: number; sin_movimiento_max: number; completados_30d: number; piezas_activas: number; proyectos: number; avance_promedio: number; salud: 'verde' | 'amarillo' | 'rojo' }[];
-  por_persona: { usuario_id: string; nombre: string; activos: number; semana_actual: number; atrasados: number; capacidad_semanal: number; pct_semana: number }[];
+  por_cliente: { cliente_id: string; cliente: string; mesa: string | null; activos: number; atrasados: number; esperando_cliente: number; sin_movimiento_max: number; completados_30d: number; piezas_activas: number; proyectos: number; avance_promedio: number; salud: 'verde' | 'amarillo' | 'rojo'; horas_30d: number; valor_cotizado_activo: number }[];
+  por_persona: { usuario_id: string; nombre: string; activos: number; semana_actual: number; atrasados: number; capacidad_semanal: number; pct_semana: number; horas_30d: number }[];
   por_estado: { estado: string; n: number }[];
   ultimas_8_semanas: { semana_inicio: string; completados: number; piezas: number; vencian: number; a_tiempo: number }[];
   arrastre: { requerimiento_id: string; titulo: string; cliente: string; owner: string | null; veces_reprogramado: number; fecha_original: string | null; fecha_actual: string | null; dias_arrastre: number; estado: string }[];
@@ -47,13 +47,15 @@ export default function DashboardPage() {
       </header>
 
       {k && (
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
           <Kpi etiqueta="Activos" valor={k.activos!} sub={`${k.proyectos_activos} proyectos · ${k.avance_promedio}% avance prom.`} />
           <Kpi etiqueta="Atrasados" valor={k.atrasados!} tono={k.atrasados! > 0 ? 'bad' : 'ok'} />
           <Kpi etiqueta="Sin movimiento >14d" valor={k.sin_movimiento_14!} tono={k.sin_movimiento_14! > 0 ? 'warn' : 'ok'} sub="la métrica que importa" />
           <Kpi etiqueta="Esperando cliente" valor={k.esperando_cliente!} tono={k.esperando_cliente! > 0 ? 'warn' : 'neutral'} />
           <Kpi etiqueta="Reprogramados ≥2" valor={k.reprogramados_2mas!} tono={k.reprogramados_2mas! > 0 ? 'bad' : 'ok'} sub={`${k.bloqueados} bloqueados`} />
           <Kpi etiqueta="Completados 30d" valor={k.completados_30d!} tono="ok" sub={`${k.piezas_completadas_30d} piezas · ${k.piezas_activas} en curso`} />
+          <Kpi etiqueta="Horas 30d" valor={k.horas_30d!} sub="timesheet de Basecamp" />
+          <Kpi etiqueta="Huérfanos" valor={k.huerfanos_pendientes!} tono={k.huerfanos_pendientes! > 0 ? 'warn' : 'ok'} sub="to-dos fuera de BackIO" />
         </div>
       )}
 
@@ -76,7 +78,7 @@ export default function DashboardPage() {
           <section className="card overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 font-semibold">Salud por cliente</div>
             <table className="w-full text-sm">
-              <thead><tr><th className="th"></th><th className="th">Cliente</th><th className="th text-right">Activos</th><th className="th text-right">Atraso</th><th className="th text-right">Espera cliente</th><th className="th text-right">Sin mov. máx</th><th className="th text-right">Hechos 30d</th><th className="th text-right">Piezas</th></tr></thead>
+              <thead><tr><th className="th"></th><th className="th">Cliente</th><th className="th text-right">Activos</th><th className="th text-right">Atraso</th><th className="th text-right">Espera cliente</th><th className="th text-right">Sin mov. máx</th><th className="th text-right">Hechos 30d</th><th className="th text-right">Piezas</th><th className="th text-right">Horas 30d</th><th className="th text-right">Cotizado</th></tr></thead>
               <tbody>
                 {d.por_cliente.map((c) => (
                   <tr key={c.cliente_id} className="hover:bg-gray-50">
@@ -88,9 +90,11 @@ export default function DashboardPage() {
                     <td className={`td text-right tabular-nums ${c.sin_movimiento_max > 14 ? 'text-amber-600 font-semibold' : ''}`}>{c.sin_movimiento_max}</td>
                     <td className="td text-right tabular-nums text-green-700">{c.completados_30d}</td>
                     <td className="td text-right tabular-nums">{c.piezas_activas}</td>
+                    <td className="td text-right tabular-nums">{c.horas_30d ? c.horas_30d.toFixed(1) : ''}</td>
+                    <td className="td text-right tabular-nums">{c.valor_cotizado_activo ? `$${c.valor_cotizado_activo.toLocaleString('es-EC')}` : ''}{c.valor_cotizado_activo && c.horas_30d ? <div className="text-[10px] text-gray-400">${Math.round(c.valor_cotizado_activo / c.horas_30d)}/h</div> : null}</td>
                   </tr>
                 ))}
-                {d.por_cliente.length === 0 && <tr><td className="td text-gray-400" colSpan={8}>Sin actividad.</td></tr>}
+                {d.por_cliente.length === 0 && <tr><td className="td text-gray-400" colSpan={10}>Sin actividad.</td></tr>}
               </tbody>
             </table>
           </section>
@@ -98,7 +102,7 @@ export default function DashboardPage() {
           <section className="card overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 font-semibold">Carga por persona</div>
             <table className="w-full text-sm">
-              <thead><tr><th className="th">Persona</th><th className="th text-right">Activos</th><th className="th text-right">Esta semana</th><th className="th text-right">% semana</th><th className="th text-right">Atrasados</th></tr></thead>
+              <thead><tr><th className="th">Persona</th><th className="th text-right">Activos</th><th className="th text-right">Esta semana</th><th className="th text-right">% semana</th><th className="th text-right">Atrasados</th><th className="th text-right">Horas 30d</th></tr></thead>
               <tbody>
                 {d.por_persona.map((p) => (
                   <tr key={p.usuario_id}>
@@ -107,9 +111,10 @@ export default function DashboardPage() {
                     <td className="td text-right tabular-nums">{p.semana_actual}</td>
                     <td className={`td text-right tabular-nums ${p.pct_semana > 30 ? 'text-red-600 font-semibold' : ''}`}>{p.semana_actual ? `${p.pct_semana}%` : ''}</td>
                     <td className={`td text-right tabular-nums ${p.atrasados ? 'text-red-600' : ''}`}>{p.atrasados || ''}</td>
+                    <td className="td text-right tabular-nums">{p.horas_30d ? p.horas_30d.toFixed(1) : ''}</td>
                   </tr>
                 ))}
-                {d.por_persona.length === 0 && <tr><td className="td text-gray-400" colSpan={5}>Sin asignaciones.</td></tr>}
+                {d.por_persona.length === 0 && <tr><td className="td text-gray-400" colSpan={6}>Sin asignaciones.</td></tr>}
               </tbody>
             </table>
             <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-2">

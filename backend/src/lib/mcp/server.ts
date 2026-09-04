@@ -31,6 +31,7 @@ import { pushDueDate } from '../basecamp/write';
 import { publicarActaEnBasecamp } from './publish';
 import { guardarPlan, tomarPlan, guardarResultado } from './plans';
 import { buildDashboard } from '../dashboard';
+import { resumenHoras } from '../horas';
 import type { CrearProyectoInput, ActualizarRequerimientoInput, Requerimiento } from '@backio/shared';
 
 type Text = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -202,6 +203,16 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     let mesaId: string | null = null;
     if (mesa) { const m = await resolverMesa(ctx, mesa); if (!m) return fail(`Mesa "${mesa}" no encontrada`); mesaId = m.id; }
     return ok(await buildDashboard(ctx, mesaId));
+  })());
+
+  server.registerTool('get_hours', {
+    description: 'Horas registradas en Basecamp (timesheet) por cliente, persona y proyecto en los últimos N días. Solo números; nunca la descripción de las entradas.',
+    inputSchema: { dias: z.number().int().min(1).max(365).default(30) },
+  }, ({ dias }) => guard(['read:backlog'], async () => {
+    if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
+    const m = await mapas(ctx);
+    const r = await resumenHoras(ctx, new Date(Date.now() - dias * 86_400_000).toISOString());
+    return ok({ dias, total: r.total, por_cliente: Object.fromEntries(Object.entries(r.por_cliente).map(([k, v]) => [m.clientes.get(k) ?? k, v])), por_persona: Object.fromEntries(Object.entries(r.por_usuario).map(([k, v]) => [m.nombres.get(k) ?? k, v])) });
   })());
 
   // ------------------------------------------------------------ ESCRITURA (preview + confirm)

@@ -96,8 +96,10 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
 
   // Si nació de una cotización de PrometIO, el borrador queda convertido.
   if (input.prometio_cotizacion_id) {
-    await ctx.db.from('proyecto_borradores').update({ estado: 'convertido', proyecto_id: proyecto.id })
-      .eq('tenant_id', ctx.tenantId).eq('prometio_cotizacion_id', input.prometio_cotizacion_id);
+    const { data: b } = await ctx.db.from('proyecto_borradores').update({ estado: 'convertido', proyecto_id: proyecto.id })
+      .eq('tenant_id', ctx.tenantId).eq('prometio_cotizacion_id', input.prometio_cotizacion_id).select('payload').maybeSingle();
+    const valor = (b as { payload?: { valor?: number | null } } | null)?.payload?.valor;
+    if (typeof valor === 'number') await updateProyecto(ctx, proyecto.id, { valor_cotizado: valor });
   }
 
   const owners = [...new Set(plan.tareas.flatMap((t) => t.owner_agencia))].filter((id) => id !== ctx.usuarioId);

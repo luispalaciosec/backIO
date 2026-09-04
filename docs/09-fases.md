@@ -19,6 +19,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 | **3** | Portal cliente + resumen ejecutivo IA | 5 | Fase 2, tests de visibilidad |
 | **3.5** | Webhooks bidireccionales con PrometIO | 2 | Fase 2.7 · **hecho 04/09/2026**: empresa y cotización aprobada verificadas de punta a punta |
 | **4** | Dashboards, vista weekly con arrastre, métricas de piezas | 4 | Fase 2.5 · **hecho 04/09/2026** |
+| **v2·3** | Importación de Basecamp, huérfanos, horas | 3 | **hecho 04/09/2026** |
 | **5** | Migración de cuentas activas, coexistencia, baja de Monday | 5 | Todas |
 
 ---

@@ -62,6 +62,13 @@ it('nunca persiste texto proveniente de Basecamp', async () => {
 });
 ```
 
+**Excepción acotada D1 (aprobada por Luis, 04/09/2026).** Para importar el trabajo que ya vive en
+Basecamp y para detectar to-dos creados fuera de BackIO, entra el **título** del to-do como
+`titulo_interno`, siempre con `visible_cliente = false` y sin etiqueta. Un título es el nombre de una
+tarea, no una conversación. Siguen fuera, sin excepción: descripción, comentarios, adjuntos y la
+descripción de las entradas de timesheet. Se implementa en `BasecampClient.listTodosSafe` y
+`timesheetSafe`, que construyen el objeto campo a campo.
+
 ### Defensa 2 — Visibilidad heredada, monotónica (lógica)
 
 `visible_cliente` se hereda de `plantilla_tareas.visible_cliente_default`.

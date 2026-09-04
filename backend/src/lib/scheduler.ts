@@ -9,6 +9,8 @@ import { reconcileTenant } from './basecamp/reconcile';
 import { recalcularSenales } from './rituals/service';
 import { notificar, procesarPendientes } from './notificaciones';
 import { temaAgenda } from './rituals/signals';
+import { detectarHuerfanos } from './basecamp/huerfanos';
+import { sincronizarHoras } from './horas';
 
 const TZ = 'America/Guayaquil';
 
@@ -40,6 +42,9 @@ export function startScheduler(): void {
     }
   };
   setInterval(() => void reconciliar(), 30 * 60_000);
+  // Huérfanos cada 30 min (desfasado 10 min de la reconciliación) y horas cada 6 h.
+  setTimeout(() => setInterval(async () => { for (const t of await tenants()) await detectarHuerfanos({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] huerfanos', e.message)); }, 30 * 60_000), 10 * 60_000);
+  setInterval(async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); }, 6 * 3600_000);
 
   setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);
 

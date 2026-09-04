@@ -5,6 +5,7 @@ import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listClientes, getCliente, updateClienteConfig, listProyectos, listBacklog, audit } from '../../lib/db';
 import type { ResumenClientePrometio } from '@backio/shared';
 import { registrarWebhookCliente, diagnosticoWebhookCliente } from '../../lib/basecamp/webhooks';
+import { importarBasecampCliente } from '../../lib/basecamp/importar';
 
 export const clientes = new Hono();
 
@@ -67,6 +68,16 @@ clientes.post('/:id/basecamp/webhook', requireScope('admin'), async (c) => {
 clientes.get('/:id/basecamp/webhook', requireScope('admin'), async (c) => {
   try {
     return c.json(await diagnosticoWebhookCliente(ctxOf(c), c.req.param('id')));
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
+  }
+});
+
+/** Importa las listas de to-dos existentes en el proyecto Basecamp del cliente (excepción D1: solo títulos). */
+clientes.post('/:id/basecamp/importar', requireScope('admin'), async (c) => {
+  try {
+    const dias = Number(c.req.query('dias_completados') ?? 60);
+    return c.json(await importarBasecampCliente(ctxOf(c), c.req.param('id'), { diasCompletados: Number.isFinite(dias) ? dias : 60 }));
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
   }
