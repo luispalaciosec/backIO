@@ -64,7 +64,7 @@ export default function DashboardPage() {
             <div className="text-xs text-gray-500 mb-3">Barra azul: completados. Fondo gris: los que vencían esa semana.</div>
             <Barras datos={d.ultimas_8_semanas.map((s) => ({ etiqueta: fechaCorta(s.semana_inicio), valor: s.completados, secundario: s.vencian }))} />
             <div className="grid grid-cols-8 text-center text-[10px] text-gray-500 mt-1">
-              {d.ultimas_8_semanas.map((s) => <div key={s.semana_inicio}>{s.vencian ? `${Math.round((s.a_tiempo / s.vencian) * 100)}% a tiempo` : '—'}</div>)}
+              {d.ultimas_8_semanas.map((s) => <div key={s.semana_inicio}>{s.vencian ? `${Math.round((s.a_tiempo / s.vencian) * 100)}% a tiempo` : ''}</div>)}
             </div>
           </section>
           <section className="card p-4">

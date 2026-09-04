@@ -1,23 +1,30 @@
-/** Gráficos SVG sin dependencias. */
-export function Barras({ datos, color = '#0073EA', alto = 120, formato = (v: number) => String(v) }: { datos: { etiqueta: string; valor: number; secundario?: number }[]; color?: string; alto?: number; formato?: (v: number) => string }) {
+/** Gráficos SVG sin dependencias. Altura fija; el ancho se adapta a la tarjeta. */
+export function Barras({ datos, color = '#0073EA', formato = (v: number) => String(v) }: { datos: { etiqueta: string; valor: number; secundario?: number }[]; color?: string; formato?: (v: number) => string }) {
+  const W = 480, H = 150, padTop = 16, padBottom = 22;
+  const areaH = H - padTop - padBottom;
   const max = Math.max(1, ...datos.map((d) => Math.max(d.valor, d.secundario ?? 0)));
-  const w = 100 / Math.max(1, datos.length);
+  const w = W / Math.max(1, datos.length);
   return (
-    <svg viewBox={`0 0 100 ${alto + 18}`} className="w-full" preserveAspectRatio="none" role="img">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-44" preserveAspectRatio="xMidYMid meet" role="img">
+      <line x1={0} x2={W} y1={padTop + areaH} y2={padTop + areaH} stroke="#E5E7EB" strokeWidth={1} />
       {datos.map((d, i) => {
-        const h = (d.valor / max) * alto;
-        const h2 = ((d.secundario ?? 0) / max) * alto;
+        const h = (d.valor / max) * areaH;
+        const h2 = ((d.secundario ?? 0) / max) * areaH;
+        const x = i * w;
         return (
           <g key={i}>
-            {d.secundario !== undefined && <rect x={i * w + w * 0.15} y={alto - h2} width={w * 0.7} height={h2} fill="#E5E7EB" />}
-            <rect x={i * w + w * 0.25} y={alto - h} width={w * 0.5} height={h} fill={color} rx={0.6}>
-              <title>{d.etiqueta}: {formato(d.valor)}</title>
-            </rect>
-            <text x={i * w + w / 2} y={alto + 12} fontSize="4.2" textAnchor="middle" fill="#6B7280">{d.etiqueta}</text>
-            {d.valor > 0 && <text x={i * w + w / 2} y={Math.max(6, alto - h - 2)} fontSize="4.2" textAnchor="middle" fill="#374151">{formato(d.valor)}</text>}
+            {d.secundario !== undefined && d.secundario > 0 && <rect x={x + w * 0.2} y={padTop + areaH - h2} width={w * 0.6} height={h2} fill="#E5E7EB" rx={3} />}
+            {d.valor > 0 && (
+              <rect x={x + w * 0.3} y={padTop + areaH - h} width={w * 0.4} height={h} fill={color} rx={3}>
+                <title>{d.etiqueta}: {formato(d.valor)}</title>
+              </rect>
+            )}
+            {d.valor > 0 && <text x={x + w / 2} y={padTop + areaH - h - 4} fontSize="11" fontWeight="600" textAnchor="middle" fill="#374151">{formato(d.valor)}</text>}
+            <text x={x + w / 2} y={H - 6} fontSize="10" textAnchor="middle" fill="#6B7280">{d.etiqueta}</text>
           </g>
         );
       })}
+      {datos.every((d) => d.valor === 0) && <text x={W / 2} y={padTop + areaH / 2} fontSize="12" textAnchor="middle" fill="#9CA3AF">Sin datos en el período</text>}
     </svg>
   );
 }
