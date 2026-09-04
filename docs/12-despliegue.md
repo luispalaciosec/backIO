@@ -1,6 +1,6 @@
 # 12 · Despliegue
 
-Frontend en **Vercel**, backend en **Railway**. Ambos desde el mismo repo
+Frontend en **Vercel** (https://backio.vercel.app), backend en **Railway** (URL pendiente). Ambos desde el mismo repo
 `luispalaciosec/backIO`, rama `main`. Cada push a `main` despliega los dos.
 
 ---
@@ -21,7 +21,7 @@ Frontend en **Vercel**, backend en **Railway**. Ambos desde el mismo repo
 | `SUPABASE_URL` | `https://gckjyjvqvdfayjrtfbmj.supabase.co` |
 | `SUPABASE_ANON_KEY` | anon key del proyecto |
 | `SUPABASE_SERVICE_ROLE_KEY` | service role key (solo aquí, nunca en el frontend) |
-| `FRONTEND_URL` | URL pública del frontend en Vercel (para CORS) |
+| `FRONTEND_URL` | `https://backio.vercel.app` (para CORS) |
 | `ANTHROPIC_API_KEY` | para el resumen ejecutivo del portal |
 | `BASECAMP_CLIENT_ID` / `BASECAMP_CLIENT_SECRET` / `BASECAMP_ACCOUNT_ID` | de la app OAuth de Basecamp |
 | `BASECAMP_REDIRECT_URI` | `https://<backend>/api/basecamp/oauth/callback` (debe coincidir en Basecamp) |
@@ -62,7 +62,7 @@ señales los domingos 18:00 (Guayaquil). No hace falta configurar nada más en R
 ## Supabase Auth
 
 Authentication → URL Configuration:
-- **Site URL**: la URL del frontend en Vercel.
+- **Site URL**: `https://backio.vercel.app`.
 - **Redirect URLs**: la misma más `http://localhost:3000` para desarrollo.
 
 ---
