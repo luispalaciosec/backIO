@@ -44,14 +44,14 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 - Plantillas recurrentes: patrón `{nombre} - {mes} {año}`, fechas desde inicio de mes, botón "Generar mes" y cron el día 25 que deja el borrador para confirmar.
 - **DoD**: el fee de Banco Amazonas de octubre se genera desde plantilla y se confirma en el paso 5 en menos de 5 minutos.
 
-### Sprint 3 · Lo que ya existe y las horas (semana del 21/09)
+### Sprint 3 · Lo que ya existe y las horas — **hecho 04/09/2026**
 - Importación única de todolists vivas por cliente (id, título, fecha, asignados, completado) → proyectos y requerimientos enlazados. *Requiere decisión D1.*
 - Detector de huérfanos cada 30 min: to-dos creados fuera de BackIO → aviso a operaciones con creador. Métrica de adopción semanal.
 - Sync de timesheets: fecha, horas, persona, to-do. Columna "horas" en backlog y dashboard; horas por cliente, mesa y persona.
 - Cruce cotizado (PrometIO) vs horas (Basecamp) por cotización.
 - **DoD**: el dashboard muestra horas reales del mes por cliente; la lista de huérfanos baja semana a semana.
 
-### Sprint 4 · Capa de IA operativa (semana del 28/09)
+### Sprint 4 · Capa de IA operativa — **hecho 04/09/2026** (ver `15-ia.md`)
 - Apertura y cierre de mesa redactados desde el Daily; Grace edita y publica.
 - Status semanal narrado desde el Plan Operativo y las señales; agenda del weekly agrupada por causa con la pregunta de decisión.
 - Brief → plan: pegar correo/transcripción y obtener brief estructurado + plantilla sugerida + alcance.
@@ -74,10 +74,10 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 
 | # | Decisión | Quién | Bloquea |
 |---|---|---|---|
-| D1 | Importar títulos de to-dos existentes como `titulo_interno` (excepción acotada a la regla 1) o migrar por CSV | Luis | Sprint 3 |
+| D1 | Importar títulos de to-dos existentes como `titulo_interno` (excepción acotada a la regla 1) — **aprobado e implementado 04/09** | Luis | Sprint 3 |
 | D2 | Día del cron de generación mensual (propuesto: 25) y quién confirma (ejecutiva de la cuenta) | Marcia | Sprint 2 |
-| D3 | Tono y firma de los mensajes generados por IA en los boards (¿aparecen como Grace o como "BackIO"?) | Marcia / Grace | Sprint 4 |
-| D4 | Formato del informe ejecutivo mensual (¿el actual del Schedule?) | Marcia | Sprint 4 |
+| D3 | Tono y firma de los mensajes IA — por defecto "Redactado por BackIO, publicado por [persona]"; ajustable | Marcia / Grace | Sprint 4 |
+| D4 | Formato del informe mensual — implementado (lectura del mes + decisiones + tablas cliente/persona); ajustar con Marcia | Marcia | Sprint 4 |
 | D5 | Fecha objetivo de baja de Monday | Luis | Sprint 5 |
 
 ## Riesgos
