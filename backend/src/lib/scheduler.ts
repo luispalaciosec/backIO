@@ -7,6 +7,8 @@
 import { serviceClient, throwIf } from './db';
 import { reconcileTenant } from './basecamp/reconcile';
 import { recalcularSenales } from './rituals/service';
+import { notificar, procesarPendientes } from './notificaciones';
+import { temaAgenda } from './rituals/signals';
 
 const TZ = 'America/Guayaquil';
 
@@ -39,6 +41,8 @@ export function startScheduler(): void {
   };
   setInterval(() => void reconciliar(), 30 * 60_000);
 
+  setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);
+
   let ultimaCorrida = '';
   setInterval(async () => {
     const t = ahoraLocal();
@@ -48,6 +52,14 @@ export function startScheduler(): void {
         try {
           const s = await recalcularSenales({ db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' });
           console.log(`[scheduler] señales ${id}: ${s.length}`);
+          const criticas = s.filter((x) => x.severidad === 'critica');
+          const lineas = s.slice(0, 15).map((x) => `• [${x.severidad.toUpperCase()}] ${x.titulo} → ${temaAgenda(x.tipo)}`);
+          await notificar({ tenantId: id }, {
+            tipo: 'agenda_weekly',
+            titulo: `Agenda del weekly: ${s.length} señales (${criticas.length} críticas)`,
+            cuerpo: lineas.length ? lineas.join('\n') : 'Sin señales esta semana.',
+            ruta: '/weekly',
+          }, { roles: ['operaciones', 'admin'] });
         } catch (err) {
           console.error('[scheduler] señales fallaron', id, err instanceof Error ? err.message : err);
         }

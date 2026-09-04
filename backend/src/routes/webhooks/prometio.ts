@@ -7,7 +7,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env';
-import { serviceClient, upsertClienteDesdePrometio, audit, throwIf } from '../../lib/db';
+import { serviceClient, upsertClienteDesdePrometio, audit, throwIf, getCliente } from '../../lib/db';
+import { notificar } from '../../lib/notificaciones';
 
 export const prometioWebhook = new Hono();
 
@@ -77,14 +78,12 @@ prometioWebhook.post('/', async (c) => {
   throwIf(error);
   const borrador = data as { id: string };
   await audit(ctx, { accion: 'cotizacion_ganada', entidad: 'proyecto_borrador', entidad_id: borrador.id, detalle: { cliente_id: cot.cliente_id } });
-  await ctx.db.from('notificaciones').insert({
-    tenant_id: tenantId,
-    usuario_id: null,
+  const cliente = await getCliente(ctx, cot.cliente_id);
+  await notificar(ctx, {
     tipo: 'borrador_proyecto',
-    titulo: 'Cotización ganada: revisar borrador de proyecto',
-    cuerpo: `Cotización ${cot.cotizacion_id} · ${cot.lineas.map((l) => `${l.servicio} ×${l.cantidad}`).join(', ')}`,
-    entidad_tipo: 'proyecto_borrador',
-    entidad_id: borrador.id,
-  });
+    titulo: `Cotización ganada: ${cliente?.nombre ?? 'cliente'}`,
+    cuerpo: `PrometIO reporta una cotización ganada${cot.monto ? ` por USD ${cot.monto}` : ''}.\nLíneas: ${cot.lineas.map((l) => `${l.servicio} ×${l.cantidad}`).join(', ') || 'sin detalle'}.\nHay un borrador de proyecto listo para revisar y confirmar en el Builder.`,
+    ruta: '/proyectos/nuevo', entidad_tipo: 'proyecto_borrador', entidad_id: borrador.id,
+  }, { roles: ['ejecutiva', 'operaciones'] });
   return c.json({ ok: true, borrador_id: borrador.id });
 });

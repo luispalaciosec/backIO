@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { serviceClient, throwIf } from '../lib/db';
 import { reconcileTenant } from '../lib/basecamp/reconcile';
 import { recalcularSenales } from '../lib/rituals/service';
+import { procesarPendientes } from '../lib/notificaciones';
 
 export const cron = new Hono();
 
@@ -30,6 +31,9 @@ cron.post('/basecamp/reconciliar', async (c) => {
   }
   return c.json(out);
 });
+
+/** Cada minuto: reintento de notificaciones pendientes. */
+cron.post('/notificaciones', async (c) => c.json(await procesarPendientes()));
 
 /** Domingo 18:00: señales del weekly. */
 cron.post('/senales', async (c) => {

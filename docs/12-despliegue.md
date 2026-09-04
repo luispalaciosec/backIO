@@ -26,6 +26,8 @@ Frontend en **Vercel** (https://backio.vercel.app), backend en **Railway** (http
 | `BASECAMP_CLIENT_ID` / `BASECAMP_CLIENT_SECRET` / `BASECAMP_ACCOUNT_ID` | de la app OAuth de Basecamp |
 | `BASECAMP_REDIRECT_URI` | `https://backiobackend-production.up.railway.app/api/basecamp/oauth/callback` (debe coincidir en Basecamp) |
 | `BASECAMP_WEBHOOK_SECRET` / `PROMETIO_WEBHOOK_SECRET` | secretos compartidos |
+| `RESEND_API_KEY` | API key de Resend (cuenta geeks, dominio `crm.geeks.com.ec` verificado) |
+| `EMAIL_FROM` | `BackIO <no-reply@crm.geeks.com.ec>` (opcional, es el default) |
 | `ENABLE_INTERNAL_CRON` | `1` (ya viene en el Dockerfile; los crons corren dentro del proceso) |
 | `NODE_ENV` | `production` |
 

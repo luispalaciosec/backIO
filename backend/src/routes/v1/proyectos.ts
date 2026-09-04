@@ -11,6 +11,7 @@ import { generarPortalToken } from '../../lib/portal/token';
 import { sanitizeForClient } from '../../lib/visibility';
 import { createProjectStructure } from '../../lib/basecamp/write';
 import { restarDias } from '../../lib/builder/plan';
+import { notificar } from '../../lib/notificaciones';
 import type { EstadoOperativo } from '@backio/shared';
 
 export const proyectos = new Hono();
@@ -130,6 +131,16 @@ proyectos.post('/', requireScope('write:proyectos'), zValidator('json', crearSch
     accion: 'crear_proyecto', entidad: 'proyecto', entidad_id: proyecto.id,
     detalle: { requerimientos: reqs.length, visibles: plan.visibles, alertas: plan.alertas },
   });
+
+  const owners = [...new Set(plan.tareas.flatMap((t) => t.owner_agencia))].filter((id) => id !== ctx.usuarioId);
+  if (owners.length) {
+    void notificar(ctx, {
+      tipo: 'proyecto_asignado',
+      titulo: `Nuevo proyecto: ${proyecto.nombre} (${cliente.nombre})`,
+      cuerpo: `Se te asignaron tareas en el proyecto "${proyecto.nombre}" de ${cliente.nombre}. Entrega final: ${input.fecha_entrega}.`,
+      ruta: `/proyectos/${proyecto.id}`, entidad_tipo: 'proyecto', entidad_id: proyecto.id,
+    }, { usuarioIds: owners }).catch((e) => console.error('[notificar] proyecto', e));
+  }
 
   // Basecamp: se intenta si el cliente tiene proyecto configurado; si falla, queda sync_estado=incompleto y se reintenta.
   let basecamp: unknown = { omitido: true, motivo: 'cliente sin basecamp_project_id' };
