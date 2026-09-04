@@ -9,7 +9,7 @@ import { listUsuarios } from '../db/usuarios';
 import { listClientes } from '../db/clientes';
 import { alcanceMesa } from '../db/mesas';
 import { fechaLocal, sumarDias } from '../rituals/daily';
-import type { DailyMensaje } from '../mcp/publish';
+import { dailyItemTexto, type DailyItem, type DailyMensaje } from '../mcp/publish';
 import { generarTexto } from './index';
 
 export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura' | 'cierre', notas: string[], responsable: string): Promise<DailyMensaje> {
@@ -20,7 +20,9 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
   const hace24h = new Date(Date.now() - 86_400_000).toISOString();
   const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? 'sin asignar';
   const cliente = (id: string) => clientes.find((x) => x.id === id)?.nombre ?? '';
-  const linea = (r: { titulo_interno: string; cliente_id: string; owner_agencia: string[]; fecha_entrega: string | null }) => `${cliente(r.cliente_id)} · ${r.titulo_interno} · ${nombre(r.owner_agencia[0])}${r.fecha_entrega ? ` · ${r.fecha_entrega}` : ''}`;
+  const linea = (r: { titulo_interno: string; cliente_id: string; owner_agencia: string[]; fecha_entrega: string | null; basecamp_url: string | null; dias_atraso: number }): DailyItem => ({
+    cliente: cliente(r.cliente_id), titulo: r.titulo_interno, owner: nombre(r.owner_agencia[0]), fecha: r.fecha_entrega, url: r.basecamp_url, atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
+  });
   return {
     tipo, responsable, fecha: hoy, notas,
     vencen: activos.filter((r) => r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado').map(linea),
@@ -36,7 +38,7 @@ En un cierre: qué quedó hecho no lo sabes, así que habla de lo que queda abie
 Tono de compañero de mesa, no de jefe. Sin saludos ni despedidas.`;
 
 export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<string> {
-  const payload = { mesa: mesa.nombre, tipo: m.tipo, fecha: m.fecha, notas_del_responsable: m.notas, vencen_hoy_o_manana_sin_iniciar: m.vencen, bloqueos_nuevos_24h: m.bloqueos, fechas_cambiadas_24h: m.cambios };
+  const payload = { mesa: mesa.nombre, tipo: m.tipo, fecha: m.fecha, notas_del_responsable: m.notas, vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto), bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto), fechas_cambiadas_24h: m.cambios.map(dailyItemTexto) };
   const g = await generarTexto(ctx, { tipo: 'daily', entidad: { tipo: 'mesa', id: mesa.id }, payload, system: SYSTEM_DAILY.replace('{TIPO}', m.tipo), maxTokens: 500, cacheMs: 5 * 60_000 });
   return g.texto;
 }

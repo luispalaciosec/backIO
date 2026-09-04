@@ -9,7 +9,7 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
   const [notas, setNotas] = useState('');
   const [narrativa, setNarrativa] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'info'; texto: string; url?: string } | null>(null);
   if (mesas.length === 0) return <span className="text-xs text-gray-400">Configura el board Daily de una mesa en Admin → Mesas para publicar desde aquí.</span>;
   const notasArr = () => notas.split('\n').map((s) => s.trim()).filter(Boolean);
 
@@ -18,18 +18,17 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
     try {
       const r = await api<{ texto: string; resumen: { vencen: number; bloqueos: number; cambios: number } }>('/ia/daily', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr() } });
       setNarrativa(r.texto);
-      setMsg(`Borrador de ${tipo} listo. Edítalo y publícalo; irá firmado "Redactado por BackIO, publicado por ti".`);
-    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Error'); }
+      setMsg({ tipo: 'info', texto: `Borrador de ${tipo} listo: ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios. Edítalo y luego publica.` });
+    } catch (e) { setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo redactar' }); }
     setBusy(null);
   }
   async function publicar(tipo: 'apertura' | 'cierre') {
     setBusy(tipo); setMsg(null);
     try {
       const r = await api<{ url: string; resumen: { vencen: number; bloqueos: number; cambios: number } }>('/semanas/daily/publicar', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined } });
-      setMsg(`Publicado en Basecamp: ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios.`);
-      window.open(r.url, '_blank');
+      setMsg({ tipo: 'ok', texto: `${tipo === 'apertura' ? 'Apertura' : 'Cierre'} publicado en Basecamp: ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios.`, url: r.url });
       setNotas(''); setNarrativa(null);
-    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Error'); }
+    } catch (e) { setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo publicar' }); }
     setBusy(null);
   }
   return (
@@ -39,8 +38,8 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
         <input className="input w-72" placeholder="Notas clave del día (una por línea)" value={notas} onChange={(e) => setNotas(e.target.value)} />
         {ia && <button className="btn-secondary" disabled={!!busy} onClick={() => redactar('apertura')} title="La IA redacta la apertura con los datos del daily; tú la editas y publicas">{busy === 'ia-apertura' ? 'Redactando…' : '✨ Redactar apertura'}</button>}
         {ia && <button className="btn-secondary" disabled={!!busy} onClick={() => redactar('cierre')}>{busy === 'ia-cierre' ? 'Redactando…' : '✨ Redactar cierre'}</button>}
-        <button className="btn-success" disabled={!!busy} onClick={() => publicar('apertura')}>Publicar apertura</button>
-        <button className="btn-danger" disabled={!!busy} onClick={() => publicar('cierre')}>Publicar cierre</button>
+        <button className="btn-success" disabled={!!busy} onClick={() => publicar('apertura')}>{busy === 'apertura' ? '⏳ Publicando apertura…' : '🟢 Publicar apertura'}</button>
+        <button className="btn-danger" disabled={!!busy} onClick={() => publicar('cierre')}>{busy === 'cierre' ? '⏳ Publicando cierre…' : '🔴 Publicar cierre'}</button>
       </div>
       {narrativa !== null && (
         <div className="card p-3 space-y-2">
@@ -48,7 +47,13 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
           <textarea className="input font-sans text-sm" rows={6} value={narrativa} onChange={(e) => setNarrativa(e.target.value)} />
         </div>
       )}
-      {msg && <span className="text-xs text-gray-600">{msg}</span>}
+      {busy && !msg && <div className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 px-3 py-2 text-sm flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />{busy.startsWith('ia') ? 'La IA está redactando con las señales del día…' : 'Armando el mensaje y publicándolo en el board Daily de Basecamp…'}</div>}
+      {msg && (
+        <div className={`rounded-md border px-3 py-2 text-sm flex items-center justify-between gap-3 ${msg.tipo === 'ok' ? 'border-green-200 bg-green-50 text-green-900' : msg.tipo === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-violet-200 bg-violet-50 text-violet-900'}`}>
+          <span>{msg.texto}</span>
+          <span className="flex items-center gap-2 shrink-0">{msg.url && <a className="btn-primary text-xs py-1" href={msg.url} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}<button className="btn-ghost text-xs py-1" onClick={() => setMsg(null)}>×</button></span>
+        </div>
+      )}
     </div>
   );
 }

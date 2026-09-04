@@ -54,14 +54,25 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
   return { acta_id: acta.id, basecamp_doc_id: doc.id, url: doc.app_url };
 }
 
-export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; vencen: string[]; bloqueos: string[]; cambios: string[]; narrativa?: string }
+/** Línea del daily: título enlazado al to-do de Basecamp cuando existe. */
+export interface DailyItem { cliente: string; titulo: string; owner: string; fecha: string | null; url: string | null; atraso_dias?: number }
+export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string }
+
+export function dailyItemTexto(i: DailyItem): string {
+  return `${i.cliente} · ${i.titulo} · ${i.owner}${i.fecha ? ` · ${i.fecha}` : ''}${i.atraso_dias ? ` (${i.atraso_dias} días de atraso)` : ''}`;
+}
 
 export function tituloDaily(m: DailyMensaje, mesa: Mesa): string {
   return `${m.tipo === 'apertura' ? '🟢APERTURA' : '🔴CIERRE'} DE MESA - ${fmtCorta(m.fecha)} - ${mesa.nombre.toUpperCase()}`;
 }
 
 export function cuerpoDaily(m: DailyMensaje): string {
-  const li = (xs: string[]) => (xs.length ? `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>');
+  const item = (i: DailyItem) => {
+    const titulo = i.url ? `<a href="${esc(i.url)}">${esc(i.titulo)}</a>` : esc(i.titulo);
+    const atraso = i.atraso_dias ? ` <span style="color:#c0392b">(${i.atraso_dias} d de atraso)</span>` : '';
+    return `<li><strong>${esc(i.cliente)}</strong> · ${titulo} · ${esc(i.owner)}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}${atraso}</li>`;
+  };
+  const li = (xs: DailyItem[]) => (xs.length ? `<ul>${xs.map(item).join('')}</ul>` : '<p><em>Nada.</em></p>');
   return [
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
     ...(m.narrativa ? m.narrativa.split(/\n+/).map((p) => `<p>${esc(p)}</p>`) : []),

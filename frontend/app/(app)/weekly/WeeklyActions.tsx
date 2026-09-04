@@ -14,11 +14,13 @@ export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { 
   const [agenda, setAgenda] = useState<WeeklyIA | null>(null);
   const [mesa, setMesa] = useState<string>(mesas[0]?.id ?? '');
   const [pub, setPub] = useState<{ url: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const q = `?${mesa ? `mesa=${mesa}&` : ''}${ia && conIA ? 'ia=1' : ''}`;
 
   async function run(nombre: string, fn: () => Promise<void>) {
     setBusy(nombre);
-    try { await fn(); router.refresh(); } catch (e) { alert(e instanceof Error ? e.message : 'Error'); }
+    setErr(null);
+    try { await fn(); router.refresh(); } catch (e) { setErr(e instanceof Error ? e.message : 'Error'); }
     setBusy(null);
   }
   return (
@@ -29,9 +31,11 @@ export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { 
       </select>
       <button className="btn-secondary" disabled={!!busy} onClick={() => run('senales', async () => { await api(`/semanas/${semanaId}/senales/recalcular`, { method: 'POST' }); })}>↻ Recalcular señales</button>
       {ia && <button className="btn-secondary" disabled={!!busy} title="Status narrado + agenda agrupada por causa con una pregunta de decisión por grupo" onClick={() => run('agenda', async () => setAgenda(await api<WeeklyIA>('/ia/weekly', { method: 'POST', json: { semana_id: semanaId, mesa_id: mesa || null } })))}>{busy === 'agenda' ? 'Redactando…' : '✨ Agenda IA'}</button>}
+      {busy && <span className="text-xs text-blue-800 flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />{busy === 'agenda' || (conIA && ia && (busy === 'plan' || busy === 'acta')) ? 'La IA está redactando…' : 'Trabajando…'}</span>}
+      {err && <span className="text-xs text-red-700 w-full">{err}</span>}
       {ia && <label className="text-xs text-gray-600 flex items-center gap-1"><input type="checkbox" checked={conIA} onChange={(e) => setConIA(e.target.checked)} /> incluir resumen IA en los documentos</label>}
-      <button className="btn-primary" disabled={!!busy} onClick={() => run('plan', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/plan${q}`, { method: 'POST' })); })}>📋 Generar Plan Operativo</button>
-      <button className="btn-success" disabled={!!busy} onClick={() => run('acta', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/acta${q}`, { method: 'POST' })); })}>✅ Generar Acta de Cierre</button>
+      <button className="btn-primary" disabled={!!busy} onClick={() => run('plan', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/plan${q}`, { method: 'POST' })); })}>{busy === 'plan' ? '⏳ Generando plan…' : '📋 Generar Plan Operativo'}</button>
+      <button className="btn-success" disabled={!!busy} onClick={() => run('acta', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/acta${q}`, { method: 'POST' })); })}>{busy === 'acta' ? '⏳ Generando acta…' : '✅ Generar Acta de Cierre'}</button>
       {agenda && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setAgenda(null)}>
           <div className="card max-w-3xl w-full max-h-[85vh] overflow-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
@@ -59,7 +63,7 @@ export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { 
               <div className="font-semibold">{acta.tipo === 'plan_operativo' ? 'Plan Operativo' : 'Acta de Cierre'} · listo para Basecamp</div>
               <div className="flex gap-2">
                 <button className="btn-ghost" onClick={() => navigator.clipboard.writeText(acta.markdown)}>Copiar</button>
-                {acta.mesa_id && !pub && <button className="btn-primary" disabled={!!busy} onClick={() => run('pub', async () => setPub(await api<{ url: string }>(`/semanas/actas/${acta.id}/publicar`, { method: 'POST' })))}>Publicar en Basecamp</button>}
+                {acta.mesa_id && !pub && <button className="btn-primary" disabled={!!busy} onClick={() => run('pub', async () => setPub(await api<{ url: string }>(`/semanas/actas/${acta.id}/publicar`, { method: 'POST' })))}>{busy === 'pub' ? '⏳ Publicando…' : 'Publicar en Basecamp'}</button>}
                 {pub && <a className="btn-secondary" href={pub.url} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}
               </div>
             </div>
