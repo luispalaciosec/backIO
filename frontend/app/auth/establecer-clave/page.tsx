@@ -12,12 +12,31 @@ export default function EstablecerClavePage() {
 
   useEffect(() => {
     const sb = supabaseBrowser();
-    // El enlace de invitación deja la sesión en el hash (#access_token) o como ?code= (PKCE).
-    const code = new URLSearchParams(window.location.search).get('code');
+    // Tres formas de llegar: ?token_hash= (nuestro correo, se canjea con verifyOtp), ?code= (PKCE)
+    // o #access_token= (enlaces antiguos de Supabase con flujo implícito).
+    const qs = new URLSearchParams(window.location.search);
+    const tokenHash = qs.get('token_hash');
+    const tipo = (qs.get('type') ?? 'invite') as 'invite' | 'recovery' | 'magiclink' | 'email';
+    const code = qs.get('code');
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const listo = async () => {
-      if (code) { const { error } = await sb.auth.exchangeCodeForSession(code); if (error) return setEstado('invalido'); }
-      const { data } = await sb.auth.getSession();
-      setEstado(data.session ? 'listo' : 'invalido');
+      try {
+        if (tokenHash) {
+          const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: tipo });
+          if (error) { setError(error.message); return setEstado('invalido'); }
+        } else if (code) {
+          const { error } = await sb.auth.exchangeCodeForSession(code);
+          if (error) { setError(error.message); return setEstado('invalido'); }
+        } else if (hash.get('access_token') && hash.get('refresh_token')) {
+          const { error } = await sb.auth.setSession({ access_token: hash.get('access_token')!, refresh_token: hash.get('refresh_token')! });
+          if (error) { setError(error.message); return setEstado('invalido'); }
+        } else if (hash.get('error_description')) {
+          setError(hash.get('error_description'));
+          return setEstado('invalido');
+        }
+        const { data } = await sb.auth.getSession();
+        setEstado(data.session ? 'listo' : 'invalido');
+      } catch (e) { setError(e instanceof Error ? e.message : String(e)); setEstado('invalido'); }
     };
     const t = setTimeout(listo, 300);
     return () => clearTimeout(t);
@@ -42,7 +61,12 @@ export default function EstablecerClavePage() {
           <div><div className="font-bold text-lg">BackIO</div><div className="text-xs text-gray-500">Geeks Ecuador</div></div>
         </div>
         {estado === 'cargando' && <p className="text-sm text-gray-500">Verificando enlace…</p>}
-        {estado === 'invalido' && <p className="text-sm text-red-600">El enlace no es válido o venció. Pide a un administrador que reenvíe la invitación desde Admin → Usuarios.</p>}
+        {estado === 'invalido' && (
+          <div className="space-y-2">
+            <p className="text-sm text-red-600">El enlace no es válido o venció. Pide a un administrador que reenvíe la invitación desde Admin → Usuarios.</p>
+            {error && <p className="text-xs text-gray-500">Detalle: {error}</p>}
+          </div>
+        )}
         {estado === 'ok' && <p className="text-sm text-green-700">Contraseña guardada. Entrando…</p>}
         {estado === 'listo' && (
           <form onSubmit={guardar} className="space-y-3">

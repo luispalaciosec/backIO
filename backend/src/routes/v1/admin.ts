@@ -68,18 +68,21 @@ admin.post('/invitaciones', zValidator('json', z.object({
  */
 async function enviarInvitacion(email: string, nombre: string): Promise<{ enviado: boolean; error?: string; url?: string }> {
   const sb = serviceClient();
-  const redirectTo = `${frontendOrigins()[0] ?? 'http://localhost:3000'}/auth/establecer-clave`;
-  const { data, error } = await sb.auth.admin.generateLink({ type: 'invite', email, options: { redirectTo, data: { name: nombre } } });
+  const base = `${frontendOrigins()[0] ?? 'http://localhost:3000'}/auth/establecer-clave`;
+  // No usamos action_link (pasa por /auth/v1/verify y vuelve con tokens en el hash, que el cliente PKCE
+  // del frontend rechaza como "enlace inválido"). Mandamos el token_hash y la página lo canjea con verifyOtp.
+  const enlace = (hashedToken: string, tipo: 'invite' | 'recovery') => `${base}?token_hash=${encodeURIComponent(hashedToken)}&type=${tipo}`;
+  const { data, error } = await sb.auth.admin.generateLink({ type: 'invite', email, options: { redirectTo: base, data: { name: nombre } } });
   if (error) {
     // Usuario ya existente: enviar enlace de recuperación para que fije su clave.
     if (/already|exists|registered/i.test(error.message)) {
-      const r = await sb.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo } });
+      const r = await sb.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: base } });
       if (r.error) return { enviado: false, error: r.error.message };
-      return mandar(email, nombre, r.data.properties.action_link, true);
+      return mandar(email, nombre, enlace(r.data.properties.hashed_token, 'recovery'), true);
     }
     return { enviado: false, error: error.message };
   }
-  return mandar(email, nombre, data.properties.action_link, false);
+  return mandar(email, nombre, enlace(data.properties.hashed_token, 'invite'), false);
 }
 
 async function mandar(email: string, nombre: string, link: string, existente: boolean): Promise<{ enviado: boolean; error?: string; url?: string }> {
