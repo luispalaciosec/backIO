@@ -137,6 +137,27 @@ Campos que BackIO agrega y PrometIO no conoce:
 
 ---
 
+## Formato real del emisor (PrometIO `app/core/webhook_saliente.py`)
+
+PrometIO ya tenía un mecanismo de webhooks salientes por organización (`organizacion_webhook`).
+BackIO se registra como destino y consume su envelope tal cual:
+
+```
+POST https://backiobackend-production.up.railway.app/api/v1/webhooks/prometio
+X-Prometio-Signature: sha256=<hmac_sha256_hex(secreto, body)>
+X-Prometio-Timestamp: <unix>
+
+{ "evento": "cotizacion.aprobada", "timestamp": "...", "data": { ... } }
+```
+
+| Evento | `data` | Efecto en BackIO |
+|---|---|---|
+| `cotizacion.aprobada` | `cotizacion_id, numero, oportunidad_id, empresa{id,nombre,activo}, valor, valido_hasta, lineas[{servicio,cantidad}]` | Borrador de proyecto + correo a ejecutivas/operaciones |
+| `empresa.creada` / `empresa.actualizada` | `id, nombre, activo, ruc, logo_url` | Upsert de cliente con el mismo id |
+
+El `secreto` lo genera PrometIO al crear la fila de `organizacion_webhook`; el mismo valor va en
+`PROMETIO_WEBHOOK_SECRET` de BackIO. Una fila por evento, las tres con el mismo secreto.
+
 ## Autenticación entre sistemas
 
 | Dirección | Método |

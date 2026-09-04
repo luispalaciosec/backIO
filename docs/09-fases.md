@@ -54,10 +54,10 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [ ] Vista `/daily` en una pantalla sin scroll
 
 ### Fase 2.7
-- [x] MCP server desplegado en `/mcp` (Streamable HTTP, API key). OAuth del MCP pendiente
+- [x] MCP server desplegado en `/mcp` (Streamable HTTP). Auth por API key u OAuth 2.1 (PKCE, registro dinámico, consentimiento en el frontend)
 - [x] Tools de escritura con patrón preview + confirm, `plan_id` expira en 15 min, un solo uso
 - [x] Scopes verificados en código: key de lectura no puede escribir (tools devuelven error de scope)
-- [ ] Spec OpenAPI autogenerada para Gemini
+- [x] Spec OpenAPI 3.1 en `/api/openapi.json` generada desde los esquemas zod
 - [x] `audit_log` registrando todas las escrituras + alerta >20 escrituras/5 min por key
 
 ### Fase 3

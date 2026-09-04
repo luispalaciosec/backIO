@@ -11,11 +11,15 @@ import { prometioWebhook } from './routes/webhooks/prometio';
 import { cron } from './routes/cron';
 import { basecampOAuth } from './routes/basecamp';
 import { mcp } from './routes/mcp';
+import { oauth, wellKnown } from './routes/oauth';
+import { openapi } from './routes/openapi';
 
 export function createApp(): Hono {
   const app = new Hono();
   app.use('*', secureHeaders());
   if (env().NODE_ENV !== 'test') app.use('*', logger());
+  app.use('/.well-known/*', cors({ origin: '*' }));
+  app.use('/oauth/*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'OPTIONS'] }));
   app.use('/mcp', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version'], allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], exposeHeaders: ['Mcp-Session-Id'] }));
   app.use('/api/*', cors({ origin: frontendOrigins(), allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
 
@@ -29,6 +33,9 @@ export function createApp(): Hono {
   app.route('/api/cron', cron);
   app.route('/api/basecamp', basecampOAuth);
   app.route('/mcp', mcp);
+  app.route('/.well-known', wellKnown);
+  app.route('/oauth', oauth);
+  app.route('/api/openapi.json', openapi);
 
   app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
   app.onError((err, c) => {

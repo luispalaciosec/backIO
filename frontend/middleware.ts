@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-const PUBLICAS = [/^\/login/, /^\/p\//, /^\/robots\.txt/, /^\/_next\//, /^\/favicon/];
+const PUBLICAS = [/^\/login/, /^\/oauth\//, /^\/p\//, /^\/robots\.txt/, /^\/_next\//, /^\/favicon/];
 
 export async function middleware(req: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

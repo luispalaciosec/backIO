@@ -35,8 +35,13 @@ type Text = { content: { type: 'text'; text: string }[]; isError?: boolean };
 const ok = (data: unknown): Text => ({ content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] });
 const fail = (msg: string): Text => ({ content: [{ type: 'text', text: JSON.stringify({ error: msg }) }], isError: true });
 
+const ROLES_GESTION = new Set(['admin', 'gerencia', 'operaciones', 'ejecutiva', 'lider']);
 function tiene(auth: AuthInfo, ...scopes: Scope[]): boolean {
-  if (auth.tipo === 'usuario') return true;
+  if (auth.tipo === 'usuario') {
+    if (auth.perfil === 'oauth' && !scopes.every((s) => auth.scopes.includes(s))) return false;
+    const escribe = scopes.some((s) => s.startsWith('write:'));
+    return !escribe || (auth.rol !== null && ROLES_GESTION.has(auth.rol));
+  }
   return auth.scopes.includes('admin') || scopes.every((s) => auth.scopes.includes(s));
 }
 const esScopeCliente = (auth: AuthInfo) => auth.tipo === 'api_key' && auth.perfil === 'cliente';

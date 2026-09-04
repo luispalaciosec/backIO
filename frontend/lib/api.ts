@@ -33,6 +33,19 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   return data;
 }
 
+/** Llamada autenticada a una ruta del backend fuera de /api/v1 (p. ej. /oauth/approve). */
+export async function apiRaw<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+  const t = await token();
+  const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
+  if (t) headers.Authorization = `Bearer ${t}`;
+  let body = init.body;
+  if (init.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(init.json); }
+  const res = await fetch(`${BACKEND}${path}`, { ...init, headers, body, cache: 'no-store' });
+  const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
+  if (!res.ok) throw new ApiError(res.status, data.error ?? `Error ${res.status}`);
+  return data;
+}
+
 /** Fetch público del portal (sin auth). */
 export async function apiPortal<T>(path: string, init: RequestInit = {}, pin?: string): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };

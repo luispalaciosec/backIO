@@ -27,11 +27,19 @@ Ninguna tool devuelve texto de Basecamp: ese texto nunca entra a la base.
 claude mcp add --transport http backio https://backiobackend-production.up.railway.app/mcp --header "Authorization: Bearer bk_live_XXXX"
 ```
 
-## Claude Desktop / claude.ai (conector remoto)
+## Claude Desktop / claude.ai (conector remoto, OAuth)
 
 Settings → Connectors → Add custom connector → URL `https://backiobackend-production.up.railway.app/mcp`.
-Si el conector exige OAuth y no permite cabeceras, usar por ahora Claude Code o un cliente que
-soporte `Authorization`. El OAuth del MCP queda como pendiente de Fase 2.7.
+El cliente descubre `/.well-known/oauth-protected-resource`, se registra solo (RFC 7591), y al
+autorizar te lleva a `backio.vercel.app/oauth/consent` con tu sesión de BackIO. El token resultante
+actúa con tu usuario y tu rol; los scopes se muestran en la pantalla de consentimiento. Tokens de
+acceso de 1 hora con refresh de 30 días, guardados hasheados. PKCE S256 obligatorio.
+
+## OpenAPI (Gemini y clientes REST)
+
+`https://backiobackend-production.up.railway.app/api/openapi.json` — OpenAPI 3.1 generada desde los
+mismos esquemas zod de las rutas. En Gemini: crear una herramienta con esa spec y auth Bearer con
+una API key de BackIO.
 
 ## Publicar actas en Basecamp
 
