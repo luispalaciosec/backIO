@@ -1,29 +1,49 @@
-/** Publica un acta como Documento de Basecamp en el proyecto de operaciones (tenants.config.basecamp_docs_project_id). */
-import type { Acta } from '@backio/shared';
+/**
+ * Publicación en Basecamp. Las mesas trabajan con Message Boards ("Daily (apertura/cierre)" y
+ * "Weekly (Status Semanal)"): Plan Operativo y Acta de Cierre van como MENSAJE en el board Weekly de la
+ * mesa, con el título que el equipo ya usa. Apertura y cierre van al board Daily.
+ * Sin mesa (documento de toda la agencia) se usa tenants.config.basecamp_docs_project_id como Doc.
+ */
+import type { Acta, Mesa } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { throwIf } from '../db/client';
 import { BasecampClient } from '../basecamp/client';
 import { getMesa } from '../db/mesas';
+import { getSemana } from '../db/semanas';
+
+const fmtFecha = (iso: string) => iso.slice(0, 10);
+const fmtCorta = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split('-'); return `${Number(d)}/${m}/${y}`; };
+
+export function tituloWeekly(acta: Acta, semana: { numero_iso: number; fecha_inicio: string; fecha_fin: string }): string {
+  return acta.tipo === 'plan_operativo'
+    ? `${fmtFecha(semana.fecha_inicio)} || Status Semanal Operativo - Semana ${semana.numero_iso}`
+    : `${fmtFecha(semana.fecha_fin)} || Acta de Cierre - Semana ${semana.numero_iso}`;
+}
 
 export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
-  let projectId: number | null = null;
+  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const html = markdownBasico(acta.markdown);
+  let doc: { id: number; app_url: string };
+
   if (acta.mesa_id) {
     const mesa = await getMesa(ctx, acta.mesa_id);
-    projectId = mesa?.basecamp_project_id ?? null;
-    if (!projectId) throw new Error(`La mesa ${mesa?.nombre ?? acta.mesa_id} no tiene proyecto Basecamp configurado`);
+    if (!mesa?.basecamp_project_id) throw new Error(`La mesa ${mesa?.nombre ?? acta.mesa_id} no tiene proyecto Basecamp configurado`);
+    if (!mesa.basecamp_board_weekly_id) throw new Error(`La mesa ${mesa.nombre} no tiene board Weekly configurado (Admin → Mesas → Detectar boards)`);
+    const semana = await getSemana(ctx, acta.semana_id);
+    if (!semana) throw new Error('Semana no encontrada');
+    doc = await bc.createMessage(mesa.basecamp_project_id, mesa.basecamp_board_weekly_id, { subject: tituloWeekly(acta, semana), content: html });
   } else {
     const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
     throwIf(error);
-    projectId = (data as { config: { basecamp_docs_project_id?: number } }).config.basecamp_docs_project_id ?? null;
+    const projectId = (data as { config: { basecamp_docs_project_id?: number } }).config.basecamp_docs_project_id ?? null;
     if (!projectId) throw new Error('El acta no es de una mesa y falta tenants.config.basecamp_docs_project_id');
+    const dock = await bc.getDock(projectId);
+    const vault = dock.find((d) => d.name === 'vault');
+    if (!vault) throw new Error('El proyecto de actas no tiene Docs & Files habilitado');
+    const titulo = `${acta.tipo === 'plan_operativo' ? 'Plan Operativo' : 'Acta de Cierre'} · ${acta.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? acta.id}`;
+    doc = await bc.createDocument(projectId, vault.id, { title: titulo, content: html });
   }
-  const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const proyecto = await bc.request<{ dock: { name: string; id: number }[] }>('GET', `/projects/${projectId}.json`);
-  const vault = proyecto.dock.find((d) => d.name === 'vault');
-  if (!vault) throw new Error('El proyecto de actas no tiene Docs & Files habilitado');
-  const titulo = `${acta.tipo === 'plan_operativo' ? 'Plan Operativo' : 'Acta de Cierre'} · ${acta.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? acta.id}`;
-  const html = markdownBasico(acta.markdown);
-  const doc = await bc.createDocument(projectId, vault.id, { title: titulo, content: html });
+
   const { error: e2 } = await ctx.db.from('actas').update({ publicado_at: new Date().toISOString(), publicado_por: ctx.usuarioId, basecamp_doc_id: doc.id }).eq('id', acta.id);
   throwIf(e2);
   const col = acta.tipo === 'plan_operativo' ? 'plan_publicado_at' : 'acta_publicada_at';
@@ -31,9 +51,46 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
   return { acta_id: acta.id, basecamp_doc_id: doc.id, url: doc.app_url };
 }
 
+export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; vencen: string[]; bloqueos: string[]; cambios: string[] }
+
+export function tituloDaily(m: DailyMensaje, mesa: Mesa): string {
+  return `${m.tipo === 'apertura' ? '🟢APERTURA' : '🔴CIERRE'} DE MESA - ${fmtCorta(m.fecha)} - ${mesa.nombre.toUpperCase()}`;
+}
+
+export function cuerpoDaily(m: DailyMensaje): string {
+  const li = (xs: string[]) => (xs.length ? `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>');
+  return [
+    `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
+    `<p>📌 <strong>Notas clave del día</strong></p>`, li(m.notas),
+    `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
+    `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
+    `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
+    `<p style="color:#888;font-size:12px">Generado por BackIO</p>`,
+  ].join('\n');
+}
+
+export async function publicarDailyEnBasecamp(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<{ id: number; url: string }> {
+  if (!mesa.basecamp_project_id || !mesa.basecamp_board_daily_id) throw new Error(`La mesa ${mesa.nombre} no tiene board Daily configurado`);
+  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const r = await bc.createMessage(mesa.basecamp_project_id, mesa.basecamp_board_daily_id, { subject: tituloDaily(m, mesa), content: cuerpoDaily(m) });
+  return { id: r.id, url: r.app_url };
+}
+
+/** Descubre en el dock del proyecto de la mesa los boards Daily y Weekly por título. */
+export async function detectarBoardsMesa(ctx: DbCtx, mesa: Mesa): Promise<{ daily: number | null; weekly: number | null; boards: { id: number; title: string }[] }> {
+  if (!mesa.basecamp_project_id) throw new Error('Mesa sin proyecto Basecamp');
+  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const dock = await bc.getDock(mesa.basecamp_project_id);
+  const boards = dock.filter((d) => d.name === 'message_board' && d.enabled).map((d) => ({ id: d.id, title: d.title }));
+  const daily = boards.find((b) => /daily|apertura/i.test(b.title))?.id ?? null;
+  const weekly = boards.find((b) => /weekly|semanal|status/i.test(b.title))?.id ?? null;
+  return { daily, weekly, boards };
+}
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 /** Conversión mínima markdown → HTML (títulos, listas, tablas, negritas). Basecamp acepta HTML simple. */
 export function markdownBasico(md: string): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const inline = (s: string) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/_(.+?)_/g, '<em>$1</em>');
   const out: string[] = [];
   const lineas = md.split('\n');

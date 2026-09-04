@@ -25,7 +25,7 @@ export async function upsertMesa(ctx: DbCtx, m: Partial<Mesa> & { nombre: string
   return data as Mesa;
 }
 
-export async function updateMesa(ctx: DbCtx, id: string, patch: Partial<Pick<Mesa, 'nombre' | 'basecamp_project_id' | 'lider_id' | 'color' | 'activa'>>): Promise<Mesa> {
+export async function updateMesa(ctx: DbCtx, id: string, patch: Partial<Pick<Mesa, 'nombre' | 'basecamp_project_id' | 'basecamp_board_daily_id' | 'basecamp_board_weekly_id' | 'lider_id' | 'color' | 'activa'>>): Promise<Mesa> {
   const { data, error } = await ctx.db.from('mesas').update(patch).eq('tenant_id', ctx.tenantId).eq('id', id).select().single();
   throwIf(error);
   if (!data) throw new DbError('Mesa no encontrada', 404);

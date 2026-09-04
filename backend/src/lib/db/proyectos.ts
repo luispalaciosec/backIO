@@ -116,7 +116,7 @@ export async function insertProyecto(ctx: DbCtx, p: InsertProyecto): Promise<Pro
 export async function updateProyecto(
   ctx: DbCtx,
   id: string,
-  patch: Partial<Pick<Proyecto, 'nombre' | 'estado' | 'fecha_entrega' | 'owner_ejecutiva' | 'portal_activo' | 'portal_token' | 'sync_estado' | 'basecamp_todolist_id' | 'brief' | 'deleted_at' | 'mesa_id'>>,
+  patch: Partial<Pick<Proyecto, 'nombre' | 'estado' | 'fecha_entrega' | 'owner_ejecutiva' | 'portal_activo' | 'portal_token' | 'sync_estado' | 'basecamp_todolist_id' | 'brief' | 'deleted_at' | 'mesa_id' | 'basecamp_grupos' | 'basecamp_todoset_id'>>,
 ): Promise<Proyecto> {
   const { data, error } = await ctx.db
     .from('proyectos')

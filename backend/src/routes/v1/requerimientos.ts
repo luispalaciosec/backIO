@@ -7,7 +7,8 @@ import {
   audit, listClientes, listUsuarios, getClienteBySlug, insertProyecto, listProyectos, getUsuarioByEmail, DbError,
 } from '../../lib/db';
 import { parseCSV, validarFilas, esVisible } from '../../lib/builder/import';
-import { pushDueDate } from '../../lib/basecamp/write';
+import { pushDueDate, pushRequerimiento } from '../../lib/basecamp/write';
+import { getProyecto } from '../../lib/db';
 import { generarPortalToken } from '../../lib/portal/token';
 import type { EstadoOperativo, Prioridad } from '@backio/shared';
 
@@ -59,7 +60,16 @@ requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json'
   const [r] = await insertRequerimientos(ctx, [c.req.valid('json')]);
   if (!r) throw new DbError('No se pudo crear', 500);
   await audit(ctx, { accion: 'crear', entidad: 'requerimiento', entidad_id: r.id });
-  return c.json(r, 201);
+  // Si pertenece a un proyecto ya sincronizado y tiene fecha, baja a Basecamp (regla: cliente → BackIO → Basecamp).
+  let basecamp: unknown = null;
+  if (r.proyecto_id && r.fecha_entrega) {
+    const p = await getProyecto(ctx, r.proyecto_id);
+    if (p?.basecamp_todolist_id) {
+      try { basecamp = await pushRequerimiento(ctx, p, r); }
+      catch (err) { basecamp = { error: err instanceof Error ? err.message : String(err) }; }
+    }
+  }
+  return c.json({ ...r, basecamp }, 201);
 });
 
 const patchSchema = z.object({

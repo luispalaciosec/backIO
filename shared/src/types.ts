@@ -52,6 +52,8 @@ export interface Mesa {
   nombre: string;
   slug: string;
   basecamp_project_id: number | null;
+  basecamp_board_daily_id: number | null;
+  basecamp_board_weekly_id: number | null;
   lider_id: string | null;
   color: string | null;
   activa: boolean;
@@ -92,6 +94,8 @@ export interface Plantilla {
   descripcion: string | null;
   tipo: TipoPlantilla;
   activa: boolean;
+  recurrente: boolean;
+  patron_nombre: string | null;
 }
 
 export interface PlantillaBloque {
@@ -137,6 +141,7 @@ export interface Proyecto {
   basecamp_todolist_id: number | null;
   sync_estado: SyncEstado;
   mesa_id: string | null;
+  basecamp_grupos: Record<string, number>;
   portal_token: string | null;
   portal_activo: boolean;
   created_at: string;

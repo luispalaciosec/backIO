@@ -39,7 +39,7 @@ export default function AdminMesasPage() {
     <div className="max-w-5xl space-y-6">
       <header>
         <h1 className="text-2xl font-bold">Mesas</h1>
-        <p className="text-sm text-gray-500">Equipos de cuenta. Cada mesa maneja clientes y tiene su proyecto Basecamp donde se publican el Plan Operativo y el Acta de Cierre.</p>
+        <p className="text-sm text-gray-500">Equipos de cuenta. Cada mesa maneja clientes y tiene su proyecto Basecamp con dos boards: Daily (apertura/cierre) y Weekly (status semanal). Ahí publica BackIO.</p>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
 
@@ -60,6 +60,13 @@ export default function AdminMesasPage() {
                       <option value="">—</option>{usuarios.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                     </select></div>
                   <div><label className="label">Color</label><input type="color" className="input h-9 p-1" defaultValue={m.color ?? '#0073EA'} onBlur={(e) => e.target.value !== m.color && patchMesa(m.id, { color: e.target.value })} /></div>
+                  <div><label className="label">Board Daily (id)</label><input className="input" inputMode="numeric" defaultValue={m.basecamp_board_daily_id ?? ''} onBlur={(e) => { const v = e.target.value.trim(); const n = v ? Number(v) : null; if (n !== m.basecamp_board_daily_id) void patchMesa(m.id, { basecamp_board_daily_id: n }); }} /></div>
+                  <div><label className="label">Board Weekly (id)</label><input className="input" inputMode="numeric" defaultValue={m.basecamp_board_weekly_id ?? ''} onBlur={(e) => { const v = e.target.value.trim(); const n = v ? Number(v) : null; if (n !== m.basecamp_board_weekly_id) void patchMesa(m.id, { basecamp_board_weekly_id: n }); }} /></div>
+                  <div className="flex items-end"><button type="button" className="btn-secondary w-full" disabled={!m.basecamp_project_id} title="Lee el proyecto Basecamp de la mesa y detecta los boards Daily y Weekly" onClick={async () => {
+                    setError(null);
+                    try { const r = await api<{ daily: number | null; weekly: number | null; boards: { id: number; title: string }[] }>(`/mesas/${m.id}/basecamp/detectar-boards`, { method: 'POST' }); alert(`Boards: ${r.boards.map((b) => `${b.title} (${b.id})`).join(', ') || 'ninguno'}\nDaily → ${r.daily ?? 'no detectado'} · Weekly → ${r.weekly ?? 'no detectado'}`); await cargar(); }
+                    catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+                  }}>Detectar boards</button></div>
                 </div>
                 <div>
                   <div className="label">Clientes ({suyos.length})</div>

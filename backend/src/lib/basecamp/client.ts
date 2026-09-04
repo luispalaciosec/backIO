@@ -93,12 +93,43 @@ export class BasecampClient {
     return todoset.id;
   }
 
+  /** Dock del proyecto: herramientas con id y título (todoset, message_board ×N, vault, schedule…). Solo metadatos. */
+  async getDock(projectId: number): Promise<{ name: string; title: string; id: number; enabled: boolean }[]> {
+    const p = await this.request<{ dock: { name: string; title: string; id: number; enabled: boolean }[] }>('GET', `/projects/${projectId}.json`);
+    return p.dock.map((d) => ({ name: d.name, title: d.title, id: d.id, enabled: d.enabled }));
+  }
+
+  /** Listas de to-dos del proyecto: solo id y nombre (para reutilizar por nombre). */
+  async listTodolists(projectId: number, todosetId: number): Promise<{ id: number; name: string }[]> {
+    const out: { id: number; name: string }[] = [];
+    for (const status of ['active']) {
+      const r = await this.request<{ id: number; name: string }[]>('GET', `/buckets/${projectId}/todosets/${todosetId}/todolists.json?status=${status}`);
+      out.push(...r.map((l) => ({ id: l.id, name: l.name })));
+    }
+    return out;
+  }
+
+  async listGroups(projectId: number, todolistId: number): Promise<{ id: number; name: string }[]> {
+    const r = await this.request<{ id: number; name: string }[]>('GET', `/buckets/${projectId}/todolists/${todolistId}/groups.json`);
+    return r.map((g) => ({ id: g.id, name: g.name }));
+  }
+
+  async createGroup(projectId: number, todolistId: number, name: string): Promise<{ id: number; name: string }> {
+    const r = await this.request<{ id: number; name: string }>('POST', `/buckets/${projectId}/todolists/${todolistId}/groups.json`, { name });
+    return { id: r.id, name: r.name };
+  }
+
+  async createMessage(projectId: number, boardId: number, input: { subject: string; content: string }): Promise<{ id: number; app_url: string }> {
+    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/message_boards/${boardId}/messages.json`, { ...input, status: 'active' });
+    return { id: r.id, app_url: r.app_url };
+  }
+
   async createTodolist(projectId: number, todosetId: number, input: { name: string; description?: string }): Promise<BcTodolistRef> {
     const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/todosets/${todosetId}/todolists.json`, input);
     return { id: r.id, app_url: r.app_url };
   }
 
-  async createTodo(projectId: number, todolistId: number, input: { content: string; due_on?: string | null; assignee_ids?: number[] }): Promise<BcTodoRef> {
+  async createTodo(projectId: number, todolistId: number, input: { content: string; due_on?: string | null; assignee_ids?: number[]; completion_subscriber_ids?: number[] }): Promise<BcTodoRef> {
     const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/todolists/${todolistId}/todos.json`, input);
     return { id: r.id, app_url: r.app_url };
   }

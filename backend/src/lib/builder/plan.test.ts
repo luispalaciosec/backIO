@@ -3,7 +3,7 @@ import { planificarProyecto, redistribuirPesos, restarDias, detectarConcentracio
 import type { PlantillaArbol } from '@backio/shared';
 
 const plantilla: PlantillaArbol = {
-  id: 'p', tenant_id: 't', nombre: 'Test', descripcion: null, tipo: 'campana', activa: true,
+  id: 'p', tenant_id: 't', nombre: 'Test', descripcion: null, tipo: 'campana', activa: true, recurrente: false, patron_nombre: null,
   bloques: [
     { id: 'b1', tenant_id: 't', plantilla_id: 'p', nombre: 'Investigación', peso: 20, orden: 1, opcional: false, tareas: [
       { id: 't1', tenant_id: 't', bloque_id: 'b1', titulo_interno: 'Kickoff', etiqueta_cliente: null, visible_cliente_default: false, peso_relativo: 1, dias_offset: 30, rol_sugerido: null, orden: 1 },
