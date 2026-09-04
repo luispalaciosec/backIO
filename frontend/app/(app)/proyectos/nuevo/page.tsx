@@ -11,6 +11,7 @@ import { Step3Alcance } from './_steps/Step3Alcance';
 import { Step4EquipoFechas } from './_steps/Step4EquipoFechas';
 import { Step5Revision } from './_steps/Step5Revision';
 import { Borradores, type Borrador } from './_components/Borradores';
+import type { TipoPieza } from '@backio/shared';
 
 const PASOS = ['Tipo de trabajo', 'Brief', 'Alcance', 'Equipo y fechas', 'Revisión'];
 
@@ -56,8 +57,22 @@ export default function NuevoProyectoPage() {
       fecha_entrega: p.valido_hasta ?? '',
       brief: { ...s.brief, objetivo_negocio: `Cotización ${p.numero ?? ''} aprobada en PrometIO${p.valor ? ` por USD ${p.valor}` : ''}. Líneas: ${(p.lineas ?? []).map((l) => `${l.servicio} ×${l.cantidad}`).join(', ')}.` },
     };
-    if (b.plantilla_sugerida_id) await elegirPlantilla(b.plantilla_sugerida_id, extra);
-    else set({ ...extra, paso: 1 });
+    if (b.plantilla_sugerida_id) {
+      await elegirPlantilla(b.plantilla_sugerida_id, extra);
+      // Líneas de la cotización → cantidades por tipo de pieza en el bloque de mayor peso.
+      try {
+        const [{ items: tipos }, arbol] = await Promise.all([api<{ items: TipoPieza[] }>('/tipos-pieza'), api<PlantillaArbol>(`/plantillas/${b.plantilla_sugerida_id}`)]);
+        const piezas: Record<string, number> = {};
+        for (const l of p.lineas ?? []) {
+          const t = tipos.find((x) => l.servicio.toLowerCase().includes(x.slug) || l.servicio.toLowerCase().includes(x.nombre.toLowerCase()));
+          if (t) piezas[t.id] = (piezas[t.id] ?? 0) + Math.max(1, Math.round(l.cantidad));
+        }
+        const bloque = [...arbol.bloques].sort((x, y) => y.peso - x.peso)[0];
+        if (bloque && Object.keys(piezas).length) {
+          setS((prev) => ({ ...prev, bloques: { ...prev.bloques, [bloque.id]: { ...(prev.bloques[bloque.id] ?? { bloque_id: bloque.id, activo: true, owner_id: null, piezas_por_canal: {} }), piezas_por_tipo: piezas } } }));
+        }
+      } catch { /* sin prellenado */ }
+    } else set({ ...extra, paso: 1 });
   }
 
   async function crear() {
