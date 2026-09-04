@@ -44,6 +44,17 @@ Rate limit: 50 req / 10 seg. El cliente HTTP implementa cola con backoff exponen
 
 ---
 
+## Estructura real (sprint 1, 04/09/2026)
+
+| Basecamp | BackIO |
+|---|---|
+| Proyecto (marca) | `clientes.basecamp_project_id` |
+| Lista de to-dos | Proyecto de BackIO. Se reutiliza por nombre si ya existe; si no, se crea con el nombre del proyecto |
+| Grupo dentro de la lista | Bloque de la plantilla (`proyectos.basecamp_grupos`) |
+| To-do | Requerimiento. `due_on` obligatorio; `completion_subscriber_ids` = ejecutiva + operaciones |
+| Board "Weekly (Status Semanal)" de la mesa | Plan Operativo y Acta de Cierre como mensaje (`mesas.basecamp_board_weekly_id`) |
+| Board "Daily (apertura/cierre)" de la mesa | Apertura y cierre generados desde el Daily (`mesas.basecamp_board_daily_id`) |
+
 ## Escritura: crear proyecto
 
 Al confirmar el paso 5 del Builder:
