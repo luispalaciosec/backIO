@@ -26,6 +26,7 @@ export interface AuthInfo {
   rol: Rol | null;
   scopes: Scope[];
   nombre: string;
+  perfil?: string | null;
 }
 
 declare module 'hono' {
@@ -42,11 +43,11 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
   const db = serviceClient();
   const { data } = await db
     .from('api_keys')
-    .select('id, tenant_id, nombre, scopes, revocada_at')
+    .select('id, tenant_id, nombre, scopes, perfil, revocada_at')
     .eq('key_hash', hashApiKey(key))
     .maybeSingle();
   if (!data || (data as { revocada_at: string | null }).revocada_at) return null;
-  const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[] };
+  const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[]; perfil: string | null };
   void db.from('api_keys').update({ ultimo_uso_at: new Date().toISOString() }).eq('id', row.id);
   return {
     tipo: 'api_key',
@@ -54,6 +55,7 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
     rol: null,
     scopes: row.scopes,
     nombre: row.nombre,
+    perfil: row.perfil,
   };
 }
 

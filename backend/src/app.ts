@@ -10,11 +10,13 @@ import { basecampWebhook } from './routes/webhooks/basecamp';
 import { prometioWebhook } from './routes/webhooks/prometio';
 import { cron } from './routes/cron';
 import { basecampOAuth } from './routes/basecamp';
+import { mcp } from './routes/mcp';
 
 export function createApp(): Hono {
   const app = new Hono();
   app.use('*', secureHeaders());
   if (env().NODE_ENV !== 'test') app.use('*', logger());
+  app.use('/mcp', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version'], allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], exposeHeaders: ['Mcp-Session-Id'] }));
   app.use('/api/*', cors({ origin: frontendOrigins(), allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
 
   app.get('/health', (c) => c.json({ ok: true, servicio: 'backio-backend', ts: new Date().toISOString() }));
@@ -26,6 +28,7 @@ export function createApp(): Hono {
   app.route('/api/v1/webhooks/prometio', prometioWebhook);
   app.route('/api/cron', cron);
   app.route('/api/basecamp', basecampOAuth);
+  app.route('/mcp', mcp);
 
   app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
   app.onError((err, c) => {

@@ -72,6 +72,7 @@ const PERFILES: Record<string, readonly (typeof SCOPES)[number][]> = {
   ejecutiva: ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos'],
   operaciones: ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos', 'write:proyectos', 'write:actas'],
   prometio: ['read:proyectos', 'write:proyectos'],
+  cliente: ['read:proyectos'],
 };
 
 admin.get('/api-keys', async (c) => {
@@ -84,7 +85,7 @@ admin.get('/api-keys', async (c) => {
 /** La key completa se devuelve UNA sola vez. Solo se guarda el hash. */
 admin.post('/api-keys', zValidator('json', z.object({
   nombre: z.string().min(2),
-  perfil: z.enum(['gerencial', 'ejecutiva', 'operaciones', 'prometio', 'custom']),
+  perfil: z.enum(['gerencial', 'ejecutiva', 'operaciones', 'prometio', 'cliente', 'custom']),
   scopes: z.array(z.enum(SCOPES)).optional(),
 })), async (c) => {
   const ctx = ctxOf(c);

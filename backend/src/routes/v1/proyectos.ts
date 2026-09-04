@@ -2,16 +2,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
-import {
-  listProyectos, getProyectoDetalle, getProyecto, insertProyecto, updateProyecto,
-  getPlantillaArbol, insertRequerimientos, audit, getCliente, listUsuarios, DbError,
-} from '../../lib/db';
-import { planificarProyecto } from '../../lib/builder/plan';
+import { listProyectos, getProyectoDetalle, getProyecto, updateProyecto, audit, DbError } from '../../lib/db';
 import { generarPortalToken } from '../../lib/portal/token';
 import { sanitizeForClient } from '../../lib/visibility';
 import { createProjectStructure } from '../../lib/basecamp/write';
-import { restarDias } from '../../lib/builder/plan';
-import { notificar } from '../../lib/notificaciones';
+import { previewProyecto, crearProyectoDesdePlantilla } from '../../lib/builder/service';
 import type { EstadoOperativo } from '@backio/shared';
 
 export const proyectos = new Hono();
@@ -57,103 +52,13 @@ proyectos.get('/:id', requireScope('read:proyectos'), async (c) => {
 
 /** Preview del paso 5: mismo plan que se ejecutará, con vista interna y vista cliente (misma sanitizeForClient). */
 proyectos.post('/preview', requireScope('read:proyectos'), zValidator('json', crearSchema), async (c) => {
-  const ctx = ctxOf(c);
-  const input = c.req.valid('json');
-  const plantilla = await getPlantillaArbol(ctx, input.plantilla_id);
-  if (!plantilla) return c.json({ error: 'Plantilla no encontrada' }, 404);
-  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques });
-  const usuarios = await listUsuarios(ctx);
-  const ahora = new Date().toISOString();
-  const vistaCliente = sanitizeForClient(
-    { nombre: input.nombre, fecha_entrega: input.fecha_entrega },
-    plan.tareas.map((t, i) => ({
-      id: `preview-${i}`,
-      etiqueta_cliente: t.etiqueta_cliente,
-      visible_cliente: t.visible_cliente,
-      peso: t.peso,
-      estado_operativo: 'backlog',
-      estado_aprobacion: 'no_aplica',
-      fecha_entrega: t.fecha_entrega,
-      ultima_actualizacion: ahora,
-    })),
-  );
-  return c.json({
-    plan,
-    vista_cliente: vistaCliente,
-    alertas: plan.alertas.map((a) => ({ ...a, nombre: usuarios.find((u) => u.id === a.owner_id)?.nombre ?? a.owner_id })),
-  });
+  const p = await previewProyecto(ctxOf(c), c.req.valid('json'));
+  return c.json({ plan: p.plan, vista_cliente: p.vista_cliente, alertas: p.alertas, resumen: p.resumen });
 });
 
 proyectos.post('/', requireScope('write:proyectos'), zValidator('json', crearSchema), async (c) => {
-  const ctx = ctxOf(c);
-  const input = c.req.valid('json');
-  const [plantilla, cliente] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id)]);
-  if (!plantilla) return c.json({ error: 'Plantilla no encontrada' }, 404);
-  if (!cliente) return c.json({ error: 'Cliente no encontrado' }, 404);
-
-  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques });
-  const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;
-  const fecha_inicio = input.fecha_inicio ?? (primeraFecha < input.fecha_entrega ? primeraFecha : restarDias(input.fecha_entrega, 1));
-
-  const proyecto = await insertProyecto(ctx, {
-    cliente_id: input.cliente_id,
-    plantilla_id: input.plantilla_id,
-    prometio_cotizacion_id: input.prometio_cotizacion_id ?? null,
-    nombre: input.nombre,
-    brief: { actual: { ...input.brief, version: 1, creado_at: new Date().toISOString() }, historial: [] },
-    fecha_inicio,
-    fecha_entrega: input.fecha_entrega,
-    owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId,
-    portal_token: generarPortalToken(),
-  });
-
-  const reqs = await insertRequerimientos(
-    ctx,
-    plan.tareas.map((t) => ({
-      cliente_id: input.cliente_id,
-      proyecto_id: proyecto.id,
-      bloque_nombre: t.bloque_nombre,
-      plantilla_tarea_id: t.plantilla_tarea_id,
-      titulo_interno: t.titulo_interno,
-      etiqueta_cliente: t.etiqueta_cliente,
-      visible_cliente: t.visible_cliente,
-      tipo_trabajo: 'proyecto',
-      estado_operativo: 'priorizado',
-      peso: t.peso,
-      fecha_pedido: fecha_inicio,
-      fecha_entrega: t.fecha_entrega,
-      owner_agencia: t.owner_agencia,
-      piezas: t.piezas,
-    })),
-  );
-
-  await audit(ctx, {
-    accion: 'crear_proyecto', entidad: 'proyecto', entidad_id: proyecto.id,
-    detalle: { requerimientos: reqs.length, visibles: plan.visibles, alertas: plan.alertas },
-  });
-
-  const owners = [...new Set(plan.tareas.flatMap((t) => t.owner_agencia))].filter((id) => id !== ctx.usuarioId);
-  if (owners.length) {
-    void notificar(ctx, {
-      tipo: 'proyecto_asignado',
-      titulo: `Nuevo proyecto: ${proyecto.nombre} (${cliente.nombre})`,
-      cuerpo: `Se te asignaron tareas en el proyecto "${proyecto.nombre}" de ${cliente.nombre}. Entrega final: ${input.fecha_entrega}.`,
-      ruta: `/proyectos/${proyecto.id}`, entidad_tipo: 'proyecto', entidad_id: proyecto.id,
-    }, { usuarioIds: owners }).catch((e) => console.error('[notificar] proyecto', e));
-  }
-
-  // Basecamp: se intenta si el cliente tiene proyecto configurado; si falla, queda sync_estado=incompleto y se reintenta.
-  let basecamp: unknown = { omitido: true, motivo: 'cliente sin basecamp_project_id' };
-  if (cliente.basecamp_project_id) {
-    try {
-      basecamp = await createProjectStructure(ctx, proyecto, reqs);
-    } catch (err) {
-      await updateProyecto(ctx, proyecto.id, { sync_estado: 'incompleto' });
-      basecamp = { error: err instanceof Error ? err.message : String(err) };
-    }
-  }
-
-  return c.json({ proyecto, requerimientos: reqs, alertas: plan.alertas, basecamp }, 201);
+  const r = await crearProyectoDesdePlantilla(ctxOf(c), c.req.valid('json'));
+  return c.json(r, 201);
 });
 
 proyectos.post('/:id/basecamp/reintentar', requireScope('write:proyectos'), async (c) => {

@@ -54,11 +54,11 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [ ] Vista `/daily` en una pantalla sin scroll
 
 ### Fase 2.7
-- [ ] MCP server desplegado con OAuth
-- [ ] Tools de escritura con patrón preview + confirm, `plan_id` expira en 15 min
-- [ ] Scopes verificados: key de lectura no puede escribir
+- [x] MCP server desplegado en `/mcp` (Streamable HTTP, API key). OAuth del MCP pendiente
+- [x] Tools de escritura con patrón preview + confirm, `plan_id` expira en 15 min, un solo uso
+- [x] Scopes verificados en código: key de lectura no puede escribir (tools devuelven error de scope)
 - [ ] Spec OpenAPI autogenerada para Gemini
-- [ ] `audit_log` registrando todas las escrituras
+- [x] `audit_log` registrando todas las escrituras + alerta >20 escrituras/5 min por key
 
 ### Fase 3
 - [x] **Checklist completo de `02-visibilidad.md` firmado** (código aprobado por Luis 03/09/2026; portal verificado en producción con proyecto sandbox: 2 hitos visibles de 4, avance renormalizado 79%)
