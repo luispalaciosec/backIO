@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
@@ -89,12 +89,28 @@ const patchSchema = z.object({
   entregable_urls: z.array(z.string().url()).nullable().optional(),
 });
 
-requerimientos.patch('/:id', requireScope('write:requerimientos'), zValidator('json', patchSchema), async (c) => {
+/** Campos que un colaborador puede cambiar en SUS tareas (owner_agencia lo incluye). El resto exige rol de gestión. */
+export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls'] as const;
+
+const escrituraOPropia: MiddlewareHandler = async (c, next) => {
+  const a = c.get('auth');
+  if (a.tipo === 'usuario' && a.rol === 'colaborador' && a.perfil !== 'oauth') return next(); // se valida en el handler
+  return requireScope('write:requerimientos')(c, next);
+};
+
+requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), async (c) => {
   const ctx = ctxOf(c);
   const id = c.req.param('id');
   const previo = await getRequerimiento(ctx, id);
   if (!previo) return c.json({ error: 'No encontrado' }, 404);
   const patch = c.req.valid('json');
+
+  const a = c.get('auth');
+  if (a.tipo === 'usuario' && a.rol === 'colaborador') {
+    if (!ctx.usuarioId || !previo.owner_agencia.includes(ctx.usuarioId)) return c.json({ error: 'Solo puedes actualizar las tareas asignadas a ti' }, 403);
+    const noPermitidos = Object.keys(patch).filter((k) => !(CAMPOS_COLABORADOR as readonly string[]).includes(k));
+    if (noPermitidos.length) return c.json({ error: `Como colaborador solo puedes cambiar estado, fecha de entrega y entregables (no: ${noPermitidos.join(', ')})` }, 403);
+  }
 
   // Basecamp manda sobre completed: no se completa desde BackIO si el to-do existe en Basecamp.
   if (patch.estado_operativo === 'completado' && previo.basecamp_todo_id) {

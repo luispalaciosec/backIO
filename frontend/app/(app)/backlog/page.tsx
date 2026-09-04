@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, EstadoOperativo, ActualizarRequerimientoInput } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
+import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
 import { BacklogTable } from '@/components/backlog/BacklogTable';
 import { KanbanBoard } from '@/components/backlog/KanbanBoard';
@@ -46,7 +47,19 @@ export default function BacklogPage() {
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
 
+  const me = useMe();
+  const colaborador = me?.rol === 'colaborador';
+  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls'];
+  /** Un colaborador solo edita sus tareas y solo estado, fecha y entregables; el backend lo exige igual. */
+  const puedeEditar = (r: RequerimientoMetricas) => !colaborador || (!!me?.usuario_id && r.owner_agencia.includes(me.usuario_id));
+
   async function patch(id: string, p: ActualizarRequerimientoInput) {
+    if (colaborador) {
+      const r = items.find((x) => x.id === id);
+      if (r && !puedeEditar(r)) { setError('Solo puedes actualizar las tareas asignadas a ti.'); return; }
+      const extra = Object.keys(p).filter((k) => !CAMPOS_COLABORADOR.includes(k));
+      if (extra.length) { setError('Como colaborador solo puedes cambiar el estado, la fecha de entrega y los entregables.'); return; }
+    }
     // Optimista: aplica en memoria y recarga en silencio.
     setItems((prev) => prev.map((r) => (r.id === id ? { ...r, ...(p as Partial<RequerimientoMetricas>) } : r)));
     try {
@@ -122,7 +135,7 @@ export default function BacklogPage() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-x-auto pb-4">
-          <BacklogTable items={items} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={crear} horas={horas} />
+          <BacklogTable items={items} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

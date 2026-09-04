@@ -17,13 +17,15 @@ export interface BacklogTableProps {
   clientes: Cliente[];
   usuarios: Usuario[];
   onPatch: (id: string, patch: ActualizarRequerimientoInput) => Promise<void>;
-  onCrear: (clienteId: string, titulo: string) => Promise<void>;
+  onCrear?: (clienteId: string, titulo: string) => Promise<void>;
   horas?: Record<string, number>;
+  /** Si devuelve false, la fila se muestra sin editores (colaborador viendo tareas ajenas). */
+  puedeEditar?: (r: RequerimientoMetricas) => boolean;
 }
 
 const COLS = 'grid-cols-[minmax(260px,2fr)_120px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
 
-export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {} }: BacklogTableProps) {
+export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar }: BacklogTableProps) {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
   const grupos = clientes
     .map((c, i) => ({ cliente: c, color: colorGrupo(i, c.color_primario), reqs: items.filter((r) => r.cliente_id === c.id) }))
@@ -50,9 +52,9 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
                   ))}
                 </div>
                 {reqs.map((r) => (
-                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} />
+                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} />
                 ))}
-                <NuevaFila color={color} onCrear={(t) => onCrear(cliente.id, t)} />
+                {onCrear && <NuevaFila color={color} onCrear={(t) => onCrear(cliente.id, t)} />}
               </div>
             )}
           </section>
@@ -63,11 +65,11 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
   );
 }
 
-function Fila({ r, color, usuarios, onPatch, horas }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number }) {
+function Fila({ r, color, usuarios, onPatch, horas, bloqueada }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean }) {
   const p = (patch: ActualizarRequerimientoInput) => onPatch(r.id, patch);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
   return (
-    <div className={`grid ${COLS} border-b border-gray-100 hover:bg-gray-50/70 items-stretch ${hecho ? 'opacity-70' : ''}`}>
+    <div className={`grid ${COLS} border-b border-gray-100 hover:bg-gray-50/70 items-stretch ${hecho ? 'opacity-70' : ''} ${bloqueada ? 'pointer-events-none select-text bg-gray-50/40' : ''}`} title={bloqueada ? 'Tarea de otra persona: solo lectura' : undefined}>
       <div className="flex min-w-0">
         <span className="w-1.5 shrink-0" style={{ backgroundColor: color }} />
         <div className="flex-1 min-w-0 flex items-center gap-1 pl-1">
