@@ -62,15 +62,25 @@ repetirlas:
 npx supabase migration repair --status applied 20260903000002 20260903000004
 ```
 
-## Primer usuario
+## Usuarios
 
-1. Crear el usuario en Supabase Auth (Dashboard → Authentication → Users).
-2. Insertar su fila en `usuarios` con el `tenant_id` de Geeks (`00000000-0000-4000-8000-000000000001`) y rol `admin`.
+Al crear un usuario en Supabase Auth (Dashboard → Authentication → Users → Add user), un
+trigger crea su fila en `usuarios` automáticamente:
+
+- Si existe una **invitación** para ese email, toma nombre, rol y capacidad de ahí.
+- Si no, y el dominio del correo está en `tenants.dominios_auto` (`geeks.com.ec`, `geeks.ec`),
+  entra como `colaborador`.
+- Cualquier otro dominio no recibe acceso.
+
+Para dar un rol distinto de colaborador, crear la invitación ANTES del usuario en Auth:
 
 ```sql
-insert into usuarios (id, tenant_id, nombre, email, rol)
-values ('<uuid de auth.users>', '00000000-0000-4000-8000-000000000001', 'Luis Palacios', 'luis@geeks.ec', 'admin');
+insert into invitaciones (tenant_id, email, nombre, rol)
+values ('00000000-0000-4000-8000-000000000001', 'persona@geeks.com.ec', 'Nombre Apellido', 'ejecutiva');
 ```
+
+Roles: `admin`, `gerencia`, `operaciones`, `ejecutiva`, `lider`, `colaborador`. Para cambiar
+el rol de alguien que ya existe: `update usuarios set rol = 'lider' where email = '...'`.
 
 ## API keys
 
