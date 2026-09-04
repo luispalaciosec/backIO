@@ -8,10 +8,12 @@ Frontend en **Vercel**, backend en **Railway**. Ambos desde el mismo repo
 ## Backend en Railway
 
 1. New Project → Deploy from GitHub repo → `luispalaciosec/backIO`.
-2. En Settings del servicio:
-   - **Root Directory**: `/` (la raíz; el Dockerfile necesita `shared/` y el lockfile)
-   - **Builder**: Dockerfile · **Dockerfile Path**: `backend/Dockerfile`
-   - **Healthcheck Path**: `/health`
+2. En Settings → Source del servicio:
+   - **Root Directory**: vacío (la raíz del repo). El Dockerfile necesita `shared/` y el lockfile.
+     Si Railway lo puso en `backend` al detectar el monorepo, bórralo.
+   - El builder y la ruta del Dockerfile los toma de `railway.json` en la raíz. Si prefieres
+     forzarlo por variable: `RAILWAY_DOCKERFILE_PATH=backend/Dockerfile`.
+   - Healthcheck `/health` también viene de `railway.json`.
 3. Variables (Settings → Variables):
 
 | Variable | Valor |
