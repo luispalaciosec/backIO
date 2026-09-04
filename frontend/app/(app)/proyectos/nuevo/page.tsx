@@ -21,10 +21,12 @@ export default function NuevoProyectoPage() {
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
   const [borradores, setBorradores] = useState<Borrador[]>([]);
+  const [pendiente, setPendiente] = useState<WizardState | null>(null);
 
   useEffect(() => {
+    // Siempre se arranca en el paso 1. Si había un proyecto a medio crear, se ofrece continuar.
     const b = leerBorrador();
-    if (b) setS(b);
+    if (b && b.paso > 1 && b.plantilla) setPendiente(b);
     Promise.all([
       api<{ items: Plantilla[] }>('/plantillas'),
       api<{ items: Cliente[] }>('/clientes'),
@@ -92,6 +94,15 @@ export default function NuevoProyectoPage() {
       </header>
 
       {error && <Alert tipo="error">{error}</Alert>}
+      {pendiente && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm flex items-center justify-between gap-3">
+          <span className="text-blue-900">Dejaste un proyecto a medio crear{pendiente.nombre ? `: "${pendiente.nombre}"` : ''} (paso {pendiente.paso}).</span>
+          <span className="flex gap-2">
+            <button className="btn-primary" onClick={() => { setS(pendiente); setPendiente(null); }}>Continuar</button>
+            <button className="btn-ghost" onClick={() => { limpiarBorrador(); setPendiente(null); }}>Descartar</button>
+          </span>
+        </div>
+      )}
 
       {borradores.length > 0 && s.paso === 1 && (
         <Borradores items={borradores} clientes={cat.clientes} plantillas={cat.plantillas} onUsar={usarBorrador} onDescartar={async (id) => { await api(`/proyectos/borradores/${id}/descartar`, { method: 'POST' }); setBorradores((b) => b.filter((x) => x.id !== id)); }} />
