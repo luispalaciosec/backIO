@@ -26,11 +26,11 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 ## Definition of Done por fase
 
 ### Fase 0
-- [ ] Migraciones versionadas aplicadas
-- [ ] RLS verificada: usuario de tenant B no lee datos de tenant A (0 filas)
-- [ ] Clientes migrados con **IDs idénticos** a PrometIO, verificado por conteo
-- [ ] `basecamp_project_id` poblado para clientes activos
-- [ ] Trigger de visibilidad monotónica aplicado y probado
+- [x] Migraciones versionadas aplicadas (6 migraciones, 03/09/2026)
+- [x] RLS verificada: JWT sin usuario lee 0 filas. Pendiente repetir con usuario real de un tenant B
+- [x] Clientes migrados con **IDs idénticos** a PrometIO (4, datos de prueba)
+- [ ] `basecamp_project_id` poblado para clientes activos (solo Acme → sandbox)
+- [x] Trigger de visibilidad monotónica aplicado y probado
 
 ### Fase 1
 - [ ] Builder completo, paso 5 usando `sanitizeForClient` real
@@ -39,11 +39,11 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [ ] Alerta de concentración de carga en paso 4
 
 ### Fase 2
-- [ ] OAuth Basecamp funcionando con refresh automático
-- [ ] Creación probada primero en proyecto sandbox de Basecamp
-- [ ] Webhook recibiendo y aplicando `completed`
-- [ ] Polling de reconciliación cada 30 min
-- [ ] **Test de fuga de texto pasando** (ver `02-visibilidad.md`)
+- [x] OAuth Basecamp funcionando con refresh automático (conectado 03/09/2026, cuenta 4186385)
+- [x] Creación probada primero en proyecto sandbox de Basecamp (proyecto 48775530, 4 to-dos, 03/09/2026)
+- [x] Webhook recibiendo y aplicando `completed` (verificado 03/09/2026: `todo_completed` → completado en <1 s)
+- [x] Polling de reconciliación cada 30 min (scheduler interno; verificado a mano)
+- [x] **Test de fuga de texto pasando** (ver `02-visibilidad.md`)
 - [x] Límite de 50 to-dos por operación implementado
 
 ### Fase 2.5
