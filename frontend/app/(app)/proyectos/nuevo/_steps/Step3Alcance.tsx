@@ -18,6 +18,7 @@ export function Step3Alcance({ state: s, set }: { state: WizardState; set: (p: P
 
   return (
     <div className="space-y-3">
+      {s.piezas_sugeridas && Object.keys(s.piezas_sugeridas).length > 0 && <p className="text-sm rounded-md bg-violet-50 border border-violet-200 text-violet-900 px-3 py-2">Del brief del cliente: {tipos.filter((t) => (s.piezas_sugeridas?.[t.id] ?? 0) > 0).map((t) => `${s.piezas_sugeridas?.[t.id]} ${t.nombre.toLowerCase()}`).join(', ')}. Repártelas en los bloques.</p>}
       <p className="text-sm text-gray-500">Desmarca bloques opcionales; su peso se redistribuye proporcionalmente. En cada bloque indica cuántas piezas de cada tipo: cada tipo se expande en un to-do por paso de su flujo (un reel: ideas → guiones → aprobación → storyboards → grabación → edición → aprobación → posteo). El peso se reparte por esfuerzo × cantidad.</p>
       {plantilla.bloques.map((b) => {
         const cfg = s.bloques[b.id];

@@ -133,7 +133,7 @@ export default function NuevoProyectoPage() {
         </div>
       )}
       {s.paso === 1 && <Step1Plantilla plantillas={cat.plantillas} onSelect={(id) => elegirPlantilla(id)} seleccionada={s.plantilla?.id ?? null} />}
-      {s.paso === 2 && s.plantilla && <Step2Brief state={s} set={set} clientes={cat.clientes} />}
+      {s.paso === 2 && s.plantilla && <Step2Brief state={s} set={set} clientes={cat.clientes} onSugerirPlantilla={(id) => elegirPlantilla(id, { paso: 2 })} />}
       {s.paso === 3 && s.plantilla && <Step3Alcance state={s} set={set} />}
       {s.paso === 4 && s.plantilla && <Step4EquipoFechas state={s} set={set} usuarios={cat.usuarios} />}
       {s.paso === 5 && s.plantilla && <Step5Revision state={s} usuarios={cat.usuarios} clientes={cat.clientes} />}

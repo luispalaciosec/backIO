@@ -32,6 +32,7 @@ import { publicarActaEnBasecamp } from './publish';
 import { guardarPlan, tomarPlan, guardarResultado } from './plans';
 import { buildDashboard } from '../dashboard';
 import { resumenHoras } from '../horas';
+import { narrarWeekly } from '../ia/weekly';
 import type { CrearProyectoInput, ActualizarRequerimientoInput, Requerimiento } from '@backio/shared';
 
 type Text = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -213,6 +214,17 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     const m = await mapas(ctx);
     const r = await resumenHoras(ctx, new Date(Date.now() - dias * 86_400_000).toISOString());
     return ok({ dias, total: r.total, por_cliente: Object.fromEntries(Object.entries(r.por_cliente).map(([k, v]) => [m.clientes.get(k) ?? k, v])), por_persona: Object.fromEntries(Object.entries(r.por_usuario).map(([k, v]) => [m.nombres.get(k) ?? k, v])) });
+  })());
+
+  server.registerTool('get_weekly_narrative', {
+    description: 'Status semanal narrado por la IA de BackIO + agenda agrupada por causa con una pregunta de decisión por grupo. Solo lectura; se alimenta de datos estructurados (nunca texto de Basecamp).',
+    inputSchema: { mesa: z.string().optional().describe('id, slug o nombre de la mesa; vacío = toda la agencia') },
+  }, ({ mesa }) => guard(['read:senales'], async () => {
+    if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
+    const m = mesa ? await resolverMesa(ctx, mesa) : null;
+    if (mesa && !m) return fail(`Mesa no encontrada: ${mesa}`);
+    const semana = await ensureSemana(ctx, fechaLocal());
+    return ok(await narrarWeekly(ctx, semana.id, m?.id ?? null));
   })());
 
   // ------------------------------------------------------------ ESCRITURA (preview + confirm)

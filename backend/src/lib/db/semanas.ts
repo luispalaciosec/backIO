@@ -86,7 +86,7 @@ export async function cerrarAcuerdo(ctx: DbCtx, id: string, estado: 'cumplido' |
   throwIf(error);
 }
 
-export async function insertActa(ctx: DbCtx, a: { semana_id: string; tipo: 'plan_operativo' | 'cierre'; mesa_id?: string | null; contenido: unknown; markdown: string }): Promise<Acta> {
+export async function insertActa(ctx: DbCtx, a: { semana_id: string; tipo: Acta['tipo']; mesa_id?: string | null; contenido: unknown; markdown: string }): Promise<Acta> {
   const { data, error } = await ctx.db.from('actas').insert({ ...a, tenant_id: ctx.tenantId }).select().single();
   throwIf(error);
   return data as Acta;

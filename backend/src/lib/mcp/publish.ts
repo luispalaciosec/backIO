@@ -15,6 +15,7 @@ const fmtFecha = (iso: string) => iso.slice(0, 10);
 const fmtCorta = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split('-'); return `${Number(d)}/${m}/${y}`; };
 
 export function tituloWeekly(acta: Acta, semana: { numero_iso: number; fecha_inicio: string; fecha_fin: string }): string {
+  if (acta.tipo === 'informe_mensual') return `${fmtFecha(semana.fecha_fin)} || ${acta.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? 'Informe mensual'}`;
   return acta.tipo === 'plan_operativo'
     ? `${fmtFecha(semana.fecha_inicio)} || Status Semanal Operativo - Semana ${semana.numero_iso}`
     : `${fmtFecha(semana.fecha_fin)} || Acta de Cierre - Semana ${semana.numero_iso}`;
@@ -40,18 +41,20 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
     const dock = await bc.getDock(projectId);
     const vault = dock.find((d) => d.name === 'vault');
     if (!vault) throw new Error('El proyecto de actas no tiene Docs & Files habilitado');
-    const titulo = `${acta.tipo === 'plan_operativo' ? 'Plan Operativo' : 'Acta de Cierre'} · ${acta.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? acta.id}`;
+    const titulo = `${acta.tipo === 'plan_operativo' ? 'Plan Operativo' : acta.tipo === 'cierre' ? 'Acta de Cierre' : 'Informe mensual'} · ${acta.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? acta.id}`;
     doc = await bc.createDocument(projectId, vault.id, { title: titulo, content: html });
   }
 
   const { error: e2 } = await ctx.db.from('actas').update({ publicado_at: new Date().toISOString(), publicado_por: ctx.usuarioId, basecamp_doc_id: doc.id }).eq('id', acta.id);
   throwIf(e2);
-  const col = acta.tipo === 'plan_operativo' ? 'plan_publicado_at' : 'acta_publicada_at';
-  await ctx.db.from('semanas').update({ [col]: new Date().toISOString() }).eq('id', acta.semana_id);
+  if (acta.tipo !== 'informe_mensual') {
+    const col = acta.tipo === 'plan_operativo' ? 'plan_publicado_at' : 'acta_publicada_at';
+    await ctx.db.from('semanas').update({ [col]: new Date().toISOString() }).eq('id', acta.semana_id);
+  }
   return { acta_id: acta.id, basecamp_doc_id: doc.id, url: doc.app_url };
 }
 
-export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; vencen: string[]; bloqueos: string[]; cambios: string[] }
+export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; vencen: string[]; bloqueos: string[]; cambios: string[]; narrativa?: string }
 
 export function tituloDaily(m: DailyMensaje, mesa: Mesa): string {
   return `${m.tipo === 'apertura' ? '🟢APERTURA' : '🔴CIERRE'} DE MESA - ${fmtCorta(m.fecha)} - ${mesa.nombre.toUpperCase()}`;
@@ -61,11 +64,12 @@ export function cuerpoDaily(m: DailyMensaje): string {
   const li = (xs: string[]) => (xs.length ? `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>');
   return [
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
+    ...(m.narrativa ? m.narrativa.split(/\n+/).map((p) => `<p>${esc(p)}</p>`) : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, li(m.notas),
     `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
     `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
     `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
-    `<p style="color:#888;font-size:12px">Generado por BackIO</p>`,
+    `<p style="color:#888;font-size:12px">${m.narrativa ? `Redactado por BackIO, publicado por ${esc(m.responsable)}` : 'Generado por BackIO'}</p>`,
   ].join('\n');
 }
 

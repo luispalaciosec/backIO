@@ -1,4 +1,5 @@
 'use client';
+import { RecordatorioIA } from './RecordatorioIA';
 import { useState } from 'react';
 import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoInput } from '@backio/shared';
@@ -72,6 +73,7 @@ function Fila({ r, color, usuarios, onPatch, horas }: { r: RequerimientoMetricas
         <div className="flex-1 min-w-0 flex items-center gap-1 pl-1">
           <CeldaTexto valor={r.titulo_interno} onCommit={(v) => p({ titulo_interno: v })} className={hecho ? 'line-through text-gray-500' : ''} />
           {r.visible_cliente && <span className="text-xs shrink-0 pr-1" title={`El cliente ve: ${r.etiqueta_cliente}`}>👁</span>}
+          {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />}
           {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0 pr-2" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
         </div>
       </div>

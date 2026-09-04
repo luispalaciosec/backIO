@@ -272,7 +272,7 @@ export interface Acta {
   id: string;
   tenant_id: string;
   semana_id: string;
-  tipo: 'plan_operativo' | 'cierre';
+  tipo: 'plan_operativo' | 'cierre' | 'informe_mensual';
   mesa_id: string | null;
   contenido: Record<string, unknown>;
   markdown: string;
@@ -304,3 +304,20 @@ export const CANALES: readonly string[] = [
   'Medios',
   'Otro',
 ];
+
+/** Salidas de la capa de IA (Sprint 4). Solo se alimentan con datos estructurados de BackIO. */
+export interface AgendaIA { causa: string; items: string[]; pregunta: string }
+export interface WeeklyIA { narrativa: string; agenda: AgendaIA[]; generado_at: string }
+export interface BriefIA {
+  nombre_proyecto: string | null;
+  objetivo_negocio: string;
+  publico_objetivo: string;
+  canales: string[];
+  mandatorios_marca: string | null;
+  fecha_entrega: string | null;
+  presupuesto_aprobado: number | null;
+  plantilla_sugerida_id: string | null;
+  plantilla_sugerida_nombre: string | null;
+  piezas_por_tipo: Record<string, number>;
+  dudas: string[];
+}

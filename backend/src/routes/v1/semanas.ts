@@ -6,7 +6,9 @@ import { ensureSemana, getSemana, listSenales, marcarSenalAtendida, insertAcuerd
 import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre } from '../../lib/rituals/service';
 import { getDaily, fechaLocal } from '../../lib/rituals/daily';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
-import { getMesa, alcanceMesa, listUsuarios, listClientes, listBacklog } from '../../lib/db';
+import { getMesa } from '../../lib/db';
+import { armarDailyMensaje } from '../../lib/ia/daily';
+import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 
 export const semanas = new Hono();
 
@@ -58,16 +60,24 @@ semanas.post('/:id/acuerdos/:acuerdoId/cerrar', requireScope('write:actas'), zVa
   return c.body(null, 204);
 });
 
+/** ?ia=1 antepone el resumen ejecutivo y la agenda por causa redactados por la IA. */
+async function narrativaOpcional(c: Parameters<typeof ctxOf>[0], semanaId: string, mesaId: string | null): Promise<string | undefined> {
+  if (c.req.query('ia') !== '1') return undefined;
+  return renderWeeklyIA(await narrarWeekly(ctxOf(c), semanaId, mesaId));
+}
+
 semanas.post('/:id/plan', requireScope('write:actas'), async (c) => {
   const ctx = ctxOf(c);
-  const acta = await generarPlanOperativo(ctx, c.req.param('id'), c.req.query('mesa') || null);
+  const mesaId = c.req.query('mesa') || null;
+  const acta = await generarPlanOperativo(ctx, c.req.param('id'), mesaId, await narrativaOpcional(c, c.req.param('id'), mesaId));
   await audit(ctx, { accion: 'generar_plan_operativo', entidad: 'acta', entidad_id: acta.id });
   return c.json(acta, 201);
 });
 
 semanas.post('/:id/acta', requireScope('write:actas'), async (c) => {
   const ctx = ctxOf(c);
-  const acta = await generarActaCierre(ctx, c.req.param('id'), c.req.query('mesa') || null);
+  const mesaId = c.req.query('mesa') || null;
+  const acta = await generarActaCierre(ctx, c.req.param('id'), mesaId, await narrativaOpcional(c, c.req.param('id'), mesaId));
   await audit(ctx, { accion: 'generar_acta_cierre', entidad: 'acta', entidad_id: acta.id });
   return c.json(acta, 201);
 });
@@ -94,29 +104,13 @@ semanas.post('/actas/:actaId/publicar', requireScope('write:actas'), async (c) =
 /** Publica apertura o cierre de mesa en el board Daily, con las tres señales del daily acotadas a la mesa. */
 semanas.post('/daily/publicar', requireScope('write:actas'), zValidator('json', z.object({
   mesa_id: z.string().uuid(), tipo: z.enum(['apertura', 'cierre']), notas: z.array(z.string()).default([]), responsable: z.string().optional(),
+  narrativa: z.string().max(4000).optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
   const b = c.req.valid('json');
   const mesa = await getMesa(ctx, b.mesa_id);
   if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
-  const [alcance, usuarios, clientes] = await Promise.all([alcanceMesa(ctx, mesa.id), listUsuarios(ctx), listClientes(ctx, { incluirInactivos: true })]);
-  const activos = await listBacklog(ctx, { solo_activos: true, mesa: alcance });
-  const hoy = fechaLocal();
-  const manana = new Date(`${hoy}T12:00:00Z`); manana.setUTCDate(manana.getUTCDate() + 1);
-  const mananaIso = manana.toISOString().slice(0, 10);
-  const hace24h = new Date(Date.now() - 86_400_000).toISOString();
-  const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? 'sin asignar';
-  const cliente = (id: string) => clientes.find((x) => x.id === id)?.nombre ?? '';
-  const linea = (r: { titulo_interno: string; cliente_id: string; owner_agencia: string[]; fecha_entrega: string | null }) => `${cliente(r.cliente_id)} · ${r.titulo_interno} · ${nombre(r.owner_agencia[0])}${r.fecha_entrega ? ` · ${r.fecha_entrega}` : ''}`;
-  const m: DailyMensaje = {
-    tipo: b.tipo,
-    responsable: b.responsable ?? c.get('auth').nombre,
-    fecha: hoy,
-    notas: b.notas,
-    vencen: activos.filter((r) => r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado').map(linea),
-    bloqueos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).map(linea),
-    cambios: activos.filter((r) => r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h).map(linea),
-  };
+  const m: DailyMensaje = { ...(await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, b.responsable ?? c.get('auth').nombre)), narrativa: b.narrativa?.trim() || undefined };
   try {
     const r = await publicarDailyEnBasecamp(ctx, mesa, m);
     await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });

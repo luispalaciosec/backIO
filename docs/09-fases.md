@@ -20,6 +20,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 | **3.5** | Webhooks bidireccionales con PrometIO | 2 | Fase 2.7 · **hecho 04/09/2026**: empresa y cotización aprobada verificadas de punta a punta |
 | **4** | Dashboards, vista weekly con arrastre, métricas de piezas | 4 | Fase 2.5 · **hecho 04/09/2026** |
 | **v2·3** | Importación de Basecamp, huérfanos, horas | 3 | **hecho 04/09/2026** |
+| **v2·4** | Capa de IA: daily y weekly narrados, brief→plan, recordatorio al cliente, informe mensual | 4 | **hecho 04/09/2026** · ver `15-ia.md` |
 | **5** | Migración de cuentas activas, coexistencia, baja de Monday | 5 | Todas |
 
 ---

@@ -9,6 +9,8 @@ export interface WizardState {
   fecha_entrega: string;
   prometio_cotizacion_id: string | null;
   bloques: Record<string, BloqueAlcanceInput>; // por bloque_id
+  /** Piezas por tipo detectadas por la IA en el brief pegado (solo un recordatorio para el paso 3). */
+  piezas_sugeridas?: Record<string, number>;
 }
 
 export const ESTADO_INICIAL: WizardState = {

@@ -10,6 +10,9 @@ import { recalcularSenales } from './rituals/service';
 import { notificar, procesarPendientes } from './notificaciones';
 import { temaAgenda } from './rituals/signals';
 import { detectarHuerfanos } from './basecamp/huerfanos';
+import { iaDisponible } from './ia';
+import { generarInformeMensual } from './ia/informe';
+import { listMesas } from './db/mesas';
 import { sincronizarHoras } from './horas';
 
 const TZ = 'America/Guayaquil';
@@ -49,8 +52,25 @@ export function startScheduler(): void {
   setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);
 
   let ultimaCorrida = '';
+  let ultimoInforme = '';
   setInterval(async () => {
     const t = ahoraLocal();
+    // Día 1 de cada mes 08:00: informe ejecutivo del mes anterior por mesa (solo se redacta; Marcia lo publica).
+    if (t.hora === 8 && t.minuto === 0 && t.clave.endsWith('-01') && ultimoInforme !== t.clave && iaDisponible()) {
+      ultimoInforme = t.clave;
+      const [y, m] = t.clave.split('-').map(Number);
+      const prev = new Date(Date.UTC(y!, (m ?? 1) - 2, 1));
+      const mes = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+      for (const id of await tenants()) {
+        const ctx = { db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' as const };
+        for (const mesa of (await listMesas(ctx)).filter((x) => x.activa)) {
+          try {
+            await generarInformeMensual(ctx, mesa.id, mes);
+            await notificar({ tenantId: id }, { tipo: 'informe_mensual', titulo: `Informe mensual ${mes} · ${mesa.nombre} listo para revisar`, cuerpo: 'BackIO redactó el informe ejecutivo del mes. Revísalo y publícalo en Basecamp desde Informes.', ruta: '/informes' }, { roles: ['operaciones', 'admin'] });
+          } catch (err) { console.error('[scheduler] informe mensual', mesa.nombre, err instanceof Error ? err.message : err); }
+        }
+      }
+    }
     if (t.dia === 0 && t.hora === 18 && t.minuto === 0 && ultimaCorrida !== t.clave) {
       ultimaCorrida = t.clave;
       for (const id of await tenants()) {

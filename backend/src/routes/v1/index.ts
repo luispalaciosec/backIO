@@ -13,6 +13,7 @@ import { dashboard } from './dashboard';
 import { tiposPieza } from './tipos_pieza';
 import { huerfanos } from './huerfanos';
 import { horas } from './horas';
+import { ia } from './ia';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -29,3 +30,4 @@ v1.route('/dashboard', dashboard);
 v1.route('/tipos-pieza', tiposPieza);
 v1.route('/huerfanos', huerfanos);
 v1.route('/horas', horas);
+v1.route('/ia', ia);

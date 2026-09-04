@@ -60,6 +60,13 @@ export async function capacidadSemana(ctx: DbCtx, semanaId: string): Promise<Cap
   return calcularCapacidad(reqs, usuarios);
 }
 
+/** Inserta la narrativa de la IA después del título del documento. */
+function conNarrativa(md: string, narrativa?: string): string {
+  if (!narrativa) return md;
+  const [titulo, ...resto] = md.split('\n');
+  return [titulo, '', narrativa.trim(), '', ...resto].join('\n');
+}
+
 async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
   if (!mesaId) return { mesa: null, alcance: undefined };
   const mesa = await getMesa(ctx, mesaId);
@@ -67,7 +74,7 @@ async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
   return { mesa, alcance: await alcanceMesa(ctx, mesaId) };
 }
 
-export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<Acta> {
+export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?: string | null, narrativa?: string): Promise<Acta> {
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
   const { mesa, alcance } = await filtroMesa(ctx, mesaId);
@@ -79,10 +86,10 @@ export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?
     listSenales(ctx, semanaId, ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga']),
   ]);
   const data = { semana, mesa: mesa?.nombre ?? null, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos, pendientes_anteriores: pendientes, usuarios, clientes };
-  return insertActa(ctx, { semana_id: semanaId, tipo: 'plan_operativo', mesa_id: mesa?.id ?? null, contenido: data, markdown: renderPlanOperativo(data) });
+  return insertActa(ctx, { semana_id: semanaId, tipo: 'plan_operativo', mesa_id: mesa?.id ?? null, contenido: data, markdown: conNarrativa(renderPlanOperativo(data), narrativa) });
 }
 
-export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<Acta> {
+export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: string | null, narrativa?: string): Promise<Acta> {
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
   const { mesa, alcance } = await filtroMesa(ctx, mesaId);
@@ -95,5 +102,5 @@ export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: s
     listAcuerdosSemana(ctx, semanaId),
   ]);
   const data = { semana, mesa: mesa?.nombre ?? null, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos: [], pendientes_anteriores: pendientes, usuarios, clientes, senales, acuerdos_semana: acuerdos };
-  return insertActa(ctx, { semana_id: semanaId, tipo: 'cierre', mesa_id: mesa?.id ?? null, contenido: data, markdown: renderActaCierre(data) });
+  return insertActa(ctx, { semana_id: semanaId, tipo: 'cierre', mesa_id: mesa?.id ?? null, contenido: data, markdown: conNarrativa(renderActaCierre(data), narrativa) });
 }

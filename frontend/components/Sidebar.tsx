@@ -11,6 +11,7 @@ const NAV = [
   { href: '/daily', label: 'Daily', icon: '◔' },
   { href: '/weekly', label: 'Weekly', icon: '◷' },
   { href: '/huerfanos', label: 'Huérfanos', icon: '⚠' },
+  { href: '/informes', label: 'Informes', icon: '◈' },
 ];
 const ADMIN = [
   { href: '/admin/clientes', label: 'Clientes', icon: '◉' },
