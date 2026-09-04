@@ -46,9 +46,21 @@ export interface Tenant {
   activo: boolean;
 }
 
+export interface Mesa {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  slug: string;
+  basecamp_project_id: number | null;
+  lider_id: string | null;
+  color: string | null;
+  activa: boolean;
+}
+
 export interface Cliente {
   id: string; // MISMO id que PrometIO
   tenant_id: string;
+  mesa_id: string | null;
   nombre: string;
   slug: string;
   logo_url: string | null;
@@ -124,6 +136,7 @@ export interface Proyecto {
   basecamp_todoset_id: number | null;
   basecamp_todolist_id: number | null;
   sync_estado: SyncEstado;
+  mesa_id: string | null;
   portal_token: string | null;
   portal_activo: boolean;
   created_at: string;
@@ -227,6 +240,7 @@ export interface Acta {
   tenant_id: string;
   semana_id: string;
   tipo: 'plan_operativo' | 'cierre';
+  mesa_id: string | null;
   contenido: Record<string, unknown>;
   markdown: string;
   publicado_at: string | null;

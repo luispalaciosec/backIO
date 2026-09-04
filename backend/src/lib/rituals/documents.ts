@@ -7,6 +7,7 @@ import { temaAgenda } from './signals';
 
 export interface PlanOperativoData {
   semana: Semana;
+  mesa?: string | null;
   capacidad: CapacidadPersona[];
   prioridades: RequerimientoMetricas[];
   riesgos: Senal[];
@@ -60,7 +61,7 @@ function tablaTareas(reqs: RequerimientoMetricas[], d: PlanOperativoData, conEst
 export function renderPlanOperativo(d: PlanOperativoData): string {
   const s = d.semana;
   const lineas: string[] = [];
-  lineas.push(`# Plan Operativo Semanal · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`, '');
+  lineas.push(`# Plan Operativo Semanal${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`, '');
   lineas.push('## 1. Compromisos pendientes de semanas anteriores', '');
   lineas.push(d.pendientes_anteriores.length
     ? d.pendientes_anteriores.map((a) => `- [ ] ${a.descripcion} — **${d.usuarios.find((u) => u.id === a.responsable_id)?.nombre ?? '—'}** · ${fmt(a.fecha_compromiso)}`).join('\n')
@@ -81,7 +82,7 @@ export function renderActaCierre(d: ActaCierreData): string {
   const completadas = d.prioridades.filter((r) => r.estado_operativo === 'completado');
   const noCompletadas = d.prioridades.filter((r) => r.estado_operativo !== 'completado');
   const lineas: string[] = [];
-  lineas.push(`# Acta de Cierre · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`, '');
+  lineas.push(`# Acta de Cierre${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`, '');
   lineas.push(`**Resultado:** ${completadas.length} de ${d.prioridades.length} tareas completadas (${d.prioridades.length ? Math.round((completadas.length / d.prioridades.length) * 100) : 0}%).`, '');
   lineas.push('## 1. Estado de las prioridades', '');
   lineas.push(tablaTareas(d.prioridades, d, true));

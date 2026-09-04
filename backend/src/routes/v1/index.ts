@@ -8,6 +8,7 @@ import { semanas } from './semanas';
 import { usuarios } from './usuarios';
 import { basecamp } from './basecamp';
 import { admin } from './admin';
+import { mesas } from './mesas';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -19,3 +20,4 @@ v1.route('/semanas', semanas);
 v1.route('/usuarios', usuarios);
 v1.route('/basecamp', basecamp);
 v1.route('/admin', admin);
+v1.route('/mesas', mesas);

@@ -45,6 +45,7 @@ const patchSchema = z.object({
   color_primario: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   logo_url: z.string().url().nullable().optional(),
   config: z.record(z.unknown()).optional(),
+  mesa_id: z.string().uuid().nullable().optional(),
 });
 
 clientes.patch('/:id', requireScope('admin'), zValidator('json', patchSchema), async (c) => {

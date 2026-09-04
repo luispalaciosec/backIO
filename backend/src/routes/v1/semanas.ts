@@ -5,6 +5,7 @@ import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { ensureSemana, getSemana, listSenales, marcarSenalAtendida, insertAcuerdo, cerrarAcuerdo, listAcuerdosSemana, listAcuerdosAbiertos, getActa, audit } from '../../lib/db';
 import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre } from '../../lib/rituals/service';
 import { getDaily, fechaLocal } from '../../lib/rituals/daily';
+import { publicarActaEnBasecamp } from '../../lib/mcp/publish';
 
 export const semanas = new Hono();
 
@@ -58,14 +59,14 @@ semanas.post('/:id/acuerdos/:acuerdoId/cerrar', requireScope('write:actas'), zVa
 
 semanas.post('/:id/plan', requireScope('write:actas'), async (c) => {
   const ctx = ctxOf(c);
-  const acta = await generarPlanOperativo(ctx, c.req.param('id'));
+  const acta = await generarPlanOperativo(ctx, c.req.param('id'), c.req.query('mesa') || null);
   await audit(ctx, { accion: 'generar_plan_operativo', entidad: 'acta', entidad_id: acta.id });
   return c.json(acta, 201);
 });
 
 semanas.post('/:id/acta', requireScope('write:actas'), async (c) => {
   const ctx = ctxOf(c);
-  const acta = await generarActaCierre(ctx, c.req.param('id'));
+  const acta = await generarActaCierre(ctx, c.req.param('id'), c.req.query('mesa') || null);
   await audit(ctx, { accion: 'generar_acta_cierre', entidad: 'acta', entidad_id: acta.id });
   return c.json(acta, 201);
 });
@@ -73,4 +74,18 @@ semanas.post('/:id/acta', requireScope('write:actas'), async (c) => {
 semanas.get('/actas/:actaId', requireScope('read:senales'), async (c) => {
   const a = await getActa(ctxOf(c), c.req.param('actaId'));
   return a ? c.json(a) : c.json({ error: 'No encontrada' }, 404);
+});
+
+semanas.post('/actas/:actaId/publicar', requireScope('write:actas'), async (c) => {
+  const ctx = ctxOf(c);
+  const acta = await getActa(ctx, c.req.param('actaId'));
+  if (!acta) return c.json({ error: 'No encontrada' }, 404);
+  if (acta.publicado_at) return c.json({ error: 'Ya publicada' }, 409);
+  try {
+    const r = await publicarActaEnBasecamp(ctx, acta);
+    await audit(ctx, { accion: 'publicar_acta', entidad: 'acta', entidad_id: acta.id, detalle: r });
+    return c.json(r);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
+  }
 });

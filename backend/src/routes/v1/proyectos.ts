@@ -80,6 +80,7 @@ const patchSchema = z.object({
   fecha_entrega: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   owner_ejecutiva: z.string().uuid().nullable().optional(),
   portal_activo: z.boolean().optional(),
+  mesa_id: z.string().uuid().nullable().optional(),
 });
 
 proyectos.patch('/:id', requireScope('write:proyectos'), zValidator('json', patchSchema), async (c) => {

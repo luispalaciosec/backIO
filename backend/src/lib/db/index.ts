@@ -6,3 +6,4 @@ export * from './plantillas';
 export * from './proyectos';
 export * from './requerimientos';
 export * from './semanas';
+export * from './mesas';

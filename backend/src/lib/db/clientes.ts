@@ -54,7 +54,7 @@ export async function upsertClienteDesdePrometio(
 export async function updateClienteConfig(
   ctx: DbCtx,
   id: string,
-  patch: Partial<Pick<Cliente, 'basecamp_project_id' | 'color_primario' | 'logo_url' | 'config'>>,
+  patch: Partial<Pick<Cliente, 'basecamp_project_id' | 'color_primario' | 'logo_url' | 'config' | 'mesa_id'>>,
 ): Promise<Cliente> {
   const { data, error } = await ctx.db
     .from('clientes')

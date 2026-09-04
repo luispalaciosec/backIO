@@ -17,6 +17,7 @@ import { getProyectoDetalle, listProyectos } from '../db/proyectos';
 import { listClientes, getCliente } from '../db/clientes';
 import { listPlantillas, getPlantillaArbol } from '../db/plantillas';
 import { listUsuarios } from '../db/usuarios';
+import { resolverMesa, alcanceMesa, listMesas } from '../db/mesas';
 import { ensureSemana, getSemana, listSenales, getActa, listAcuerdosAbiertos } from '../db/semanas';
 import { audit } from '../db/audit';
 import { sanitizeForClient } from '../visibility';
@@ -80,6 +81,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
       owner: z.string().optional().describe('nombre o id de la persona responsable'),
       estado: z.enum(['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'reprogramado', 'bloqueado', 'completado', 'cancelado']).optional(),
       semana: z.enum(['actual']).optional().describe('"actual" limita a requerimientos con entrega en la semana ISO en curso'),
+      mesa: z.string().optional().describe('nombre o slug de la mesa (Orión, Omega)'),
       min_dias_atraso: z.number().int().min(0).optional(),
       solo_activos: z.boolean().default(true),
       limite: z.number().int().min(1).max(200).default(50),
@@ -92,7 +94,9 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     const owner = args.owner ? m.usuarios.find((u) => u.id === args.owner || u.nombre.toLowerCase().includes(args.owner!.toLowerCase())) : null;
     let desde: string | undefined, hasta: string | undefined;
     if (args.semana === 'actual') { const s = await ensureSemana(ctx, fechaLocal()); desde = s.fecha_inicio; hasta = s.fecha_fin; }
-    const items = await listBacklog(ctx, { cliente_id: cliente?.id, owner: owner?.id, estado: args.estado, min_dias_atraso: args.min_dias_atraso, solo_activos: args.solo_activos, desde, hasta });
+    let alcance;
+    if (args.mesa) { const m2 = await resolverMesa(ctx, args.mesa); if (!m2) return fail(`Mesa "${args.mesa}" no encontrada`); alcance = await alcanceMesa(ctx, m2.id); }
+    const items = await listBacklog(ctx, { cliente_id: cliente?.id, owner: owner?.id, estado: args.estado, min_dias_atraso: args.min_dias_atraso, solo_activos: args.solo_activos, desde, hasta, mesa: alcance });
     return ok({ total: items.length, items: items.slice(0, args.limite).map((r) => reqInterno(r, m.nombres, m.clientes)) });
   })());
 
@@ -253,22 +257,26 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
 
   server.registerTool('generate_weekly_plan', {
     description: 'Genera el Plan Operativo Semanal (markdown en el formato de Geeks). No publica.',
-    inputSchema: { semana_id: z.string().uuid().optional() },
-  }, ({ semana_id }) => guard(['write:actas'], async () => {
+    inputSchema: { semana_id: z.string().uuid().optional(), mesa: z.string().describe('Mesa (Orión, Omega): el acta se publica en su proyecto Basecamp') },
+  }, ({ semana_id, mesa }) => guard(['write:actas'], async () => {
     const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, fechaLocal());
     if (!semana) return fail('Semana no encontrada');
-    const acta = await generarPlanOperativo(ctx, semana.id);
+    const m = await resolverMesa(ctx, mesa);
+    if (!m) return fail(`Mesa "${mesa}" no encontrada. Disponibles: ${(await listMesas(ctx)).map((x) => x.nombre).join(', ')}`);
+    const acta = await generarPlanOperativo(ctx, semana.id, m.id);
     await audit(ctx, { accion: 'generar_plan_operativo', entidad: 'acta', entidad_id: acta.id });
     return ok({ acta_id: acta.id, tipo: acta.tipo, markdown: acta.markdown, siguiente_paso: 'Revisar y, si procede, publish_document con acta_id.' });
   })());
 
   server.registerTool('generate_closing_minutes', {
     description: 'Genera el Acta de Cierre de la semana (markdown). No publica.',
-    inputSchema: { semana_id: z.string().uuid().optional() },
-  }, ({ semana_id }) => guard(['write:actas'], async () => {
+    inputSchema: { semana_id: z.string().uuid().optional(), mesa: z.string().describe('Mesa (Orión, Omega): el acta se publica en su proyecto Basecamp') },
+  }, ({ semana_id, mesa }) => guard(['write:actas'], async () => {
     const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, fechaLocal());
     if (!semana) return fail('Semana no encontrada');
-    const acta = await generarActaCierre(ctx, semana.id);
+    const m = await resolverMesa(ctx, mesa);
+    if (!m) return fail(`Mesa "${mesa}" no encontrada. Disponibles: ${(await listMesas(ctx)).map((x) => x.nombre).join(', ')}`);
+    const acta = await generarActaCierre(ctx, semana.id, m.id);
     await audit(ctx, { accion: 'generar_acta_cierre', entidad: 'acta', entidad_id: acta.id });
     return ok({ acta_id: acta.id, tipo: acta.tipo, markdown: acta.markdown, siguiente_paso: 'Revisar y, si procede, publish_document con acta_id.' });
   })());

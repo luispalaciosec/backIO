@@ -6,6 +6,7 @@ import type { DbCtx } from '../db/client';
 import { listBacklog } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
 import { listClientes } from '../db/clientes';
+import { getMesa, alcanceMesa } from '../db/mesas';
 import { ensureSemana, getSemana, listAcuerdosAbiertos, listAcuerdosSemana, listSenales, replaceSenales, insertActa } from '../db/semanas';
 import { calcularSenales, type SignalThresholds } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
@@ -59,31 +60,40 @@ export async function capacidadSemana(ctx: DbCtx, semanaId: string): Promise<Cap
   return calcularCapacidad(reqs, usuarios);
 }
 
-export async function generarPlanOperativo(ctx: DbCtx, semanaId: string): Promise<Acta> {
+async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
+  if (!mesaId) return { mesa: null, alcance: undefined };
+  const mesa = await getMesa(ctx, mesaId);
+  if (!mesa) throw new Error('Mesa no encontrada');
+  return { mesa, alcance: await alcanceMesa(ctx, mesaId) };
+}
+
+export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<Acta> {
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
+  const { mesa, alcance } = await filtroMesa(ctx, mesaId);
   const [prioridades, usuarios, clientes, pendientes, riesgos] = await Promise.all([
-    listBacklog(ctx, { solo_activos: true, desde: semana.fecha_inicio, hasta: semana.fecha_fin }),
+    listBacklog(ctx, { solo_activos: true, desde: semana.fecha_inicio, hasta: semana.fecha_fin, mesa: alcance }),
     listUsuarios(ctx),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
     listSenales(ctx, semanaId, ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga']),
   ]);
-  const data = { semana, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos, pendientes_anteriores: pendientes, usuarios, clientes };
-  return insertActa(ctx, { semana_id: semanaId, tipo: 'plan_operativo', contenido: data, markdown: renderPlanOperativo(data) });
+  const data = { semana, mesa: mesa?.nombre ?? null, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos, pendientes_anteriores: pendientes, usuarios, clientes };
+  return insertActa(ctx, { semana_id: semanaId, tipo: 'plan_operativo', mesa_id: mesa?.id ?? null, contenido: data, markdown: renderPlanOperativo(data) });
 }
 
-export async function generarActaCierre(ctx: DbCtx, semanaId: string): Promise<Acta> {
+export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<Acta> {
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
+  const { mesa, alcance } = await filtroMesa(ctx, mesaId);
   const [prioridades, usuarios, clientes, pendientes, senales, acuerdos] = await Promise.all([
-    listBacklog(ctx, { desde: semana.fecha_inicio, hasta: semana.fecha_fin }),
+    listBacklog(ctx, { desde: semana.fecha_inicio, hasta: semana.fecha_fin, mesa: alcance }),
     listUsuarios(ctx),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
     listSenales(ctx, semanaId),
     listAcuerdosSemana(ctx, semanaId),
   ]);
-  const data = { semana, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos: [], pendientes_anteriores: pendientes, usuarios, clientes, senales, acuerdos_semana: acuerdos };
-  return insertActa(ctx, { semana_id: semanaId, tipo: 'cierre', contenido: data, markdown: renderActaCierre(data) });
+  const data = { semana, mesa: mesa?.nombre ?? null, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos: [], pendientes_anteriores: pendientes, usuarios, clientes, senales, acuerdos_semana: acuerdos };
+  return insertActa(ctx, { semana_id: semanaId, tipo: 'cierre', mesa_id: mesa?.id ?? null, contenido: data, markdown: renderActaCierre(data) });
 }

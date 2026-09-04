@@ -3,19 +3,27 @@ import type { Acta } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { throwIf } from '../db/client';
 import { BasecampClient } from '../basecamp/client';
+import { getMesa } from '../db/mesas';
 
 export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
-  const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
-  throwIf(error);
-  const cfg = (data as { config: { basecamp_docs_project_id?: number } }).config;
-  if (!cfg.basecamp_docs_project_id) throw new Error('Falta tenants.config.basecamp_docs_project_id (proyecto Basecamp donde viven las actas)');
+  let projectId: number | null = null;
+  if (acta.mesa_id) {
+    const mesa = await getMesa(ctx, acta.mesa_id);
+    projectId = mesa?.basecamp_project_id ?? null;
+    if (!projectId) throw new Error(`La mesa ${mesa?.nombre ?? acta.mesa_id} no tiene proyecto Basecamp configurado`);
+  } else {
+    const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
+    throwIf(error);
+    projectId = (data as { config: { basecamp_docs_project_id?: number } }).config.basecamp_docs_project_id ?? null;
+    if (!projectId) throw new Error('El acta no es de una mesa y falta tenants.config.basecamp_docs_project_id');
+  }
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const proyecto = await bc.request<{ dock: { name: string; id: number }[] }>('GET', `/projects/${cfg.basecamp_docs_project_id}.json`);
+  const proyecto = await bc.request<{ dock: { name: string; id: number }[] }>('GET', `/projects/${projectId}.json`);
   const vault = proyecto.dock.find((d) => d.name === 'vault');
   if (!vault) throw new Error('El proyecto de actas no tiene Docs & Files habilitado');
   const titulo = `${acta.tipo === 'plan_operativo' ? 'Plan Operativo' : 'Acta de Cierre'} · ${acta.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? acta.id}`;
   const html = markdownBasico(acta.markdown);
-  const doc = await bc.createDocument(cfg.basecamp_docs_project_id, vault.id, { title: titulo, content: html });
+  const doc = await bc.createDocument(projectId, vault.id, { title: titulo, content: html });
   const { error: e2 } = await ctx.db.from('actas').update({ publicado_at: new Date().toISOString(), publicado_por: ctx.usuarioId, basecamp_doc_id: doc.id }).eq('id', acta.id);
   throwIf(e2);
   const col = acta.tipo === 'plan_operativo' ? 'plan_publicado_at' : 'acta_publicada_at';

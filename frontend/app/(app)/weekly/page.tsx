@@ -1,4 +1,4 @@
-import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona } from '@backio/shared';
+import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa } from '@backio/shared';
 import { apiServer } from '@/lib/api.server';
 import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
@@ -9,12 +9,13 @@ const SEV: Record<string, string> = { critica: 'bg-red-100 text-red-800', alta: 
 
 export default async function WeeklyPage() {
   const semana = await apiServer<Semana>('/semanas/actual');
-  const [{ items: senales }, { items: acuerdos }, { items: abiertos }, { items: capacidad }, { items: usuarios }] = await Promise.all([
+  const [{ items: senales }, { items: acuerdos }, { items: abiertos }, { items: capacidad }, { items: usuarios }, { items: mesas }] = await Promise.all([
     apiServer<{ items: Senal[] }>(`/semanas/${semana.id}/senales`),
     apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
     apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
     apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad`),
     apiServer<{ items: Usuario[] }>('/usuarios'),
+    apiServer<{ items: Mesa[] }>('/mesas'),
   ]);
   const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
   const hoy = new Date().toISOString().slice(0, 10);
@@ -27,7 +28,7 @@ export default async function WeeklyPage() {
           <h1 className="text-2xl font-bold">Weekly · Semana {semana.numero_iso}</h1>
           <p className="text-sm text-gray-500">{fecha(semana.fecha_inicio)} – {fecha(semana.fecha_fin)} · agenda generada por el motor de señales</p>
         </div>
-        <WeeklyActions semanaId={semana.id} />
+        <WeeklyActions semanaId={semana.id} mesas={mesas.filter((m) => m.activa).map((m) => ({ id: m.id, nombre: m.nombre }))} />
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

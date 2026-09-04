@@ -12,6 +12,7 @@ const NAV = [
 ];
 const ADMIN = [
   { href: '/admin/clientes', label: 'Clientes', icon: '◉' },
+  { href: '/admin/mesas', label: 'Mesas', icon: '▤' },
   { href: '/admin/usuarios', label: 'Usuarios', icon: '⚇' },
   { href: '/admin/integraciones', label: 'Integraciones', icon: '⇄' },
   { href: '/admin/api-keys', label: 'API keys', icon: '⚿' },

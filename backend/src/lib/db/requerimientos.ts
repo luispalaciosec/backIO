@@ -17,6 +17,8 @@ export interface FiltroBacklog {
   hasta?: string; // fecha_entrega <=
   solo_activos?: boolean;
   query?: string;
+  /** Alcance de mesa: requerimientos de estos clientes O de estos proyectos */
+  mesa?: { clienteIds: string[]; proyectoIds: string[] };
 }
 
 export async function listBacklog(ctx: DbCtx, f: FiltroBacklog = {}): Promise<RequerimientoMetricas[]> {
@@ -30,6 +32,13 @@ export async function listBacklog(ctx: DbCtx, f: FiltroBacklog = {}): Promise<Re
   if (f.desde) q = q.gte('fecha_entrega', f.desde);
   if (f.hasta) q = q.lte('fecha_entrega', f.hasta);
   if (f.query) q = q.ilike('titulo_interno', `%${f.query}%`);
+  if (f.mesa) {
+    const partes: string[] = [];
+    if (f.mesa.clienteIds.length) partes.push(`cliente_id.in.(${f.mesa.clienteIds.join(',')})`);
+    if (f.mesa.proyectoIds.length) partes.push(`proyecto_id.in.(${f.mesa.proyectoIds.join(',')})`);
+    if (partes.length === 0) return [];
+    q = q.or(partes.join(','));
+  }
   q = q.order('fecha_entrega', { ascending: true, nullsFirst: false }).order('prioridad');
   const { data, error } = await q;
   throwIf(error);
