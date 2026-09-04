@@ -93,8 +93,14 @@ export default function NuevoProyectoPage() {
 
       {error && <Alert tipo="error">{error}</Alert>}
 
-      {s.paso === 1 && borradores.length > 0 && (
+      {borradores.length > 0 && s.paso === 1 && (
         <Borradores items={borradores} clientes={cat.clientes} plantillas={cat.plantillas} onUsar={usarBorrador} onDescartar={async (id) => { await api(`/proyectos/borradores/${id}/descartar`, { method: 'POST' }); setBorradores((b) => b.filter((x) => x.id !== id)); }} />
+      )}
+      {borradores.length > 0 && s.paso > 1 && !s.prometio_cotizacion_id && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm flex items-center justify-between gap-3">
+          <span className="text-amber-900">Hay {borradores.length} {borradores.length === 1 ? 'cotización ganada' : 'cotizaciones ganadas'} en PrometIO esperando convertirse en proyecto.</span>
+          <button className="btn-secondary" onClick={() => { limpiarBorrador(); setS({ ...ESTADO_INICIAL }); }}>Ver cotizaciones</button>
+        </div>
       )}
       {s.paso === 1 && <Step1Plantilla plantillas={cat.plantillas} onSelect={(id) => elegirPlantilla(id)} seleccionada={s.plantilla?.id ?? null} />}
       {s.paso === 2 && s.plantilla && <Step2Brief state={s} set={set} clientes={cat.clientes} />}
