@@ -14,7 +14,7 @@ import { audit } from '../db/audit';
 import { generarPortalToken } from '../portal/token';
 import { BasecampClient } from './client';
 
-export interface ResultadoImport { listas: number; proyectos_creados: number; requerimientos_creados: number; ya_enlazados: number; omitidos_completados_viejos: number }
+export interface ResultadoImport { listas: number; proyectos_creados: number; requerimientos_creados: number; ya_enlazados: number; omitidos_completados_viejos: number; responsables_actualizados: number }
 
 export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opts: { incluirCompletados?: boolean; diasCompletados?: number } = {}): Promise<ResultadoImport> {
   const cliente = await getCliente(ctx, clienteId);
@@ -28,11 +28,13 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
   const { data: existentesP } = await ctx.db.from('proyectos').select('id, basecamp_todolist_id, basecamp_grupos').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).is('deleted_at', null);
   type P = { id: string; basecamp_todolist_id: number | null; basecamp_grupos: Record<string, number> };
   const proyectoPorLista = new Map(((existentesP ?? []) as P[]).filter((p) => p.basecamp_todolist_id).map((p) => [p.basecamp_todolist_id as number, p]));
-  const { data: existentesR } = await ctx.db.from('requerimientos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).not('basecamp_todo_id', 'is', null);
-  const yaEnlazados = new Set(((existentesR ?? []) as { basecamp_todo_id: number }[]).map((r) => r.basecamp_todo_id));
+  const { data: existentesR } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id, owner_agencia').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).not('basecamp_todo_id', 'is', null).is('deleted_at', null);
+  type RX = { id: string; basecamp_todo_id: number; owner_agencia: string[] };
+  const enlazadoPorTodo = new Map(((existentesR ?? []) as RX[]).map((x) => [x.basecamp_todo_id, x]));
+  const yaEnlazados = new Set(enlazadoPorTodo.keys());
 
   const limiteCompletados = Date.now() - (opts.diasCompletados ?? 60) * 86_400_000;
-  const r: ResultadoImport = { listas: listas.length, proyectos_creados: 0, requerimientos_creados: 0, ya_enlazados: 0, omitidos_completados_viejos: 0 };
+  const r: ResultadoImport = { listas: listas.length, proyectos_creados: 0, requerimientos_creados: 0, ya_enlazados: 0, omitidos_completados_viejos: 0, responsables_actualizados: 0 };
 
   for (const lista of listas) {
     const grupos = await bc.listGroups(cliente.basecamp_project_id, lista.id);
@@ -44,6 +46,17 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
     const nuevos = todosPlanos.filter((t) => !yaEnlazados.has(t.id));
     const filtrados = nuevos.filter((t) => !(t.completed && t.completed_at && new Date(t.completed_at).getTime() < limiteCompletados));
     r.ya_enlazados += todosPlanos.length - nuevos.length;
+    // Reimportación: completar responsables de to-dos ya enlazados que quedaron sin owner
+    // (p. ej. porque los usuarios aún no tenían basecamp_user_id al importar).
+    for (const t of todosPlanos) {
+      const ex = enlazadoPorTodo.get(t.id);
+      if (!ex || ex.owner_agencia.length) continue;
+      const owners = t.assignee_ids.map((id) => porBcUser.get(id)).filter((x): x is string => !!x);
+      if (!owners.length) continue;
+      const { error } = await ctx.db.from('requerimientos').update({ owner_agencia: owners }).eq('id', ex.id);
+      throwIf(error);
+      r.responsables_actualizados += 1;
+    }
     r.omitidos_completados_viejos += nuevos.length - filtrados.length;
     if (filtrados.length === 0 && (proyectoPorLista.has(lista.id) || todosPlanos.length === 0)) continue;
 
