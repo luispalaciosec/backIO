@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
-import { env } from './config/env';
+import { env, frontendOrigins } from './config/env';
 import { DbError } from './lib/db';
 import { v1 } from './routes/v1';
 import { portal } from './routes/portal';
@@ -14,7 +14,7 @@ export function createApp(): Hono {
   const app = new Hono();
   app.use('*', secureHeaders());
   if (env().NODE_ENV !== 'test') app.use('*', logger());
-  app.use('/api/*', cors({ origin: [env().FRONTEND_URL], allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
+  app.use('/api/*', cors({ origin: frontendOrigins(), allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
 
   app.get('/health', (c) => c.json({ ok: true, servicio: 'backio-backend', ts: new Date().toISOString() }));
   app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /api/portal/\n'));

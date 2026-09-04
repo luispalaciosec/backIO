@@ -12,7 +12,7 @@ const schema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   BACKEND_PORT: z.coerce.number().default(4000),
-  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  FRONTEND_URL: z.string().default('http://localhost:3000'), // una o varias URLs separadas por coma
   ANTHROPIC_API_KEY: z.string().optional(),
   BASECAMP_CLIENT_ID: z.string().optional(),
   BASECAMP_CLIENT_SECRET: z.string().optional(),
@@ -27,6 +27,10 @@ const schema = z.object({
 export type Env = z.infer<typeof schema>;
 
 let cached: Env | null = null;
+
+export function frontendOrigins(): string[] {
+  return env().FRONTEND_URL.split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean);
+}
 
 export function env(): Env {
   if (cached) return cached;

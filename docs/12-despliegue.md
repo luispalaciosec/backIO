@@ -21,7 +21,7 @@ Frontend en **Vercel** (https://backio.vercel.app), backend en **Railway** (http
 | `SUPABASE_URL` | `https://gckjyjvqvdfayjrtfbmj.supabase.co` |
 | `SUPABASE_ANON_KEY` | anon key del proyecto |
 | `SUPABASE_SERVICE_ROLE_KEY` | service role key (solo aquí, nunca en el frontend) |
-| `FRONTEND_URL` | `https://backio.vercel.app` (para CORS) |
+| `FRONTEND_URL` | `https://backio.vercel.app,http://localhost:3000` (CORS; varias URLs separadas por coma) |
 | `ANTHROPIC_API_KEY` | para el resumen ejecutivo del portal |
 | `BASECAMP_CLIENT_ID` / `BASECAMP_CLIENT_SECRET` / `BASECAMP_ACCOUNT_ID` | de la app OAuth de Basecamp |
 | `BASECAMP_REDIRECT_URI` | `https://backiobackend-production.up.railway.app/api/basecamp/oauth/callback` (debe coincidir en Basecamp) |
