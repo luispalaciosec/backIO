@@ -28,7 +28,11 @@ export default function AdminUsuariosPage() {
   }
   async function invitar(e: FormEvent) {
     e.preventDefault(); setError(null);
-    try { await api('/admin/invitaciones', { method: 'POST', json: inv }); setInv({ email: '', nombre: '', rol: 'colaborador', capacidad_semanal: 40 }); await cargar(); }
+    try {
+      const r = await api<{ envio?: { enviado: boolean; error?: string; url?: string } }>('/admin/invitaciones', { method: 'POST', json: inv });
+      if (r.envio && !r.envio.enviado) setError(`Invitación guardada pero el correo no salió: ${r.envio.error ?? 'error'}${r.envio.url ? `. Enlace: ${r.envio.url}` : ''}`);
+      setInv({ email: '', nombre: '', rol: 'colaborador', capacidad_semanal: 40 }); await cargar();
+    }
     catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
   }
 
@@ -36,7 +40,7 @@ export default function AdminUsuariosPage() {
     <div className="max-w-5xl space-y-6">
       <header>
         <h1 className="text-2xl font-bold">Usuarios</h1>
-        <p className="text-sm text-gray-500">La cuenta se crea en Supabase Auth. Si hay invitación para ese correo, entra con el rol indicado; si no, un correo @geeks entra como colaborador.</p>
+        <p className="text-sm text-gray-500">Al guardar una invitación se crea la cuenta y la persona recibe un correo para definir su contraseña. Entra con el rol indicado; un correo @geeks sin invitación entra como colaborador.</p>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
 
@@ -68,7 +72,7 @@ export default function AdminUsuariosPage() {
             <input className="input w-24" type="number" min={1} max={80} value={inv.capacidad_semanal} onChange={(e) => setInv({ ...inv, capacidad_semanal: Number(e.target.value) })} />
           </div>
           <button className="btn-primary w-full">Guardar invitación</button>
-          <p className="text-xs text-gray-500">Luego crea la cuenta en Supabase → Authentication → Users con ese correo.</p>
+          <p className="text-xs text-gray-500">Se crea la cuenta y se envía el correo con el enlace para definir contraseña (vence en 24 h). Si no llega, usa “reenviar”.</p>
         </form>
         <div className="card p-4">
           <div className="font-semibold mb-2">Invitaciones</div>
@@ -76,7 +80,10 @@ export default function AdminUsuariosPage() {
             {invitaciones.map((i) => (
               <li key={i.id} className="py-2 flex justify-between gap-2">
                 <span>{i.nombre} · {i.email} · <span className="text-gray-500">{i.rol}</span></span>
-                {i.usada_at ? <span className="text-xs text-green-700">usada</span> : <button className="text-xs text-red-600" onClick={async () => { await api(`/admin/invitaciones/${i.id}`, { method: 'DELETE' }); void cargar(); }}>eliminar</button>}
+                <span className="flex gap-3">
+                  <button className="text-xs text-brand" onClick={async () => { setError(null); try { await api(`/admin/invitaciones/${i.id}/reenviar`, { method: 'POST' }); alert(`Invitación reenviada a ${i.email}`); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); } }}>reenviar</button>
+                  {i.usada_at ? <span className="text-xs text-green-700">usada</span> : <button className="text-xs text-red-600" onClick={async () => { await api(`/admin/invitaciones/${i.id}`, { method: 'DELETE' }); void cargar(); }}>eliminar</button>}
+                </span>
               </li>
             ))}
             {invitaciones.length === 0 && <li className="text-gray-400 py-2">Sin invitaciones.</li>}

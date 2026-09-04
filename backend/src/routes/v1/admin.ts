@@ -4,6 +4,8 @@ import { zValidator } from '@hono/zod-validator';
 import { randomBytes } from 'node:crypto';
 import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
 import { listUsuarios, audit, throwIf, serviceClient } from '../../lib/db';
+import { frontendOrigins } from '../../config/env';
+import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 
 export const admin = new Hono();
 admin.use('*', requireScope('admin'));
@@ -55,7 +57,50 @@ admin.post('/invitaciones', zValidator('json', z.object({
     .single();
   throwIf(error);
   await audit(ctx, { accion: 'crear_invitacion', entidad: 'invitacion', entidad_id: (data as { id: string }).id, detalle: { email: body.email, rol: body.rol } });
-  return c.json(data, 201);
+  const envio = await enviarInvitacion(body.email.toLowerCase(), body.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
+  return c.json({ ...(data as object), envio }, 201);
+});
+
+/**
+ * Crea (o reutiliza) la cuenta en Supabase Auth y envía el enlace de invitación por Resend.
+ * El trigger handle_new_auth_user completa la fila en usuarios con el rol de la invitación.
+ * El enlace lleva a /auth/establecer-clave en el frontend.
+ */
+async function enviarInvitacion(email: string, nombre: string): Promise<{ enviado: boolean; error?: string; url?: string }> {
+  const sb = serviceClient();
+  const redirectTo = `${frontendOrigins()[0] ?? 'http://localhost:3000'}/auth/establecer-clave`;
+  const { data, error } = await sb.auth.admin.generateLink({ type: 'invite', email, options: { redirectTo, data: { name: nombre } } });
+  if (error) {
+    // Usuario ya existente: enviar enlace de recuperación para que fije su clave.
+    if (/already|exists|registered/i.test(error.message)) {
+      const r = await sb.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo } });
+      if (r.error) return { enviado: false, error: r.error.message };
+      return mandar(email, nombre, r.data.properties.action_link, true);
+    }
+    return { enviado: false, error: error.message };
+  }
+  return mandar(email, nombre, data.properties.action_link, false);
+}
+
+async function mandar(email: string, nombre: string, link: string, existente: boolean): Promise<{ enviado: boolean; error?: string; url?: string }> {
+  if (!emailHabilitado()) return { enviado: false, error: 'RESEND_API_KEY no configurada; comparte el enlace manualmente', url: link };
+  const titulo = existente ? 'Restablece tu acceso a BackIO' : 'Te invitaron a BackIO';
+  const cuerpo = existente
+    ? `Hola ${nombre}. Usa el botón para definir tu contraseña y entrar a BackIO, la capa de gestión de Geeks.`
+    : `Hola ${nombre}. Te crearon una cuenta en BackIO, la capa de gestión de backlog de Geeks. Usa el botón para definir tu contraseña y entrar. El enlace vence en 24 horas.`;
+  await sendEmail({ to: email, subject: `[BackIO] ${titulo}`, html: plantillaHtml(titulo, cuerpo, link), text: `${cuerpo}\n${link}` });
+  return { enviado: true };
+}
+
+admin.post('/invitaciones/:id/reenviar', async (c) => {
+  const ctx = ctxOf(c);
+  const { data, error } = await ctx.db.from('invitaciones').select('email, nombre').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('id')).maybeSingle();
+  throwIf(error);
+  if (!data) return c.json({ error: 'Invitación no encontrada' }, 404);
+  const inv = data as { email: string; nombre: string };
+  const envio = await enviarInvitacion(inv.email, inv.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
+  await audit(ctx, { accion: 'reenviar_invitacion', entidad: 'invitacion', entidad_id: c.req.param('id'), detalle: envio });
+  return c.json(envio, envio.enviado ? 200 : 422);
 });
 
 admin.delete('/invitaciones/:id', async (c) => {

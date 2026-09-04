@@ -62,14 +62,18 @@ prometioWebhook.post('/', async (c) => {
   let parsedRaw: unknown;
   try { parsedRaw = JSON.parse(raw); } catch { return c.json({ error: 'bad json' }, 400); }
   const env1 = envelope.safeParse(parsedRaw);
-  if (!env1.success) return c.json({ error: 'payload inválido', detalle: env1.error.issues }, 400);
-  const { evento, data } = env1.data;
   const tenantId = await tenantDefault();
   const ctx = { db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' as const };
+  const invalido = async (evento: string, issues: unknown) => {
+    await audit(ctx, { accion: 'webhook_payload_invalido', entidad: 'webhook', detalle: { evento, issues } });
+    return c.json({ error: 'payload inválido', detalle: issues }, 400);
+  };
+  if (!env1.success) return invalido(String((parsedRaw as { evento?: unknown })?.evento ?? 'desconocido'), env1.error.issues);
+  const { evento, data } = env1.data;
 
   if (evento === 'empresa.creada' || evento === 'empresa.actualizada') {
     const e = empresa.safeParse(data);
-    if (!e.success) return c.json({ error: 'empresa inválida', detalle: e.error.issues }, 400);
+    if (!e.success) return invalido(evento, e.error.issues);
     const cl = await upsertClienteDesdePrometio(ctx, { id: e.data.id, nombre: e.data.nombre, activo: e.data.activo });
     if (e.data.logo_url) await ctx.db.from('clientes').update({ logo_url: e.data.logo_url }).eq('id', cl.id).is('logo_url', null);
     await audit(ctx, { accion: evento, entidad: 'cliente', entidad_id: cl.id });
@@ -78,7 +82,7 @@ prometioWebhook.post('/', async (c) => {
 
   if (evento === 'cotizacion.aprobada') {
     const p = cotizacionAprobada.safeParse(data);
-    if (!p.success) return c.json({ error: 'cotización inválida', detalle: p.error.issues }, 400);
+    if (!p.success) return invalido(evento, p.error.issues);
     const cot = p.data;
     // Garantiza que el cliente exista (mismo id que PrometIO).
     const cliente = (await getCliente(ctx, cot.empresa.id)) ?? (await upsertClienteDesdePrometio(ctx, { id: cot.empresa.id, nombre: cot.empresa.nombre, activo: cot.empresa.activo }));
