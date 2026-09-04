@@ -36,6 +36,9 @@ Se calculan el domingo a las 18:00 y se persisten en `senales`.
 | Tipo | Condición | Severidad | Tema que entra a agenda |
 |---|---|---|---|
 | `arrastre_reincidente` | `veces_reprogramado >= 2` | Crítica | "Decidir: se hace, se reasigna o se mata" |
+| `reproceso_reincidente` | `veces_reproceso >= 2` | Crítica | "Revisar brief y control de calidad antes de enviar" (ver `16-cumplimiento.md`) |
+| `reprogramacion_sin_motivo` | reprogramación sin causa en 45 días | Media | "Completar la causa de la reprogramación" |
+| `reproceso_sin_motivo` | reproceso sin causa en 45 días | Media | "Completar la causa del reproceso" |
 | `concentracion_carga` | Un owner con >30% de tareas de la semana | Crítica | "Redistribución de carga — riesgo de punto único" |
 | `bloqueo_cliente` | `estado_aprobacion = 'pendiente_cliente'` y >5 días | Alta | "Escalamiento a ejecutiva de cuenta" |
 | `cuenta_silenciosa` | Cliente sin requerimientos completados en 14 días | Alta | "Revisión de estado de cuenta" |
