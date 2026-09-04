@@ -23,9 +23,9 @@ export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { 
         <option value="">Toda la agencia</option>
         {mesas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
       </select>
-      <button className="btn-secondary" disabled={!!busy} onClick={() => run('senales', async () => { await api(`/semanas/${semanaId}/senales/recalcular`, { method: 'POST' }); })}>Recalcular señales</button>
-      <button className="btn-secondary" disabled={!!busy} onClick={() => run('plan', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/plan${q}`, { method: 'POST' })); })}>Generar Plan Operativo</button>
-      <button className="btn-secondary" disabled={!!busy} onClick={() => run('acta', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/acta${q}`, { method: 'POST' })); })}>Generar Acta de Cierre</button>
+      <button className="btn-secondary" disabled={!!busy} onClick={() => run('senales', async () => { await api(`/semanas/${semanaId}/senales/recalcular`, { method: 'POST' }); })}>↻ Recalcular señales</button>
+      <button className="btn-primary" disabled={!!busy} onClick={() => run('plan', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/plan${q}`, { method: 'POST' })); })}>📋 Generar Plan Operativo</button>
+      <button className="btn-success" disabled={!!busy} onClick={() => run('acta', async () => { setPub(null); setActa(await api<Acta>(`/semanas/${semanaId}/acta${q}`, { method: 'POST' })); })}>✅ Generar Acta de Cierre</button>
       {acta && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setActa(null)}>
           <div className="card max-w-3xl w-full max-h-[85vh] overflow-auto p-6" onClick={(e) => e.stopPropagation()}>

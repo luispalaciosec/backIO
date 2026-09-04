@@ -23,8 +23,8 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
     <div className="flex flex-wrap items-center gap-2">
       <select className="input w-40" value={mesa} onChange={(e) => setMesa(e.target.value)}>{mesas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>
       <input className="input w-72" placeholder="Notas clave del día (una por línea)" value={notas} onChange={(e) => setNotas(e.target.value)} />
-      <button className="btn-secondary" disabled={!!busy} onClick={() => publicar('apertura')}>🟢 Publicar apertura</button>
-      <button className="btn-secondary" disabled={!!busy} onClick={() => publicar('cierre')}>🔴 Publicar cierre</button>
+      <button className="btn-success" disabled={!!busy} onClick={() => publicar('apertura')}>Publicar apertura</button>
+      <button className="btn-danger" disabled={!!busy} onClick={() => publicar('cierre')}>Publicar cierre</button>
       {msg && <span className="text-xs text-gray-600 w-full">{msg}</span>}
     </div>
   );

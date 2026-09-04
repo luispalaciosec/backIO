@@ -50,11 +50,11 @@ export default function AdminClientesPage() {
             <div className="flex gap-1">
               <button className="btn-primary">Guardar</button>
               {c.basecamp_project_id && (
-                <button type="button" className="btn-ghost text-xs" title="Registrar webhook de BackIO en el proyecto Basecamp" onClick={async () => {
+                <button type="button" className={`${(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? 'btn-success' : 'btn-secondary'} text-xs`} title="Registrar webhook de BackIO en el proyecto Basecamp" onClick={async () => {
                   setError(null); setOk(null);
                   try { const r = await api<{ webhook_id: number }>(`/clientes/${c.id}/basecamp/webhook`, { method: 'POST' }); setOk(`Webhook ${r.webhook_id} registrado en Basecamp para ${c.nombre}`); await cargar(); }
                   catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
-                }}>{(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? '✓ webhook' : 'Webhook'}</button>
+                }}>{(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? '✓ Webhook activo' : 'Activar webhook'}</button>
               )}
               {(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id && (
                 <button type="button" className="btn-ghost text-xs" title="Ver entregas recientes del webhook" onClick={async () => {
