@@ -71,6 +71,7 @@ const patchSchema = z.object({
   prioridad: z.enum(['alta', 'media', 'baja']).optional(),
   peso: z.number().min(0).optional(),
   fecha_entrega: fecha.nullable().optional(),
+  fecha_pedido: fecha.nullable().optional(),
   owner_agencia: z.array(z.string().uuid()).optional(),
   owner_cliente: z.array(z.string()).nullable().optional(),
   piezas: z.number().int().min(0).optional(),

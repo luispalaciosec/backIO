@@ -58,6 +58,7 @@ export type ActualizarRequerimientoInput = Partial<
     | 'prioridad'
     | 'peso'
     | 'fecha_entrega'
+    | 'fecha_pedido'
     | 'owner_agencia'
     | 'owner_cliente'
     | 'piezas'
