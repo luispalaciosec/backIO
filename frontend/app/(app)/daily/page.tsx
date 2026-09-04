@@ -1,6 +1,7 @@
 import type { DailyView, Usuario, Mesa } from '@backio/shared';
 import { DailyPublicar } from './DailyPublicar';
 import { apiServer } from '@/lib/api.server';
+import { meServer, puedeEscribir } from '@/lib/me.server';
 import { fecha } from '@/lib/format';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** Daily: una sola pantalla, sin scroll, proyectable. El daily no prioriza, desbloquea. */
 export default async function DailyPage() {
-  const [d, { items: usuarios }, { items: mesas }] = await Promise.all([apiServer<DailyView>('/semanas/daily'), apiServer<{ items: Usuario[] }>('/usuarios'), apiServer<{ items: Mesa[] }>('/mesas')]);
+  const [d, { items: usuarios }, { items: mesas }, me] = await Promise.all([apiServer<DailyView>('/semanas/daily'), apiServer<{ items: Usuario[] }>('/usuarios'), apiServer<{ items: Mesa[] }>('/mesas'), meServer()]);
   const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
   const Col = ({ titulo, items, vacio }: { titulo: string; items: DailyView['bloqueos_nuevos']; vacio: string }) => (
     <section className="card flex flex-col min-h-0">
@@ -29,7 +30,7 @@ export default async function DailyPage() {
     <div className="h-[calc(100vh-3rem)] flex flex-col gap-4">
       <header className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-2xl font-bold">Daily · {new Intl.DateTimeFormat('es-EC', { timeZone: 'America/Guayaquil', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</h1>
-        <DailyPublicar mesas={mesas.filter((m) => m.activa && m.basecamp_board_daily_id).map((m) => ({ id: m.id, nombre: m.nombre }))} />
+        {puedeEscribir(me.rol) ? <DailyPublicar mesas={mesas.filter((m) => m.activa && m.basecamp_board_daily_id).map((m) => ({ id: m.id, nombre: m.nombre }))} /> : <span className="text-xs text-gray-400">Solo lectura · la apertura y el cierre los publica quien lleva la mesa</span>}
       </header>
       <div className="grid grid-cols-3 gap-4 flex-1 min-h-0">
         <Col titulo="Vence hoy o mañana sin iniciar" items={d.vencen_hoy_o_manana_sin_iniciar} vacio="Nada vence sin iniciar." />

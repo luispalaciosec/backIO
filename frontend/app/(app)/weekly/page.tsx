@@ -2,13 +2,15 @@ import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa } from '@b
 import { apiServer } from '@/lib/api.server';
 import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
+import { meServer, puedeEscribir } from '@/lib/me.server';
 
 export const dynamic = 'force-dynamic';
 
 const SEV: Record<string, string> = { critica: 'bg-red-100 text-red-800', alta: 'bg-amber-100 text-amber-800', media: 'bg-gray-100 text-gray-700' };
 
 export default async function WeeklyPage() {
-  const semana = await apiServer<Semana>('/semanas/actual');
+  const [semana, me] = await Promise.all([apiServer<Semana>('/semanas/actual'), meServer()]);
+  const escribe = puedeEscribir(me.rol);
   const [{ items: senales }, { items: acuerdos }, { items: abiertos }, { items: capacidad }, { items: usuarios }, { items: mesas }] = await Promise.all([
     apiServer<{ items: Senal[] }>(`/semanas/${semana.id}/senales`),
     apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
@@ -29,7 +31,7 @@ export default async function WeeklyPage() {
           <h1 className="text-2xl font-bold">Weekly · Semana {semana.numero_iso}</h1>
           <p className="text-sm text-gray-500">{fecha(semana.fecha_inicio)} – {fecha(semana.fecha_fin)} · agenda generada por el motor de señales</p>
         </div>
-        <WeeklyActions semanaId={semana.id} mesas={mesas.filter((m) => m.activa).map((m) => ({ id: m.id, nombre: m.nombre }))} />
+        {escribe ? <WeeklyActions semanaId={semana.id} mesas={mesas.filter((m) => m.activa).map((m) => ({ id: m.id, nombre: m.nombre }))} /> : <span className="text-xs text-gray-400">Solo lectura · los documentos los genera operaciones</span>}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -83,7 +85,7 @@ export default async function WeeklyPage() {
           <section className="card p-4 space-y-3">
             <div className="font-semibold">Acuerdos de la sesión</div>
             <p className="text-xs text-gray-500">Tres campos. La fecha es real: no existe “próxima weekly”.</p>
-            <AcuerdoForm semanaId={semana.id} usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre }))} />
+            {escribe ? <AcuerdoForm semanaId={semana.id} usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre }))} /> : <p className="text-xs text-gray-400">Los acuerdos los registra quien dirige el weekly.</p>}
             <ul className="divide-y divide-gray-100 text-sm">
               {acuerdos.map((a) => (
                 <li key={a.id} className="py-2"><div>{a.descripcion}</div><div className="text-xs text-gray-500">{nombre(a.responsable_id)} · {fecha(a.fecha_compromiso)} · {a.estado}</div></li>
