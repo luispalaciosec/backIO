@@ -91,6 +91,7 @@ export function buildSpec(base: string) {
       '/semanas/{id}/plan': { post: { operationId: 'generarPlanOperativo', summary: 'Generar Plan Operativo (markdown)', parameters: [path('id'), q('mesa', 'uuid de la mesa')], responses: { '201': { description: 'Acta' } } } },
       '/semanas/{id}/acta': { post: { operationId: 'generarActaCierre', summary: 'Generar Acta de Cierre (markdown)', parameters: [path('id'), q('mesa', 'uuid de la mesa')], responses: { '201': { description: 'Acta' } } } },
       '/semanas/daily': { get: { operationId: 'getDaily', summary: 'Las tres señales del daily', responses: { '200': { description: 'DailyView' } } } },
+      '/dashboard': { get: { operationId: 'getDashboard', summary: 'KPIs, salud por cliente, carga por persona, arrastre, serie 8 semanas', parameters: [q('mesa', 'uuid de la mesa')], responses: { '200': { description: 'Dashboard' } } } },
       '/mesas': { get: { operationId: 'listMesas', summary: 'Mesas (equipos de cuenta)', responses: { '200': { description: 'Mesas' } } } },
     },
   };

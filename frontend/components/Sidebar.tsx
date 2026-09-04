@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { SignOutButton } from '@/components/SignOutButton';
 
 const NAV = [
+  { href: '/dashboard', label: 'Dashboard', icon: '◧' },
   { href: '/backlog', label: 'Backlog', icon: '☰' },
   { href: '/proyectos', label: 'Proyectos', icon: '▦' },
   { href: '/daily', label: 'Daily', icon: '◔' },

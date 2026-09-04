@@ -29,6 +29,7 @@ import { updateRequerimiento, getRequerimiento } from '../db/requerimientos';
 import { pushDueDate } from '../basecamp/write';
 import { publicarActaEnBasecamp } from './publish';
 import { guardarPlan, tomarPlan, guardarResultado } from './plans';
+import { buildDashboard } from '../dashboard';
 import type { CrearProyectoInput, ActualizarRequerimientoInput, Requerimiento } from '@backio/shared';
 
 type Text = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -189,6 +190,16 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
       plantillas: arboles.filter(Boolean).map((p) => ({ id: p!.id, nombre: p!.nombre, tipo: p!.tipo, bloques: p!.bloques.map((b) => ({ id: b.id, nombre: b.nombre, peso: b.peso, opcional: b.opcional, tareas: b.tareas.length })) })),
       equipo: usuarios.map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol, capacidad_semanal: u.capacidad_semanal })),
     });
+  })());
+
+  server.registerTool('get_dashboard', {
+    description: 'KPIs de la agencia o de una mesa: activos, atrasados, sin movimiento, esperando cliente, salud por cliente, carga por persona, arrastre y serie de 8 semanas.',
+    inputSchema: { mesa: z.string().optional().describe('nombre o slug de la mesa; vacío = toda la agencia') },
+  }, ({ mesa }) => guard(['read:backlog', 'read:proyectos'], async () => {
+    if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
+    let mesaId: string | null = null;
+    if (mesa) { const m = await resolverMesa(ctx, mesa); if (!m) return fail(`Mesa "${mesa}" no encontrada`); mesaId = m.id; }
+    return ok(await buildDashboard(ctx, mesaId));
   })());
 
   // ------------------------------------------------------------ ESCRITURA (preview + confirm)

@@ -17,6 +17,7 @@ export default async function WeeklyPage() {
     apiServer<{ items: Usuario[] }>('/usuarios'),
     apiServer<{ items: Mesa[] }>('/mesas'),
   ]);
+  const dash = await apiServer<{ arrastre: { requerimiento_id: string; titulo: string; cliente: string; owner: string | null; veces_reprogramado: number; fecha_original: string | null; fecha_actual: string | null; dias_arrastre: number }[] }>('/dashboard');
   const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
   const hoy = new Date().toISOString().slice(0, 10);
   const vencidos = abiertos.filter((a) => a.fecha_compromiso < hoy);
@@ -57,7 +58,20 @@ export default async function WeeklyPage() {
           </section>
 
           <section className="card">
-            <div className="px-4 py-3 border-b border-gray-200 font-semibold">3. Capacidad (calculada, no declarada)</div>
+            <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between"><span>3. Arrastre ({dash.arrastre.length})</span><span className="text-xs font-normal text-gray-500">se hace, se reasigna o se mata</span></div>
+            <ul className="divide-y divide-gray-100">
+              {dash.arrastre.length === 0 && <li className="p-4 text-sm text-gray-400">Sin arrastre.</li>}
+              {dash.arrastre.slice(0, 15).map((a) => (
+                <li key={a.requerimiento_id} className="p-3 text-sm flex items-center justify-between gap-3">
+                  <div><div>{a.titulo}</div><div className="text-xs text-gray-500">{a.cliente} · {a.owner ?? 'sin owner'} · {fecha(a.fecha_original)} → {fecha(a.fecha_actual)}</div></div>
+                  <div className="text-right whitespace-nowrap"><div className={`font-semibold ${a.veces_reprogramado >= 2 ? 'text-red-600' : 'text-amber-600'}`}>{a.veces_reprogramado}× reprog.</div><div className="text-xs text-gray-500">{a.dias_arrastre} días</div></div>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="card">
+            <div className="px-4 py-3 border-b border-gray-200 font-semibold">4. Capacidad (calculada, no declarada)</div>
             <table className="w-full"><thead><tr><th className="th">Persona</th><th className="th text-right">Tareas</th><th className="th text-right">% total</th><th className="th text-right">Capacidad h</th></tr></thead>
               <tbody>{capacidad.map((c) => (
                 <tr key={c.usuario_id}><td className="td">{c.nombre}</td><td className="td text-right">{c.tareas}</td><td className={`td text-right ${c.pct_del_total > 30 ? 'text-red-600 font-semibold' : ''}`}>{c.pct_del_total}%</td><td className="td text-right">{c.capacidad_semanal}</td></tr>
