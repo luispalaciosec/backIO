@@ -141,4 +141,7 @@ insert into mapeo_servicios (tenant_id, servicio_prometio, plantilla_id) values
 ('00000000-0000-4000-8000-000000000001', 'Campaña 360', (select id from plantillas where tenant_id='00000000-0000-4000-8000-000000000001' and nombre='Creatividad de Campañas'))
 on conflict (tenant_id, servicio_prometio) do update set plantilla_id = excluded.plantilla_id;
 
+-- Las plantillas iniciales que el catálogo reemplaza dejan de ofrecerse.
+update plantillas set activa = false where tenant_id = '00000000-0000-4000-8000-000000000001' and nombre in ('Fee mensual', 'Campaña 360', 'Trade / Retail');
+
 drop function pg_temp.seed_pl(uuid, text, text, tipo_plantilla_t, text, text, text, text, boolean, text, jsonb);

@@ -14,6 +14,23 @@ Reemplaza la carga manual tarea por tarea de Monday.
 
 ### Paso 1 — Tipo de trabajo
 
+**Catálogo consolidado (04/09/2026).** El paso 1 muestra las 25 familias vendibles del
+`Catalogo_Pilares_v3` agrupadas por pilar, más "Lanzamiento de producto" y "Pieza suelta":
+
+| Pilar | Familias |
+|---|---|
+| Marca | Kit de Identidad de Marca · Gestión de Redes Sociales (recurrente) · Reportería y Escucha Activa RRSS (recurrente) · Piezas de Imagen Corporativa · Diseño de Piezas ATL / Prensa · Empaque y Etiquetas |
+| Crecimiento | Desarrollo Web · Desarrollo de Apps · CRM y Marketing Directo · Dashboards Básicos · Meta CAPI / Eventos de Conversión · SEO / SEM (recurrente) · Automatización de Performance |
+| Transformación | Chatbots y Agentes de IA · Automatización de Procesos / RPA · Minería de Procesos · Analítica Predictiva · IA Generativa a Medida · Arquitectura de Datos · Dashboards con Analítica Automatizada · Proyectos Especiales de Innovación |
+| Transversal | Producción Audiovisual · Creatividad de Campañas · BTL / Activaciones · Kit de Activación POP |
+
+Medios (Audela) no tiene plantilla: no se produce por pieza. Las 37 líneas del tarifario 2024 y
+los nombres de servicio de PrometIO están mapeados a su familia en `mapeo_servicios`, así que una
+cotización aprobada sugiere la plantilla correcta. Cada familia lleva pilar, unidad (proyecto, mes,
+pieza) y precio de referencia. Las plantillas se editan en Admin → Plantillas, pueden ser generales o
+de un cliente, y cualquier proyecto se puede "guardar como plantilla". Seed: `backend/supabase/seed_catalogo.sql`.
+
+
 Selección de plantilla. Cards visuales, no dropdown.
 
 | Plantilla | Cuándo | Bloques |
