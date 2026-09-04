@@ -59,6 +59,7 @@ unifica la capa de gestión sin tocar la capa de ejecución.
 | 11 | `docs/11-setup.md` | Estructura del repo, variables de entorno, cómo correr |
 | 12 | `docs/12-despliegue.md` | Railway (backend) + Vercel (frontend), variables por plataforma |
 | 13 | `docs/13-mcp.md` | Conectar Claude y otros agentes al MCP Server |
+| 14 | `docs/14-plan-v2.md` | Plan v2: fidelidad Basecamp, plantillas, horas, IA, adopción |
 
 ---
 
