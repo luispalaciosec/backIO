@@ -17,7 +17,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 | **2.5** | Motor de señales, Plan Operativo, Acta de Cierre, vista Daily | 4 | Decisión: ¿GG en backlog? |
 | **2.7** | API REST + MCP Server + scopes + adaptador OpenAPI | 4 | Fase 2 |
 | **3** | Portal cliente + resumen ejecutivo IA | 5 | Fase 2, tests de visibilidad |
-| **3.5** | Webhooks bidireccionales con PrometIO | 2 | Fase 2.7 · **emisor en rama `backio-webhooks` de prometio-backend, pendiente merge** |
+| **3.5** | Webhooks bidireccionales con PrometIO | 2 | Fase 2.7 · **hecho 04/09/2026**: empresa y cotización aprobada verificadas de punta a punta |
 | **4** | Dashboards, vista weekly con arrastre, métricas de piezas | 4 | Fase 2.5 · **hecho 04/09/2026** |
 | **5** | Migración de cuentas activas, coexistencia, baja de Monday | 5 | Todas |
 

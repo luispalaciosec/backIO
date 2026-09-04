@@ -10,6 +10,7 @@ import { Step2Brief } from './_steps/Step2Brief';
 import { Step3Alcance } from './_steps/Step3Alcance';
 import { Step4EquipoFechas } from './_steps/Step4EquipoFechas';
 import { Step5Revision } from './_steps/Step5Revision';
+import { Borradores, type Borrador } from './_components/Borradores';
 
 const PASOS = ['Tipo de trabajo', 'Brief', 'Alcance', 'Equipo y fechas', 'Revisión'];
 
@@ -19,6 +20,7 @@ export default function NuevoProyectoPage() {
   const [cat, setCat] = useState<Catalogo>({ plantillas: [], clientes: [], usuarios: [] });
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
+  const [borradores, setBorradores] = useState<Borrador[]>([]);
 
   useEffect(() => {
     const b = leerBorrador();
@@ -30,15 +32,30 @@ export default function NuevoProyectoPage() {
     ])
       .then(([p, c, u]) => setCat({ plantillas: p.items, clientes: c.items, usuarios: u.items }))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar el catálogo'));
+    api<{ items: Borrador[] }>('/proyectos/borradores').then((r) => setBorradores(r.items)).catch(() => {});
   }, []);
   useEffect(() => { guardarBorrador(s); }, [s]);
 
   const set = (patch: Partial<WizardState>) => setS((prev) => ({ ...prev, ...patch }));
 
-  async function elegirPlantilla(id: string) {
+  async function elegirPlantilla(id: string, extra: Partial<WizardState> = {}) {
     const arbol = await api<PlantillaArbol>(`/plantillas/${id}`);
     const bloques = Object.fromEntries(arbol.bloques.map((b) => [b.id, { bloque_id: b.id, activo: true, owner_id: null, piezas_por_canal: {} }]));
-    set({ plantilla: arbol, bloques, paso: 2 });
+    set({ plantilla: arbol, bloques, paso: 2, ...extra });
+  }
+
+  /** Desde un borrador de PrometIO: cliente, cotización, nombre y plantilla sugerida ya vienen; la ejecutiva completa el brief. */
+  async function usarBorrador(b: Borrador) {
+    const p = b.payload;
+    const extra: Partial<WizardState> = {
+      cliente_id: b.cliente_id,
+      prometio_cotizacion_id: b.prometio_cotizacion_id,
+      nombre: p.lineas?.[0]?.servicio ? `${p.lineas[0].servicio} - ${p.empresa?.nombre ?? ''}`.trim() : `Cotización ${p.numero ?? ''}`.trim(),
+      fecha_entrega: p.valido_hasta ?? '',
+      brief: { ...s.brief, objetivo_negocio: `Cotización ${p.numero ?? ''} aprobada en PrometIO${p.valor ? ` por USD ${p.valor}` : ''}. Líneas: ${(p.lineas ?? []).map((l) => `${l.servicio} ×${l.cantidad}`).join(', ')}.` },
+    };
+    if (b.plantilla_sugerida_id) await elegirPlantilla(b.plantilla_sugerida_id, extra);
+    else set({ ...extra, paso: 1 });
   }
 
   async function crear() {
@@ -76,7 +93,10 @@ export default function NuevoProyectoPage() {
 
       {error && <Alert tipo="error">{error}</Alert>}
 
-      {s.paso === 1 && <Step1Plantilla plantillas={cat.plantillas} onSelect={elegirPlantilla} seleccionada={s.plantilla?.id ?? null} />}
+      {s.paso === 1 && borradores.length > 0 && (
+        <Borradores items={borradores} clientes={cat.clientes} plantillas={cat.plantillas} onUsar={usarBorrador} onDescartar={async (id) => { await api(`/proyectos/borradores/${id}/descartar`, { method: 'POST' }); setBorradores((b) => b.filter((x) => x.id !== id)); }} />
+      )}
+      {s.paso === 1 && <Step1Plantilla plantillas={cat.plantillas} onSelect={(id) => elegirPlantilla(id)} seleccionada={s.plantilla?.id ?? null} />}
       {s.paso === 2 && s.plantilla && <Step2Brief state={s} set={set} clientes={cat.clientes} />}
       {s.paso === 3 && s.plantilla && <Step3Alcance state={s} set={set} />}
       {s.paso === 4 && s.plantilla && <Step4EquipoFechas state={s} set={set} usuarios={cat.usuarios} />}

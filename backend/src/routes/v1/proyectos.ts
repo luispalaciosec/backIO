@@ -37,6 +37,27 @@ const crearSchema = z.object({
   owner_ejecutiva: z.string().uuid().nullable().optional(),
 });
 
+/** Borradores creados por PrometIO (cotización aprobada) pendientes de convertir en proyecto. */
+proyectos.get('/borradores', requireScope('read:proyectos'), async (c) => {
+  const ctx = ctxOf(c);
+  const { data, error } = await ctx.db
+    .from('proyecto_borradores')
+    .select('id, cliente_id, prometio_cotizacion_id, plantilla_sugerida_id, payload, estado, proyecto_id, created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('estado', 'pendiente')
+    .order('created_at', { ascending: false });
+  if (error) throw new DbError(error.message, 500);
+  return c.json({ items: data ?? [] });
+});
+
+proyectos.post('/borradores/:id/descartar', requireScope('write:proyectos'), async (c) => {
+  const ctx = ctxOf(c);
+  const { error } = await ctx.db.from('proyecto_borradores').update({ estado: 'descartado' }).eq('tenant_id', ctx.tenantId).eq('id', c.req.param('id'));
+  if (error) throw new DbError(error.message, 500);
+  await audit(ctx, { accion: 'descartar_borrador', entidad: 'proyecto_borrador', entidad_id: c.req.param('id') });
+  return c.body(null, 204);
+});
+
 proyectos.get('/', requireScope('read:proyectos'), async (c) => {
   const items = await listProyectos(ctxOf(c), {
     cliente_id: c.req.query('cliente') || undefined,
