@@ -7,10 +7,14 @@ import { Alert } from '@/components/ui/Alert';
 const ROLES: Rol[] = ['admin', 'gerencia', 'operaciones', 'ejecutiva', 'lider', 'colaborador'];
 interface Invitacion { id: string; email: string; nombre: string; rol: Rol; capacidad_semanal: number; usada_at: string | null }
 
+interface Vinculo { personas_basecamp: number; vinculados: { usuario: string; basecamp_user_id: number }[]; sin_coincidencia: string[]; solo_en_basecamp: string[] }
+
 export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [vinculando, setVinculando] = useState(false);
+  const [vinculo, setVinculo] = useState<Vinculo | null>(null);
   const [inv, setInv] = useState({ email: '', nombre: '', rol: 'colaborador' as Rol, capacidad_semanal: 40 });
 
   const cargar = async () => {
@@ -38,11 +42,26 @@ export default function AdminUsuariosPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Usuarios</h1>
-        <p className="text-sm text-gray-500">Al guardar una invitación se crea la cuenta y la persona recibe un correo para definir su contraseña. Entra con el rol indicado; un correo @geeks sin invitación entra como colaborador.</p>
+      <header className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Usuarios</h1>
+          <p className="text-sm text-gray-500">Al guardar una invitación se crea la cuenta y la persona recibe un correo para definir su contraseña. Entra con el rol indicado; un correo @geeks sin invitación entra como colaborador.</p>
+        </div>
+        <button className="btn-secondary" disabled={vinculando} title="Lee las personas de la cuenta Basecamp y llena el Basecamp user id de cada usuario con el mismo correo" onClick={async () => {
+          setVinculando(true); setError(null); setVinculo(null);
+          try { setVinculo(await api<Vinculo>('/admin/usuarios/basecamp/vincular', { method: 'POST' })); await cargar(); }
+          catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+          setVinculando(false);
+        }}>{vinculando ? 'Escaneando…' : '⇄ Vincular con Basecamp'}</button>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
+      {vinculo && (
+        <Alert tipo={vinculo.sin_coincidencia.length ? 'warn' : 'ok'}>
+          <div>{vinculo.personas_basecamp} personas en Basecamp · {vinculo.vinculados.length} usuarios vinculados ahora{vinculo.vinculados.length ? `: ${vinculo.vinculados.map((v) => v.usuario).join(', ')}` : ''}.</div>
+          {vinculo.sin_coincidencia.length > 0 && <div className="mt-1">Sin correo igual en Basecamp ({vinculo.sin_coincidencia.length}): {vinculo.sin_coincidencia.join(', ')}. Escribe su id a mano.</div>}
+          {vinculo.solo_en_basecamp.length > 0 && <div className="mt-1 text-xs opacity-80">En Basecamp pero no en BackIO: {vinculo.solo_en_basecamp.join(', ')}.</div>}
+        </Alert>
+      )}
 
       <section className="card overflow-x-auto">
         <table className="w-full min-w-[820px]">

@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
 import { listUsuarios, audit, throwIf, serviceClient } from '../../lib/db';
 import { frontendOrigins } from '../../config/env';
+import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 
 export const admin = new Hono();
@@ -14,6 +15,27 @@ const ROLES = ['admin', 'gerencia', 'operaciones', 'ejecutiva', 'lider', 'colabo
 
 // ---------------- usuarios
 admin.get('/usuarios', async (c) => c.json({ items: await listUsuarios(ctxOf(c)) }));
+
+/** Escanea las personas de la cuenta Basecamp y enlaza usuarios por email (basecamp_user_id). */
+admin.post('/usuarios/basecamp/vincular', async (c) => {
+  const ctx = ctxOf(c);
+  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const [personas, usuarios] = await Promise.all([bc.listPeopleSafe(), listUsuarios(ctx)]);
+  const porEmail = new Map(personas.filter((p) => p.email).map((p) => [p.email!, p]));
+  const vinculados: { usuario: string; basecamp_user_id: number }[] = [];
+  const sinCoincidencia: string[] = [];
+  for (const u of usuarios) {
+    const p = porEmail.get(u.email.toLowerCase());
+    if (!p) { sinCoincidencia.push(`${u.nombre} <${u.email}>`); continue; }
+    if (u.basecamp_user_id === p.id) continue;
+    const { error } = await serviceClient().from('usuarios').update({ basecamp_user_id: p.id }).eq('tenant_id', ctx.tenantId).eq('id', u.id);
+    throwIf(error);
+    vinculados.push({ usuario: u.nombre, basecamp_user_id: p.id });
+  }
+  await audit(ctx, { accion: 'vincular_basecamp_usuarios', entidad: 'usuario', entidad_id: null, detalle: { vinculados: vinculados.length, sin_coincidencia: sinCoincidencia.length } });
+  const emailsBackio = new Set(usuarios.map((u) => u.email.toLowerCase()));
+  return c.json({ personas_basecamp: personas.length, vinculados, sin_coincidencia: sinCoincidencia, solo_en_basecamp: personas.filter((p) => p.email && !emailsBackio.has(p.email)).map((p) => `${p.nombre} <${p.email}>`) });
+});
 
 admin.patch('/usuarios/:id', zValidator('json', z.object({
   rol: z.enum(ROLES).optional(),
