@@ -26,10 +26,11 @@ export function createApp(): Hono {
   app.get('/health', (c) => c.json({ ok: true, servicio: 'backio-backend', ts: new Date().toISOString() }));
   app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /api/portal/\n'));
 
+  // Webhooks públicos ANTES de /api/v1: el router v1 exige auth en '*' y se tragaba estas rutas.
+  app.route('/api/v1/webhooks/prometio', prometioWebhook);
   app.route('/api/v1', v1);
   app.route('/api/portal', portal);
   app.route('/api/webhooks/basecamp', basecampWebhook);
-  app.route('/api/v1/webhooks/prometio', prometioWebhook);
   app.route('/api/cron', cron);
   app.route('/api/basecamp', basecampOAuth);
   app.route('/mcp', mcp);

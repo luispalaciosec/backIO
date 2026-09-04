@@ -53,6 +53,13 @@ describe('portal público', () => {
     expect(res.status).toBe(404);
   });
 
+  it('el webhook de PrometIO no queda detrás del auth de /api/v1', async () => {
+    // Sin secreto configurado (test) la firma no se exige: debe llegar al handler, no al 401 de requireAuth.
+    const res = await app.request('/api/v1/webhooks/prometio', { method: 'POST', headers: { 'content-type': 'application/json' }, body: 'no-json' });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('bad json');
+  });
+
   it('el webhook de Basecamp ignora eventos que no son de to-do', async () => {
     const res = await app.request('/api/webhooks/basecamp/cualquiera', { method: 'POST', body: JSON.stringify({ kind: 'comment_created', recording: { id: 1, content: 'HORRIBLE' } }) });
     expect(res.status).toBe(200);
