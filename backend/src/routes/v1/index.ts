@@ -6,6 +6,7 @@ import { proyectos } from './proyectos';
 import { requerimientos } from './requerimientos';
 import { semanas } from './semanas';
 import { usuarios } from './usuarios';
+import { basecamp } from './basecamp';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -15,3 +16,4 @@ v1.route('/proyectos', proyectos);
 v1.route('/requerimientos', requerimientos);
 v1.route('/semanas', semanas);
 v1.route('/usuarios', usuarios);
+v1.route('/basecamp', basecamp);

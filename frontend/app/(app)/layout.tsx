@@ -8,6 +8,7 @@ const NAV = [
   { href: '/proyectos', label: 'Proyectos' },
   { href: '/daily', label: 'Daily' },
   { href: '/weekly', label: 'Weekly' },
+  { href: '/admin/integraciones', label: 'Integraciones' },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

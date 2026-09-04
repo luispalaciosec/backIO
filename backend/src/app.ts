@@ -9,6 +9,7 @@ import { portal } from './routes/portal';
 import { basecampWebhook } from './routes/webhooks/basecamp';
 import { prometioWebhook } from './routes/webhooks/prometio';
 import { cron } from './routes/cron';
+import { basecampOAuth } from './routes/basecamp';
 
 export function createApp(): Hono {
   const app = new Hono();
@@ -24,6 +25,7 @@ export function createApp(): Hono {
   app.route('/api/webhooks/basecamp', basecampWebhook);
   app.route('/api/v1/webhooks/prometio', prometioWebhook);
   app.route('/api/cron', cron);
+  app.route('/api/basecamp', basecampOAuth);
 
   app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
   app.onError((err, c) => {

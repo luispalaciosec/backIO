@@ -53,28 +53,13 @@ export class BasecampClient {
 
   private async refreshIfNeeded(): Promise<void> {
     if (new Date(this.tokens.expires_at).getTime() - Date.now() > 60_000) return;
-    const e = env();
-    const res = await fetch('https://launchpad.37signals.com/authorization/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': e.BASECAMP_USER_AGENT },
-      body: JSON.stringify({
-        type: 'refresh',
-        refresh_token: this.tokens.refresh_token,
-        client_id: e.BASECAMP_CLIENT_ID,
-        client_secret: e.BASECAMP_CLIENT_SECRET,
-      }),
-    });
-    if (!res.ok) throw new Error(`Refresh de token Basecamp falló: ${res.status}`);
-    const body = (await res.json()) as { access_token: string; expires_in: number };
-    this.tokens = {
-      access_token: body.access_token,
-      refresh_token: this.tokens.refresh_token,
-      expires_at: new Date(Date.now() + body.expires_in * 1000).toISOString(),
-    };
+    const { refreshTokens } = await import('./oauth');
+    this.tokens = await refreshTokens(this.tokens);
     const db = serviceClient();
     const { data } = await db.from('tenants').select('config').eq('id', this.tenantId).single();
     const cfg = (data as { config: Record<string, unknown> } | null)?.config ?? {};
-    await db.from('tenants').update({ config: { ...cfg, basecamp: this.tokens } }).eq('id', this.tenantId);
+    const prev = (cfg.basecamp as Record<string, unknown> | undefined) ?? {};
+    await db.from('tenants').update({ config: { ...cfg, basecamp: { ...prev, ...this.tokens } } }).eq('id', this.tenantId);
   }
 
   async request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, intento = 0): Promise<T> {
