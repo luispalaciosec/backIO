@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ClientSafeProject } from '@backio/shared';
 import { apiPortal, ApiError } from '@/lib/api';
 import { VistaCliente } from '@/components/VistaCliente';
@@ -12,7 +12,7 @@ export function PortalView({ token }: { token: string }) {
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'pin' | 'no_disponible'>('cargando');
   const [pin, setPin] = useState('');
 
-  async function cargar(p?: string) {
+  const cargar = useCallback(async (p?: string) => {
     try {
       setData(await apiPortal<Payload>(`/${token}`, {}, p));
       setEstado('ok');
@@ -20,8 +20,8 @@ export function PortalView({ token }: { token: string }) {
       if (e instanceof ApiError && e.status === 401) setEstado('pin');
       else setEstado('no_disponible');
     }
-  }
-  useEffect(() => { void cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [token]);
+  }, [token]);
+  useEffect(() => { void cargar(); }, [cargar]);
 
   if (estado === 'cargando') return <div className="text-center text-gray-500 py-20">Cargando…</div>;
   if (estado === 'no_disponible')

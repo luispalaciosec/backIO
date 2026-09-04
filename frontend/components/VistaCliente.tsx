@@ -24,7 +24,9 @@ export function VistaCliente({
   return (
     <div className="card overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-3">
-        {logoUrl ? <img src={logoUrl} alt={clienteNombre} className="h-8 w-auto" /> : <div className="h-8 w-8 rounded bg-gray-200" />}
+        {/* Logos de clientes vienen de dominios arbitrarios: <img> a propósito, next/image exigiría whitelist */}
+        {logoUrl ? // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoUrl} alt={clienteNombre} className="h-8 w-auto" /> : <div className="h-8 w-8 rounded bg-gray-200" />}
         <div className="min-w-0">
           <div className="font-semibold truncate">{data.nombre}</div>
           <div className="text-xs text-gray-500">Geeks · Entrega {fechaLarga(data.fecha_entrega)}</div>
