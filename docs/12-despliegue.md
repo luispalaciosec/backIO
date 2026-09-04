@@ -1,6 +1,6 @@
 # 12 · Despliegue
 
-Frontend en **Vercel** (https://backio.vercel.app), backend en **Railway** (URL pendiente). Ambos desde el mismo repo
+Frontend en **Vercel** (https://backio.vercel.app), backend en **Railway** (https://backiobackend-production.up.railway.app). Ambos desde el mismo repo
 `luispalaciosec/backIO`, rama `main`. Cada push a `main` despliega los dos.
 
 ---
@@ -24,7 +24,7 @@ Frontend en **Vercel** (https://backio.vercel.app), backend en **Railway** (URL 
 | `FRONTEND_URL` | `https://backio.vercel.app` (para CORS) |
 | `ANTHROPIC_API_KEY` | para el resumen ejecutivo del portal |
 | `BASECAMP_CLIENT_ID` / `BASECAMP_CLIENT_SECRET` / `BASECAMP_ACCOUNT_ID` | de la app OAuth de Basecamp |
-| `BASECAMP_REDIRECT_URI` | `https://<backend>/api/basecamp/oauth/callback` (debe coincidir en Basecamp) |
+| `BASECAMP_REDIRECT_URI` | `https://backiobackend-production.up.railway.app/api/basecamp/oauth/callback` (debe coincidir en Basecamp) |
 | `BASECAMP_WEBHOOK_SECRET` / `PROMETIO_WEBHOOK_SECRET` | secretos compartidos |
 | `ENABLE_INTERNAL_CRON` | `1` (ya viene en el Dockerfile; los crons corren dentro del proceso) |
 | `NODE_ENV` | `production` |
@@ -52,7 +52,7 @@ señales los domingos 18:00 (Guayaquil). No hace falta configurar nada más en R
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://gckjyjvqvdfayjrtfbmj.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key (la misma del backend) |
-| `NEXT_PUBLIC_BACKEND_URL` | URL del backend en Railway, sin barra final |
+| `NEXT_PUBLIC_BACKEND_URL` | `https://backiobackend-production.up.railway.app` |
 
 4. Deploy. Luego copiar la URL de Vercel en `FRONTEND_URL` del backend (Railway) y
    redeployar el backend para que CORS acepte el dominio.
