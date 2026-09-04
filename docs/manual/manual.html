@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>BackIO · Manual de uso</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  :root { --ink:#1b2430; --muted:#5b6673; --brand:#0073EA; --brand-soft:#e8f1fd; --line:#e3e8ee; --ok:#0f8a4b; --warn:#b7791f; --bad:#c0392b; --bg:#f6f8fb; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; color:var(--ink); font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height:1.45; }
+  h1 { font-size: 26pt; margin: 0 0 6pt; letter-spacing:-0.3pt; }
+  h2 { font-size: 17pt; margin: 0 0 8pt; padding-bottom:5pt; border-bottom: 2px solid var(--brand); color: var(--brand); page-break-after: avoid; }
+  h3 { font-size: 12.5pt; margin: 14pt 0 5pt; page-break-after: avoid; }
+  h4 { font-size: 10.5pt; margin: 10pt 0 3pt; color: var(--muted); text-transform: uppercase; letter-spacing:.4pt; page-break-after: avoid; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt 18pt; padding:0; }
+  li { margin-bottom: 3pt; }
+  section.cap { page-break-before: always; }
+  .cover { height: 250mm; display:flex; flex-direction:column; justify-content:space-between; }
+  .cover .logo { display:flex; align-items:center; gap:14pt; }
+  .cover .logo .mark { width:54pt; height:54pt; border-radius:12pt; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22pt; }
+  .cover .title { font-size: 36pt; font-weight:800; line-height:1.05; margin-top:60pt; letter-spacing:-0.5pt; }
+  .cover .sub { font-size: 15pt; color: var(--muted); margin-top:10pt; }
+  .cover .meta { color:var(--muted); font-size:10pt; border-top:1px solid var(--line); padding-top:10pt; }
+  .eyebrow { color:var(--brand); font-weight:700; text-transform:uppercase; letter-spacing:.8pt; font-size:8.5pt; margin-bottom:4pt; }
+  .callout { border-left: 4px solid var(--brand); background: var(--brand-soft); padding: 7pt 10pt; margin: 8pt 0 10pt; border-radius: 0 6pt 6pt 0; page-break-inside: avoid; }
+  .callout.warn { border-color: var(--warn); background:#fff7e6; }
+  .callout.bad { border-color: var(--bad); background:#fdeeed; }
+  .callout.ok { border-color: var(--ok); background:#e9f7ef; }
+  .callout b:first-child { display:block; margin-bottom:2pt; }
+  table { width:100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.5pt; page-break-inside: auto; }
+  th, td { border: 1px solid var(--line); padding: 4.5pt 6pt; text-align:left; vertical-align: top; }
+  th { background: var(--bg); font-weight:700; }
+  tr { page-break-inside: avoid; }
+  code, kbd { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; background: var(--bg); padding: 1pt 4pt; border-radius: 3pt; }
+  .btn { display:inline-block; border:1px solid var(--line); border-radius:5pt; padding:1pt 6pt; font-size:9pt; background:#fff; white-space:nowrap; }
+  .btn.p { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .btn.g { background:var(--ok); color:#fff; border-color:var(--ok); }
+  .btn.d { background:var(--bad); color:#fff; border-color:var(--bad); }
+  .chip { display:inline-block; border-radius:10pt; padding:0 6pt; font-size:8.5pt; font-weight:600; }
+  .steps { counter-reset: s; margin:0 0 10pt; padding:0; list-style:none; }
+  .steps li { counter-increment: s; position:relative; padding-left: 26pt; margin-bottom:6pt; }
+  .steps li::before { content: counter(s); position:absolute; left:0; top:0; width:18pt; height:18pt; border-radius:50%; background:var(--brand); color:#fff; font-weight:700; font-size:9pt; display:flex; align-items:center; justify-content:center; }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+  .card { border:1px solid var(--line); border-radius:8pt; padding:8pt 10pt; page-break-inside: avoid; }
+  .card h4 { margin-top:0; color:var(--ink); text-transform:none; letter-spacing:0; font-size:10.5pt; }
+  .flow { display:flex; align-items:center; gap:4pt; margin: 8pt 0 12pt; flex-wrap:nowrap; }
+  .flow .node { border:1.5px solid var(--brand); border-radius:8pt; padding:5pt 7pt; font-weight:600; background:#fff; text-align:center; font-size:8.5pt; flex:1; }
+  .flow .node small { display:block; font-weight:400; color:var(--muted); font-size:8.5pt; }
+  .flow .arrow { color:var(--brand); font-size:13pt; flex:0 0 auto; }
+  .toc ol { list-style:none; margin:0; padding:0; column-count:2; column-gap: 18pt; }
+  .toc li { margin: 0 0 4pt; padding-left: 0; break-inside: avoid; }
+  .toc li span { color:var(--brand); font-weight:700; margin-right:5pt; }
+  .kv td:first-child { width: 32%; font-weight:600; background:#fbfcfe; }
+  .muted { color: var(--muted); }
+  .small { font-size: 9pt; }
+  .role { display:inline-block; padding:0 6pt; border-radius:4pt; background:var(--bg); font-size:8.5pt; font-weight:600; margin-right:3pt; }
+  footer.note { margin-top: 18pt; color: var(--muted); font-size: 8.5pt; border-top:1px solid var(--line); padding-top:6pt; }
+</style>
+</head>
+<body>
+
+<!-- ============ PORTADA ============ -->
+<div class="cover">
+  <div>
+    <div class="logo"><div class="mark">B</div><div><div style="font-size:16pt;font-weight:800">BackIO</div><div class="muted">Geeks Ecuador · Sistema operativo de backlog</div></div></div>
+    <div class="title">Manual de uso</div>
+    <div class="sub">Cómo se gestiona una cuenta de principio a fin: del pedido del cliente al to-do en Basecamp, y de ahí al weekly, los indicadores y el informe mensual.</div>
+    <div style="margin-top:28pt" class="callout"><b>Para quién es este manual</b>Ejecutivas de cuenta, operaciones (Marcia), líderes de mesa, equipo de producción y administración. Cada sección dice a qué rol le toca y qué botón pulsar.</div>
+  </div>
+  <div class="meta">Versión 1.0 · 4 de septiembre de 2026 · backio.vercel.app · Documento interno de Geeks Ecuador</div>
+</div>
+
+<!-- ============ ÍNDICE ============ -->
+<section class="cap toc">
+  <h2>Contenido</h2>
+  <ol>
+    <li><span>1</span>Qué es BackIO y cómo encaja con PrometIO y Basecamp</li>
+    <li><span>2</span>Las cinco reglas que nunca se rompen</li>
+    <li><span>3</span>Entrar por primera vez, roles y permisos</li>
+    <li><span>4</span>Recorrido por la pantalla</li>
+    <li><span>5</span>Dashboard</li>
+    <li><span>6</span>Backlog: la tabla del día a día</li>
+    <li><span>7</span>Reprogramar una entrega (con motivo)</li>
+    <li><span>8</span>Reprocesos: cuando un entregable vuelve</li>
+    <li><span>9</span>Proyectos</li>
+    <li><span>10</span>Crear un proyecto: el Builder en 5 pasos</li>
+    <li><span>11</span>Fees mensuales: recurrencia automática</li>
+    <li><span>12</span>Daily: apertura y cierre de mesa</li>
+    <li><span>13</span>Weekly: señales, acuerdos, plan y acta</li>
+    <li><span>14</span>Huérfanos: tareas creadas fuera de BackIO</li>
+    <li><span>15</span>Informes mensuales</li>
+    <li><span>16</span>Portal del cliente</li>
+    <li><span>17</span>Basecamp: qué entra, qué sale, qué nunca</li>
+    <li><span>18</span>PrometIO: de la cotización al proyecto</li>
+    <li><span>19</span>La capa de IA: qué redacta y quién publica</li>
+    <li><span>20</span>Administración</li>
+    <li><span>21</span>Agentes: MCP y API</li>
+    <li><span>22</span>Indicadores y definiciones</li>
+    <li><span>23</span>Rutinas recomendadas por rol</li>
+    <li><span>24</span>Problemas frecuentes</li>
+  </ol>
+</section>
+
+<!-- ============ 1 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 1</div>
+  <h2>Qué es BackIO y cómo encaja</h2>
+  <p>BackIO es la capa de gestión de cuenta y backlog operativo de Geeks. Reemplaza a Monday como tablero de requerimientos y como cara hacia el cliente, y se apoya en Basecamp como sistema de ejecución del equipo. No sustituye a Basecamp: lo organiza.</p>
+  <div class="flow">
+    <div class="node">Cliente<small>pide, aprueba, espera</small></div><div class="arrow">→</div>
+    <div class="node">PrometIO<small>CRM: empresa y cotización</small></div><div class="arrow">→</div>
+    <div class="node">BackIO<small>backlog, proyectos, rituales, indicadores</small></div><div class="arrow">→</div>
+    <div class="node">Basecamp<small>listas, grupos, to-dos, comentarios</small></div>
+  </div>
+  <table class="kv">
+    <tr><td>PrometIO</td><td>CRM comercial. Cuando una cotización se aprueba, la empresa aparece como cliente en BackIO y la cotización como borrador de proyecto.</td></tr>
+    <tr><td>BackIO</td><td>Dónde se decide qué se hace, para quién, cuándo y quién lo lleva. Dónde viven el daily, el weekly, las señales, los indicadores y el portal del cliente.</td></tr>
+    <tr><td>Basecamp</td><td>Dónde el equipo produce: cada proyecto de BackIO es una lista de to-dos en el proyecto Basecamp del cliente; cada bloque es un grupo; cada requerimiento es un to-do. Los comentarios y archivos se quedan en Basecamp.</td></tr>
+    <tr><td>Mesas</td><td>Orión y Omega. Cada cliente pertenece a una mesa. El daily, el weekly y el informe mensual se publican en el proyecto Basecamp de la mesa.</td></tr>
+  </table>
+  <div class="callout"><b>La regla de oro del flujo</b>Todo trabajo nuevo entra por BackIO: <b>cliente → ejecutiva → BackIO → Basecamp</b>. Si alguien crea un to-do a mano en Basecamp, BackIO lo detecta como "huérfano" y avisa. La meta es que esa lista esté siempre en cero.</div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 2</div>
+  <h2>Las cinco reglas que nunca se rompen</h2>
+  <ol class="steps">
+    <li><b>El texto de Basecamp jamás entra a BackIO.</b> BackIO solo sincroniza si un to-do está completado, cuándo, su fecha y sus asignados. Nunca comentarios, descripciones ni adjuntos. Es la garantía de que un comentario interno no pueda llegar al cliente por ningún camino.</li>
+    <li><b>La visibilidad se hereda, no se decide.</b> Qué ve el cliente viene de la plantilla. Una persona puede ocultar algo que era visible, nunca mostrar algo que estaba oculto. Lo impide la base de datos, no la pantalla.</li>
+    <li><b>Los estados no se sincronizan en dos direcciones.</b> Basecamp manda sobre "completado". BackIO manda sobre todo lo demás: estado operativo, aprobación, prioridad, peso. Por eso una tarea enlazada a Basecamp no se puede marcar completada desde BackIO: se marca allá.</li>
+    <li><b>Toda escritura de un agente de IA requiere vista previa y confirmación.</b> Un agente propone un plan; una persona lo confirma. Nunca ejecuta directo.</li>
+    <li><b>Cada dato pertenece a un tenant.</b> Hoy solo existe Geeks, pero la base ya está preparada para separar agencias sin reescribir nada.</li>
+  </ol>
+  <div class="callout warn"><b>Excepción acotada (aprobada el 04/09/2026)</b>Al importar lo que ya existía en Basecamp, entra el <b>título</b> del to-do como título interno, siempre oculto al cliente. Un título es el nombre de una tarea, no una conversación. Descripciones y comentarios siguen fuera.</div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 3</div>
+  <h2>Entrar por primera vez, roles y permisos</h2>
+  <h3>Recibir la invitación</h3>
+  <ol class="steps">
+    <li>Un administrador te invita desde <b>Admin → Usuarios</b> con tu correo y tu rol.</li>
+    <li>Te llega un correo de <code>BackIO &lt;no-reply@crm.geeks.com.ec&gt;</code> con el botón para definir tu contraseña. El enlace vence en 24 horas; si venció, pide que te lo reenvíen ("reenviar" junto a tu invitación).</li>
+    <li>Defines la contraseña (mínimo 8 caracteres) y entras directo al backlog.</li>
+  </ol>
+  <p class="small muted">Un correo <code>@geeks.com.ec</code> sin invitación previa también puede entrar, pero lo hace como colaborador. Para tener otro rol hace falta la invitación.</p>
+  <h3>Roles</h3>
+  <table>
+    <tr><th>Rol</th><th>Quién</th><th>Puede</th><th>No puede</th></tr>
+    <tr><td><span class="role">admin</span></td><td>Luis</td><td>Todo, incluida la sección Admin</td><td>—</td></tr>
+    <tr><td><span class="role">operaciones</span></td><td>Marcia</td><td>Todo lo operativo: backlog, proyectos, weekly, daily, informes, publicar en Basecamp</td><td>Admin (clientes, mesas, plantillas, usuarios, API keys)</td></tr>
+    <tr><td><span class="role">ejecutiva</span> <span class="role">lider</span> <span class="role">gerencia</span></td><td>Cuentas, líderes de mesa, gerencia</td><td>Lo mismo que operaciones</td><td>Admin</td></tr>
+    <tr><td><span class="role">colaborador</span></td><td>Equipo de producción</td><td>Ver todo el backlog, proyectos, daily y weekly. En <b>sus</b> tareas: cambiar estado, fecha de entrega (con motivo), entregables, registrar y cerrar reprocesos</td><td>Crear proyectos, generar o publicar documentos, editar tareas ajenas, título, prioridad, responsables, visibilidad</td></tr>
+  </table>
+  <p>Tu rol aparece junto a tu correo al pie del panel lateral. Los botones que no te corresponden no se muestran, y el servidor rechaza la acción aunque alguien la fuerce.</p>
+</section>
+
+<!-- ============ 4 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 4</div>
+  <h2>Recorrido por la pantalla</h2>
+  <p>El panel lateral izquierdo se puede plegar con «. Cuando está plegado quedan solo los iconos.</p>
+  <table>
+    <tr><th>Sección</th><th>Para qué</th><th>Quién la usa a diario</th></tr>
+    <tr><td>Dashboard</td><td>Salud de la operación: KPIs, clientes, personas, últimas 8 semanas, arrastre</td><td>Operaciones, gerencia, líderes</td></tr>
+    <tr><td>Backlog</td><td>Todos los requerimientos, editables en línea. Tabla estilo Monday o Kanban</td><td>Todos</td></tr>
+    <tr><td>Proyectos</td><td>Lista y detalle de proyectos, portal del cliente, avance</td><td>Ejecutivas, operaciones</td></tr>
+    <tr><td>Daily</td><td>Las tres señales del día y la publicación de apertura y cierre</td><td>Quien lleva la mesa</td></tr>
+    <tr><td>Weekly</td><td>Señales, acuerdos, plan operativo, acta de cierre, causas pendientes</td><td>Marcia</td></tr>
+    <tr><td>Huérfanos</td><td>To-dos creados a mano en Basecamp</td><td>Operaciones</td></tr>
+    <tr><td>Informes</td><td>Informe ejecutivo mensual por mesa</td><td>Marcia, gerencia</td></tr>
+    <tr><td>Admin</td><td>Clientes, mesas, plantillas, recurrencias, tipos de pieza, usuarios, integraciones, API keys</td><td>Solo admin</td></tr>
+  </table>
+  <h3>Botones y colores</h3>
+  <p><span class="btn p">Azul</span> acción principal · <span class="btn g">Verde</span> confirmar o publicar apertura · <span class="btn d">Rojo</span> publicar cierre o acciones delicadas · <span class="btn">Gris</span> acciones secundarias · <b>✨</b> lo redacta la IA y tú lo revisas antes de publicar.</p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 5</div>
+  <h2>Dashboard</h2>
+  <p>Se puede ver toda la agencia o una mesa. Todo lo que muestra sale de los datos del backlog y de las horas de Basecamp; no hay nada cargado a mano.</p>
+  <h3>KPIs de arriba</h3>
+  <table>
+    <tr><th>KPI</th><th>Qué mide</th></tr>
+    <tr><td>Activos / Atrasados</td><td>Requerimientos no completados; atrasados = fecha de entrega ya pasó</td></tr>
+    <tr><td>Sin movimiento 14d</td><td>Tareas que nadie tocó en dos semanas. Es la columna que más importa: detecta tableros muertos</td></tr>
+    <tr><td>Esperando cliente / Bloqueados</td><td>Con aprobación "Pendiente cliente" / con estado "Bloqueado"</td></tr>
+    <tr><td>Completados 30d</td><td>Entregas del último mes, con piezas</td></tr>
+    <tr><td>Horas 30d</td><td>Horas registradas en el timesheet de Basecamp</td></tr>
+    <tr><td>A tiempo 30d</td><td>Porcentaje entregado antes de la <b>fecha original</b> comprometida. Debajo, el porcentaje sobre la fecha vigente</td></tr>
+    <tr><td>Reprocesos 30d</td><td>Entregables que volvieron al equipo, con las horas que costaron</td></tr>
+    <tr><td>Huérfanos</td><td>To-dos creados fuera de BackIO pendientes de adoptar</td></tr>
+  </table>
+  <h3>Salud por cliente</h3>
+  <p>Cada cliente aparece en verde, amarillo o rojo. Rojo: más de 2 atrasados, o más de 14 días sin movimiento, o algo con más de 30 días de atraso. Amarillo: algún atraso o más de 7 días sin movimiento. Además: horas del mes, valor cotizado activo y la relación USD por hora, porcentaje a tiempo y reprocesos.</p>
+  <h3>Carga por persona</h3>
+  <p>Tareas activas, cuántas vencen esta semana y qué porcentaje del total de la semana carga cada persona, atrasados, horas, porcentaje a tiempo sobre fecha original, desvío mediano en días, reprogramaciones atribuibles al equipo y reprocesos. Al pasar el cursor por las dos últimas columnas se ve la causa dominante.</p>
+  <h3>Arrastre</h3>
+  <p>Tareas reprogramadas o atrasadas, ordenadas por veces reprogramadas y días acumulados desde la fecha original. Es la lista que se discute en el weekly.</p>
+</section>
+
+<!-- ============ 6 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 6</div>
+  <h2>Backlog: la tabla del día a día</h2>
+  <p>Todos los requerimientos activos, agrupados por cliente, con edición en línea: haces clic en una celda, cambias y se guarda solo. Arriba a la derecha se alterna entre <b>Tabla</b> y <b>Kanban</b> (columnas por estado; arrastrar una tarjeta cambia el estado).</p>
+  <h3>Buscar, filtrar y ordenar</h3>
+  <p>El panel arranca plegado. Al abrirlo: filtro por <b>mesa</b>, cliente, persona, estado, proyecto, búsqueda por texto y la casilla "Solo activos". Debajo, "Ordenar por" con doce criterios y atajos de un clic: <b>Más atrasados</b>, <b>Más tiempo sin mover</b>, <b>Próximos a vencer</b>, <b>Prioridad alta primero</b>. Aunque el panel esté cerrado, la cabecera muestra chips con lo que está aplicado y "N de M".</p>
+  <h3>Columnas</h3>
+  <table>
+    <tr><th>Columna</th><th>Qué es y cómo se edita</th></tr>
+    <tr><td>Requerimiento</td><td>Título interno (clic para editar). Iconos: 👁 el cliente lo ve · ✉ redactar recordatorio al cliente (solo si espera al cliente o está bloqueado) · ↺ historial de reprogramaciones y reprocesos · ↗ ir al proyecto</td></tr>
+    <tr><td>Proyecto</td><td>Proyecto al que pertenece, con enlace. Al pasar el cursor se ve el bloque</td></tr>
+    <tr><td>Owner agencia</td><td>Responsables (avatares). Clic para asignar o quitar</td></tr>
+    <tr><td>Fecha pedido / Fecha entrega</td><td>Selector de fecha. Cambiar la fecha de entrega pide motivo (capítulo 7). En rojo si está vencida; ↺N indica cuántas veces se reprogramó</td></tr>
+    <tr><td>Prioridad</td><td>Alta, Media, Baja</td></tr>
+    <tr><td>Estado</td><td>Backlog · Priorizado · En proceso · En revisión · Reprogramado · Bloqueado · Completado · Cancelado. "Completado" está deshabilitado si la tarea tiene to-do en Basecamp: se marca allá</td></tr>
+    <tr><td>Aprobación</td><td>Sin estado · Pendiente interno · Pendiente cliente · Aprobado · Cambios solicitados. Pasar a "Cambios solicitados" registra un reproceso del cliente</td></tr>
+    <tr><td>Tipo</td><td>FEE (recurrente) o Proyecto (campaña)</td></tr>
+    <tr><td>Atraso / Sin mov.</td><td>Días de atraso sobre la fecha vigente · días desde el último cambio</td></tr>
+    <tr><td>Horas</td><td>Horas registradas en Basecamp para ese to-do (90 días)</td></tr>
+    <tr><td>Basecamp / Última act.</td><td>Enlace al to-do · hace cuánto se tocó</td></tr>
+  </table>
+  <p>Al final de cada cliente, la fila <b>+ Agregar requerimiento</b> crea una tarea suelta (sin proyecto) escribiendo el título y pulsando Enter. Para trabajo con estructura usa el Builder.</p>
+  <div class="callout"><b>Si eres colaborador</b>Las tareas de otras personas se ven en gris y no se editan. En las tuyas puedes cambiar estado, fecha (con motivo) y entregables, y registrar reprocesos. No ves la fila de creación.</div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 7</div>
+  <h2>Reprogramar una entrega (con motivo)</h2>
+  <p>La fecha que se compromete en la apertura de mesa <b>nunca se pierde</b>. Cada requerimiento guarda su fecha original y cuenta cuántas veces se movió. Así el indicador de cumplimiento mide contra lo prometido, no contra la última fecha.</p>
+  <ol class="steps">
+    <li>En el backlog cambia la fecha de entrega.</li>
+    <li>Se abre un cuadro con la fecha comprometida, la actual tachada y la nueva. Elige el <b>motivo</b>. Sin motivo no se guarda.</li>
+    <li>La tarea pasa a estado "Reprogramado", la fecha nueva se envía a Basecamp y el cambio queda en el historial ↺.</li>
+  </ol>
+  <table>
+    <tr><th>Motivo</th><th>Se atribuye a</th><th>Efecto en indicadores</th></tr>
+    <tr><td>Insumos o aprobación del cliente</td><td>Cliente</td><td>No descuenta al equipo</td></tr>
+    <tr><td>Cambio de alcance</td><td>Cliente</td><td>No descuenta al equipo</td></tr>
+    <tr><td>Capacidad del equipo</td><td>Equipo</td><td>Cuenta como reprogramación del equipo</td></tr>
+    <tr><td>Error de estimación</td><td>Equipo</td><td>Cuenta como reprogramación del equipo</td></tr>
+    <tr><td>Reproceso</td><td>Equipo</td><td>Cuenta como reprogramación del equipo</td></tr>
+    <tr><td>Prioridad de negocio / Otro</td><td>Neutro</td><td>No se atribuye</td></tr>
+  </table>
+  <p>Con 2 o más reprogramaciones la tarea sale como señal crítica "arrastre reincidente" en el weekly: se hace, se reasigna o se mata. Si una fecha se cambió por API o por un agente sin motivo, aparece en el weekly como "causa pendiente" para completarla con un clic.</p>
+</section>
+
+<!-- ============ 8 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 8</div>
+  <h2>Reprocesos: cuando un entregable vuelve</h2>
+  <p>Un reproceso es un entregable que regresa al equipo para corrección. Se registra la <b>causa</b> y el <b>paso al que vuelve</b>, nunca el comentario.</p>
+  <h3>Cómo registrarlo</h3>
+  <ol class="steps">
+    <li>En la fila del backlog pulsa <b>↺</b> y luego la pestaña <b>⟲ Registrar reproceso</b>.</li>
+    <li>Indica quién lo pide (cliente o revisión interna), la causa, el paso al que regresa (idea, guion, copy, storyboard, diseño, grabación, edición, posteo) y si reabrir el to-do en Basecamp.</li>
+    <li>La tarea vuelve a "En proceso". Si estaba completada en Basecamp, el to-do se desmarca allá automáticamente.</li>
+    <li>Cuando se vuelve a entregar, pulsa <b>Entregado de nuevo</b> en el historial, o simplemente completa el to-do en Basecamp: el reproceso se cierra solo y guarda las horas que costó.</li>
+  </ol>
+  <p>También se registra sin pulsar nada: al poner la aprobación en "Cambios solicitados", al reabrir una tarea completada, o cuando alguien desmarca un to-do terminado en Basecamp (queda "sin causa" hasta que la mesa la complete).</p>
+  <table>
+    <tr><th>Causa</th><th>Responsable natural</th></tr>
+    <tr><td>Brief incompleto o ambiguo</td><td>Ejecutiva</td></tr>
+    <tr><td>Error de ejecución</td><td>Equipo</td></tr>
+    <tr><td>Cambio de opinión del cliente</td><td>Cliente</td></tr>
+    <tr><td>Ajuste de marca o legal</td><td>Cliente</td></tr>
+    <tr><td>Dirección de arte</td><td>Líder</td></tr>
+    <tr><td>Error de texto</td><td>Equipo</td></tr>
+  </table>
+  <p>Con 2 o más reprocesos en la misma tarea salta la señal crítica "reproceso reincidente": revisar brief y control de calidad antes de enviar.</p>
+</section>
+
+<!-- ============ 9 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 9</div>
+  <h2>Proyectos</h2>
+  <p>Un proyecto agrupa requerimientos de un cliente con un objetivo y una fecha: un fee mensual ("Cronograma de contenido - Octubre 2026") o una campaña. En Basecamp es una lista de to-dos.</p>
+  <h3>Lista</h3>
+  <p>Tarjetas o lista, con búsqueda y filtros por cliente, mesa, ejecutiva, estado y portal. "Solo activos" viene marcado. Orden por entrega, inicio, avance, nombre, cliente, estado o actualización, con atajos "Próximos a entregar", "Menos avanzados", "Recién actualizados". Las entregas vencidas salen en rojo.</p>
+  <h3>Detalle</h3>
+  <ul>
+    <li><b>Avance ponderado interno</b>: suma de pesos completados sobre pesos totales de todas las tareas (las canceladas no cuentan).</li>
+    <li><b>Vista interna</b>: tareas por bloque con fecha vigente, fecha original tachada si cambió, contadores ↺ y ⟲, peso, estado y qué ve el cliente.</li>
+    <li><b>Vista cliente</b>: exactamente lo que verá el cliente en el portal, calculada con la misma función que el portal.</li>
+    <li><b>Controles</b>: activar o desactivar el portal, copiar el enlace, rotar el token, <b>Guardar como plantilla</b>, <b>↻ Repetir cada mes</b> (fees), <b>Reintentar Basecamp</b> si la sincronización quedó incompleta.</li>
+  </ul>
+  <div class="callout warn"><b>Proyectos importados de Basecamp</b>Los que se trajeron con "Importar Basecamp" no nacieron de una plantilla, así que no se pueden repetir cada mes directamente. Para el fee de un cliente importado, crea el próximo mes una vez desde el Builder con "Repetir cada mes" y de ahí en adelante sale solo.</div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 10</div>
+  <h2>Crear un proyecto: el Builder en 5 pasos</h2>
+  <p>Botón <span class="btn p">+ Nuevo proyecto</span>. Si dejaste uno a medias, te ofrece continuar o descartar. Si hay cotizaciones aprobadas en PrometIO, aparecen arriba como borradores listos para usar.</p>
+  <ol class="steps">
+    <li><b>Tipo de trabajo.</b> Elige la plantilla. Están agrupadas por pilar (Marca, Crecimiento, Transformación, Transversal) y familia, con precio de referencia. Hay plantillas generales y plantillas de un cliente.</li>
+    <li><b>Brief.</b> Cliente, nombre, objetivo de negocio, público, canales, mandatorios de marca, fecha de entrega final, presupuesto, cotización. Con <b>✨ Pegar correo del cliente</b> pegas el pedido tal cual llegó y la IA llena el brief, sugiere plantilla, cuenta las piezas y lista las dudas que hay que preguntar antes de arrancar. El texto pegado no se guarda.</li>
+    <li><b>Alcance.</b> Desmarca bloques opcionales (su peso se redistribuye). En cada bloque indica el responsable y cuántas piezas de cada tipo: <b>post estático</b>, <b>carrusel</b> o <b>reel</b>. Cada tipo se expande en un to-do por paso de su flujo (un reel: ideas → guion → aprobación → storyboard → grabación → edición → aprobación → posteo). Un lote por paso para fees; una tarea por pieza para campañas.</li>
+    <li><b>Equipo y fechas.</b> Responsables por bloque y ajuste de fechas. El sistema avisa si una persona queda sobrecargada.</li>
+    <li><b>Revisión.</b> Ves la lista completa de tareas con fechas y pesos, y la <b>pantalla exacta del cliente</b>. Si es un fee, marca <b>Repetir cada mes</b>. Al crear: se guardan las tareas, se crea la lista y los grupos en Basecamp (máximo 50 to-dos por operación), se avisa por correo a los responsables.</li>
+  </ol>
+  <div class="callout"><b>Pesos y avance</b>El peso de cada tarea sale de la plantilla y del esfuerzo del tipo de pieza (post 1, carrusel 1.5, reel 4) multiplicado por la cantidad. El avance del proyecto y del portal es ponderado por ese peso, no por número de tareas.</div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 11</div>
+  <h2>Fees mensuales: recurrencia automática</h2>
+  <p>Un fee se configura <b>una sola vez</b>. Después, BackIO crea el mes siguiente solo.</p>
+  <ol class="steps">
+    <li>Crea el mes actual en el Builder y marca <b>Repetir cada mes</b> en el paso 5 (o pulsa <b>↻ Repetir cada mes</b> en un proyecto que nació de plantilla).</li>
+    <li>Cada día a las 08:05, BackIO revisa las recurrencias activas. Si ya es el <b>día 25</b> (configurable de 1 a 28) y el mes siguiente no existe, lo crea con la misma configuración: bloques, piezas, responsables, ejecutiva.</li>
+    <li>El proyecto nuevo lleva el nombre del patrón de la plantilla (por ejemplo "Cronograma de contenido - Noviembre 2026"), inicio el día 1, entrega el último día del mes, sus tareas repartidas según la plantilla, la estructura en Basecamp y el correo a la ejecutiva y a operaciones para que lo revisen antes de que arranque el mes.</li>
+  </ol>
+  <p>En <b>Admin → Recurrencias</b> se ve cada una: cliente, plantilla, patrón de nombre (editable), ejecutiva, día, último mes generado con enlace, próximo periodo y si está pendiente. Se puede pausar, cambiar el día y <b>Generar ahora</b> sin esperar al 25. Un periodo nunca se genera dos veces.</p>
+</section>
+
+<!-- ============ 12 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 12</div>
+  <h2>Daily: apertura y cierre de mesa</h2>
+  <p>El daily no prioriza: desbloquea. Una sola pantalla, sin scroll, con tres columnas:</p>
+  <ul>
+    <li><b>Vence hoy o mañana sin iniciar</b>: priorizado y con fecha inminente.</li>
+    <li><b>Bloqueos nuevos (24 h)</b>: pasaron a bloqueado desde ayer.</li>
+    <li><b>Fechas cambiadas desde ayer</b>: reprogramaciones recientes.</li>
+  </ul>
+  <h3>Publicar en Basecamp</h3>
+  <ol class="steps">
+    <li>Elige la mesa y escribe las notas clave del día (una por línea).</li>
+    <li>Opcional: <b>✨ Redactar apertura</b> o <b>✨ Redactar cierre</b>. La IA escribe de 3 a 6 líneas con las señales del día; el texto aparece en un cuadro para editarlo.</li>
+    <li><span class="btn g">🟢 Publicar apertura</span> o <span class="btn d">🔴 Publicar cierre</span>. Mientras trabaja ves "Publicando…" y al terminar una franja verde con el resumen y el botón <b>Ver en Basecamp ↗</b>.</li>
+  </ol>
+  <p>El mensaje llega al board Daily de la mesa con el formato de siempre (responsable, hora, notas, vence, bloqueos, cambios). Cada tarea sale con el cliente en negrita, el <b>título enlazado al to-do</b>, el responsable, la fecha y los días de atraso en rojo. Si usaste la IA, se firma "Redactado por BackIO, publicado por [tu nombre]".</p>
+</section>
+
+<!-- ============ 13 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 13</div>
+  <h2>Weekly: señales, acuerdos, plan y acta</h2>
+  <p>El weekly es de Marcia. La agenda no se escribe: la genera el motor de señales el domingo a las 18:00 (llega por correo) y se puede recalcular en cualquier momento con <span class="btn">↻ Recalcular señales</span>.</p>
+  <h3>Señales</h3>
+  <table>
+    <tr><th>Señal</th><th>Cuándo salta</th><th>Severidad</th><th>Tema de agenda</th></tr>
+    <tr><td>Compromiso vencido</td><td>Acuerdo del weekly con fecha pasada</td><td>Crítica</td><td>Rendición de cuentas</td></tr>
+    <tr><td>Arrastre reincidente</td><td>2 o más reprogramaciones</td><td>Crítica</td><td>Se hace, se reasigna o se mata</td></tr>
+    <tr><td>Reproceso reincidente</td><td>2 o más reprocesos</td><td>Crítica</td><td>Revisar brief y control de calidad</td></tr>
+    <tr><td>Atraso crítico</td><td>Más de 30 días de atraso</td><td>Crítica</td><td>Decisión inmediata</td></tr>
+    <tr><td>Bloqueo por cliente</td><td>Más de 5 días esperando al cliente</td><td>Alta</td><td>Escalar con la ejecutiva</td></tr>
+    <tr><td>Sobrecarga proyectada / Concentración de carga</td><td>Una persona con más del 30 % de la semana o por encima de su capacidad</td><td>Alta</td><td>Redistribuir</td></tr>
+    <tr><td>Sin movimiento</td><td>Más de 14 días sin tocar</td><td>Media</td><td>Revivir o cerrar</td></tr>
+    <tr><td>Cuenta silenciosa</td><td>Cliente sin entregas ni actividad en 14 días</td><td>Media</td><td>Contacto proactivo</td></tr>
+    <tr><td>Reprogramación / reproceso sin causa</td><td>Cambio sin motivo registrado</td><td>Media</td><td>Completar la causa</td></tr>
+  </table>
+  <h3>Acuerdos</h3>
+  <p>Cada acuerdo lleva descripción, responsable y <b>fecha de compromiso real</b> (mínimo mañana). Se cierran como cumplidos o cancelados. Los vencidos encabezan la siguiente agenda.</p>
+  <h3>Documentos</h3>
+  <p>Elige la mesa. <span class="btn p">📋 Generar Plan Operativo</span> (lunes: pendientes anteriores, capacidad, prioridades, riesgos) y <span class="btn g">✅ Generar Acta de Cierre</span> (viernes: resultado, arrastre, señales, acuerdos). Con la casilla "incluir resumen IA" el documento arranca con un resumen ejecutivo y la agenda por causa. <b>Publicar en Basecamp</b> lo deja como mensaje en el board Weekly de la mesa con el título de siempre ("dd/mm/aaaa || Status Semanal Operativo - Semana N").</p>
+  <h3>✨ Agenda IA</h3>
+  <p>Status semanal en prosa (qué se entregó, qué se arrastra y por qué, dónde está la presión) y la agenda agrupada por causa: dependencias del cliente, ejecución y arrastre, capacidad, relación con cuentas, calidad y reprocesos, compromisos. Cada grupo trae <b>una pregunta de decisión</b> concreta para resolver en la reunión.</p>
+  <h3>Causas pendientes</h3>
+  <p>Panel a la derecha con las reprogramaciones y reprocesos sin causa. Se completan con un desplegable, sin salir del weekly.</p>
+</section>
+
+<!-- ============ 14 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 14</div>
+  <h2>Huérfanos: tareas creadas fuera de BackIO</h2>
+  <p>Cada 30 minutos BackIO revisa los proyectos Basecamp de los clientes importados y detecta to-dos que no pasaron por BackIO. Operaciones recibe un correo.</p>
+  <p>En la pantalla se ve cliente, título, quién lo creó, fecha y antigüedad, y arriba un resumen de cuántos huérfanos creó cada persona. Dos acciones: <b>Adoptar</b> (crea el requerimiento en BackIO enlazado al to-do, dentro del proyecto de su lista si existe) o <b>Ignorar</b>. <span class="btn">↻ Revisar Basecamp ahora</span> fuerza la revisión.</p>
+  <div class="callout ok"><b>Cómo leerlo</b>La lista debería tender a cero. Si una persona aparece repetidamente, la conversación no es con BackIO, es con el hábito: el trabajo entra por la ejecutiva.</div>
+</section>
+
+<!-- ============ 15 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 15</div>
+  <h2>Informes mensuales</h2>
+  <p>Informe ejecutivo por mesa. El día 1 de cada mes a las 08:00, BackIO redacta el del mes anterior para cada mesa y avisa por correo. También se genera a mano: mesa, mes y <span class="btn p">✨ Generar informe</span>.</p>
+  <p>Contiene: entregas y piezas, porcentaje a tiempo sobre fecha original y sobre fecha vigente, reprogramaciones con la causa principal, reprocesos con horas, horas totales, abiertos y atrasados al cierre, señales críticas; la sección "Lectura del mes" y "Lo que hay que decidir" redactadas por la IA; y las tablas por cliente (incluido cotizado vs. horas, USD por hora) y por persona.</p>
+  <p>Se revisa en pantalla, se copia o se publica en el board Weekly de la mesa con <b>Publicar en Basecamp</b>. Queda guardado en la lista con su estado (borrador o publicado).</p>
+</section>
+
+<!-- ============ 16 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 16</div>
+  <h2>Portal del cliente</h2>
+  <p>Cada proyecto tiene un enlace de portal (token largo) que se activa desde el detalle del proyecto. Opcionalmente, el cliente puede tener un <b>PIN</b> de hasta 6 dígitos (Admin → Clientes) que se pide al abrirlo.</p>
+  <h3>Qué ve el cliente</h3>
+  <ul>
+    <li>Solo los hitos marcados como visibles en la plantilla, con la <b>etiqueta para cliente</b> (o el título si no hay etiqueta).</li>
+    <li>Avance renormalizado sobre lo visible, para que 100 % signifique "todo lo que le prometimos está entregado".</li>
+    <li>Estados simplificados: pendiente, en proceso, completado. "Cancelado" se muestra como en proceso. Lo que espera de su lado aparece con naturalidad, sin tono de reclamo.</li>
+    <li>Un resumen ejecutivo de tres párrafos redactado por la IA <b>únicamente</b> con esos datos visibles.</li>
+  </ul>
+  <p>Nunca ve: títulos internos, responsables, pesos, prioridades, comentarios, ni nada de Basecamp. La misma función que filtra el portal es la que genera la "vista cliente" del detalle del proyecto y del paso 5 del Builder, así que lo que ves ahí es lo que verá el cliente.</p>
+</section>
+
+<!-- ============ 17 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 17</div>
+  <h2>Basecamp: qué entra, qué sale, qué nunca</h2>
+  <table>
+    <tr><th>Dirección</th><th>Qué</th><th>Cuándo</th></tr>
+    <tr><td>BackIO → Basecamp</td><td>Lista por proyecto, grupo por bloque, to-do por requerimiento (título, fecha, asignados, "avisar al completar" a la ejecutiva), cambios de fecha, reapertura por reproceso, mensajes de daily, weekly e informe</td><td>Al crear el proyecto, al reprogramar, al registrar reproceso, al publicar</td></tr>
+    <tr><td>Basecamp → BackIO</td><td>Completado sí/no y cuándo, fecha, asignados; horas del timesheet (número, fecha, persona); títulos de to-dos al importar o detectar huérfanos</td><td>Webhook en segundos; reconciliación cada 30 min; horas cada 6 h</td></tr>
+    <tr><td>Nunca</td><td>Comentarios, descripciones, adjuntos, texto de las entradas de timesheet</td><td>—</td></tr>
+  </table>
+  <h3>Poner en marcha un cliente que ya trabaja en Basecamp</h3>
+  <ol class="steps">
+    <li>Admin → Clientes: escribe el <b>Basecamp project id</b> (el número en la URL del proyecto) y guarda.</li>
+    <li>Pulsa <b>Webhook</b> para que Basecamp avise en tiempo real.</li>
+    <li>Pulsa <b>Importar Basecamp</b>: cada lista se vuelve un proyecto y cada to-do un requerimiento (oculto al cliente). Los completados de más de 60 días se omiten. Se puede repetir: solo trae lo nuevo y completa responsables.</li>
+    <li>Admin → Usuarios → <b>⇄ Vincular con Basecamp</b> para que cada persona quede enlazada por correo. Sin esto, las tareas importadas salen "sin asignar".</li>
+    <li>Asigna el cliente a su mesa.</li>
+  </ol>
+  <div class="callout warn"><b>Tareas importadas con fechas viejas</b>Las fechas son las reales de Basecamp. Si están vencidas, hay que reprogramarlas (con motivo) o completarlas en Basecamp; no se "limpian" solas.</div>
+</section>
+
+<!-- ============ 18 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 18</div>
+  <h2>PrometIO: de la cotización al proyecto</h2>
+  <ol class="steps">
+    <li>En PrometIO se crea la empresa y el contacto. Al guardarla, aparece como cliente en BackIO con el mismo identificador. Si se edita el nombre o el RUC, se actualiza.</li>
+    <li>Se aprueba la cotización. BackIO recibe el evento y crea un <b>borrador de proyecto</b> con cliente, número, valor, líneas cotizadas y una plantilla sugerida según los servicios. Marcia recibe un correo.</li>
+    <li>En el Builder, el borrador aparece arriba con <b>Usar</b>: precarga cliente, cotización, nombre, plantilla y las piezas por tipo según las líneas. La ejecutiva completa el brief y crea. El valor cotizado queda en el proyecto para el indicador cotizado vs. horas.</li>
+  </ol>
+  <p>El estado de la conexión y el secreto compartido se ven en Admin → Integraciones. Los intentos rechazados quedan en auditoría.</p>
+</section>
+
+<!-- ============ 19 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 19</div>
+  <h2>La capa de IA: qué redacta y quién publica</h2>
+  <p>Principio: <b>la IA redacta, nunca publica</b>. Siempre hay una persona que revisa y pulsa. Todo texto generado va firmado "Redactado por BackIO, publicado por [persona]". El modelo solo recibe datos estructurados de BackIO (títulos, estados, fechas, números); como el texto de Basecamp nunca entra a BackIO, no puede llegar al modelo.</p>
+  <table>
+    <tr><th>Botón</th><th>Dónde</th><th>Qué hace</th></tr>
+    <tr><td>✨ Redactar apertura / cierre</td><td>Daily</td><td>Mensaje de 3 a 6 líneas con las señales del día, editable antes de publicar</td></tr>
+    <tr><td>✨ Agenda IA · casilla "incluir resumen IA"</td><td>Weekly</td><td>Status narrado y agenda por causa con una pregunta de decisión por grupo; antepuesto al plan y al acta si marcas la casilla</td></tr>
+    <tr><td>✨ Pegar correo del cliente</td><td>Builder, paso 2</td><td>Convierte el pedido en brief estructurado, sugiere plantilla, cuenta piezas y lista dudas</td></tr>
+    <tr><td>✉ Recordatorio</td><td>Backlog, filas en espera del cliente</td><td>Borrador de correo amable para copiar y enviar desde tu correo. BackIO no escribe al cliente</td></tr>
+    <tr><td>✨ Generar informe</td><td>Informes</td><td>Informe ejecutivo mensual por mesa</td></tr>
+    <tr><td>Resumen ejecutivo</td><td>Portal del cliente</td><td>Tres párrafos con datos visibles al cliente, en caché 6 horas</td></tr>
+  </table>
+  <p>Si los botones ✨ no aparecen, la clave de IA no está configurada en el servidor. Cada generación queda registrada con fecha, tipo y consumo.</p>
+</section>
+
+<!-- ============ 20 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 20</div>
+  <h2>Administración</h2>
+  <div class="grid2">
+    <div class="card"><h4>Clientes</h4><p>Nombre, mesa, Basecamp project id, logo, color, PIN del portal, activo. Botones: Webhook (registrar y ver entregas), Importar / Reimportar Basecamp.</p></div>
+    <div class="card"><h4>Mesas</h4><p>Orión y Omega: proyecto Basecamp de la mesa, boards Daily y Weekly (<b>Detectar boards</b> los encuentra solos), líder, color y lista de clientes.</p></div>
+    <div class="card"><h4>Plantillas</h4><p>Catálogo por pilar y familia: bloques, tareas con offset de días, rol sugerido, peso, etiqueta para cliente y visibilidad. Recurrente y patrón de nombre para fees. Plantillas de un cliente o generales.</p></div>
+    <div class="card"><h4>Recurrencias</h4><p>Fees mensuales automáticos: pausar, día de generación, patrón de nombre, ejecutiva, generar ahora (capítulo 11).</p></div>
+    <div class="card"><h4>Tipos de pieza</h4><p>Post estático (1), carrusel (1.5) y reel (4) con su flujo de pasos. El esfuerzo multiplica el peso.</p></div>
+    <div class="card"><h4>Usuarios</h4><p>Invitar, rol, capacidad semanal en horas, Basecamp user id (manual o con <b>⇄ Vincular con Basecamp</b>), activo, reenviar invitación.</p></div>
+    <div class="card"><h4>Integraciones</h4><p>Estado de Basecamp (conectar cuenta), MCP Server (URL, OAuth, lista de tools, OpenAPI para Gemini u otros) y PrometIO (webhook).</p></div>
+    <div class="card"><h4>API keys</h4><p>Claves para agentes y sistemas con perfiles: gerencial (lectura), ejecutiva, operaciones, prometio, cliente o personalizado. La clave se muestra una sola vez; se puede revocar.</p></div>
+  </div>
+</section>
+
+<!-- ============ 21 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 21</div>
+  <h2>Agentes: MCP y API</h2>
+  <p>BackIO expone un servidor MCP en <code>/mcp</code> y una API REST documentada en <code>/api/openapi.json</code>. Un asistente (Claude, Gemini u otro) puede consultar el backlog, el estado de un proyecto, las señales, la capacidad, la salud de un cliente, las horas y el status semanal narrado.</p>
+  <p>Para escribir (crear un proyecto desde plantilla, actualizar un requerimiento, generar plan o acta, publicar) el agente recibe un <b>plan de cambios</b> con un identificador que vence en 15 minutos; solo se ejecuta si una persona confirma con ese identificador. Cambiar una fecha de entrega exige motivo, igual que en la pantalla.</p>
+  <p>Acceso con API key (Admin → API keys) o con OAuth desde el propio asistente (pantalla de consentimiento de BackIO). Una key con más de 20 escrituras en 5 minutos genera alerta.</p>
+</section>
+
+<!-- ============ 22 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 22</div>
+  <h2>Indicadores y definiciones</h2>
+  <table>
+    <tr><th>Término</th><th>Definición</th></tr>
+    <tr><td>Días sin movimiento</td><td>Días desde el último cambio sustantivo de la tarea (estado, fecha, responsable, título). La métrica más importante: detecta tableros muertos</td></tr>
+    <tr><td>Días de atraso</td><td>Días desde la fecha de entrega vigente, solo en tareas no completadas</td></tr>
+    <tr><td>Fecha original</td><td>La comprometida al crear la tarea. No cambia nunca</td></tr>
+    <tr><td>A tiempo (original)</td><td>Completada antes o el día de la fecha original. Es el dato real de tiempos de entrega</td></tr>
+    <tr><td>A tiempo (vigente)</td><td>Completada antes o el día de la última fecha acordada. Mide si se cumple lo replanificado</td></tr>
+    <tr><td>Desvío</td><td>Mediana de días entre la fecha original y la entrega real, solo en entregas tardías</td></tr>
+    <tr><td>Arrastre</td><td>Días entre la fecha original y la vigente, más los días de atraso actuales</td></tr>
+    <tr><td>Reprogramación del equipo</td><td>Cambio de fecha con motivo capacidad, error de estimación o reproceso</td></tr>
+    <tr><td>Reproceso</td><td>Entregable que vuelve al equipo. Se mide en cantidad, causa y horas</td></tr>
+    <tr><td>Bien a la primera</td><td>Entregas sin ningún reproceso</td></tr>
+    <tr><td>Avance ponderado</td><td>Suma de pesos completados sobre pesos totales, sin cancelados. En el portal se renormaliza sobre lo visible</td></tr>
+    <tr><td>Peso</td><td>Importancia relativa de la tarea. Viene de la plantilla y del esfuerzo del tipo de pieza por cantidad</td></tr>
+    <tr><td>Capacidad semanal</td><td>Horas por persona (Admin → Usuarios). Base de la señal de sobrecarga</td></tr>
+    <tr><td>USD por hora</td><td>Valor cotizado activo del cliente dividido por sus horas del periodo. Señal de rentabilidad relativa</td></tr>
+    <tr><td>Huérfano</td><td>To-do creado en Basecamp sin pasar por BackIO</td></tr>
+  </table>
+</section>
+
+<!-- ============ 23 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 23</div>
+  <h2>Rutinas recomendadas por rol</h2>
+  <div class="grid2">
+    <div class="card"><h4>Ejecutiva de cuenta · a diario</h4><ul><li>Backlog filtrado por tus clientes: nada "sin movimiento" más de 7 días.</li><li>Filas con ✉: mandar el recordatorio al cliente.</li><li>Pedidos nuevos: Builder (o "+ Agregar requerimiento" si es suelto). Nunca directo en Basecamp.</li><li>Borradores de PrometIO: convertirlos el mismo día.</li></ul></div>
+    <div class="card"><h4>Quien lleva la mesa · a diario</h4><ul><li>09:00 Daily: revisar las tres columnas, ✨ redactar, publicar apertura.</li><li>18:00 publicar cierre.</li><li>Reprocesos del día: registrarlos con causa.</li></ul></div>
+    <div class="card"><h4>Colaborador · a diario</h4><ul><li>Tus tareas al día en estado. Completar en Basecamp.</li><li>Si no llegas a la fecha: reprogramar con motivo antes de que venza, no después.</li><li>Horas en el timesheet de Basecamp.</li></ul></div>
+    <div class="card"><h4>Marcia · semanal</h4><ul><li>Domingo llega la agenda por correo.</li><li>Lunes: recalcular señales, ✨ Agenda IA, Plan Operativo con resumen, publicar. Completar causas pendientes.</li><li>Viernes: Acta de Cierre, acuerdos con fecha real, publicar.</li><li>Huérfanos en cero.</li></ul></div>
+    <div class="card"><h4>Marcia · mensual</h4><ul><li>Día 1: revisar el informe de cada mesa y publicarlo.</li><li>Día 25: confirmar que los fees del mes siguiente se generaron (Admin → Recurrencias) y revisar fechas y responsables.</li></ul></div>
+    <div class="card"><h4>Admin · cuando haga falta</h4><ul><li>Nuevo cliente: mesa, Basecamp project id, webhook, importar.</li><li>Nueva persona: invitar, capacidad, vincular con Basecamp.</li><li>Nuevo servicio: plantilla.</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ 24 ============ -->
+<section class="cap">
+  <div class="eyebrow">Capítulo 24</div>
+  <h2>Problemas frecuentes</h2>
+  <table>
+    <tr><th>Síntoma</th><th>Causa habitual</th><th>Qué hacer</th></tr>
+    <tr><td>"El enlace no es válido o venció" al definir contraseña</td><td>Invitación de más de 24 h</td><td>Admin → Usuarios → reenviar. La pantalla muestra el detalle del error si es otra cosa</td></tr>
+    <tr><td>No veo la sección Admin / no puedo generar en Weekly</td><td>Tu rol no lo permite</td><td>Mira tu rol al pie del panel. Pide el cambio a un admin</td></tr>
+    <tr><td>Un proyecto muestra 0 tareas y 0 %</td><td>Abierto en los segundos en que se importaba, o filtro activo</td><td>Recarga. Si persiste, revisa Solo activos y filtros</td></tr>
+    <tr><td>No puedo marcar "Completado"</td><td>La tarea tiene to-do en Basecamp</td><td>Complétala en Basecamp; BackIO se entera en segundos</td></tr>
+    <tr><td>Tareas importadas "sin asignar"</td><td>Personas sin Basecamp user id al importar</td><td>Admin → Usuarios → Vincular con Basecamp; luego Reimportar en el cliente</td></tr>
+    <tr><td>Al publicar el daily no pasa nada</td><td>Versión antigua o error del board</td><td>Ahora siempre hay franja de progreso y resultado; si sale roja, lee el motivo (board Daily no configurado, mesa sin proyecto)</td></tr>
+    <tr><td>Proyecto con "⚠ sync Basecamp"</td><td>Basecamp falló al crear la lista (límite de 50, sin proyecto Basecamp)</td><td>Detalle del proyecto → Reintentar Basecamp</td></tr>
+    <tr><td>No aparecen los botones ✨</td><td>Clave de IA no configurada</td><td>Avisar a Luis</td></tr>
+    <tr><td>La cotización aprobada no llegó</td><td>Webhook de PrometIO rechazado (secreto) o empresa sin sincronizar</td><td>Admin → Integraciones y auditoría; editar y guardar la empresa en PrometIO vuelve a enviarla</td></tr>
+    <tr><td>El filtro de mesa no muestra nada</td><td>Los clientes no tienen mesa asignada</td><td>Admin → Clientes → mesa</td></tr>
+  </table>
+  <footer class="note">BackIO · Manual de uso v1.0 · Geeks Ecuador · Producción: backio.vercel.app · Las especificaciones técnicas viven en la carpeta <code>docs/</code> del repositorio.</footer>
+</section>
+</body>
+</html>
