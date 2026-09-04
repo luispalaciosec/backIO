@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { RequerimientoMetricas, Cliente, Usuario, EstadoOperativo, ActualizarRequerimientoInput } from '@backio/shared';
+import type { RequerimientoMetricas, Cliente, Usuario, Mesa, EstadoOperativo, ActualizarRequerimientoInput } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
@@ -19,8 +19,10 @@ export default function BacklogPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [horas, setHoras] = useState<Record<string, number>>({});
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
+  const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
+  const [mesas, setMesas] = useState<Mesa[]>([]);
   const [vista, setVista] = useState<Vista>('tabla');
-  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '' });
+  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '' });
   const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
   const [panel, setPanel] = useState(false);
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
@@ -49,7 +51,8 @@ export default function BacklogPage() {
   useEffect(() => {
     api<{ items: Cliente[] }>('/clientes').then((r) => setClientes(r.items)).catch(() => {});
     api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {});
-    api<{ items: { id: string; nombre: string }[] }>('/proyectos').then((r) => setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre])))).catch(() => {});
+    api<{ items: { id: string; nombre: string; mesa_id: string | null }[] }>('/proyectos').then((r) => { setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id]))); }).catch(() => {});
+    api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(() => {});
     api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(() => {});
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
@@ -93,7 +96,10 @@ export default function BacklogPage() {
   }
 
   const nombres = Object.fromEntries(usuarios.map((u) => [u.id, u.nombre]));
-  const itemsFiltrados = filtro.proyecto ? items.filter((r) => r.proyecto_id === filtro.proyecto) : items;
+  const mesaDeCliente = Object.fromEntries(clientes.map((c) => [c.id, c.mesa_id]));
+  /** Mesa del requerimiento: la del proyecto si tiene override, si no la del cliente. */
+  const mesaDe = (r: RequerimientoMetricas) => (r.proyecto_id && proyectoMesa[r.proyecto_id]) || mesaDeCliente[r.cliente_id] || null;
+  const itemsFiltrados = items.filter((r) => (!filtro.proyecto || r.proyecto_id === filtro.proyecto) && (!filtro.mesa || mesaDe(r) === filtro.mesa));
   const itemsOrdenados = ordenarRequerimientos(itemsFiltrados, orden.campo, orden.dir, { nombres, proyectos, horas });
   const proyectosDelFiltro = Object.entries(proyectos).filter(([id]) => items.some((r) => r.proyecto_id === id)).sort((a, b) => a[1].localeCompare(b[1]));
   const clientesVisibles = filtro.cliente ? clientes.filter((c) => c.id === filtro.cliente) : clientes.filter((c) => itemsOrdenados.some((r) => r.cliente_id === c.id));
@@ -119,6 +125,7 @@ export default function BacklogPage() {
         <button type="button" className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm" onClick={() => setPanel((v) => !v)}>
           <span className="flex items-center gap-2 flex-wrap">
             <span className="font-medium">{panel ? '▾' : '▸'} Buscar, filtrar y ordenar</span>
+            {filtro.mesa && <Chip>Mesa {mesas.find((m) => m.id === filtro.mesa)?.nombre}</Chip>}
             {filtro.cliente && <Chip>{clientes.find((c) => c.id === filtro.cliente)?.nombre}</Chip>}
             {filtro.owner && <Chip>{nombres[filtro.owner]}</Chip>}
             {filtro.estado && <Chip>{ESTADO_LABEL[filtro.estado]}</Chip>}
@@ -130,11 +137,18 @@ export default function BacklogPage() {
           <span className="text-xs text-gray-400 shrink-0">{itemsOrdenados.length} de {items.length}</span>
         </button>
         {panel && <div className="px-3 pb-3 flex flex-wrap gap-3 items-end border-t border-gray-100 pt-3">
+        <div className="min-w-40">
+          <label className="label">Mesa</label>
+          <select className="input" value={filtro.mesa} onChange={(e) => setFiltro({ ...filtro, mesa: e.target.value, cliente: '' })}>
+            <option value="">Todas</option>
+            {mesas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+          </select>
+        </div>
         <div className="min-w-44">
           <label className="label">Cliente</label>
           <select className="input" value={filtro.cliente} onChange={(e) => setFiltro({ ...filtro, cliente: e.target.value })}>
             <option value="">Todos</option>
-            {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            {clientes.filter((c) => !filtro.mesa || c.mesa_id === filtro.mesa).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </div>
         <div className="min-w-44">
@@ -176,7 +190,7 @@ export default function BacklogPage() {
           {[{ campo: 'atraso', dir: 'desc', label: 'Más atrasados' }, { campo: 'sin_movimiento', dir: 'desc', label: 'Más tiempo sin mover' }, { campo: 'fecha_entrega', dir: 'asc', label: 'Próximos a vencer' }, { campo: 'prioridad', dir: 'asc', label: 'Prioridad alta primero' }].map((a) => (
             <button key={a.label} type="button" className={`text-xs rounded-full border px-3 py-1 ${orden.campo === a.campo && orden.dir === a.dir ? 'border-brand text-brand bg-brand/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`} onClick={() => setOrden({ campo: a.campo as CampoOrden, dir: a.dir as Dir })}>{a.label}</button>
           ))}
-          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '' }); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); }}>Limpiar</button>
+          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '' }); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); }}>Limpiar</button>
         </div>
         </div>}
       </div>
