@@ -25,6 +25,7 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
     expect(safe).toEqual({
       todo_id: 991,
       completed: true,
+      bucket_id: null,
       completed_at: '2026-09-01T10:00:00Z',
       due_on: '2026-09-05',
       assignee_ids: [5],
@@ -35,7 +36,7 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
     expect(dump).not.toContain('no sabe lo que quiere');
     expect(dump).not.toContain('horrible.png');
     expect(dump).not.toContain('Elías');
-    expect(Object.keys(safe!)).toEqual(['todo_id', 'completed', 'completed_at', 'due_on', 'assignee_ids', 'updated_at']);
+    expect(Object.keys(safe!).sort()).toEqual(['assignee_ids', 'bucket_id', 'completed', 'completed_at', 'due_on', 'todo_id', 'updated_at']);
   });
 
   it('ignora eventos que no son de to-do', () => {
@@ -45,8 +46,15 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
   });
 
   it('extractSafeTodo tolera objetos incompletos', () => {
-    expect(extractSafeTodo({ id: 1 })?.completed).toBe(false);
+    expect(extractSafeTodo({ id: 1 })?.completed).toBeNull();
     expect(extractSafeTodo({ id: 'x' })).toBeNull();
+  });
+
+  it('deriva completed del tipo de evento aunque el recording resumido no lo traiga', () => {
+    const resumido = { id: 991, type: 'Todo', bucket: { id: 48775530 } };
+    expect(extractSafePayload({ kind: 'todo_completed', recording: resumido })).toMatchObject({ completed: true, bucket_id: 48775530 });
+    expect(extractSafePayload({ kind: 'todo_uncompleted', recording: resumido })).toMatchObject({ completed: false });
+    expect(extractSafePayload({ kind: 'todo_changed', recording: resumido })?.completed).toBeNull();
   });
 
   it('nunca persiste texto proveniente de Basecamp', async () => {

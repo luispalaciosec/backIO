@@ -13,21 +13,36 @@ import type { Requerimiento } from '@backio/shared';
 
 export interface BasecampSyncPayload {
   todo_id: number;
-  completed: boolean;
+  /** null = el evento no informa el estado; hay que consultar el to-do vivo. */
+  completed: boolean | null;
+  bucket_id: number | null;
   completed_at: string | null;
   due_on: string | null;
   assignee_ids: number[];
   updated_at: string;
 }
 
-const EVENTOS_TODO = new Set(['todo_completed', 'todo_uncompleted', 'todo_changed', 'todo_created', 'todo_assignment_changed']);
+const EVENTOS_TODO = new Set(['todo_completed', 'todo_uncompleted', 'todo_changed', 'todo_created', 'todo_assignment_changed', 'todo_due_on_changed', 'todo_unarchived']);
 
-/** Extrae el payload seguro de un evento de webhook. Devuelve null si no es evento de to-do. */
+/**
+ * Extrae el payload seguro de un evento de webhook. Devuelve null si no es evento de to-do.
+ * El `recording` del webhook es un resumen y puede no traer `completed`: el estado se deriva del
+ * tipo de evento cuando es inequívoco (todo_completed / todo_uncompleted); si no, queda null y
+ * el llamador consulta el to-do vivo.
+ */
 export function extractSafePayload(evento: unknown): BasecampSyncPayload | null {
   if (!evento || typeof evento !== 'object') return null;
   const e = evento as { kind?: unknown; recording?: unknown };
   if (typeof e.kind !== 'string' || !EVENTOS_TODO.has(e.kind)) return null;
-  return extractSafeTodo(e.recording);
+  const base = extractSafeTodo(e.recording);
+  if (!base) return null;
+  const rec = e.recording as Record<string, unknown>;
+  const completed =
+    e.kind === 'todo_completed' ? true
+    : e.kind === 'todo_uncompleted' ? false
+    : typeof rec.completed === 'boolean' ? rec.completed
+    : null;
+  return { ...base, completed };
 }
 
 /** Extrae el payload seguro de un objeto to-do (webhook o polling). */
@@ -40,9 +55,11 @@ export function extractSafeTodo(recording: unknown): BasecampSyncPayload | null 
         .map((a) => (a && typeof a === 'object' ? (a as { id?: unknown }).id : undefined))
         .filter((id): id is number => typeof id === 'number')
     : [];
+  const bucket = r.bucket && typeof r.bucket === 'object' ? (r.bucket as { id?: unknown }).id : undefined;
   return {
     todo_id: r.id,
-    completed: r.completed === true,
+    completed: typeof r.completed === 'boolean' ? r.completed : null,
+    bucket_id: typeof bucket === 'number' ? bucket : null,
     completed_at: typeof r.completed_at === 'string' ? r.completed_at : null,
     due_on: typeof r.due_on === 'string' ? r.due_on : null,
     assignee_ids: assignees,
@@ -64,6 +81,7 @@ export interface SyncResult {
 export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload): Promise<SyncResult> {
   const req = await findByBasecampTodo(ctx, safe.todo_id);
   if (!req) return { aplicado: false, motivo: 'to-do no gestionado por BackIO' };
+  if (safe.completed === null) return { aplicado: false, requerimiento_id: req.id, motivo: 'evento sin estado; requiere consulta al to-do vivo' };
 
   const yaCompletado = req.estado_operativo === 'completado';
   const cancelado = req.estado_operativo === 'cancelado';

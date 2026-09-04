@@ -24,7 +24,7 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
     try {
       const raw = await bc.getTodoRaw(bcProject, r.basecamp_todo_id as number);
       const safe = extractSafeTodo(raw);
-      if (safe && (await applyBasecampUpdate(ctx, safe)).aplicado) aplicados += 1;
+      if (safe && (await applyBasecampUpdate(ctx, { ...safe, completed: safe.completed ?? false })).aplicado) aplicados += 1;
     } catch (err) {
       console.error('[reconcile] fallo en to-do', r.basecamp_todo_id, err);
     }
