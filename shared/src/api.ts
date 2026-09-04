@@ -23,6 +23,9 @@ export interface CrearProyectoInput {
   prometio_cotizacion_id?: string | null;
   bloques: BloqueAlcanceInput[];
   owner_ejecutiva?: string | null;
+  /** Builder: crear también la recurrencia mensual (fees). */
+  repetir_mensual?: boolean;
+  periodo?: string | null;
 }
 
 export interface BloqueAlcanceInput {

@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
+import { upsertRecurrencia } from '../../lib/recurrencias';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
-import { listProyectos, getProyectoDetalle, getProyecto, updateProyecto, audit, DbError } from '../../lib/db';
+import { listProyectos, getProyectoDetalle, getProyecto, updateProyecto, audit, DbError, getPlantillaArbol } from '../../lib/db';
 import { generarPortalToken } from '../../lib/portal/token';
 import { sanitizeForClient } from '../../lib/visibility';
 import { createProjectStructure } from '../../lib/basecamp/write';
@@ -37,6 +38,8 @@ const crearSchema = z.object({
   prometio_cotizacion_id: z.string().uuid().nullable().optional(),
   bloques: z.array(bloqueSchema).default([]),
   owner_ejecutiva: z.string().uuid().nullable().optional(),
+  repetir_mensual: z.boolean().optional(),
+  periodo: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
 });
 
 /** Borradores creados por PrometIO (cotización aprobada) pendientes de convertir en proyecto. */
@@ -80,8 +83,22 @@ proyectos.post('/preview', requireScope('read:proyectos'), zValidator('json', cr
 });
 
 proyectos.post('/', requireScope('write:proyectos'), zValidator('json', crearSchema), async (c) => {
-  const r = await crearProyectoDesdePlantilla(ctxOf(c), c.req.valid('json'));
-  return c.json(r, 201);
+  const ctx = ctxOf(c);
+  const input = c.req.valid('json');
+  const r = await crearProyectoDesdePlantilla(ctx, input);
+  let recurrencia: unknown = null;
+  if (input.repetir_mensual) {
+    const plantilla = await getPlantillaArbol(ctx, input.plantilla_id);
+    const periodo = input.periodo ?? input.fecha_entrega.slice(0, 7);
+    await updateProyecto(ctx, r.proyecto.id, { periodo });
+    const rec = await upsertRecurrencia(ctx, {
+      cliente_id: input.cliente_id, plantilla_id: input.plantilla_id, nombre_patron: plantilla?.patron_nombre ?? `${plantilla?.nombre ?? input.nombre} - {mes} {año}`,
+      brief: input.brief, bloques: input.bloques, owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId, proyecto_origen_id: r.proyecto.id, ultimo_mes_generado: periodo, ultimo_proyecto_id: r.proyecto.id,
+    });
+    await updateProyecto(ctx, r.proyecto.id, { recurrencia_id: rec.id });
+    recurrencia = rec;
+  }
+  return c.json({ ...r, recurrencia }, 201);
 });
 
 proyectos.post('/:id/basecamp/reintentar', requireScope('write:proyectos'), async (c) => {

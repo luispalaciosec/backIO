@@ -33,7 +33,7 @@ export default async function ProyectoPage({ params }: { params: { id: string } 
         <div>
           <div className="text-sm text-gray-500">{p.cliente_nombre}</div>
           <h1 className="text-2xl font-bold">{p.nombre}</h1>
-          <div className="text-sm text-gray-500 mt-1">Inicio {fecha(p.fecha_inicio)} · Entrega {fecha(p.fecha_entrega)} · <EstadoChip estado={p.estado} /></div>
+          <div className="text-sm text-gray-500 mt-1">Inicio {fecha(p.fecha_inicio)} · Entrega {fecha(p.fecha_entrega)} · <EstadoChip estado={p.estado} />{p.recurrencia_id && <span className="ml-2 text-brand">↻ Fee mensual{p.periodo ? ` ${p.periodo}` : ''}</span>}</div>
         </div>
         <PortalControls proyecto={p} />
       </header>

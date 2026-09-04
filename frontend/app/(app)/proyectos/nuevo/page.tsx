@@ -136,7 +136,7 @@ export default function NuevoProyectoPage() {
       {s.paso === 2 && s.plantilla && <Step2Brief state={s} set={set} clientes={cat.clientes} onSugerirPlantilla={(id) => elegirPlantilla(id, { paso: 2 })} />}
       {s.paso === 3 && s.plantilla && <Step3Alcance state={s} set={set} />}
       {s.paso === 4 && s.plantilla && <Step4EquipoFechas state={s} set={set} usuarios={cat.usuarios} />}
-      {s.paso === 5 && s.plantilla && <Step5Revision state={s} usuarios={cat.usuarios} clientes={cat.clientes} />}
+      {s.paso === 5 && s.plantilla && <Step5Revision state={s} usuarios={cat.usuarios} clientes={cat.clientes} set={set} />}
 
       <footer className="flex justify-between border-t border-gray-200 pt-4">
         <button className="btn-secondary" disabled={s.paso === 1} onClick={() => set({ paso: (s.paso - 1) as WizardState['paso'] })}>Volver</button>

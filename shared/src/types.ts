@@ -169,6 +169,8 @@ export interface Proyecto {
   mesa_id: string | null;
   basecamp_grupos: Record<string, number>;
   valor_cotizado: number | null;
+  recurrencia_id: string | null;
+  periodo: string | null;
   portal_token: string | null;
   portal_activo: boolean;
   created_at: string;
@@ -360,3 +362,11 @@ export interface Reproceso {
   fecha_entrega_antes: string | null; abierto_at: string; cerrado_at: string | null; horas_reproceso: number | null; usuario_id: string | null; created_at: string;
 }
 export interface HistorialRequerimiento { reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] }
+
+/** Recurrencia mensual de un fee (D2, 04/09/2026). */
+export interface Recurrencia {
+  id: string; tenant_id: string; cliente_id: string; plantilla_id: string; nombre_patron: string;
+  brief: Record<string, unknown>; bloques: unknown[]; owner_ejecutiva: string | null;
+  dia_generacion: number; activa: boolean; ultimo_mes_generado: string | null; ultimo_proyecto_id: string | null; proyecto_origen_id: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+}

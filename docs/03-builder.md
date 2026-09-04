@@ -200,3 +200,17 @@ borrador de UI. Nada de negocio se persiste hasta el paso 5.
 
 El preview del paso 5 debe usar **la misma función** `sanitizeForClient` que el portal real.
 No una versión "para preview". Si divergen, el preview miente.
+
+
+## Recurrencia mensual (D2, decidido 04/09/2026)
+
+Un fee se crea una sola vez en el Builder marcando **«Repetir cada mes»** en el paso 5 (aparece si la plantilla
+es recurrente o de tipo `fee_mensual`), o desde un proyecto existente con **«↻ Repetir cada mes»**. Eso guarda una
+`recurrencia` con la configuración completa (plantilla, brief, bloques, piezas por tipo, responsables, ejecutiva).
+
+Cada día a las 08:05 (Guayaquil) el scheduler revisa las recurrencias activas: si el día del mes ≥ `dia_generacion`
+(por defecto **25**) y el mes siguiente aún no existe, genera el proyecto por el mismo camino que el Builder
+(plan → requerimientos → estructura en Basecamp → correo a los responsables), lo marca con `periodo = YYYY-MM`
+y avisa a la ejecutiva y a operaciones. Nombre según `patron_nombre` de la plantilla (`{mes}`, `{año}`); inicio
+el día 1 y entrega el último día del mes. Idempotente por periodo. Admin → Recurrencias permite pausar, cambiar día,
+patrón y ejecutiva, y **generar ahora**.

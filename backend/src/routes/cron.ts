@@ -5,6 +5,7 @@ import { reconcileTenant } from '../lib/basecamp/reconcile';
 import { recalcularSenales } from '../lib/rituals/service';
 import { procesarPendientes } from '../lib/notificaciones';
 import { detectarHuerfanos } from '../lib/basecamp/huerfanos';
+import { procesarRecurrencias } from '../lib/recurrencias';
 import { sincronizarHoras } from '../lib/horas';
 
 export const cron = new Hono();
@@ -50,6 +51,12 @@ cron.post('/senales', async (c) => {
 cron.post('/huerfanos', async (c) => {
   const out: Record<string, unknown> = {};
   for (const t of await tenants()) out[t] = await detectarHuerfanos({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({ error: e.message }));
+  return c.json(out);
+});
+/** Diario: recurrencias de fees. */
+cron.post('/recurrencias', async (c) => {
+  const out: Record<string, unknown> = {};
+  for (const t of await tenants()) out[t] = await procesarRecurrencias({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({ error: e.message }));
   return c.json(out);
 });
 /** Cada 6 h: horas. */

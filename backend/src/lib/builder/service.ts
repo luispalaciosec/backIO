@@ -79,6 +79,7 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
     fecha_entrega: input.fecha_entrega,
     owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId,
     portal_token: generarPortalToken(),
+    ...(input.periodo ? { periodo: input.periodo } : {}),
   });
 
   const requerimientos = await insertRequerimientos(

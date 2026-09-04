@@ -11,6 +11,8 @@ export interface WizardState {
   bloques: Record<string, BloqueAlcanceInput>; // por bloque_id
   /** Piezas por tipo detectadas por la IA en el brief pegado (solo un recordatorio para el paso 3). */
   piezas_sugeridas?: Record<string, number>;
+  /** Fees: crear la recurrencia mensual al crear el proyecto (D2). */
+  repetir_mensual?: boolean;
 }
 
 export const ESTADO_INICIAL: WizardState = {
@@ -39,6 +41,8 @@ export function toInput(s: WizardState): CrearProyectoInput {
     fecha_entrega: s.fecha_entrega,
     prometio_cotizacion_id: s.prometio_cotizacion_id,
     bloques: Object.values(s.bloques),
+    repetir_mensual: s.repetir_mensual ?? false,
+    periodo: s.repetir_mensual ? s.fecha_entrega.slice(0, 7) : null,
   };
 }
 

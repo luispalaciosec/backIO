@@ -13,6 +13,7 @@ import { detectarHuerfanos } from './basecamp/huerfanos';
 import { iaDisponible } from './ia';
 import { generarInformeMensual } from './ia/informe';
 import { listMesas } from './db/mesas';
+import { procesarRecurrencias } from './recurrencias';
 import { sincronizarHoras } from './horas';
 
 const TZ = 'America/Guayaquil';
@@ -53,8 +54,17 @@ export function startScheduler(): void {
 
   let ultimaCorrida = '';
   let ultimoInforme = '';
+  let ultimaRecurrencia = '';
   setInterval(async () => {
     const t = ahoraLocal();
+    // Diario 08:05: recurrencias de fees (genera el mes siguiente cuando llega el día configurado).
+    if (t.hora === 8 && t.minuto === 5 && ultimaRecurrencia !== t.clave) {
+      ultimaRecurrencia = t.clave;
+      for (const id of await tenants()) {
+        try { const r = await procesarRecurrencias({ db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' }); if (r.generadas.length || r.errores.length) console.log('[scheduler] recurrencias', JSON.stringify(r)); }
+        catch (err) { console.error('[scheduler] recurrencias', err instanceof Error ? err.message : err); }
+      }
+    }
     // Día 1 de cada mes 08:00: informe ejecutivo del mes anterior por mesa (solo se redacta; Marcia lo publica).
     if (t.hora === 8 && t.minuto === 0 && t.clave.endsWith('-01') && ultimoInforme !== t.clave && iaDisponible()) {
       ultimoInforme = t.clave;

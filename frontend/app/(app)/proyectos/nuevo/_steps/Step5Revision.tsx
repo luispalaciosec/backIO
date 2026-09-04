@@ -11,12 +11,23 @@ interface Preview {
 }
 
 /** Paso 5 · NO OPCIONAL. La ejecutiva ve exactamente la pantalla del cliente antes de que exista. */
-export function Step5Revision({ state: s, usuarios, clientes }: { state: WizardState; usuarios: Usuario[]; clientes: Cliente[] }) {
+export function Step5Revision({ state: s, usuarios, clientes, set }: { state: WizardState; usuarios: Usuario[]; clientes: Cliente[]; set?: (p: Partial<WizardState>) => void }) {
   const [p, setP] = useState<Preview | null>(null);
   useEffect(() => { api<Preview>('/proyectos/preview', { method: 'POST', json: toInput(s) }).then(setP).catch(() => setP(null)); }, [s]);
   const cliente = clientes.find((c) => c.id === s.cliente_id);
   if (!p) return <div className="text-gray-500">Generando preview…</div>;
+  const esFee = s.plantilla?.recurrente || s.plantilla?.tipo === 'fee_mensual';
   return (
+    <div className="space-y-4">
+    {esFee && set && (
+      <label className="card p-4 flex items-start gap-3 cursor-pointer border-brand/30 bg-brand/5">
+        <input type="checkbox" className="mt-1" checked={!!s.repetir_mensual} onChange={(e) => set({ repetir_mensual: e.target.checked })} />
+        <span className="text-sm">
+          <span className="font-semibold">Repetir cada mes</span>
+          <span className="block text-gray-600">Es un fee. BackIO creará el proyecto del mes siguiente el día 25 con esta misma configuración (bloques, piezas, responsables), lo enviará a Basecamp y avisará a la ejecutiva. El nombre seguirá el patrón «{s.plantilla?.patron_nombre ?? `${s.plantilla?.nombre} - {mes} {año}`}». Se pausa o ajusta en Admin → Recurrencias.</span>
+        </span>
+      </label>
+    )}
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 font-semibold">Vista interna · {p.plan.tareas.length} tareas · {p.plan.visibles} visibles</div>
@@ -35,6 +46,7 @@ export function Step5Revision({ state: s, usuarios, clientes }: { state: WizardS
         <VistaCliente data={p.vista_cliente} clienteNombre={cliente?.nombre ?? ''} logoUrl={cliente?.logo_url} color={cliente?.color_primario ?? '#0073EA'} />
         <p className="text-xs text-gray-500">Si algo no debe estar aquí, se corrige en la plantilla antes de crear, no después.</p>
       </section>
+    </div>
     </div>
   );
 }

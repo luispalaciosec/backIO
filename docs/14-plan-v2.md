@@ -75,7 +75,7 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 | # | Decisión | Quién | Bloquea |
 |---|---|---|---|
 | D1 | Importar títulos de to-dos existentes como `titulo_interno` (excepción acotada a la regla 1) — **aprobado e implementado 04/09** | Luis | Sprint 3 |
-| D2 | Día del cron de generación mensual (propuesto: 25) y quién confirma (ejecutiva de la cuenta) | Marcia | Sprint 2 |
+| D2 | Día del cron de generación mensual (propuesto: 25) y quién confirma (ejecutiva de la cuenta) | Marcia | Sprint 2 — **decidido e implementado 04/09: día 25, patrón de la plantilla, Admin → Recurrencias** |
 | D3 | Tono y firma de los mensajes IA — por defecto "Redactado por BackIO, publicado por [persona]"; ajustable | Marcia / Grace | Sprint 4 |
 | D4 | Formato del informe mensual — implementado (lectura del mes + decisiones + tablas cliente/persona); ajustar con Marcia | Marcia | Sprint 4 |
 | D5 | Fecha objetivo de baja de Monday | Luis | Sprint 5 |
