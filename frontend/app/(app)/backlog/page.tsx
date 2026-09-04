@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert';
 import { BacklogTable } from '@/components/backlog/BacklogTable';
 import { KanbanBoard } from '@/components/backlog/KanbanBoard';
 import { ESTADO_LABEL } from '@/lib/format';
+import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '@/lib/orden';
 
 type Vista = 'tabla' | 'kanban';
 
@@ -18,7 +19,8 @@ export default function BacklogPage() {
   const [horas, setHoras] = useState<Record<string, number>>({});
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
   const [vista, setVista] = useState<Vista>('tabla');
-  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '' });
+  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '' });
+  const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -82,7 +84,11 @@ export default function BacklogPage() {
     }
   }
 
-  const clientesVisibles = filtro.cliente ? clientes.filter((c) => c.id === filtro.cliente) : clientes.filter((c) => items.some((r) => r.cliente_id === c.id));
+  const nombres = Object.fromEntries(usuarios.map((u) => [u.id, u.nombre]));
+  const itemsFiltrados = filtro.proyecto ? items.filter((r) => r.proyecto_id === filtro.proyecto) : items;
+  const itemsOrdenados = ordenarRequerimientos(itemsFiltrados, orden.campo, orden.dir, { nombres, proyectos, horas });
+  const proyectosDelFiltro = Object.entries(proyectos).filter(([id]) => items.some((r) => r.proyecto_id === id)).sort((a, b) => a[1].localeCompare(b[1]));
+  const clientesVisibles = filtro.cliente ? clientes.filter((c) => c.id === filtro.cliente) : clientes.filter((c) => itemsOrdenados.some((r) => r.cliente_id === c.id));
 
   return (
     <div className="space-y-4">
@@ -123,6 +129,13 @@ export default function BacklogPage() {
             {Object.keys(ESTADO_LABEL).map((s) => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
           </select>
         </div>
+        <div className="min-w-52">
+          <label className="label">Proyecto</label>
+          <select className="input" value={filtro.proyecto} onChange={(e) => setFiltro({ ...filtro, proyecto: e.target.value })}>
+            <option value="">Todos</option>
+            {proyectosDelFiltro.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+          </select>
+        </div>
         <div className="flex-1 min-w-52">
           <label className="label">Buscar</label>
           <input className="input" placeholder="Requerimiento…" value={filtro.q} onChange={(e) => setFiltro({ ...filtro, q: e.target.value })} />
@@ -130,6 +143,19 @@ export default function BacklogPage() {
         <label className="flex items-center gap-2 text-sm pb-2">
           <input type="checkbox" checked={filtro.activos} onChange={(e) => setFiltro({ ...filtro, activos: e.target.checked })} /> Solo activos
         </label>
+        <div className="w-full flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-sm">
+          <span className="text-xs uppercase tracking-wide text-gray-500">Ordenar por</span>
+          <select className="input w-56" value={orden.campo} onChange={(e) => setOrden({ ...orden, campo: e.target.value as CampoOrden })}>
+            {CAMPOS_ORDEN.map((c) => <option key={c.campo} value={c.campo}>{c.label}</option>)}
+          </select>
+          <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5">
+            {(['asc', 'desc'] as Dir[]).map((d) => <button key={d} type="button" onClick={() => setOrden({ ...orden, dir: d })} className={`px-3 py-1 rounded ${orden.dir === d ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{d === 'asc' ? '↑ Ascendente' : '↓ Descendente'}</button>)}
+          </div>
+          {[{ campo: 'atraso', dir: 'desc', label: 'Más atrasados' }, { campo: 'sin_movimiento', dir: 'desc', label: 'Más tiempo sin mover' }, { campo: 'fecha_entrega', dir: 'asc', label: 'Próximos a vencer' }, { campo: 'prioridad', dir: 'asc', label: 'Prioridad alta primero' }].map((a) => (
+            <button key={a.label} type="button" className={`text-xs rounded-full border px-3 py-1 ${orden.campo === a.campo && orden.dir === a.dir ? 'border-brand text-brand bg-brand/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`} onClick={() => setOrden({ campo: a.campo as CampoOrden, dir: a.dir as Dir })}>{a.label}</button>
+          ))}
+          <span className="ml-auto text-xs text-gray-400">{itemsOrdenados.length} de {items.length}</span>
+        </div>
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
@@ -137,11 +163,11 @@ export default function BacklogPage() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-x-auto pb-4">
-          <BacklogTable items={items} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} />
+          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} />
         </div>
       )}
       {!loading && vista === 'kanban' && (
-        <KanbanBoard items={items} clientes={clientes} usuarios={usuarios} onMover={(id, estado) => patch(id, { estado_operativo: estado })} />
+        <KanbanBoard items={itemsOrdenados} clientes={clientes} usuarios={usuarios} onMover={(id, estado) => patch(id, { estado_operativo: estado })} />
       )}
     </div>
   );
