@@ -21,6 +21,7 @@ export default function BacklogPage() {
   const [vista, setVista] = useState<Vista>('tabla');
   const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '' });
   const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
+  const [panel, setPanel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -107,7 +108,21 @@ export default function BacklogPage() {
         </div>
       </header>
 
-      <div className="card p-3 flex flex-wrap gap-3 items-end">
+      <div className="card">
+        <button type="button" className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm" onClick={() => setPanel((v) => !v)}>
+          <span className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium">{panel ? '▾' : '▸'} Buscar, filtrar y ordenar</span>
+            {filtro.cliente && <Chip>{clientes.find((c) => c.id === filtro.cliente)?.nombre}</Chip>}
+            {filtro.owner && <Chip>{nombres[filtro.owner]}</Chip>}
+            {filtro.estado && <Chip>{ESTADO_LABEL[filtro.estado]}</Chip>}
+            {filtro.proyecto && <Chip>{proyectos[filtro.proyecto]}</Chip>}
+            {filtro.q && <Chip>“{filtro.q}”</Chip>}
+            {!filtro.activos && <Chip>incluye completados</Chip>}
+            <Chip tono="gris">{CAMPOS_ORDEN.find((c) => c.campo === orden.campo)?.label} {orden.dir === 'asc' ? '↑' : '↓'}</Chip>
+          </span>
+          <span className="text-xs text-gray-400 shrink-0">{itemsOrdenados.length} de {items.length}</span>
+        </button>
+        {panel && <div className="px-3 pb-3 flex flex-wrap gap-3 items-end border-t border-gray-100 pt-3">
         <div className="min-w-44">
           <label className="label">Cliente</label>
           <select className="input" value={filtro.cliente} onChange={(e) => setFiltro({ ...filtro, cliente: e.target.value })}>
@@ -154,8 +169,9 @@ export default function BacklogPage() {
           {[{ campo: 'atraso', dir: 'desc', label: 'Más atrasados' }, { campo: 'sin_movimiento', dir: 'desc', label: 'Más tiempo sin mover' }, { campo: 'fecha_entrega', dir: 'asc', label: 'Próximos a vencer' }, { campo: 'prioridad', dir: 'asc', label: 'Prioridad alta primero' }].map((a) => (
             <button key={a.label} type="button" className={`text-xs rounded-full border px-3 py-1 ${orden.campo === a.campo && orden.dir === a.dir ? 'border-brand text-brand bg-brand/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`} onClick={() => setOrden({ campo: a.campo as CampoOrden, dir: a.dir as Dir })}>{a.label}</button>
           ))}
-          <span className="ml-auto text-xs text-gray-400">{itemsOrdenados.length} de {items.length}</span>
+          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '' }); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); }}>Limpiar</button>
         </div>
+        </div>}
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
@@ -171,4 +187,8 @@ export default function BacklogPage() {
       )}
     </div>
   );
+}
+
+function Chip({ children, tono = 'brand' }: { children: React.ReactNode; tono?: 'brand' | 'gris' }) {
+  return <span className={`rounded-full px-2 py-0.5 text-xs ${tono === 'brand' ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-600'}`}>{children}</span>;
 }

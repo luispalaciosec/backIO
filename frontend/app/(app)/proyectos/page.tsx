@@ -27,6 +27,7 @@ export default function ProyectosPage() {
   const [orden, setOrden] = useState<Orden>('entrega');
   const [dir, setDir] = useState<'asc' | 'desc'>('asc');
   const [vista, setVista] = useState<'tarjetas' | 'lista'>('tarjetas');
+  const [panel, setPanel] = useState(false);
 
   useEffect(() => {
     Promise.all([api<{ items: Fila[] }>('/proyectos'), api<{ items: Cliente[] }>('/clientes?todos=1'), api<{ items: Mesa[] }>('/mesas'), api<{ items: Usuario[] }>('/usuarios')])
@@ -88,7 +89,22 @@ export default function ProyectosPage() {
         </div>
       </header>
 
-      <div className="card p-3 flex flex-wrap gap-3 items-end">
+      <div className="card">
+        <button type="button" className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm" onClick={() => setPanel((v) => !v)}>
+          <span className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium">{panel ? '▾' : '▸'} Buscar, filtrar y ordenar</span>
+            {f.q && <Chip>“{f.q}”</Chip>}
+            {f.cliente && <Chip>{clientes.find((c) => c.id === f.cliente)?.nombre}</Chip>}
+            {f.mesa && <Chip>{mesas.find((m) => m.id === f.mesa)?.nombre}</Chip>}
+            {f.ejecutiva && <Chip>{nombreU(f.ejecutiva)}</Chip>}
+            {f.estado && <Chip>{ESTADO_LABEL[f.estado]}</Chip>}
+            {f.portal && <Chip>portal {f.portal}</Chip>}
+            {!f.activos && <Chip>incluye completados</Chip>}
+            <Chip tono="gris">{ORDENES.find((o) => o.v === orden)?.label} {dir === 'asc' ? '↑' : '↓'}</Chip>
+          </span>
+          <span className="text-xs text-gray-400 shrink-0">{visibles.length} de {items.length}</span>
+        </button>
+        {panel && <div className="px-3 pb-3 flex flex-wrap gap-3 items-end border-t border-gray-100 pt-3">
         <div className="flex-1 min-w-56"><label className="label">Buscar</label><input className="input" placeholder="Nombre del proyecto o cliente…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} /></div>
         <div className="min-w-44"><label className="label">Cliente</label><select className="input" value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })}><option value="">Todos</option>{clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div>
         <div className="min-w-36"><label className="label">Mesa</label><select className="input" value={f.mesa} onChange={(e) => setF({ ...f, mesa: e.target.value })}><option value="">Todas</option>{mesas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>
@@ -105,8 +121,9 @@ export default function ProyectosPage() {
           {[{ o: 'entrega', d: 'asc', label: 'Próximos a entregar' }, { o: 'avance', d: 'asc', label: 'Menos avanzados' }, { o: 'actualizado', d: 'desc', label: 'Recién actualizados' }].map((a) => (
             <button key={a.label} type="button" className={`text-xs rounded-full border px-3 py-1 ${orden === a.o && dir === a.d ? 'border-brand text-brand bg-brand/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`} onClick={() => { setOrden(a.o as Orden); setDir(a.d as 'asc' | 'desc'); }}>{a.label}</button>
           ))}
-          <span className="ml-auto text-xs text-gray-400">{visibles.length} de {items.length}</span>
+          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setF({ q: '', cliente: '', estado: '', mesa: '', ejecutiva: '', portal: '', activos: true }); setOrden('entrega'); setDir('asc'); }}>Limpiar</button>
         </div>
+        </div>}
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
@@ -161,4 +178,8 @@ export default function ProyectosPage() {
       )}
     </div>
   );
+}
+
+function Chip({ children, tono = 'brand' }: { children: React.ReactNode; tono?: 'brand' | 'gris' }) {
+  return <span className={`rounded-full px-2 py-0.5 text-xs ${tono === 'brand' ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-600'}`}>{children}</span>;
 }
