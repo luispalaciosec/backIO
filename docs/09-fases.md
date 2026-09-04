@@ -61,11 +61,11 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [ ] `audit_log` registrando todas las escrituras
 
 ### Fase 3
-- [ ] **Checklist completo de `02-visibilidad.md` firmado**
-- [ ] Test de integración: endpoint público no devuelve campos internos
-- [ ] Portal responsive verificado en móvil
-- [ ] Resumen IA cacheado 6 horas
-- [ ] `noindex` y `robots.txt` configurados
+- [x] **Checklist completo de `02-visibilidad.md` firmado** (código aprobado por Luis 03/09/2026; portal verificado en producción con proyecto sandbox: 2 hitos visibles de 4, avance renormalizado 79%)
+- [x] Test de integración: endpoint público no devuelve campos internos
+- [ ] Portal responsive verificado en móvil (verificado en escritorio; falta abrir el enlace desde el celular)
+- [x] Resumen IA cacheado 6 horas (verificado en producción)
+- [x] `noindex` y `robots.txt` configurados
 
 ### Fase 5
 - [ ] Las cuentas activas migradas y verificadas
