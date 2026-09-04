@@ -1,4 +1,4 @@
--- PROPUESTA (zona de revisión humana: políticas RLS). No aplicar sin revisión de Luis.
+-- Aprobada por Luis y aplicada el 04/09/2026 (zona de revisión humana: políticas RLS).
 -- Hoy un colaborador solo LEE los requerimientos donde está en owner_agencia. Eso hace que en
 -- Proyectos vea "0 tareas" y avance 0 %, y que en el backlog solo vea lo suyo.
 -- Cambio: el colaborador lee todo el backlog del tenant (es equipo interno; titulo_interno ya es interno),
