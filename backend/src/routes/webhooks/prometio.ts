@@ -50,7 +50,15 @@ async function tenantDefault(): Promise<string> {
 
 prometioWebhook.post('/', async (c) => {
   const raw = await c.req.text();
-  if (!verify(raw, c.req.header('x-prometio-signature') ?? c.req.header('x-signature'))) return c.text('unauthorized', 401);
+  const sig = c.req.header('x-prometio-signature') ?? c.req.header('x-signature');
+  if (!verify(raw, sig)) {
+    // Rastro diagnosticable sin exponer el cuerpo: solo evento y si venía firma.
+    let evento = 'desconocido';
+    try { evento = String((JSON.parse(raw) as { evento?: string }).evento ?? 'desconocido'); } catch { /* ignore */ }
+    const tenantId = await tenantDefault().catch(() => null);
+    if (tenantId) await audit({ db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' }, { accion: 'webhook_rechazado', entidad: 'webhook', detalle: { evento, con_firma: !!sig, motivo: env().PROMETIO_WEBHOOK_SECRET ? 'firma inválida' : 'secreto no configurado' } });
+    return c.text('unauthorized', 401);
+  }
   let parsedRaw: unknown;
   try { parsedRaw = JSON.parse(raw); } catch { return c.json({ error: 'bad json' }, 400); }
   const env1 = envelope.safeParse(parsedRaw);
