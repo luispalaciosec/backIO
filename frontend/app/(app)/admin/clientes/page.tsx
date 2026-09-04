@@ -8,6 +8,7 @@ export default function AdminClientesPage() {
   const [items, setItems] = useState<Cliente[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [diag, setDiag] = useState<Record<string, unknown> | null>(null);
   const cargar = () => api<{ items: Cliente[] }>('/clientes?todos=1').then((r) => setItems(r.items)).catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => { void cargar(); }, []);
 
@@ -55,11 +56,19 @@ export default function AdminClientesPage() {
                   catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
                 }}>{(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? '✓ webhook' : 'Webhook'}</button>
               )}
+              {(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id && (
+                <button type="button" className="btn-ghost text-xs" title="Ver entregas recientes del webhook" onClick={async () => {
+                  setError(null);
+                  try { setDiag(await api<Record<string, unknown>>(`/clientes/${c.id}/basecamp/webhook`)); }
+                  catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+                }}>Diag</button>
+              )}
             </div>
           </form>
         ))}
         {items.length === 0 && <div className="card p-6 text-gray-500">Sin clientes. Llegan desde PrometIO por webhook.</div>}
       </div>
+      {diag && <pre className="card p-3 text-xs overflow-auto">{JSON.stringify(diag, null, 2)}</pre>}
       <p className="text-xs text-gray-500">El id del proyecto en Basecamp es el número de la URL: <code>3.basecamp.com/&lt;cuenta&gt;/projects/<b>&lt;id&gt;</b></code>.</p>
     </div>
   );

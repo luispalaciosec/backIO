@@ -117,6 +117,16 @@ export class BasecampClient {
     return { id: r.id, app_url: r.app_url };
   }
 
+  /** Diagnóstico: solo metadatos de entregas (fecha y código HTTP). NUNCA el body (contiene texto de Basecamp). */
+  async getWebhookDeliveries(projectId: number, webhookId: number): Promise<{ activo: boolean; payload_url: string; entregas: { at: string; status: number | null }[] }> {
+    const r = await this.request<{ active: boolean; payload_url: string; recent_deliveries?: { created_at: string; response?: { code?: number } }[] }>('GET', `/buckets/${projectId}/webhooks/${webhookId}.json`);
+    return {
+      activo: r.active,
+      payload_url: r.payload_url,
+      entregas: (r.recent_deliveries ?? []).slice(0, 10).map((d) => ({ at: d.created_at, status: d.response?.code ?? null })),
+    };
+  }
+
   async registerWebhook(projectId: number, payloadUrl: string): Promise<{ id: number }> {
     return this.request<{ id: number }>('POST', `/buckets/${projectId}/webhooks.json`, {
       payload_url: payloadUrl,

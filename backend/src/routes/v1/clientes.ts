@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listClientes, getCliente, updateClienteConfig, listProyectos, listBacklog, audit } from '../../lib/db';
 import type { ResumenClientePrometio } from '@backio/shared';
-import { registrarWebhookCliente } from '../../lib/basecamp/webhooks';
+import { registrarWebhookCliente, diagnosticoWebhookCliente } from '../../lib/basecamp/webhooks';
 
 export const clientes = new Hono();
 
@@ -58,6 +58,14 @@ clientes.patch('/:id', requireScope('admin'), zValidator('json', patchSchema), a
 clientes.post('/:id/basecamp/webhook', requireScope('admin'), async (c) => {
   try {
     return c.json(await registrarWebhookCliente(ctxOf(c), c.req.param('id')));
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
+  }
+});
+
+clientes.get('/:id/basecamp/webhook', requireScope('admin'), async (c) => {
+  try {
+    return c.json(await diagnosticoWebhookCliente(ctxOf(c), c.req.param('id')));
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
   }

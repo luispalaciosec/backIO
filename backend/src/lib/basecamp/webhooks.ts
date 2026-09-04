@@ -24,3 +24,14 @@ export async function registrarWebhookCliente(ctx: DbCtx, clienteId: string): Pr
   await audit(ctx, { accion: 'basecamp_registrar_webhook', entidad: 'cliente', entidad_id: clienteId, detalle: { webhook_id: wh.id, project: cliente.basecamp_project_id } });
   return { webhook_id: wh.id, payload_url: url };
 }
+
+export async function diagnosticoWebhookCliente(ctx: DbCtx, clienteId: string) {
+  const cliente = await getCliente(ctx, clienteId);
+  if (!cliente?.basecamp_project_id) throw new Error('Cliente sin basecamp_project_id');
+  const id = (cliente.config as { basecamp_webhook_id?: number }).basecamp_webhook_id;
+  if (!id) throw new Error('Cliente sin webhook registrado');
+  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const d = await bc.getWebhookDeliveries(cliente.basecamp_project_id, id);
+  // Se enmascara el token de la URL.
+  return { webhook_id: id, activo: d.activo, payload_url: d.payload_url.replace(/(\/api\/webhooks\/basecamp\/)[^/]+$/, '$1***'), url_coincide: d.payload_url === webhookUrl(), entregas: d.entregas };
+}
