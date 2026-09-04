@@ -76,7 +76,7 @@ export function cuerpoDaily(m: DailyMensaje): string {
   return [
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
     ...(m.narrativa ? m.narrativa.split(/\n+/).map((p) => `<p>${esc(p)}</p>`) : []),
-    `<p>📌 <strong>Notas clave del día</strong></p>`, li(m.notas),
+    `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
     `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
     `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
     `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
