@@ -9,7 +9,7 @@ export interface FiltroProyectos {
 export async function listProyectos(ctx: DbCtx, f: FiltroProyectos = {}): Promise<(Proyecto & { avance: number; cliente_nombre: string })[]> {
   let q = ctx.db
     .from('proyectos')
-    .select('*, clientes!inner(nombre), v_proyectos_avance(avance, atrasados, esperando_cliente)')
+    .select('*, clientes!inner(nombre)')
     .eq('tenant_id', ctx.tenantId)
     .is('deleted_at', null)
     .order('fecha_entrega');
@@ -17,14 +17,15 @@ export async function listProyectos(ctx: DbCtx, f: FiltroProyectos = {}): Promis
   if (f.estado) q = q.eq('estado', f.estado);
   const { data, error } = await q;
   throwIf(error);
-  return (data ?? []).map((row) => {
-    const r = row as Record<string, unknown>;
-    const cl = r.clientes as { nombre: string } | null;
-    const av = r.v_proyectos_avance as { avance: number }[] | { avance: number } | null;
-    const avance = Array.isArray(av) ? (av[0]?.avance ?? 0) : (av?.avance ?? 0);
-    const { clientes: _c, v_proyectos_avance: _v, ...rest } = r;
-    return { ...(rest as unknown as Proyecto), avance, cliente_nombre: cl?.nombre ?? '' };
-  });
+  const filas = (data ?? []) as (Proyecto & { clientes: { nombre: string } | null })[];
+  const ids = filas.map((p) => p.id);
+  const avances = new Map<string, number>();
+  if (ids.length) {
+    const { data: av, error: ea } = await ctx.db.from('v_proyectos_avance').select('proyecto_id, avance').in('proyecto_id', ids);
+    throwIf(ea);
+    for (const a of (av ?? []) as { proyecto_id: string; avance: number }[]) avances.set(a.proyecto_id, Number(a.avance));
+  }
+  return filas.map(({ clientes, ...p }) => ({ ...p, avance: avances.get(p.id) ?? 0, cliente_nombre: clientes?.nombre ?? '' }));
 }
 
 export async function getProyecto(ctx: DbCtx, id: string): Promise<Proyecto | null> {
