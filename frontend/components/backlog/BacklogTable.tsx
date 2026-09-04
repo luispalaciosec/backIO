@@ -21,11 +21,13 @@ export interface BacklogTableProps {
   horas?: Record<string, number>;
   /** Si devuelve false, la fila se muestra sin editores (colaborador viendo tareas ajenas). */
   puedeEditar?: (r: RequerimientoMetricas) => boolean;
+  /** Nombre de proyecto por id, para la columna Proyecto. */
+  proyectos?: Record<string, string>;
 }
 
-const COLS = 'grid-cols-[minmax(260px,2fr)_120px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
+const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
 
-export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar }: BacklogTableProps) {
+export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {} }: BacklogTableProps) {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
   const grupos = clientes
     .map((c, i) => ({ cliente: c, color: colorGrupo(i, c.color_primario), reqs: items.filter((r) => r.cliente_id === c.id) }))
@@ -47,12 +49,12 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50`}>
                   <div className="flex"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
-                  {['Owner cliente', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
+                  {['Proyecto', 'Owner cliente', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
                     <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>
                   ))}
                 </div>
                 {reqs.map((r) => (
-                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} />
+                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined} />
                 ))}
                 {onCrear && <NuevaFila color={color} onCrear={(t) => onCrear(cliente.id, t)} />}
               </div>
@@ -65,7 +67,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
   );
 }
 
-function Fila({ r, color, usuarios, onPatch, horas, bloqueada }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean }) {
+function Fila({ r, color, usuarios, onPatch, horas, bloqueada }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean; proyecto?: string }) {
   const p = (patch: ActualizarRequerimientoInput) => onPatch(r.id, patch);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
   return (
@@ -79,6 +81,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada }: { r: Requerimie
           {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0 pr-2" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
         </div>
       </div>
+      <div className="border-l border-gray-100 flex items-center px-2 min-w-0 text-xs">{r.proyecto_id ? <Link href={`/proyectos/${r.proyecto_id}`} className="truncate text-gray-700 hover:text-brand" title={`${proyecto ?? 'Proyecto'}${r.bloque_nombre ? ` · ${r.bloque_nombre}` : ''}`}>{proyecto ?? '…'}</Link> : <span className="text-gray-300">—</span>}</div>
       <div className="border-l border-gray-100"><CeldaTexto valor={(r.owner_cliente ?? []).join(', ')} placeholder="—" onCommit={(v) => p({ owner_cliente: v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null })} className="text-center text-xs" /></div>
       <div className="border-l border-gray-100"><CeldaOwners ids={r.owner_agencia} usuarios={usuarios} onChange={(ids) => p({ owner_agencia: ids })} /></div>
       <div className="border-l border-gray-100"><CeldaFecha valor={r.fecha_pedido} onChange={(v) => p({ fecha_pedido: v })} /></div>
