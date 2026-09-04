@@ -72,7 +72,7 @@ export default function AdminMesasPage() {
                   <div className="label">Clientes ({suyos.length})</div>
                   <ul className="divide-y divide-gray-100">
                     {suyos.map((c) => (
-                      <li key={c.id} className="py-1.5 flex justify-between items-center"><span>{c.nombre}</span><button className="text-xs text-gray-400 hover:text-red-600" onClick={() => asignarCliente(c.id, null)}>quitar</button></li>
+                      <li key={c.id} className="py-1.5 flex justify-between items-center"><span>{c.nombre}</span><button className="link-danger" onClick={() => asignarCliente(c.id, null)}>quitar</button></li>
                     ))}
                     {suyos.length === 0 && <li className="py-1.5 text-gray-400">Sin clientes asignados.</li>}
                   </ul>

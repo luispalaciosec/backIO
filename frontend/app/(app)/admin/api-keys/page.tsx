@@ -53,7 +53,7 @@ export default function AdminApiKeysPage() {
                 <td className="td font-mono text-xs">{k.prefijo}…</td>
                 <td className="td text-xs">{k.scopes.join(', ')}</td>
                 <td className="td text-xs">{k.ultimo_uso_at ? new Date(k.ultimo_uso_at).toLocaleString('es-EC') : 'nunca'}</td>
-                <td className="td">{k.revocada_at ? <span className="text-xs">revocada</span> : <button className="text-xs text-red-600" onClick={async () => { if (confirm(`¿Revocar "${k.nombre}"?`)) { await api(`/admin/api-keys/${k.id}/revocar`, { method: 'POST' }); void cargar(); } }}>revocar</button>}</td>
+                <td className="td">{k.revocada_at ? <span className="text-xs">revocada</span> : <button className="link-danger" onClick={async () => { if (confirm(`¿Revocar "${k.nombre}"?`)) { await api(`/admin/api-keys/${k.id}/revocar`, { method: 'POST' }); void cargar(); } }}>revocar</button>}</td>
               </tr>
             ))}
             {items.length === 0 && <tr><td className="td text-gray-400" colSpan={5}>Sin keys.</td></tr>}

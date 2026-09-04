@@ -81,8 +81,8 @@ export default function AdminUsuariosPage() {
               <li key={i.id} className="py-2 flex justify-between gap-2">
                 <span>{i.nombre} · {i.email} · <span className="text-gray-500">{i.rol}</span></span>
                 <span className="flex gap-3">
-                  <button className="text-xs text-brand" onClick={async () => { setError(null); try { await api(`/admin/invitaciones/${i.id}/reenviar`, { method: 'POST' }); alert(`Invitación reenviada a ${i.email}`); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); } }}>reenviar</button>
-                  {i.usada_at ? <span className="text-xs text-green-700">usada</span> : <button className="text-xs text-red-600" onClick={async () => { await api(`/admin/invitaciones/${i.id}`, { method: 'DELETE' }); void cargar(); }}>eliminar</button>}
+                  <button className="link-action" onClick={async () => { setError(null); try { await api(`/admin/invitaciones/${i.id}/reenviar`, { method: 'POST' }); alert(`Invitación reenviada a ${i.email}`); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); } }}>reenviar</button>
+                  {i.usada_at ? <span className="text-xs text-green-700">usada</span> : <button className="link-danger" onClick={async () => { await api(`/admin/invitaciones/${i.id}`, { method: 'DELETE' }); void cargar(); }}>eliminar</button>}
                 </span>
               </li>
             ))}

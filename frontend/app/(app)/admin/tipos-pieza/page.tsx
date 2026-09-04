@@ -58,7 +58,7 @@ export default function AdminTiposPiezaPage() {
                     <td className="td text-center"><input type="checkbox" checked={p.visible} onChange={(e) => setPaso(i, { visible: e.target.checked })} /></td>
                     <td className="td"><input className="input" value={p.etiqueta ?? ''} disabled={!p.visible} placeholder={p.visible ? 'obligatoria' : ''} onChange={(e) => setPaso(i, { etiqueta: e.target.value })} /></td>
                     <td className="td text-center"><input type="checkbox" checked={p.aprobacion_cliente ?? false} onChange={(e) => setPaso(i, { aprobacion_cliente: e.target.checked })} /></td>
-                    <td className="td"><button className="text-xs text-red-600" onClick={() => setSel({ ...sel, pasos: sel.pasos.filter((_, j) => j !== i) })}>quitar</button></td>
+                    <td className="td"><button className="link-danger" onClick={() => setSel({ ...sel, pasos: sel.pasos.filter((_, j) => j !== i) })}>quitar</button></td>
                   </tr>
                 ))}
               </tbody>

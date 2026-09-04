@@ -6,10 +6,16 @@
 body { @apply bg-gray-50 text-gray-900 antialiased; }
 
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50; }
   .btn-primary { @apply btn bg-brand text-white hover:bg-brand-dark; }
-  .btn-secondary { @apply btn bg-white border border-gray-300 text-gray-800 hover:bg-gray-50; }
-  .btn-ghost { @apply btn text-gray-600 hover:bg-gray-100; }
+  /* Secundario: azul claro con borde azul — se ve, pero no compite con el primario */
+  .btn-secondary { @apply btn bg-brand/10 border border-brand/40 text-brand-dark hover:bg-brand/20; }
+  /* Ghost: acción terciaria; ahora con borde y color para que no pase desapercibida */
+  .btn-ghost { @apply btn bg-white border border-gray-300 text-gray-700 hover:border-brand hover:text-brand shadow-none; }
+  .btn-danger { @apply btn bg-white border border-red-300 text-red-700 hover:bg-red-50 shadow-none; }
+  .btn-success { @apply btn bg-[#00C875] text-white hover:bg-[#00A862]; }
+  .link-action { @apply text-xs font-semibold text-brand hover:underline; }
+  .link-danger { @apply text-xs font-semibold text-red-600 hover:underline; }
   .input { @apply w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand; }
   .label { @apply block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1; }
   .card { @apply rounded-lg border border-gray-200 bg-white shadow-sm; }

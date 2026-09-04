@@ -9,6 +9,9 @@ type Bloque = { nombre: string; peso: number; opcional: boolean; tareas: Tarea[]
 type Form = { id?: string; nombre: string; descripcion: string; tipo: Plantilla['tipo']; pilar: string; familia: string; unidad: string; precio_referencia: string; cliente_id: string; recurrente: boolean; patron_nombre: string; activa: boolean; bloques: Bloque[] };
 
 const PILARES = ['Marca', 'Crecimiento', 'Transformación', 'Transversal', 'Medios'];
+const COLOR: Record<string, string> = { Marca: '#A25DDC', Crecimiento: '#00C875', Transformación: '#579BFC', Transversal: '#FDAB3D', Medios: '#808080', '': '#9CA3AF' };
+const BLOQUE_COLORES = ['#0073EA', '#A25DDC', '#00C875', '#FDAB3D', '#579BFC', '#FF642E', '#0086C0', '#9CD326'];
+const UNIDAD: Record<string, string> = { proyecto: 'Proyecto', mes: 'Fee mensual', pieza: 'Por pieza' };
 const TIPOS: Plantilla['tipo'][] = ['campana', 'lanzamiento', 'fee_mensual', 'pieza_suelta', 'trade'];
 const T0: Tarea = { titulo_interno: '', etiqueta_cliente: null, visible_cliente_default: false, peso_relativo: 1, dias_offset: 0, rol_sugerido: '' };
 const F0: Form = { nombre: '', descripcion: '', tipo: 'campana', pilar: 'Transversal', familia: '', unidad: 'proyecto', precio_referencia: '', cliente_id: '', recurrente: false, patron_nombre: '', activa: true, bloques: [{ nombre: 'Brief', peso: 20, opcional: false, tareas: [{ ...T0, titulo_interno: 'Brief', dias_offset: 10 }] }, { nombre: 'Producción', peso: 60, opcional: false, tareas: [] }, { nombre: 'Entrega', peso: 20, opcional: false, tareas: [{ ...T0, titulo_interno: 'Entrega', etiqueta_cliente: 'Entrega', visible_cliente_default: true }] }] };
@@ -53,17 +56,22 @@ export default function AdminPlantillasPage() {
       {error && <Alert tipo="error">{error}</Alert>}
       {ok && <Alert tipo="ok">{ok}</Alert>}
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <aside className="card p-3 space-y-2 max-h-[75vh] overflow-auto">
-          <input className="input" placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <aside className="card p-3 space-y-3 max-h-[78vh] overflow-auto">
+          <input className="input" placeholder="Buscar plantilla…" value={q} onChange={(e) => setQ(e.target.value)} />
           {PILARES.concat(['']).map((pl) => {
             const items = filtradas.filter((p) => (pl ? p.pilar === pl : !p.pilar));
             if (!items.length) return null;
             return (
               <div key={pl || 'sin'}>
-                <div className="text-[10px] uppercase tracking-wide text-gray-400 px-1 mt-2">{pl || 'Sin pilar'}</div>
+                <div className="flex items-center gap-2 px-1 mb-1">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLOR[pl] }} />
+                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: COLOR[pl] }}>{pl || 'Sin pilar'}</span>
+                  <span className="text-[11px] text-gray-400">{items.length}</span>
+                </div>
                 {items.map((p) => (
-                  <button key={p.id} onClick={() => abrir(p.id)} className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-gray-100 ${f?.id === p.id ? 'bg-brand/10 text-brand font-medium' : ''} ${!p.activa ? 'opacity-50' : ''}`}>
-                    {p.nombre}{p.cliente_id && <span className="ml-1 text-[10px] text-gray-400">(cliente)</span>}{p.recurrente && <span className="ml-1 text-[10px] text-gray-400">↻</span>}
+                  <button key={p.id} onClick={() => abrir(p.id)} className={`w-full text-left pl-3 pr-2 py-1.5 rounded-md text-sm border-l-4 mb-0.5 transition ${f?.id === p.id ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'} ${!p.activa ? 'opacity-50' : ''}`} style={{ borderLeftColor: COLOR[pl] }}>
+                    <span className="block leading-snug">{p.nombre}</span>
+                    <span className="block text-[10px] text-gray-500">{UNIDAD[p.unidad ?? ''] ?? p.tipo}{p.recurrente ? ' · ↻ mensual' : ''}{p.cliente_id ? ' · del cliente' : ''}{!p.activa ? ' · inactiva' : ''}</span>
                   </button>
                 ))}
               </div>
@@ -71,7 +79,13 @@ export default function AdminPlantillasPage() {
           })}
         </aside>
         {f ? (
-          <section className="card p-4 space-y-4">
+          <section className="card overflow-hidden">
+            <div className="px-5 py-4 text-white" style={{ backgroundColor: COLOR[f.pilar] }}>
+              <div className="text-[11px] uppercase tracking-wide opacity-90">{f.pilar || 'Sin pilar'}{f.familia ? ` · ${f.familia}` : ''}</div>
+              <div className="text-xl font-bold leading-tight">{f.nombre || 'Nueva plantilla'}</div>
+              <div className="text-xs opacity-90 mt-1">{f.bloques.length} bloques · {f.bloques.reduce((n, b) => n + b.tareas.length, 0)} tareas · {f.bloques.reduce((n, b) => n + b.tareas.filter((t) => t.visible_cliente_default).length, 0)} visibles al cliente{f.precio_referencia ? ` · ref. ${f.precio_referencia}` : ''}</div>
+            </div>
+            <div className="p-4 space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="md:col-span-2"><label className="label">Nombre</label><input className="input" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} /></div>
               <div><label className="label">Tipo</label><select className="input" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value as Plantilla['tipo'] })}>{TIPOS.map((t) => <option key={t}>{t}</option>)}</select></div>
@@ -89,17 +103,21 @@ export default function AdminPlantillasPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between"><div className="font-semibold">Bloques <span className={`text-xs font-normal ${Math.abs(suma - 100) > 0.5 ? 'text-red-600' : 'text-gray-500'}`}>(suman {Math.round(suma * 10) / 10})</span></div><button className="btn-secondary" onClick={() => setF({ ...f, bloques: [...f.bloques, { nombre: 'Nuevo bloque', peso: 0, opcional: false, tareas: [] }] })}>+ Bloque</button></div>
+              <div className="flex items-center justify-between"><div className="font-semibold">Bloques <span className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${Math.abs(suma - 100) > 0.5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{Math.abs(suma - 100) > 0.5 ? `suman ${Math.round(suma * 10) / 10}, deben ser 100` : 'suman 100'}</span></div><button className="btn-secondary" onClick={() => setF({ ...f, bloques: [...f.bloques, { nombre: 'Nuevo bloque', peso: 0, opcional: false, tareas: [] }] })}>+ Bloque</button></div>
+              <div className="flex h-2 rounded-full overflow-hidden bg-gray-100" title="Distribución de peso por bloque">
+                {f.bloques.map((b, i) => <div key={i} style={{ width: `${Math.max(0, Number(b.peso) || 0)}%`, backgroundColor: BLOQUE_COLORES[i % BLOQUE_COLORES.length] }} title={`${b.nombre}: ${b.peso}%`} />)}
+              </div>
               {f.bloques.map((b, i) => (
-                <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <input className="input max-w-xs font-medium" value={b.nombre} onChange={(e) => setB(i, { nombre: e.target.value })} />
+                <div key={i} className="rounded-md border border-gray-200 overflow-hidden">
+                  <div className="flex flex-wrap gap-2 items-center px-3 py-2 border-l-4" style={{ borderLeftColor: BLOQUE_COLORES[i % BLOQUE_COLORES.length], backgroundColor: `${BLOQUE_COLORES[i % BLOQUE_COLORES.length]}14` }}>
+                    <input className="input max-w-xs font-semibold" value={b.nombre} onChange={(e) => setB(i, { nombre: e.target.value })} />
                     <label className="text-sm flex items-center gap-1">peso <input className="input w-20" type="number" value={b.peso} onChange={(e) => setB(i, { peso: Number(e.target.value) })} /> %</label>
                     <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={b.opcional} onChange={(e) => setB(i, { opcional: e.target.checked })} /> opcional</label>
                     <span className="flex-1" />
-                    <button className="text-xs text-gray-500" onClick={() => setB(i, { tareas: [...b.tareas, { ...T0 }] })}>+ tarea</button>
-                    <button className="text-xs text-red-600" onClick={() => setF({ ...f, bloques: f.bloques.filter((_, j) => j !== i) })}>quitar bloque</button>
+                    <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setB(i, { tareas: [...b.tareas, { ...T0 }] })}>+ Tarea</button>
+                    <button className="btn-danger px-3 py-1 text-xs" onClick={() => setF({ ...f, bloques: f.bloques.filter((_, j) => j !== i) })}>Quitar bloque</button>
                   </div>
+                  <div className="p-2">
                   {b.tareas.length > 0 && (
                     <table className="w-full text-sm">
                       <thead><tr><th className="th">Tarea</th><th className="th">Rol</th><th className="th">Días antes</th><th className="th">Peso rel.</th><th className="th">Cliente ve</th><th className="th">Etiqueta</th><th className="th"></th></tr></thead>
@@ -111,15 +129,18 @@ export default function AdminPlantillasPage() {
                           <td className="td"><input className="input w-20" type="number" step={0.5} value={t.peso_relativo} onChange={(e) => setT(i, k, { peso_relativo: Number(e.target.value) })} /></td>
                           <td className="td text-center"><input type="checkbox" checked={t.visible_cliente_default} onChange={(e) => setT(i, k, { visible_cliente_default: e.target.checked })} /></td>
                           <td className="td"><input className="input" disabled={!t.visible_cliente_default} placeholder={t.visible_cliente_default ? 'obligatoria' : ''} value={t.etiqueta_cliente ?? ''} onChange={(e) => setT(i, k, { etiqueta_cliente: e.target.value })} /></td>
-                          <td className="td"><button className="text-xs text-red-600" onClick={() => setB(i, { tareas: b.tareas.filter((_, l) => l !== k) })}>quitar</button></td>
+                          <td className="td"><button className="link-danger" onClick={() => setB(i, { tareas: b.tareas.filter((_, l) => l !== k) })}>quitar</button></td>
                         </tr>
                       ))}</tbody>
                     </table>
                   )}
+                  {b.tareas.length === 0 && <div className="text-xs text-gray-400 px-2 py-1">Sin tareas fijas: aquí van las piezas (post, carrusel, reel) que se piden en el Builder.</div>}
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex gap-2"><button className="btn-primary" onClick={guardar}>Guardar plantilla</button><button className="btn-ghost" onClick={() => setF(null)}>Cerrar</button></div>
+            <div className="flex gap-2 pt-2 border-t border-gray-100"><button className="btn-primary" onClick={guardar}>Guardar plantilla</button><button className="btn-ghost" onClick={() => setF(null)}>Cerrar</button></div>
+            </div>
           </section>
         ) : <div className="card p-8 text-gray-500">Elige una plantilla o crea una nueva.</div>}
       </div>
