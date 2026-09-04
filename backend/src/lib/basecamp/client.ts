@@ -138,6 +138,11 @@ export class BasecampClient {
     await this.request('PUT', `/buckets/${projectId}/todos/${todoId}.json`, input);
   }
 
+  /** Desmarca un to-do completado (reproceso). */
+  async uncompleteTodo(projectId: number, todoId: number): Promise<void> {
+    await this.request('DELETE', `/buckets/${projectId}/todos/${todoId}/completion.json`);
+  }
+
   /** GET paginado (Link: rel="next"). Devuelve la unión de páginas. */
   /** Personas de la cuenta Basecamp: solo id, nombre y email (para enlazar usuarios). */
   async listPeopleSafe(): Promise<{ id: number; nombre: string; email: string | null; admin: boolean }[]> {

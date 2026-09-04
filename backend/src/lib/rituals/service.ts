@@ -8,6 +8,7 @@ import { listUsuarios } from '../db/usuarios';
 import { listClientes } from '../db/clientes';
 import { getMesa, alcanceMesa } from '../db/mesas';
 import { ensureSemana, getSemana, listAcuerdosAbiertos, listAcuerdosSemana, listSenales, replaceSenales, insertActa } from '../db/semanas';
+import { listSinMotivo } from '../db/historial';
 import { calcularSenales, type SignalThresholds } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
 import { fechaLocal } from './daily';
@@ -24,12 +25,13 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
   const hoy = fechaLocal();
   const semana = semanaId ? await getSemana(ctx, semanaId) : await ensureSemana(ctx, hoy);
   if (!semana) throw new Error('Semana no encontrada');
-  const [activos, usuarios, clientes, acuerdosAbiertos, u] = await Promise.all([
+  const [activos, usuarios, clientes, acuerdosAbiertos, u, sinMotivo] = await Promise.all([
     listBacklog(ctx, { solo_activos: true }),
     listUsuarios(ctx),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
     umbrales(ctx),
+    listSinMotivo(ctx, 45),
   ]);
   const { data: completados } = await ctx.db
     .from('requerimientos')
@@ -46,6 +48,7 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
     clientes,
     acuerdosAbiertos,
     umbrales: u,
+    sinMotivo,
   });
   return replaceSenales(ctx, semana.id, senales);
 }

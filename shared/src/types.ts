@@ -195,6 +195,7 @@ export interface Requerimiento {
   fecha_entrega: string | null;
   fecha_entrega_original: string | null;
   veces_reprogramado: number;
+  veces_reproceso: number;
   owner_agencia: string[];
   owner_cliente: string[] | null;
   piezas: number;
@@ -240,7 +241,10 @@ export type TipoSenal =
   | 'compromiso_vencido'
   | 'sobrecarga_proyectada'
   | 'sin_movimiento'
-  | 'atraso_critico';
+  | 'atraso_critico'
+  | 'reproceso_reincidente'
+  | 'reprogramacion_sin_motivo'
+  | 'reproceso_sin_motivo';
 
 export interface Senal {
   id: string;
@@ -321,3 +325,38 @@ export interface BriefIA {
   piezas_por_tipo: Record<string, number>;
   dudas: string[];
 }
+
+/** Cumplimiento: reprogramaciones y reprocesos (04/09/2026). Solo motivos de catálogo; nunca texto libre. */
+export type MotivoReprogramacion = 'insumos_cliente' | 'cambio_alcance' | 'capacidad_equipo' | 'prioridad_negocio' | 'error_estimacion' | 'reproceso' | 'otro';
+export type MotivoReproceso = 'brief_incompleto' | 'error_ejecucion' | 'cambio_opinion_cliente' | 'ajuste_marca_legal' | 'direccion_arte' | 'error_texto';
+export type OrigenReproceso = 'cliente' | 'interno' | 'basecamp';
+
+/** atribuible: a quién se le cuenta. equipo = descuenta al equipo; cliente = no; neutro = ninguno. */
+export const MOTIVOS_REPROGRAMACION: { valor: MotivoReprogramacion; label: string; atribuible: 'equipo' | 'cliente' | 'neutro' }[] = [
+  { valor: 'insumos_cliente', label: 'Insumos o aprobación del cliente', atribuible: 'cliente' },
+  { valor: 'cambio_alcance', label: 'Cambio de alcance', atribuible: 'cliente' },
+  { valor: 'capacidad_equipo', label: 'Capacidad del equipo', atribuible: 'equipo' },
+  { valor: 'prioridad_negocio', label: 'Prioridad de negocio', atribuible: 'neutro' },
+  { valor: 'error_estimacion', label: 'Error de estimación', atribuible: 'equipo' },
+  { valor: 'reproceso', label: 'Reproceso', atribuible: 'equipo' },
+  { valor: 'otro', label: 'Otro', atribuible: 'neutro' },
+];
+export const MOTIVOS_REPROCESO: { valor: MotivoReproceso; label: string; responsable: 'ejecutiva' | 'equipo' | 'cliente' | 'lider' }[] = [
+  { valor: 'brief_incompleto', label: 'Brief incompleto o ambiguo', responsable: 'ejecutiva' },
+  { valor: 'error_ejecucion', label: 'Error de ejecución', responsable: 'equipo' },
+  { valor: 'cambio_opinion_cliente', label: 'Cambio de opinión del cliente', responsable: 'cliente' },
+  { valor: 'ajuste_marca_legal', label: 'Ajuste de marca o legal', responsable: 'cliente' },
+  { valor: 'direccion_arte', label: 'Dirección de arte', responsable: 'lider' },
+  { valor: 'error_texto', label: 'Error de texto', responsable: 'equipo' },
+];
+export const PASOS_RETORNO: readonly string[] = ['Idea', 'Guion', 'Copy', 'Storyboard', 'Diseño', 'Grabación', 'Edición', 'Posteo'];
+
+export interface Reprogramacion {
+  id: string; tenant_id: string; requerimiento_id: string; fecha_anterior: string | null; fecha_nueva: string | null;
+  motivo: MotivoReprogramacion | null; origen: string; usuario_id: string | null; created_at: string;
+}
+export interface Reproceso {
+  id: string; tenant_id: string; requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null;
+  fecha_entrega_antes: string | null; abierto_at: string; cerrado_at: string | null; horas_reproceso: number | null; usuario_id: string | null; created_at: string;
+}
+export interface HistorialRequerimiento { reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] }

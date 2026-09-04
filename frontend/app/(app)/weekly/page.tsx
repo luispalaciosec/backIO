@@ -1,7 +1,8 @@
-import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa } from '@backio/shared';
+import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa, RequerimientoMetricas } from '@backio/shared';
 import { apiServer } from '@/lib/api.server';
 import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
+import { CausasPendientes } from './CausasPendientes';
 import { meServer, puedeEscribir } from '@/lib/me.server';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,8 @@ export default async function WeeklyPage() {
     apiServer<{ items: Usuario[] }>('/usuarios'),
     apiServer<{ items: Mesa[] }>('/mesas'),
   ]);
+  const { items: reqs } = await apiServer<{ items: RequerimientoMetricas[] }>('/requerimientos?activos=1');
+  const titulos = Object.fromEntries(reqs.map((r) => [r.id, r.titulo_interno]));
   const dash = await apiServer<{ arrastre: { requerimiento_id: string; titulo: string; cliente: string; owner: string | null; veces_reprogramado: number; fecha_original: string | null; fecha_actual: string | null; dias_arrastre: number }[] }>('/dashboard');
   const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
   const hoy = new Date().toISOString().slice(0, 10);
@@ -82,6 +85,7 @@ export default async function WeeklyPage() {
         </div>
 
         <aside className="space-y-4">
+          <CausasPendientes titulos={titulos} escribe={escribe} />
           <section className="card p-4 space-y-3">
             <div className="font-semibold">Acuerdos de la sesión</div>
             <p className="text-xs text-gray-500">Tres campos. La fecha es real: no existe “próxima weekly”.</p>

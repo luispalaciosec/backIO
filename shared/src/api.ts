@@ -51,7 +51,7 @@ export interface CrearRequerimientoInput {
   piezas?: number;
 }
 
-export type ActualizarRequerimientoInput = Partial<
+export type ActualizarRequerimientoInput = { motivo_reprogramacion?: import('./types').MotivoReprogramacion | null } & Partial<
   Pick<
     Requerimiento,
     | 'titulo_interno'

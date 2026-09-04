@@ -1,5 +1,6 @@
 'use client';
 import { RecordatorioIA } from './RecordatorioIA';
+import { HistorialReq } from './HistorialReq';
 import { useState } from 'react';
 import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoInput } from '@backio/shared';
@@ -23,11 +24,13 @@ export interface BacklogTableProps {
   puedeEditar?: (r: RequerimientoMetricas) => boolean;
   /** Nombre de proyecto por id, para la columna Proyecto. */
   proyectos?: Record<string, string>;
+  /** Recargar tras registrar/cerrar un reproceso o completar una causa. */
+  onCambio?: () => void;
 }
 
 const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
 
-export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {} }: BacklogTableProps) {
+export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined }: BacklogTableProps) {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
   const grupos = clientes
     .map((c, i) => ({ cliente: c, color: colorGrupo(i, c.color_primario), reqs: items.filter((r) => r.cliente_id === c.id) }))
@@ -54,7 +57,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
                   ))}
                 </div>
                 {reqs.map((r) => (
-                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined} />
+                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined} onCambio={onCambio} />
                 ))}
                 {onCrear && <NuevaFila color={color} onCrear={(t) => onCrear(cliente.id, t)} />}
               </div>
@@ -67,7 +70,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
   );
 }
 
-function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean; proyecto?: string }) {
+function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambio }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean; proyecto?: string; onCambio: () => void }) {
   const p = (patch: ActualizarRequerimientoInput) => onPatch(r.id, patch);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
   return (
@@ -78,6 +81,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto }: { r: 
           <CeldaTexto valor={r.titulo_interno} onCommit={(v) => p({ titulo_interno: v })} className={hecho ? 'line-through text-gray-500' : ''} />
           {r.visible_cliente && <span className="text-xs shrink-0 pr-1" title={`El cliente ve: ${r.etiqueta_cliente}`}>👁</span>}
           {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />}
+          <HistorialReq r={r} onCambio={onCambio} />
           {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0 pr-2" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
         </div>
       </div>
@@ -85,7 +89,10 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto }: { r: 
       {/* Owner cliente oculto por ahora (pedido de Luis 04/09); el dato sigue en la base. */}
       <div className="border-l border-gray-100"><CeldaOwners ids={r.owner_agencia} usuarios={usuarios} onChange={(ids) => p({ owner_agencia: ids })} /></div>
       <div className="border-l border-gray-100"><CeldaFecha valor={r.fecha_pedido} onChange={(v) => p({ fecha_pedido: v })} /></div>
-      <div className="border-l border-gray-100"><CeldaFecha valor={r.fecha_entrega} onChange={(v) => p({ fecha_entrega: v })} alerta={r.dias_atraso > 0} /></div>
+      <div className="border-l border-gray-100 relative" title={r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega ? `Comprometida originalmente: ${r.fecha_entrega_original} · reprogramada ${r.veces_reprogramado}×` : undefined}>
+        <CeldaFecha valor={r.fecha_entrega} onChange={(v) => p({ fecha_entrega: v })} alerta={r.dias_atraso > 0} />
+        {r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega && <span className="absolute right-1 top-0.5 text-[10px] leading-none text-amber-700 pointer-events-none">↺{r.veces_reprogramado}</span>}
+      </div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.prioridad} opciones={PRIOS} colores={COLOR_PRIORIDAD} labels={PRIORIDAD_LABEL} onChange={(v) => p({ prioridad: v as RequerimientoMetricas['prioridad'] })} /></div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_operativo} opciones={ESTADOS} colores={COLOR_ESTADO} labels={ESTADO_LABEL} disabledValues={r.basecamp_todo_id ? ['completado'] : []} onChange={(v) => p({ estado_operativo: v as RequerimientoMetricas['estado_operativo'] })} /></div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_aprobacion} opciones={APROB} colores={COLOR_APROBACION} labels={APROBACION_LABEL} onChange={(v) => p({ estado_aprobacion: v as RequerimientoMetricas['estado_aprobacion'] })} /></div>

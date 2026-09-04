@@ -20,6 +20,9 @@ export const CAUSAS: Record<TipoSenal, string> = {
   sin_movimiento: 'Ejecución y arrastre',
   atraso_critico: 'Ejecución y arrastre',
   compromiso_vencido: 'Compromisos internos',
+  reproceso_reincidente: 'Calidad y reprocesos',
+  reprogramacion_sin_motivo: 'Causas pendientes de registrar',
+  reproceso_sin_motivo: 'Causas pendientes de registrar',
 };
 
 export function agruparPorCausa(senales: Senal[], compromisosVencidos: string[]): { causa: string; items: string[]; severidad_max: string }[] {

@@ -159,3 +159,16 @@ export async function pushDueDate(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
   const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
   await client.updateTodo(cliente.basecamp_project_id, req.basecamp_todo_id, { due_on: req.fecha_entrega });
 }
+
+/**
+ * Reproceso: reabre el to-do en Basecamp (DELETE completion). Decidido por Luis 04/09/2026: automático cuando
+ * la tarea tiene to-do enlazado. El webhook todo_uncompleted que vuelve NO crea otro reproceso (registrarReproceso es idempotente).
+ */
+export async function reabrirTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampClient): Promise<void> {
+  if (!req.basecamp_todo_id) return;
+  const cliente = await getCliente(ctx, req.cliente_id);
+  if (!cliente?.basecamp_project_id) return;
+  const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
+  await client.uncompleteTodo(cliente.basecamp_project_id, req.basecamp_todo_id);
+  await audit(ctx, { accion: 'basecamp_reabrir_todo', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: req.basecamp_todo_id } });
+}

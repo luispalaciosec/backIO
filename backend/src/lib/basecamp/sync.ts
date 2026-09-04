@@ -7,6 +7,7 @@
  * (nunca spread del objeto recibido).
  */
 import type { DbCtx } from '../db/client';
+import { registrarReproceso, cerrarReproceso } from '../cumplimiento';
 import { findByBasecampTodo, updateRequerimiento } from '../db/requerimientos';
 import { audit } from '../db/audit';
 import type { Requerimiento } from '@backio/shared';
@@ -100,5 +101,12 @@ export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload)
     entidad_id: req.id,
     detalle: { todo_id: safe.todo_id, completed_at: safe.completed_at },
   });
+  if (!safe.completed && yaCompletado) {
+    // Un to-do completado que se desmarca en Basecamp es un reproceso (sin causa hasta que la mesa la complete).
+    await registrarReproceso(tenantCtx, req.id, { origen: 'basecamp', motivo: null, reabrir_basecamp: false }).catch((err) => console.error('[sync] reproceso no registrado', err instanceof Error ? err.message : err));
+  }
+  if (safe.completed) {
+    await cerrarReproceso(tenantCtx, req.id).catch(() => undefined);
+  }
   return { aplicado: true, requerimiento_id: req.id };
 }

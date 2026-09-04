@@ -7,6 +7,7 @@ import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
 import { BacklogTable } from '@/components/backlog/BacklogTable';
 import { KanbanBoard } from '@/components/backlog/KanbanBoard';
+import { MotivoReprogramacionModal } from '@/components/backlog/MotivoReprogramacion';
 import { ESTADO_LABEL } from '@/lib/format';
 import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '@/lib/orden';
 
@@ -22,6 +23,7 @@ export default function BacklogPage() {
   const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '' });
   const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
   const [panel, setPanel] = useState(false);
+  const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -59,6 +61,11 @@ export default function BacklogPage() {
   const puedeEditar = (r: RequerimientoMetricas) => !colaborador || (!!me?.usuario_id && r.owner_agencia.includes(me.usuario_id));
 
   async function patch(id: string, p: ActualizarRequerimientoInput) {
+    // Cambiar la fecha de entrega exige motivo: se pide en un modal y se envía junto con la fecha.
+    if (p.fecha_entrega !== undefined && !p.motivo_reprogramacion) {
+      const r = items.find((x) => x.id === id);
+      if (r && r.fecha_entrega && p.fecha_entrega !== r.fecha_entrega) { setReprog({ r, fecha: p.fecha_entrega }); return; }
+    }
     if (colaborador) {
       const r = items.find((x) => x.id === id);
       if (r && !puedeEditar(r)) { setError('Solo puedes actualizar las tareas asignadas a ti.'); return; }
@@ -175,11 +182,16 @@ export default function BacklogPage() {
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
+      {reprog && (
+        <MotivoReprogramacionModal titulo={reprog.r.titulo_interno} fechaOriginal={reprog.r.fecha_entrega_original} fechaAnterior={reprog.r.fecha_entrega} fechaNueva={reprog.fecha} veces={reprog.r.veces_reprogramado}
+          onCancelar={() => { setReprog(null); void cargar(true); }}
+          onConfirmar={async (motivo) => { const { r, fecha } = reprog; setReprog(null); await patch(r.id, { fecha_entrega: fecha, motivo_reprogramacion: motivo }); }} />
+      )}
       {loading && <div className="text-sm text-gray-500">Cargando…</div>}
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-x-auto pb-4">
-          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} />
+          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => void cargar(true)} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

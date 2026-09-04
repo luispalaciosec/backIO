@@ -32,6 +32,8 @@ import { publicarActaEnBasecamp } from './publish';
 import { guardarPlan, tomarPlan, guardarResultado } from './plans';
 import { buildDashboard } from '../dashboard';
 import { resumenHoras } from '../horas';
+import { completarUltimaReprogramacion } from '../db/historial';
+import { registrarReproceso } from '../cumplimiento';
 import { narrarWeekly } from '../ia/weekly';
 import type { CrearProyectoInput, ActualizarRequerimientoInput, Requerimiento } from '@backio/shared';
 
@@ -277,6 +279,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
         estado_aprobacion: z.enum(['no_aplica', 'pendiente_interno', 'pendiente_cliente', 'aprobado', 'rechazado']).optional(),
         prioridad: z.enum(['alta', 'media', 'baja']).optional(),
         fecha_entrega: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        motivo_reprogramacion: z.enum(['insumos_cliente', 'cambio_alcance', 'capacidad_equipo', 'prioridad_negocio', 'error_estimacion', 'reproceso', 'otro']).optional().describe('Obligatorio si cambia fecha_entrega: causa de la reprogramación'),
         owners: z.array(z.string()).optional().describe('nombres o ids'),
         piezas: z.number().int().min(0).optional(),
       }),
@@ -290,9 +293,11 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     if (cambios.estado_aprobacion) patch.estado_aprobacion = cambios.estado_aprobacion;
     if (cambios.prioridad) patch.prioridad = cambios.prioridad;
     if (cambios.fecha_entrega) patch.fecha_entrega = cambios.fecha_entrega;
+    if (cambios.fecha_entrega && cambios.fecha_entrega !== r.fecha_entrega && !cambios.motivo_reprogramacion) return fail('Cambiar fecha_entrega requiere motivo_reprogramacion (insumos_cliente, cambio_alcance, capacidad_equipo, prioridad_negocio, error_estimacion, reproceso, otro)');
+    if (cambios.motivo_reprogramacion) patch.motivo_reprogramacion = cambios.motivo_reprogramacion;
     if (cambios.piezas !== undefined) patch.piezas = cambios.piezas;
     if (cambios.owners) patch.owner_agencia = cambios.owners.map((o) => usuarios.find((u) => u.id === o || u.nombre.toLowerCase().includes(o.toLowerCase()))?.id).filter((x): x is string => !!x);
-    const diff = Object.entries(patch).map(([k, v]) => ({ campo: k, antes: (r as unknown as Record<string, unknown>)[k], despues: v }));
+    const diff = Object.entries(patch).filter(([k]) => k !== 'motivo_reprogramacion').map(([k, v]) => ({ campo: k, antes: (r as unknown as Record<string, unknown>)[k], despues: v }));
     if (diff.length === 0) return fail('Sin cambios que aplicar');
     const { plan_id, expira_en } = await guardarPlan(ctx, 'plan_requirement_update', { requerimiento_id, patch }, diff);
     return ok({ plan_id, expira_en, requerimiento: r.titulo_interno, diff, nota: patch.fecha_entrega ? 'Cambiar fecha_entrega cuenta como reprogramación y se refleja en Basecamp (due_on).' : undefined, siguiente_paso: 'Confirmar con confirm_plan.' });
@@ -353,8 +358,11 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
       if (!tiene(auth, 'write:requerimientos')) return fail('Scope requerido: write:requerimientos');
       const { requerimiento_id, patch } = plan.parametros as { requerimiento_id: string; patch: ActualizarRequerimientoInput };
       const previo = await getRequerimiento(ctx, requerimiento_id);
-      const r = await updateRequerimiento(ctx, requerimiento_id, patch);
-      const reprogramado = patch.fecha_entrega !== undefined && patch.fecha_entrega !== previo?.fecha_entrega;
+      const { motivo_reprogramacion, ...cambios } = patch;
+      const r = await updateRequerimiento(ctx, requerimiento_id, cambios);
+      const reprogramado = patch.fecha_entrega !== undefined && patch.fecha_entrega !== previo?.fecha_entrega && !!previo?.fecha_entrega;
+      if (reprogramado) await completarUltimaReprogramacion(ctx, requerimiento_id, { motivo: motivo_reprogramacion ?? null, origen: 'mcp' });
+      if (patch.estado_aprobacion === 'rechazado' && previo?.estado_aprobacion !== 'rechazado') await registrarReproceso(ctx, requerimiento_id, { origen: 'cliente', motivo: null, reabrir_basecamp: true });
       await audit(ctx, { accion: reprogramado ? 'reprogramar' : 'actualizar', entidad: 'requerimiento', entidad_id: requerimiento_id, detalle: { plan_id, ...patch } });
       if (reprogramado && r.basecamp_todo_id) pushDueDate(ctx, r).catch((e) => console.error('[mcp] due_on', e));
       await guardarResultado(ctx, plan_id, { ok: true });

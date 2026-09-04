@@ -34,6 +34,8 @@ export interface WeekContext {
   clientes: Pick<Cliente, 'id' | 'nombre' | 'activo'>[];
   acuerdosAbiertos: Acuerdo[];
   umbrales?: Partial<SignalThresholds>;
+  /** Reprogramaciones y reprocesos sin causa (últimos 45 días). Opcional para compatibilidad. */
+  sinMotivo?: { reprogramaciones: { requerimiento_id: string }[]; reprocesos: { requerimiento_id: string; origen: string }[] };
 }
 
 export interface SignalOut {
@@ -216,6 +218,49 @@ export const REGLAS: SignalRule[] = [
 ];
 
 const ORDEN: Record<SeveridadSenal, number> = { critica: 0, alta: 1, media: 2 };
+
+const REGLAS_CUMPLIMIENTO: SignalRule[] = [
+  {
+    tipo: 'reproceso_reincidente',
+    severidad: 'critica',
+    tema_agenda: 'Revisar brief y control de calidad antes de enviar',
+    detectar: (ctx) =>
+      ctx.activos
+        .filter((r) => (r.veces_reproceso ?? 0) >= 2)
+        .map((r) => ({
+          tipo: 'reproceso_reincidente', severidad: 'critica', entidad_tipo: 'requerimiento', entidad_id: r.id,
+          titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" lleva ${r.veces_reproceso} reprocesos (${nombreDe(ctx, r.owner_agencia[0] ?? '')})`,
+          detalle: { veces_reproceso: r.veces_reproceso, owner: r.owner_agencia[0] ?? null },
+        })),
+  },
+  {
+    tipo: 'reprogramacion_sin_motivo',
+    severidad: 'media',
+    tema_agenda: 'Completar la causa de la reprogramación',
+    detectar: (ctx) => {
+      const ids = new Set((ctx.sinMotivo?.reprogramaciones ?? []).map((x) => x.requerimiento_id));
+      return ctx.activos.filter((r) => ids.has(r.id)).map((r) => ({
+        tipo: 'reprogramacion_sin_motivo', severidad: 'media', entidad_tipo: 'requerimiento', entidad_id: r.id,
+        titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" se reprogramó sin causa registrada`,
+        detalle: { owner: r.owner_agencia[0] ?? null },
+      }));
+    },
+  },
+  {
+    tipo: 'reproceso_sin_motivo',
+    severidad: 'media',
+    tema_agenda: 'Completar la causa del reproceso',
+    detectar: (ctx) => {
+      const por = new Map((ctx.sinMotivo?.reprocesos ?? []).map((x) => [x.requerimiento_id, x.origen]));
+      return ctx.activos.filter((r) => por.has(r.id)).map((r) => ({
+        tipo: 'reproceso_sin_motivo', severidad: 'media', entidad_tipo: 'requerimiento', entidad_id: r.id,
+        titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" volvió al equipo (${por.get(r.id) === 'basecamp' ? 'desmarcado en Basecamp' : por.get(r.id)}) sin causa registrada`,
+        detalle: { origen: por.get(r.id) ?? null, owner: r.owner_agencia[0] ?? null },
+      }));
+    },
+  },
+];
+REGLAS.push(...REGLAS_CUMPLIMIENTO);
 
 export function calcularSenales(ctx: WeekContext): SignalOut[] {
   const u = { ...UMBRALES_DEFAULT, ...(ctx.umbrales ?? {}) };
