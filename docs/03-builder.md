@@ -63,6 +63,22 @@ Por cada bloque activo se define cantidad de piezas por canal:
 Al desmarcar un bloque, su peso se **redistribuye proporcionalmente** entre los restantes.
 El total siempre suma 100.
 
+### Tipos de pieza (sprint 2, 04/09/2026)
+
+Dentro de un fee conviven piezas con flujos distintos. Tres tipos, editables en Admin → Tipos de pieza:
+
+| Tipo | Esfuerzo | Flujo |
+|---|---|---|
+| Post estático | 1 | Copy → Diseño → Revisión DA → Aprobación cliente → Posteo |
+| Carrusel | 1,5 | Copy → Diseño → Revisión DA → Aprobación cliente → Posteo |
+| Reel | 4 | Ideas → Guiones → Aprobación de guiones → Storyboards → Grabación → Edición → Aprobación cliente → Posteo |
+
+En el paso 3 se indican cantidades por tipo en cada bloque. BackIO genera **un to-do por paso por
+lote** ("Guiones · Reel (4)"), o uno por pieza si se marca "una tarea por pieza". El peso del bloque
+se reparte por esfuerzo × cantidad: 4 reels pesan como 16 posts. Los pasos de aprobación son visibles
+al cliente y disparan `esperando_cliente` en el portal; los pasos internos no. Las líneas de una
+cotización de PrometIO prellenan las cantidades por nombre de servicio.
+
 ### Paso 4 — Equipo y fechas
 
 Asignación de owner por bloque (no por tarea — demasiado granular para este momento).

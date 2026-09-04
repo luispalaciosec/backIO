@@ -12,7 +12,7 @@ export default function AdminTiposPiezaPage() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const cargar = () => api<{ items: TipoPieza[] }>('/tipos-pieza?todos=1').then((r) => { setTipos(r.items); if (!sel && r.items[0]) setSel(r.items[0]); }).catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
-  useEffect(() => { void cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { void cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPaso = (i: number, patch: Partial<PasoPieza>) => sel && setSel({ ...sel, pasos: sel.pasos.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
   const mover = (i: number, d: -1 | 1) => { if (!sel) return; const p = [...sel.pasos]; const j = i + d; if (j < 0 || j >= p.length) return; [p[i], p[j]] = [p[j]!, p[i]!]; setSel({ ...sel, pasos: p }); };
