@@ -25,7 +25,7 @@ export interface BacklogTableProps {
   proyectos?: Record<string, string>;
 }
 
-const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
+const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
 
 export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {} }: BacklogTableProps) {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
@@ -49,7 +49,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50`}>
                   <div className="flex"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
-                  {['Proyecto', 'Owner cliente', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
+                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
                     <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>
                   ))}
                 </div>
@@ -82,7 +82,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto }: { r: 
         </div>
       </div>
       <div className="border-l border-gray-100 flex items-center px-2 min-w-0 text-xs">{r.proyecto_id ? <Link href={`/proyectos/${r.proyecto_id}`} className="truncate text-gray-700 hover:text-brand" title={`${proyecto ?? 'Proyecto'}${r.bloque_nombre ? ` · ${r.bloque_nombre}` : ''}`}>{proyecto ?? '…'}</Link> : <span className="text-gray-300">—</span>}</div>
-      <div className="border-l border-gray-100"><CeldaTexto valor={(r.owner_cliente ?? []).join(', ')} placeholder="—" onCommit={(v) => p({ owner_cliente: v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null })} className="text-center text-xs" /></div>
+      {/* Owner cliente oculto por ahora (pedido de Luis 04/09); el dato sigue en la base. */}
       <div className="border-l border-gray-100"><CeldaOwners ids={r.owner_agencia} usuarios={usuarios} onChange={(ids) => p({ owner_agencia: ids })} /></div>
       <div className="border-l border-gray-100"><CeldaFecha valor={r.fecha_pedido} onChange={(v) => p({ fecha_pedido: v })} /></div>
       <div className="border-l border-gray-100"><CeldaFecha valor={r.fecha_entrega} onChange={(v) => p({ fecha_entrega: v })} alerta={r.dias_atraso > 0} /></div>
