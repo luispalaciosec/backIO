@@ -4,8 +4,16 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 const PUBLICAS = [/^\/login/, /^\/p\//, /^\/robots\.txt/, /^\/_next\//, /^\/favicon/];
 
 export async function middleware(req: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) {
+    return new NextResponse(
+      'BackIO: faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en las variables de entorno del despliegue. Cárgalas y redeploya.',
+      { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+    );
+  }
   let res = NextResponse.next({ request: req });
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  const supabase = createServerClient(url, anon, {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll: (list: { name: string; value: string; options: CookieOptions }[]) => {
