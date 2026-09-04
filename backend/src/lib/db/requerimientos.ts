@@ -71,6 +71,7 @@ export async function findByBasecampTodo(ctx: DbCtx, todoId: number): Promise<Re
 export type InsertRequerimiento = CrearRequerimientoInput & {
   visible_cliente: boolean;
   plantilla_tarea_id?: string | null;
+  tipo_pieza_id?: string | null;
   fecha_entrega_original?: string | null;
   estado_operativo?: EstadoOperativo;
 };

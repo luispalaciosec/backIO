@@ -18,6 +18,7 @@ import { listClientes, getCliente } from '../db/clientes';
 import { listPlantillas, getPlantillaArbol } from '../db/plantillas';
 import { listUsuarios } from '../db/usuarios';
 import { resolverMesa, alcanceMesa, listMesas } from '../db/mesas';
+import { listTiposPieza } from '../db/tipos_pieza';
 import { ensureSemana, getSemana, listSenales, getActa, listAcuerdosAbiertos } from '../db/semanas';
 import { audit } from '../db/audit';
 import { sanitizeForClient } from '../visibility';
@@ -188,6 +189,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     return ok({
       clientes: clientes.map((c) => ({ id: c.id, nombre: c.nombre, slug: c.slug, basecamp_configurado: !!c.basecamp_project_id })),
       plantillas: arboles.filter(Boolean).map((p) => ({ id: p!.id, nombre: p!.nombre, tipo: p!.tipo, bloques: p!.bloques.map((b) => ({ id: b.id, nombre: b.nombre, peso: b.peso, opcional: b.opcional, tareas: b.tareas.length })) })),
+      tipos_pieza: (await listTiposPieza(ctx)).map((t) => ({ id: t.id, slug: t.slug, nombre: t.nombre, esfuerzo: t.esfuerzo, pasos: t.pasos.map((p) => p.titulo) })),
       equipo: usuarios.map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol, capacidad_semanal: u.capacidad_semanal })),
     });
   })());
@@ -211,7 +213,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
       nombre: z.string().min(3),
       fecha_entrega: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       brief: z.object({ objetivo_negocio: z.string(), publico_objetivo: z.string(), canales: z.array(z.string()).min(1), mandatorios_marca: z.string().optional() }),
-      bloques: z.array(z.object({ bloque_id: z.string().uuid(), activo: z.boolean().default(true), owner: z.string().nullable().optional().describe('nombre o id'), piezas_por_canal: z.record(z.number().int().min(0)).default({}) })).default([]),
+      bloques: z.array(z.object({ bloque_id: z.string().uuid(), activo: z.boolean().default(true), owner: z.string().nullable().optional().describe('nombre o id'), piezas_por_canal: z.record(z.number().int().min(0)).default({}), piezas: z.record(z.number().int().min(0)).default({}).describe('cantidades por tipo de pieza: {"reel": 4, "post": 8, "carrusel": 2}') })).default([]),
     },
   }, (args) => guard(['write:proyectos'], async () => {
     const c = await resolverCliente(ctx, args.cliente);
@@ -219,11 +221,13 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     const plantillas = await listPlantillas(ctx);
     const pl = plantillas.find((p) => p.id === args.plantilla) ?? plantillas.find((p) => p.nombre.toLowerCase().includes(args.plantilla.toLowerCase()));
     if (!pl) return fail(`Plantilla "${args.plantilla}" no encontrada. Disponibles: ${plantillas.map((p) => p.nombre).join(', ')}`);
-    const usuarios = await listUsuarios(ctx);
+    const [usuarios, tipos] = await Promise.all([listUsuarios(ctx), listTiposPieza(ctx)]);
+    const tipoId = (k: string) => tipos.find((t) => t.slug === k.toLowerCase() || t.nombre.toLowerCase() === k.toLowerCase() || t.id === k)?.id;
     const input: CrearProyectoInput = {
       cliente_id: c.id, plantilla_id: pl.id, nombre: args.nombre, fecha_entrega: args.fecha_entrega, brief: args.brief,
       bloques: args.bloques.map((b) => ({
         bloque_id: b.bloque_id, activo: b.activo, piezas_por_canal: b.piezas_por_canal,
+        piezas_por_tipo: Object.fromEntries(Object.entries(b.piezas).map(([k, v]) => [tipoId(k) ?? k, v]).filter(([k]) => tipos.some((t) => t.id === k))),
         owner_id: b.owner ? (usuarios.find((u) => u.id === b.owner || u.nombre.toLowerCase().includes(b.owner!.toLowerCase()))?.id ?? null) : null,
       })),
     };

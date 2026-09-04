@@ -5,7 +5,7 @@
  *  - Fechas calculadas HACIA ATRÁS desde fecha_entrega usando dias_offset.
  *  - Alerta de concentración de carga (>30% de tareas de una semana en un owner).
  */
-import type { PlantillaArbol, BloqueAlcanceInput } from '@backio/shared';
+import type { PlantillaArbol, BloqueAlcanceInput, TipoPieza } from '@backio/shared';
 
 export interface TareaPlanificada {
   plantilla_tarea_id: string;
@@ -19,6 +19,8 @@ export interface TareaPlanificada {
   owner_agencia: string[];
   piezas: number;
   rol_sugerido: string | null;
+  tipo_pieza_id?: string | null;
+  aprobacion_cliente?: boolean;
 }
 
 export interface AlertaCapacidad {
@@ -41,6 +43,7 @@ export interface PlanInput {
   fecha_entrega: string;
   bloques: BloqueAlcanceInput[];
   umbral_concentracion_pct?: number;
+  tiposPieza?: TipoPieza[];
 }
 
 export function redistribuirPesos(bloques: { id: string; peso: number }[], activosIds: Set<string>): Map<string, number> {
@@ -88,8 +91,15 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
     if (!activosIds.has(bloque.id)) continue;
     const cfg = config.get(bloque.id);
     const pesoBloque = pesos.get(bloque.id) ?? 0;
-    const sumaRel = bloque.tareas.reduce((s, t) => s + t.peso_relativo, 0) || 1;
     const piezasBloque = Object.values(cfg?.piezas_por_canal ?? {}).reduce((s, n) => s + (n || 0), 0);
+
+    // Lotes de piezas de este bloque: (tipo, cantidad). Peso relativo del lote = esfuerzo × cantidad.
+    const lotes = Object.entries(cfg?.piezas_por_tipo ?? {})
+      .map(([tipoId, n]) => ({ tipo: (input.tiposPieza ?? []).find((t) => t.id === tipoId), n: Number(n) || 0 }))
+      .filter((l): l is { tipo: TipoPieza; n: number } => !!l.tipo && l.n > 0);
+    const pesoLotes = lotes.reduce((s, l) => s + l.tipo.esfuerzo * l.n, 0);
+    const sumaRel = bloque.tareas.reduce((s, t) => s + t.peso_relativo, 0) + pesoLotes || 1;
+
     for (const t of bloque.tareas) {
       tareas.push({
         plantilla_tarea_id: t.id,
@@ -101,9 +111,36 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
         peso: round3(pesoBloque * (t.peso_relativo / sumaRel)),
         fecha_entrega: restarDias(fecha_entrega, t.dias_offset),
         owner_agencia: cfg?.owner_id ? [cfg.owner_id] : [],
-        piezas: piezasBloque,
+        piezas: lotes.length ? 0 : piezasBloque,
         rol_sugerido: t.rol_sugerido,
       });
+    }
+
+    // Expansión: un to-do por paso del flujo del tipo, por lote (o por pieza si se pide).
+    for (const { tipo, n } of lotes) {
+      const pesoLote = pesoBloque * ((tipo.esfuerzo * n) / sumaRel);
+      const sumaPasos = tipo.pasos.reduce((s, p) => s + p.peso, 0) || 1;
+      const unidades = cfg?.una_tarea_por_pieza ? Array.from({ length: n }, (_, i) => ({ sufijo: ` ${i + 1}/${n}`, piezas: 1, factor: 1 / n })) : [{ sufijo: ` (${n})`, piezas: n, factor: 1 }];
+      for (const u of unidades) {
+        for (const paso of tipo.pasos) {
+          const visible = paso.visible === true;
+          tareas.push({
+            plantilla_tarea_id: null as unknown as string,
+            bloque_id: bloque.id,
+            bloque_nombre: bloque.nombre,
+            titulo_interno: `${paso.titulo} · ${tipo.nombre}${u.sufijo}`,
+            etiqueta_cliente: visible ? `${paso.etiqueta ?? paso.titulo} · ${tipo.nombre}${u.sufijo}` : null,
+            visible_cliente: visible,
+            peso: round3(pesoLote * u.factor * (paso.peso / sumaPasos)),
+            fecha_entrega: restarDias(fecha_entrega, paso.dias_offset),
+            owner_agencia: cfg?.owner_id ? [cfg.owner_id] : [],
+            piezas: u.piezas,
+            rol_sugerido: paso.rol ?? null,
+            tipo_pieza_id: tipo.id,
+            aprobacion_cliente: paso.aprobacion_cliente === true,
+          });
+        }
+      }
     }
   }
 

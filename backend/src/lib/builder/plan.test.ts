@@ -69,6 +69,56 @@ describe('builder · planificarProyecto', () => {
   });
 });
 
+describe('builder · tipos de pieza', () => {
+  const reel = { id: 'tp-reel', tenant_id: 't', nombre: 'Reel', slug: 'reel', esfuerzo: 4, activo: true, pasos: [
+    { titulo: 'Guiones', rol: 'Content', dias_offset: 10, peso: 2, visible: false },
+    { titulo: 'Aprobación de guiones', rol: 'Ejecutiva', dias_offset: 8, peso: 0.5, visible: true, etiqueta: 'Aprobación de guiones', aprobacion_cliente: true },
+    { titulo: 'Posteo', rol: 'CM', dias_offset: 0, peso: 1, visible: true, etiqueta: 'Publicación' },
+  ] };
+  const post = { id: 'tp-post', tenant_id: 't', nombre: 'Post estático', slug: 'post', esfuerzo: 1, activo: true, pasos: [
+    { titulo: 'Diseño', rol: 'Diseñador', dias_offset: 3, peso: 2, visible: false },
+    { titulo: 'Posteo', rol: 'CM', dias_offset: 0, peso: 1, visible: true, etiqueta: 'Publicación' },
+  ] };
+
+  it('expande un to-do por paso por lote, con cantidad en piezas y fechas hacia atrás', () => {
+    const plan = planificarProyecto({
+      plantilla, fecha_entrega: '2026-12-15', tiposPieza: [reel, post],
+      bloques: [{ bloque_id: 'b2', activo: true, owner_id: 'u1', piezas_por_canal: {}, piezas_por_tipo: { 'tp-reel': 4, 'tp-post': 8 } }],
+    });
+    const reels = plan.tareas.filter((t) => t.tipo_pieza_id === 'tp-reel');
+    expect(reels.map((t) => t.titulo_interno)).toEqual(['Guiones · Reel (4)', 'Aprobación de guiones · Reel (4)', 'Posteo · Reel (4)']);
+    expect(reels.every((t) => t.piezas === 4)).toBe(true);
+    expect(reels[0]?.fecha_entrega).toBe('2026-12-05');
+    expect(reels[1]?.visible_cliente).toBe(true);
+    expect(reels[1]?.etiqueta_cliente).toBe('Aprobación de guiones · Reel (4)');
+    expect(reels[1]?.aprobacion_cliente).toBe(true);
+    expect(plan.tareas.filter((t) => t.tipo_pieza_id === 'tp-post')).toHaveLength(2);
+  });
+
+  it('reparte el peso del bloque por esfuerzo × cantidad y sigue sumando 100', () => {
+    const plan = planificarProyecto({
+      plantilla, fecha_entrega: '2026-12-15', tiposPieza: [reel, post],
+      bloques: [{ bloque_id: 'b2', activo: true, owner_id: null, piezas_por_canal: {}, piezas_por_tipo: { 'tp-reel': 4, 'tp-post': 16 } }],
+    });
+    const suma = plan.tareas.reduce((s, t) => s + t.peso, 0);
+    expect(Math.round(suma)).toBe(100);
+    const pesoReels = plan.tareas.filter((t) => t.tipo_pieza_id === 'tp-reel').reduce((s, t) => s + t.peso, 0);
+    const pesoPosts = plan.tareas.filter((t) => t.tipo_pieza_id === 'tp-post').reduce((s, t) => s + t.peso, 0);
+    expect(Math.abs(pesoReels - pesoPosts)).toBeLessThan(0.05); // 4×4 == 16×1
+  });
+
+  it('una tarea por pieza cuando se pide', () => {
+    const plan = planificarProyecto({
+      plantilla, fecha_entrega: '2026-12-15', tiposPieza: [post],
+      bloques: [{ bloque_id: 'b2', activo: true, owner_id: null, piezas_por_canal: {}, piezas_por_tipo: { 'tp-post': 3 }, una_tarea_por_pieza: true }],
+    });
+    const posts = plan.tareas.filter((t) => t.tipo_pieza_id === 'tp-post');
+    expect(posts).toHaveLength(6);
+    expect(posts[0]?.titulo_interno).toBe('Diseño · Post estático 1/3');
+    expect(posts.every((t) => t.piezas === 1)).toBe(true);
+  });
+});
+
 describe('builder · utilidades', () => {
   it('redistribuirPesos siempre suma 100', () => {
     const m = redistribuirPesos([{ id: 'a', peso: 33 }, { id: 'b', peso: 33 }, { id: 'c', peso: 34 }], new Set(['a', 'b']));

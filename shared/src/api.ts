@@ -30,6 +30,10 @@ export interface BloqueAlcanceInput {
   activo: boolean;
   owner_id: string | null;
   piezas_por_canal: Record<string, number>;
+  /** Cantidades por tipo de pieza (post, carrusel, reel). Cada tipo se expande en un to-do por paso de su flujo. */
+  piezas_por_tipo?: Record<string, number>;
+  /** true = una tarea por pieza por paso (campañas); false = un lote por paso (fee). */
+  una_tarea_por_pieza?: boolean;
 }
 
 export interface CrearRequerimientoInput {

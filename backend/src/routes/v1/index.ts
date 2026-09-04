@@ -10,6 +10,7 @@ import { basecamp } from './basecamp';
 import { admin } from './admin';
 import { mesas } from './mesas';
 import { dashboard } from './dashboard';
+import { tiposPieza } from './tipos_pieza';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -23,3 +24,4 @@ v1.route('/basecamp', basecamp);
 v1.route('/admin', admin);
 v1.route('/mesas', mesas);
 v1.route('/dashboard', dashboard);
+v1.route('/tipos-pieza', tiposPieza);

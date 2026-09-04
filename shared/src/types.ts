@@ -121,6 +121,26 @@ export interface PlantillaTarea {
   orden: number;
 }
 
+export interface PasoPieza {
+  titulo: string;
+  rol?: string | null;
+  dias_offset: number; // días ANTES del posteo/entrega
+  peso: number;
+  visible: boolean;
+  etiqueta?: string | null;
+  aprobacion_cliente?: boolean;
+}
+
+export interface TipoPieza {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  slug: string;
+  esfuerzo: number; // peso relativo por unidad
+  pasos: PasoPieza[];
+  activo: boolean;
+}
+
 export interface PlantillaArbol extends Plantilla {
   bloques: (PlantillaBloque & { tareas: PlantillaTarea[] })[];
 }
@@ -171,6 +191,7 @@ export interface Requerimiento {
   owner_agencia: string[];
   owner_cliente: string[] | null;
   piezas: number;
+  tipo_pieza_id: string | null;
   brief_url: string | null;
   entregable_urls: string[] | null;
   basecamp_todo_id: number | null;

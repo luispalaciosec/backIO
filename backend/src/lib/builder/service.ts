@@ -11,6 +11,7 @@ import { getCliente } from '../db/clientes';
 import { insertProyecto, updateProyecto } from '../db/proyectos';
 import { insertRequerimientos } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
+import { listTiposPieza } from '../db/tipos_pieza';
 import { audit } from '../db/audit';
 import { notificar } from '../notificaciones';
 import { createProjectStructure } from '../basecamp/write';
@@ -21,14 +22,14 @@ export interface PreviewProyecto {
   plan: PlanProyecto;
   vista_cliente: ClientSafeProject;
   alertas: (AlertaCapacidad & { nombre: string })[];
-  resumen: { requerimientos_a_crear: number; visibles_al_cliente: number; todos_basecamp_a_crear: number; cliente: string; plantilla: string };
+  resumen: { requerimientos_a_crear: number; visibles_al_cliente: number; todos_basecamp_a_crear: number; piezas: number; cliente: string; plantilla: string };
 }
 
 export async function previewProyecto(ctx: DbCtx, input: CrearProyectoInput): Promise<PreviewProyecto> {
-  const [plantilla, cliente, usuarios] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id), listUsuarios(ctx)]);
+  const [plantilla, cliente, usuarios, tiposPieza] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id), listUsuarios(ctx), listTiposPieza(ctx)]);
   if (!plantilla) throw new DbError('Plantilla no encontrada', 404);
   if (!cliente) throw new DbError('Cliente no encontrado', 404);
-  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [] });
+  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [], tiposPieza });
   const ahora = new Date().toISOString();
   const vista_cliente = sanitizeForClient(
     { nombre: input.nombre, fecha_entrega: input.fecha_entrega },
@@ -45,6 +46,7 @@ export async function previewProyecto(ctx: DbCtx, input: CrearProyectoInput): Pr
       requerimientos_a_crear: plan.tareas.length,
       visibles_al_cliente: plan.visibles,
       todos_basecamp_a_crear: cliente.basecamp_project_id ? plan.tareas.length : 0,
+      piezas: plan.tareas.filter((t) => t.tipo_pieza_id).reduce((s, t) => s + (t.piezas || 0), 0),
       cliente: cliente.nombre,
       plantilla: plantilla.nombre,
     },
@@ -59,11 +61,11 @@ export interface ResultadoCreacion {
 }
 
 export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyectoInput): Promise<ResultadoCreacion> {
-  const [plantilla, cliente] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id)]);
+  const [plantilla, cliente, tiposPieza] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id), listTiposPieza(ctx)]);
   if (!plantilla) throw new DbError('Plantilla no encontrada', 404);
   if (!cliente) throw new DbError('Cliente no encontrado', 404);
 
-  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [] });
+  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [], tiposPieza });
   const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;
   const fecha_inicio = input.fecha_inicio ?? (primeraFecha < input.fecha_entrega ? primeraFecha : restarDias(input.fecha_entrega, 1));
 
@@ -82,9 +84,10 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   const requerimientos = await insertRequerimientos(
     ctx,
     plan.tareas.map((t) => ({
-      cliente_id: input.cliente_id, proyecto_id: proyecto.id, bloque_nombre: t.bloque_nombre, plantilla_tarea_id: t.plantilla_tarea_id,
+      cliente_id: input.cliente_id, proyecto_id: proyecto.id, bloque_nombre: t.bloque_nombre, plantilla_tarea_id: t.plantilla_tarea_id || null,
+      tipo_pieza_id: t.tipo_pieza_id ?? null,
       titulo_interno: t.titulo_interno, etiqueta_cliente: t.etiqueta_cliente, visible_cliente: t.visible_cliente,
-      tipo_trabajo: 'proyecto', estado_operativo: 'priorizado', peso: t.peso, fecha_pedido: fecha_inicio, fecha_entrega: t.fecha_entrega,
+      tipo_trabajo: plantilla.tipo === 'fee_mensual' ? 'fee' : 'proyecto', estado_operativo: 'priorizado', peso: t.peso, fecha_pedido: fecha_inicio, fecha_entrega: t.fecha_entrega,
       owner_agencia: t.owner_agencia, piezas: t.piezas,
     })),
   );

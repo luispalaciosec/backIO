@@ -7,3 +7,4 @@ export * from './proyectos';
 export * from './requerimientos';
 export * from './semanas';
 export * from './mesas';
+export * from './tipos_pieza';
