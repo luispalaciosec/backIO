@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listClientes, getCliente, updateClienteConfig, listProyectos, listBacklog, audit } from '../../lib/db';
 import type { ResumenClientePrometio } from '@backio/shared';
+import { registrarWebhookCliente } from '../../lib/basecamp/webhooks';
 
 export const clientes = new Hono();
 
@@ -51,4 +52,13 @@ clientes.patch('/:id', requireScope('admin'), zValidator('json', patchSchema), a
   const cl = await updateClienteConfig(ctx, c.req.param('id'), c.req.valid('json'));
   await audit(ctx, { accion: 'actualizar_config', entidad: 'cliente', entidad_id: cl.id, detalle: c.req.valid('json') });
   return c.json(cl);
+});
+
+/** Registra el webhook de BackIO en el proyecto Basecamp del cliente (idempotente). */
+clientes.post('/:id/basecamp/webhook', requireScope('admin'), async (c) => {
+  try {
+    return c.json(await registrarWebhookCliente(ctxOf(c), c.req.param('id')));
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
+  }
 });

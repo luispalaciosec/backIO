@@ -54,7 +54,7 @@ describe('portal público', () => {
   });
 
   it('el webhook de Basecamp ignora eventos que no son de to-do', async () => {
-    const res = await app.request('/api/webhooks/basecamp', { method: 'POST', body: JSON.stringify({ kind: 'comment_created', recording: { id: 1, content: 'HORRIBLE' } }) });
+    const res = await app.request('/api/webhooks/basecamp/cualquiera', { method: 'POST', body: JSON.stringify({ kind: 'comment_created', recording: { id: 1, content: 'HORRIBLE' } }) });
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('ok');
   });

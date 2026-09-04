@@ -46,7 +46,16 @@ export default function AdminClientesPage() {
             <div><label className="label">Logo URL</label><input name="logo_url" className="input" defaultValue={c.logo_url ?? ''} /></div>
             <div><label className="label">Color</label><input name="color_primario" type="color" className="input h-9 p-1" defaultValue={c.color_primario ?? '#0073EA'} /></div>
             <div><label className="label">PIN portal</label><input name="portal_pin" className="input" maxLength={6} defaultValue={String((c.config as { portal_pin?: string })?.portal_pin ?? '')} placeholder="opcional" /></div>
-            <button className="btn-primary">Guardar</button>
+            <div className="flex gap-1">
+              <button className="btn-primary">Guardar</button>
+              {c.basecamp_project_id && (
+                <button type="button" className="btn-ghost text-xs" title="Registrar webhook de BackIO en el proyecto Basecamp" onClick={async () => {
+                  setError(null); setOk(null);
+                  try { const r = await api<{ webhook_id: number }>(`/clientes/${c.id}/basecamp/webhook`, { method: 'POST' }); setOk(`Webhook ${r.webhook_id} registrado en Basecamp para ${c.nombre}`); await cargar(); }
+                  catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+                }}>{(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? '✓ webhook' : 'Webhook'}</button>
+              )}
+            </div>
           </form>
         ))}
         {items.length === 0 && <div className="card p-6 text-gray-500">Sin clientes. Llegan desde PrometIO por webhook.</div>}
