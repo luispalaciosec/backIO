@@ -93,6 +93,12 @@ export function buildSpec(base: string) {
       '/semanas/daily': { get: { operationId: 'getDaily', summary: 'Las tres señales del daily', responses: { '200': { description: 'DailyView' } } } },
       '/dashboard': { get: { operationId: 'getDashboard', summary: 'KPIs, salud por cliente, carga por persona, arrastre, serie 8 semanas', parameters: [q('mesa', 'uuid de la mesa')], responses: { '200': { description: 'Dashboard' } } } },
       '/mesas': { get: { operationId: 'listMesas', summary: 'Mesas (equipos de cuenta)', responses: { '200': { description: 'Mesas' } } } },
+      '/horas/resumen': { get: { operationId: 'getHoras', summary: 'Horas de Basecamp (timesheet) por cliente, persona, proyecto y requerimiento. Solo números', parameters: [q('dias', 'ventana en días (default 30)')], responses: { '200': { description: 'ResumenHoras' } } } },
+      '/huerfanos': { get: { operationId: 'listHuerfanos', summary: 'To-dos creados en Basecamp fuera de BackIO (solo título, fechas, creador)', responses: { '200': { description: 'Huérfanos pendientes' } } } },
+      '/huerfanos/{id}/adoptar': { post: { operationId: 'adoptarHuerfano', summary: 'Crear el requerimiento en BackIO enlazado al to-do', parameters: [path('id')], responses: { '200': { description: 'Requerimiento' } } } },
+      '/ia/weekly': { post: { operationId: 'narrarWeekly', summary: 'Status semanal narrado por IA + agenda por causa con pregunta de decisión (solo redacta)', requestBody: { required: true, content: json({ type: 'object', properties: { semana_id: { type: 'string' }, mesa_id: { type: 'string', nullable: true } }, required: ['semana_id'] }) }, responses: { '200': { description: 'WeeklyIA' } } } },
+      '/ia/brief': { post: { operationId: 'briefDesdeTexto', summary: 'Convierte el pedido de un cliente en brief estructurado + plantilla y piezas sugeridas', requestBody: { required: true, content: json({ type: 'object', properties: { texto: { type: 'string' }, cliente_id: { type: 'string', nullable: true } }, required: ['texto'] }) }, responses: { '200': { description: 'BriefIA' } } } },
+      '/ia/informe-mensual': { post: { operationId: 'informeMensual', summary: 'Informe ejecutivo mensual por mesa (se guarda como acta; una persona lo publica)', requestBody: { required: true, content: json({ type: 'object', properties: { mesa_id: { type: 'string' }, mes: { type: 'string', example: '2026-08' } }, required: ['mesa_id', 'mes'] }) }, responses: { '201': { description: 'Acta' } } } },
     },
   };
 }
