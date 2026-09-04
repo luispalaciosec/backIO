@@ -8,7 +8,12 @@ const NAV = [
   { href: '/proyectos', label: 'Proyectos' },
   { href: '/daily', label: 'Daily' },
   { href: '/weekly', label: 'Weekly' },
+];
+const ADMIN = [
+  { href: '/admin/clientes', label: 'Clientes' },
+  { href: '/admin/usuarios', label: 'Usuarios' },
   { href: '/admin/integraciones', label: 'Integraciones' },
+  { href: '/admin/api-keys', label: 'API keys' },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +28,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map((n) => (
+            <Link key={n.href} href={n.href} className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              {n.label}
+            </Link>
+          ))}
+          <div className="pt-3 mt-3 border-t border-gray-100 text-[10px] uppercase tracking-wide text-gray-400 px-3">Admin</div>
+          {ADMIN.map((n) => (
             <Link key={n.href} href={n.href} className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
               {n.label}
             </Link>
