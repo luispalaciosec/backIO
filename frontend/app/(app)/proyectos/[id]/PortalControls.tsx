@@ -25,6 +25,15 @@ export function PortalControls({ proyecto }: { proyecto: Proyecto }) {
     setBusy(false);
     router.refresh();
   }
+  async function comoPlantilla() {
+    const nombre = prompt('Nombre de la plantilla nueva:', proyecto.nombre);
+    if (!nombre) return;
+    const solo = confirm('¿Solo para este cliente? Aceptar = del cliente · Cancelar = general para toda la agencia');
+    setBusy(true);
+    try { const p = await api<{ id: string; nombre: string }>(`/plantillas/desde-proyecto/${proyecto.id}`, { method: 'POST', json: { nombre, solo_cliente: solo } }); alert(`Plantilla "${p.nombre}" creada. Edítala en Admin → Plantillas.`); }
+    catch (e) { alert(e instanceof Error ? e.message : 'Error'); }
+    setBusy(false);
+  }
   async function reintentar() {
     setBusy(true);
     try {
@@ -60,6 +69,7 @@ export function PortalControls({ proyecto }: { proyecto: Proyecto }) {
       )}
       <div className="flex gap-2">
         <button className="btn-ghost text-xs" disabled={busy} onClick={rotar}>Rotar token</button>
+        <button className="btn-ghost text-xs" disabled={busy} onClick={comoPlantilla}>Guardar como plantilla</button>
         {proyecto.sync_estado !== 'ok' && <button className="btn-ghost text-xs" disabled={busy} onClick={reintentar}>Reintentar Basecamp</button>}
       </div>
     </div>

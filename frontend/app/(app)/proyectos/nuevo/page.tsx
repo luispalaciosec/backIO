@@ -38,6 +38,10 @@ export default function NuevoProyectoPage() {
     api<{ items: Borrador[] }>('/proyectos/borradores').then((r) => setBorradores(r.items)).catch(() => {});
   }, []);
   useEffect(() => { guardarBorrador(s); }, [s]);
+  // Plantillas propias del cliente: al elegir cliente se recarga la lista (generales + suyas).
+  useEffect(() => {
+    api<{ items: Plantilla[] }>(`/plantillas${s.cliente_id ? `?cliente=${s.cliente_id}` : ''}`).then((r) => setCat((c) => ({ ...c, plantillas: r.items }))).catch(() => {});
+  }, [s.cliente_id]);
 
   const set = (patch: Partial<WizardState>) => setS((prev) => ({ ...prev, ...patch }));
 

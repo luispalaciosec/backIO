@@ -96,6 +96,11 @@ export interface Plantilla {
   activa: boolean;
   recurrente: boolean;
   patron_nombre: string | null;
+  pilar: 'Marca' | 'Crecimiento' | 'Transformación' | 'Transversal' | 'Medios' | null;
+  familia: string | null;
+  unidad: string | null;
+  precio_referencia: string | null;
+  cliente_id: string | null;
 }
 
 export interface PlantillaBloque {
