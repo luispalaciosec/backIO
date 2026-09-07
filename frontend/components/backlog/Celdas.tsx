@@ -14,10 +14,13 @@ export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabl
       <select
         aria-label="Cambiar"
         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+        // El select es invisible (opacity 0) pero su lista desplegable hereda el texto blanco del contenedor
+        // y en Chrome/Windows las opciones salían blancas sobre blanco. Color explícito en select y options.
+        style={{ color: '#1b2430', backgroundColor: '#ffffff' }}
         value={valor}
         onChange={async (e) => { setBusy(true); await onChange(e.target.value); setBusy(false); }}
       >
-        {opciones.map((o) => <option key={o} value={o} disabled={disabledValues.includes(o)}>{labels[o] ?? o}</option>)}
+        {opciones.map((o) => <option key={o} value={o} disabled={disabledValues.includes(o)} style={{ color: disabledValues.includes(o) ? '#9ca3af' : '#1b2430', backgroundColor: '#ffffff' }}>{labels[o] ?? o}</option>)}
       </select>
     </div>
   );
