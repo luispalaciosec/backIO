@@ -56,7 +56,8 @@ async function leerCache(ctx: DbCtx, tipo: string, hash: string, cacheMs: number
 export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado> {
   const key = env().ANTHROPIC_API_KEY;
   if (!key) throw new Error('La capa de IA no está configurada (falta ANTHROPIC_API_KEY en el backend)');
-  const hash = hashPayload(o.payload);
+  // El hash incluye el prompt: si cambia el formato pedido, el caché anterior deja de valer.
+  const hash = hashPayload({ payload: o.payload, system: o.system, modelo: MODELO_IA });
   const cacheMs = o.cacheMs ?? 10 * 60_000;
   const cache = await leerCache(ctx, o.tipo, hash, cacheMs);
   if (cache) return { texto: cache, desde_cache: true, modelo: MODELO_IA };

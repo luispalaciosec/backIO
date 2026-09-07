@@ -86,6 +86,11 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
 
 /** Formato de texto plano NARRATIVA: / AGENDA: (más robusto que JSON con títulos que traen comillas). */
 export function parsearWeekly(texto: string): { narrativa: string; agenda: { causa: string; pregunta: string }[] } {
+  // Compatibilidad: si llega JSON (respuestas antiguas en caché), se intenta leer.
+  const posibleJson = texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (posibleJson.startsWith('{')) {
+    try { const j = JSON.parse(posibleJson) as { narrativa?: string; agenda?: { causa: string; pregunta: string }[] }; if (j.narrativa) return { narrativa: j.narrativa, agenda: j.agenda ?? [] }; } catch { /* sigue al formato de texto */ }
+  }
   const t = texto.replace(/\r/g, '');
   const iN = t.search(/NARRATIVA\s*:/i); const iA = t.search(/\nAGENDA\s*:/i);
   const narrativa = (iN >= 0 ? t.slice(t.indexOf(':', iN) + 1, iA >= 0 ? iA : undefined) : (iA >= 0 ? t.slice(0, iA) : t)).trim();
