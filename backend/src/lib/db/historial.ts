@@ -12,24 +12,33 @@ export async function listReprocesos(ctx: DbCtx, requerimientoId: string): Promi
 }
 
 /** El trigger deja la fila con motivo null y origen 'desconocido'; el backend la completa justo después del update. */
-export async function completarUltimaReprogramacion(ctx: DbCtx, requerimientoId: string, datos: { motivo: MotivoReprogramacion | null; origen: string }): Promise<void> {
+/** Reintenta sin `observacion` si la columna aún no existe (migración 17 pendiente). */
+async function conObservacionOpcional<T>(fn: (incluir: boolean) => Promise<{ error: { message?: string } | null; data?: T }>): Promise<{ error: { message?: string } | null; data?: T }> {
+  const r = await fn(true);
+  if (r.error && /observacion/i.test(r.error.message ?? '')) return fn(false);
+  return r;
+}
+
+export async function completarUltimaReprogramacion(ctx: DbCtx, requerimientoId: string, datos: { motivo: MotivoReprogramacion | null; origen: string; observacion?: string | null }): Promise<void> {
   const { data } = await ctx.db.from('reprogramaciones').select('id').eq('tenant_id', ctx.tenantId).eq('requerimiento_id', requerimientoId).eq('origen', 'desconocido').order('created_at', { ascending: false }).limit(1).maybeSingle();
   const row = data as { id: string } | null;
   if (!row) return;
-  const { error } = await ctx.db.from('reprogramaciones').update({ motivo: datos.motivo, origen: datos.origen, usuario_id: ctx.usuarioId }).eq('id', row.id);
-  throwIf(error);
+  const { error } = await conObservacionOpcional((inc) => ctx.db.from('reprogramaciones').update({ motivo: datos.motivo, origen: datos.origen, usuario_id: ctx.usuarioId, ...(inc && datos.observacion ? { observacion: datos.observacion } : {}) }).eq('id', row.id));
+  throwIf(error as never);
 }
-export async function setMotivoReprogramacion(ctx: DbCtx, id: string, motivo: MotivoReprogramacion): Promise<void> {
-  const { error } = await ctx.db.from('reprogramaciones').update({ motivo }).eq('tenant_id', ctx.tenantId).eq('id', id);
-  throwIf(error);
+export async function setMotivoReprogramacion(ctx: DbCtx, id: string, motivo: MotivoReprogramacion, observacion?: string | null): Promise<void> {
+  const { error } = await conObservacionOpcional((inc) => ctx.db.from('reprogramaciones').update({ motivo, ...(inc && observacion ? { observacion } : {}) }).eq('tenant_id', ctx.tenantId).eq('id', id));
+  throwIf(error as never);
 }
-export async function insertReproceso(ctx: DbCtx, r: { requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null; fecha_entrega_antes: string | null }): Promise<Reproceso> {
-  const { data, error } = await ctx.db.from('reprocesos').insert({ ...r, tenant_id: ctx.tenantId, usuario_id: ctx.usuarioId }).select().single();
-  throwIf(error); return data as Reproceso;
+export async function insertReproceso(ctx: DbCtx, r: { requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null; fecha_entrega_antes: string | null; observacion?: string | null }): Promise<Reproceso> {
+  const { observacion, ...resto } = r;
+  const { data, error } = await conObservacionOpcional<Reproceso>((inc) => ctx.db.from('reprocesos').insert({ ...resto, tenant_id: ctx.tenantId, usuario_id: ctx.usuarioId, ...(inc && observacion ? { observacion } : {}) }).select().single());
+  throwIf(error as never); return data as Reproceso;
 }
-export async function updateReproceso(ctx: DbCtx, id: string, patch: Partial<Pick<Reproceso, 'motivo' | 'paso_retorno' | 'cerrado_at' | 'horas_reproceso'>>): Promise<void> {
-  const { error } = await ctx.db.from('reprocesos').update(patch).eq('tenant_id', ctx.tenantId).eq('id', id);
-  throwIf(error);
+export async function updateReproceso(ctx: DbCtx, id: string, patch: Partial<Pick<Reproceso, 'motivo' | 'paso_retorno' | 'cerrado_at' | 'horas_reproceso' | 'observacion'>>): Promise<void> {
+  const { observacion, ...resto } = patch;
+  const { error } = await conObservacionOpcional((inc) => ctx.db.from('reprocesos').update({ ...resto, ...(inc && observacion !== undefined ? { observacion } : {}) }).eq('tenant_id', ctx.tenantId).eq('id', id));
+  throwIf(error as never);
 }
 export async function reprocesoAbierto(ctx: DbCtx, requerimientoId: string): Promise<Reproceso | null> {
   const { data } = await ctx.db.from('reprocesos').select('*').eq('tenant_id', ctx.tenantId).eq('requerimiento_id', requerimientoId).is('cerrado_at', null).order('abierto_at', { ascending: false }).limit(1).maybeSingle();

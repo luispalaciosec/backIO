@@ -28,7 +28,7 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
   const [tab, setTab] = useState<'historial' | 'reproceso'>('historial');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState<{ origen: 'cliente' | 'interno'; motivo: MotivoReproceso | ''; paso: string; reabrir: boolean }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true });
+  const [f, setF] = useState<{ origen: 'cliente' | 'interno'; motivo: MotivoReproceso | ''; paso: string; reabrir: boolean; observacion: string }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true, observacion: '' });
   const cargar = () => api<HistorialRequerimiento>(`/requerimientos/${r.id}/historial`).then(setH).catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => { void cargar(); }, [r.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const abiertoRp = h?.reprocesos.find((x) => !x.cerrado_at);
@@ -37,7 +37,7 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
   async function registrar() {
     if (!f.motivo) return;
     setBusy(true); setErr(null);
-    try { await api(`/requerimientos/${r.id}/reprocesos`, { method: 'POST', json: { origen: f.origen, motivo: f.motivo, paso_retorno: f.paso || null, reabrir_basecamp: f.reabrir } }); await cargar(); onCambio(); setTab('historial'); }
+    try { await api(`/requerimientos/${r.id}/reprocesos`, { method: 'POST', json: { origen: f.origen, motivo: f.motivo, paso_retorno: f.paso || null, observacion: f.observacion.trim() || null, reabrir_basecamp: f.reabrir } }); await cargar(); onCambio(); setTab('historial'); }
     catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
     setBusy(false);
   }
@@ -72,12 +72,13 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
 
         {tab === 'reproceso' && !abiertoRp && (
           <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm text-amber-900">El entregable vuelve al equipo. La tarea pasa a «En ejecución»{r.basecamp_todo_id ? ' y el to-do se reabre en Basecamp' : ''}. Se registra la causa, nunca el comentario.</p>
+            <p className="text-sm text-amber-900">El entregable vuelve al equipo. La tarea pasa a «En ejecución»{r.basecamp_todo_id ? ' y el to-do se reabre en Basecamp' : ''}. La causa alimenta los indicadores; la observación es para el equipo (no se copia del comentario de Basecamp y nunca la ve el cliente).</p>
             <div className="grid gap-3 md:grid-cols-2">
               <div><label className="label">Quién lo pide</label><select className="input" value={f.origen} onChange={(e) => setF({ ...f, origen: e.target.value as 'cliente' | 'interno' })}><option value="cliente">Cliente</option><option value="interno">Revisión interna</option></select></div>
               <div><label className="label">Causa *</label><select className="input" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value as MotivoReproceso })}><option value="">Selecciona…</option>{MOTIVOS_REPROCESO.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>{info && <p className="text-xs text-gray-600 mt-1">Responsable natural: {info.responsable}.</p>}</div>
               <div><label className="label">Regresa al paso</label><select className="input" value={f.paso} onChange={(e) => setF({ ...f, paso: e.target.value })}><option value="">No aplica / pieza simple</option>{PASOS_RETORNO.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
               {r.basecamp_todo_id && <label className="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" checked={f.reabrir} onChange={(e) => setF({ ...f, reabrir: e.target.checked })} /> Reabrir el to-do en Basecamp</label>}
+              <div className="md:col-span-2"><label className="label">Observación</label><textarea className="input" rows={3} maxLength={1000} placeholder="Qué hay que corregir y por qué. Ej.: el cliente pidió cambiar el color del logo a la versión 2024 y quitar el claim." value={f.observacion} onChange={(e) => setF({ ...f, observacion: e.target.value })} /></div>
             </div>
             <div className="flex justify-end"><button className="btn-danger" disabled={!f.motivo || busy} onClick={registrar}>{busy ? 'Registrando…' : '⟲ Registrar reproceso'}</button></div>
           </div>
@@ -87,7 +88,7 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
           <div className="space-y-4">
             {abiertoRp && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm flex items-center justify-between gap-3">
-                <span><b>Reproceso abierto</b> desde {fecha(abiertoRp.abierto_at.slice(0, 10))} · {ORIGEN[abiertoRp.origen]} · {labelRc(abiertoRp.motivo)}{abiertoRp.paso_retorno ? ` · vuelve a ${abiertoRp.paso_retorno}` : ''}</span>
+                <span><b>Reproceso abierto</b> desde {fecha(abiertoRp.abierto_at.slice(0, 10))} · {ORIGEN[abiertoRp.origen]} · {labelRc(abiertoRp.motivo)}{abiertoRp.paso_retorno ? ` · vuelve a ${abiertoRp.paso_retorno}` : ''}{abiertoRp.observacion ? <span className="block text-xs text-red-800 mt-1">{abiertoRp.observacion}</span> : null}</span>
                 {!hecho && <button className="btn-success text-xs py-1" disabled={busy} onClick={() => cerrar(abiertoRp.id)}>Entregado de nuevo</button>}
               </div>
             )}
@@ -100,7 +101,7 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
                   <tbody>{h.reprogramaciones.map((x) => (
                     <tr key={x.id}><td className="td whitespace-nowrap text-gray-500">{fecha(x.created_at.slice(0, 10))}</td><td className="td line-through text-gray-500">{fecha(x.fecha_anterior)}</td><td className="td font-medium">{fecha(x.fecha_nueva)}</td>
                       <td className="td">{x.motivo ? labelRp(x.motivo) : <select className="input py-1 text-xs border-amber-300" defaultValue="" onChange={(e) => e.target.value && patchRp(x.id, e.target.value as MotivoReprogramacion)}><option value="">Sin causa · completar…</option>{MOTIVOS_REPROGRAMACION.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>}</td>
-                      <td className="td text-xs text-gray-500">{x.origen}</td></tr>
+                      <td className="td text-xs text-gray-500">{x.origen}{x.observacion ? <div className="text-gray-500 mt-0.5 max-w-56 whitespace-normal">{x.observacion}</div> : null}</td></tr>
                   ))}</tbody></table>
               )}
             </section>
@@ -112,7 +113,7 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
                   <tbody>{h.reprocesos.map((x) => (
                     <tr key={x.id}><td className="td whitespace-nowrap text-gray-500">{fecha(x.abierto_at.slice(0, 10))}</td><td className="td">{ORIGEN[x.origen]}</td>
                       <td className="td">{x.motivo ? labelRc(x.motivo) : <select className="input py-1 text-xs border-amber-300" defaultValue="" onChange={(e) => e.target.value && patchRc(x.id, e.target.value as MotivoReproceso)}><option value="">Sin causa · completar…</option>{MOTIVOS_REPROCESO.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>}</td>
-                      <td className="td text-xs">{x.paso_retorno ?? '—'}</td><td className="td whitespace-nowrap text-gray-500">{x.cerrado_at ? fecha(x.cerrado_at.slice(0, 10)) : <span className="text-red-700">abierto</span>}</td><td className="td text-right tabular-nums">{x.horas_reproceso ?? ''}</td></tr>
+                      <td className="td text-xs">{x.paso_retorno ?? '—'}{x.observacion ? <div className="text-gray-500 mt-0.5 max-w-56 whitespace-normal">{x.observacion}</div> : null}</td><td className="td whitespace-nowrap text-gray-500">{x.cerrado_at ? fecha(x.cerrado_at.slice(0, 10)) : <span className="text-red-700">abierto</span>}</td><td className="td text-right tabular-nums">{x.horas_reproceso ?? ''}</td></tr>
                   ))}</tbody></table>
               )}
             </section>

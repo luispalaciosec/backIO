@@ -7,10 +7,11 @@ import { fecha } from '@/lib/format';
 /** Toda reprogramación desde la UI exige motivo (decidido 04/09). La fecha original nunca se pierde. */
 export function MotivoReprogramacionModal({ titulo, fechaOriginal, fechaAnterior, fechaNueva, veces, onConfirmar, onCancelar }: {
   titulo: string; fechaOriginal: string | null; fechaAnterior: string | null; fechaNueva: string | null; veces: number;
-  onConfirmar: (motivo: MotivoReprogramacion) => void | Promise<void>; onCancelar: () => void;
+  onConfirmar: (motivo: MotivoReprogramacion, observacion: string | null) => void | Promise<void>; onCancelar: () => void;
 }) {
   const [motivo, setMotivo] = useState<MotivoReprogramacion | ''>('');
   const [busy, setBusy] = useState(false);
+  const [obs, setObs] = useState('');
   const info = MOTIVOS_REPROGRAMACION.find((m) => m.valor === motivo);
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={onCancelar}>
@@ -33,9 +34,13 @@ export function MotivoReprogramacionModal({ titulo, fechaOriginal, fechaAnterior
           </select>
           {info && <p className="text-xs text-gray-500 mt-1">{info.atribuible === 'equipo' ? 'Cuenta como reprogramación del equipo en los indicadores.' : info.atribuible === 'cliente' ? 'No descuenta al equipo: la causa es del cliente.' : 'Neutro: no se atribuye a nadie.'}</p>}
         </div>
+        <div>
+          <label className="label">Observación</label>
+          <textarea className="input" rows={2} maxLength={1000} placeholder="Detalle para el equipo (opcional)" value={obs} onChange={(e) => setObs(e.target.value)} />
+        </div>
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-ghost" onClick={onCancelar}>Cancelar</button>
-          <button type="button" className="btn-primary" disabled={!motivo || busy} onClick={async () => { if (!motivo) return; setBusy(true); await onConfirmar(motivo); setBusy(false); }}>{busy ? 'Guardando…' : 'Reprogramar'}</button>
+          <button type="button" className="btn-primary" disabled={!motivo || busy} onClick={async () => { if (!motivo) return; setBusy(true); await onConfirmar(motivo, obs.trim() || null); setBusy(false); }}>{busy ? 'Guardando…' : 'Reprogramar'}</button>
         </div>
       </div>
     </div>

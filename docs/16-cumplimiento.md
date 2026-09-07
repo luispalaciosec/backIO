@@ -43,6 +43,12 @@ nunca el texto del comentario del cliente o del equipo (regla 1).
 - Idempotente por tarea: mientras hay un reproceso abierto no se crea otro (el webhook `todo_uncompleted`
   que vuelve tras reabrir desde BackIO no duplica).
 
+## Observación (07/09/2026)
+
+Reprocesos y reprogramaciones admiten una **observación** libre escrita en BackIO por el equipo (máx. 1000
+caracteres). Es texto propio de BackIO, no copiado de Basecamp, y nunca llega al portal del cliente. Migración
+`20260907000017`; el backend tolera la columna ausente (guarda sin observación) hasta que se aplique.
+
 ## Indicadores
 
 | Indicador | Cálculo | Dónde |

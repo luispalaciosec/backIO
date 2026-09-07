@@ -80,7 +80,7 @@ export default function BacklogPage() {
 
   const me = useMe();
   const colaborador = me?.rol === 'colaborador';
-  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls'];
+  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion'];
   /** Un colaborador solo edita sus tareas y solo estado, fecha y entregables; el backend lo exige igual. */
   const puedeEditar = (r: RequerimientoMetricas) => !colaborador || (!!me?.usuario_id && r.owner_agencia.includes(me.usuario_id));
 
@@ -230,7 +230,7 @@ export default function BacklogPage() {
       {reprog && (
         <MotivoReprogramacionModal titulo={reprog.r.titulo_interno} fechaOriginal={reprog.r.fecha_entrega_original} fechaAnterior={reprog.r.fecha_entrega} fechaNueva={reprog.fecha} veces={reprog.r.veces_reprogramado}
           onCancelar={() => { setReprog(null); void cargar(true); }}
-          onConfirmar={async (motivo) => { const { r, fecha } = reprog; setReprog(null); await patch(r.id, { fecha_entrega: fecha, motivo_reprogramacion: motivo }); }} />
+          onConfirmar={async (motivo, observacion) => { const { r, fecha } = reprog; setReprog(null); await patch(r.id, { fecha_entrega: fecha, motivo_reprogramacion: motivo, observacion_reprogramacion: observacion }); }} />
       )}
       {loading && <div className="text-sm text-gray-500">Cargando…</div>}
 

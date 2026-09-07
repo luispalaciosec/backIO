@@ -91,10 +91,11 @@ const patchSchema = z.object({
   brief_url: z.string().url().nullable().optional(),
   entregable_urls: z.array(z.string().url()).nullable().optional(),
   motivo_reprogramacion: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]).nullable().optional(),
+  observacion_reprogramacion: z.string().max(1000).nullable().optional(),
 });
 
 /** Campos que un colaborador puede cambiar en SUS tareas (owner_agencia lo incluye). El resto exige rol de gestión. */
-export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion'] as const;
+export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion'] as const;
 
 const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');
@@ -122,14 +123,14 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
   }
 
   const reprogramado = patch.fecha_entrega !== undefined && patch.fecha_entrega !== previo.fecha_entrega && previo.fecha_entrega !== null;
-  const { motivo_reprogramacion, ...cambios } = patch;
+  const { motivo_reprogramacion, observacion_reprogramacion, ...cambios } = patch;
   // Motivo obligatorio para toda reprogramación desde la UI (decidido 04/09). API/MCP pueden omitirlo: queda "sin causa" y sale como señal.
   if (reprogramado && ctx.origen === 'ui' && !motivo_reprogramacion) {
     return c.json({ error: 'Para cambiar la fecha de entrega indica el motivo de la reprogramación.' }, 422);
   }
 
   const r = await updateRequerimiento(ctx, id, cambios);
-  if (reprogramado) await completarUltimaReprogramacion(ctx, id, { motivo: (motivo_reprogramacion as MotivoReprogramacion | null | undefined) ?? null, origen: ctx.origen });
+  if (reprogramado) await completarUltimaReprogramacion(ctx, id, { motivo: (motivo_reprogramacion as MotivoReprogramacion | null | undefined) ?? null, origen: ctx.origen, observacion: observacion_reprogramacion ?? null });
   // Rechazo del cliente o reapertura de un completado = reproceso.
   if (patch.estado_aprobacion === 'rechazado' && previo.estado_aprobacion !== 'rechazado') {
     await registrarReproceso(ctx, id, { origen: 'cliente', motivo: null, reabrir_basecamp: true });
@@ -152,9 +153,9 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
 // ---------------- Cumplimiento: historial, reprocesos y causas pendientes
 requerimientos.get('/causas-pendientes', requireScope('read:backlog'), async (c) => c.json(await listSinMotivo(ctxOf(c), 45)));
 
-requerimientos.patch('/reprogramaciones/:rid', escrituraOPropia, zValidator('json', z.object({ motivo: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]) })), async (c) => {
+requerimientos.patch('/reprogramaciones/:rid', escrituraOPropia, zValidator('json', z.object({ motivo: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]), observacion: z.string().max(1000).nullable().optional() })), async (c) => {
   const ctx = ctxOf(c);
-  await setMotivoReprogramacion(ctx, c.req.param('rid'), c.req.valid('json').motivo as MotivoReprogramacion);
+  await setMotivoReprogramacion(ctx, c.req.param('rid'), c.req.valid('json').motivo as MotivoReprogramacion, c.req.valid('json').observacion ?? null);
   return c.body(null, 204);
 });
 
@@ -168,6 +169,7 @@ requerimientos.post('/:id/reprocesos', escrituraOPropia, zValidator('json', z.ob
   origen: z.enum(['cliente', 'interno']),
   motivo: z.enum(MOTIVOS_REPROCESO.map((m) => m.valor) as [string, ...string[]]),
   paso_retorno: z.string().max(60).nullable().optional(),
+  observacion: z.string().max(1000).nullable().optional(),
   reabrir_basecamp: z.boolean().default(true),
 })), async (c) => {
   const ctx = ctxOf(c); const b = c.req.valid('json');
@@ -175,16 +177,17 @@ requerimientos.post('/:id/reprocesos', escrituraOPropia, zValidator('json', z.ob
   if (!previo) return c.json({ error: 'No encontrado' }, 404);
   const a = c.get('auth');
   if (a.tipo === 'usuario' && a.rol === 'colaborador' && !(ctx.usuarioId && previo.owner_agencia.includes(ctx.usuarioId))) return c.json({ error: 'Solo puedes registrar reprocesos en tus tareas' }, 403);
-  const rp = await registrarReproceso(ctx, previo.id, { origen: b.origen as OrigenReproceso, motivo: b.motivo as MotivoReproceso, paso_retorno: b.paso_retorno ?? null, reabrir_basecamp: b.reabrir_basecamp });
+  const rp = await registrarReproceso(ctx, previo.id, { origen: b.origen as OrigenReproceso, motivo: b.motivo as MotivoReproceso, paso_retorno: b.paso_retorno ?? null, observacion: b.observacion ?? null, reabrir_basecamp: b.reabrir_basecamp });
   return c.json(rp, 201);
 });
 
 requerimientos.patch('/:id/reprocesos/:rid', escrituraOPropia, zValidator('json', z.object({
   motivo: z.enum(MOTIVOS_REPROCESO.map((m) => m.valor) as [string, ...string[]]).optional(),
   paso_retorno: z.string().max(60).nullable().optional(),
+  observacion: z.string().max(1000).nullable().optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
-  await updateReproceso(ctx, c.req.param('rid'), c.req.valid('json') as { motivo?: MotivoReproceso; paso_retorno?: string | null });
+  await updateReproceso(ctx, c.req.param('rid'), c.req.valid('json') as { motivo?: MotivoReproceso; paso_retorno?: string | null; observacion?: string | null });
   return c.body(null, 204);
 });
 

@@ -355,11 +355,11 @@ export const PASOS_RETORNO: readonly string[] = ['Idea', 'Guion', 'Copy', 'Story
 
 export interface Reprogramacion {
   id: string; tenant_id: string; requerimiento_id: string; fecha_anterior: string | null; fecha_nueva: string | null;
-  motivo: MotivoReprogramacion | null; origen: string; usuario_id: string | null; created_at: string;
+  motivo: MotivoReprogramacion | null; origen: string; usuario_id: string | null; created_at: string; observacion?: string | null;
 }
 export interface Reproceso {
   id: string; tenant_id: string; requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null;
-  fecha_entrega_antes: string | null; abierto_at: string; cerrado_at: string | null; horas_reproceso: number | null; usuario_id: string | null; created_at: string;
+  fecha_entrega_antes: string | null; abierto_at: string; cerrado_at: string | null; horas_reproceso: number | null; usuario_id: string | null; created_at: string; observacion?: string | null;
 }
 export interface HistorialRequerimiento { reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] }
 
