@@ -9,7 +9,7 @@ import { listUsuarios } from '../db/usuarios';
 import { getMesa } from '../db/mesas';
 import { buildDashboard } from '../dashboard';
 import { fechaLocal } from '../rituals/daily';
-import { generarJson } from './index';
+import { generarTexto } from './index';
 
 export const CAUSAS: Record<TipoSenal, string> = {
   bloqueo_cliente: 'Dependencias del cliente',
@@ -47,13 +47,16 @@ export function agruparPorCausa(senales: Senal[], compromisosVencidos: string[])
 }
 
 const SYSTEM_WEEKLY = `Eres el analista de operaciones de la agencia. Preparas el weekly que dirige la jefa de operaciones.
-Devuelve JSON con esta forma exacta:
-{
-  "narrativa": "string",
-  "agenda": [ { "causa": "string", "pregunta": "string" } ]
-}
-- "narrativa": 2 a 4 párrafos cortos (máximo 1200 caracteres en total) con el estado real de la semana: qué se entregó, qué se arrastra y por qué, dónde está la presión (clientes, personas), qué cambió respecto a los números. Habla de personas y clientes por nombre cuando estén en los datos. Sin listas.
-- "agenda": una entrada por cada causa recibida en "grupos", en el mismo orden y con el mismo texto de "causa". "pregunta" es UNA pregunta concreta de una sola frase que la mesa debe decidir hoy (qué se reprograma, quién asume, a quién se escala, qué se le dice al cliente). Nada de preguntas genéricas tipo "¿cómo mejoramos?".`;
+Responde en TEXTO PLANO con exactamente este formato (sin JSON, sin markdown, sin comillas especiales):
+
+NARRATIVA:
+(2 a 4 párrafos cortos, máximo 1200 caracteres en total, separados por línea en blanco. Estado real de la semana: qué se entregó, qué se arrastra y por qué, dónde está la presión (clientes, personas), qué cambió respecto a los números. Nombra personas y clientes cuando estén en los datos. Sin listas.)
+
+AGENDA:
+causa :: pregunta
+causa :: pregunta
+
+En AGENDA escribe una línea por cada entrada de "grupos", en el mismo orden y copiando el texto de "causa" tal cual; después de " :: " va UNA pregunta concreta de una sola frase que la mesa debe decidir hoy (qué se reprograma, quién asume, a quién se escala, qué se le dice al cliente). Nada de preguntas genéricas.`;
 
 export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<WeeklyIA> {
   const semana = await getSemana(ctx, semanaId);
@@ -74,11 +77,26 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
     arrastre: dash.arrastre.slice(0, 12).map((a) => ({ tarea: a.titulo, cliente: a.cliente, owner: a.owner, reprogramada_veces: a.veces_reprogramado, dias_arrastre: a.dias_arrastre })),
     grupos,
   };
-  const out = await generarJson<{ narrativa: string; agenda: { causa: string; pregunta: string }[] }>(ctx, {
-    tipo: 'weekly', entidad: { tipo: 'semana', id: semanaId }, payload, system: SYSTEM_WEEKLY, maxTokens: 4000, cacheMs: 15 * 60_000,
-  });
-  const agenda: AgendaIA[] = grupos.map((g) => ({ causa: g.causa, items: g.items, pregunta: out.agenda.find((a) => a.causa === g.causa)?.pregunta ?? '¿Qué decidimos hoy sobre esto?' }));
+  const g = await generarTexto(ctx, { tipo: 'weekly', entidad: { tipo: 'semana', id: semanaId }, payload, system: SYSTEM_WEEKLY, maxTokens: 4000, cacheMs: 15 * 60_000 });
+  const out = parsearWeekly(g.texto);
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-záéíóúñ ]/g, '').trim();
+  const agenda: AgendaIA[] = grupos.map((gr) => ({ causa: gr.causa, items: gr.items, pregunta: out.agenda.find((a) => norm(a.causa) === norm(gr.causa))?.pregunta ?? out.agenda.find((a) => norm(gr.causa).includes(norm(a.causa)) || norm(a.causa).includes(norm(gr.causa)))?.pregunta ?? '¿Qué decidimos hoy sobre esto?' }));
   return { narrativa: out.narrativa, agenda, generado_at: new Date().toISOString() };
+}
+
+/** Formato de texto plano NARRATIVA: / AGENDA: (más robusto que JSON con títulos que traen comillas). */
+export function parsearWeekly(texto: string): { narrativa: string; agenda: { causa: string; pregunta: string }[] } {
+  const t = texto.replace(/\r/g, '');
+  const iN = t.search(/NARRATIVA\s*:/i); const iA = t.search(/\nAGENDA\s*:/i);
+  const narrativa = (iN >= 0 ? t.slice(t.indexOf(':', iN) + 1, iA >= 0 ? iA : undefined) : (iA >= 0 ? t.slice(0, iA) : t)).trim();
+  const agenda: { causa: string; pregunta: string }[] = [];
+  if (iA >= 0) {
+    for (const linea of t.slice(t.indexOf(':', iA) + 1).split('\n')) {
+      const m = /^\s*[-•*]?\s*(.+?)\s*::\s*(.+?)\s*$/.exec(linea);
+      if (m) agenda.push({ causa: m[1]!, pregunta: m[2]! });
+    }
+  }
+  return { narrativa: narrativa || texto.trim(), agenda };
 }
 
 export function renderWeeklyIA(w: WeeklyIA): string {

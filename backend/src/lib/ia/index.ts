@@ -114,5 +114,5 @@ export async function generarJson<T>(ctx: DbCtx, o: GenerarOpts): Promise<T> {
   const a = sinFences.indexOf('{'); const b = sinFences.lastIndexOf('}');
   const limpio = a >= 0 && b > a ? sinFences.slice(a, b + 1) : sinFences;
   try { return JSON.parse(limpio) as T; }
-  catch { console.error('[ia] JSON inválido', { tipo: o.tipo, muestra: limpio.slice(0, 300) }); throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502); }
+  catch { console.error('[ia] JSON inválido', { tipo: o.tipo, longitud: limpio.length, inicio: limpio.slice(0, 200), fin: limpio.slice(-200) }); throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502); }
 }

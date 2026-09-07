@@ -30,7 +30,8 @@ y lo conviertes en el brief estructurado del proyecto. Devuelve JSON exacto:
 - "piezas_por_tipo": cantidades que el cliente pide por tipo (post estático, carrusel, reel) usando los ids de "tipos_pieza". Omite los que no se mencionan.
 - "fecha_entrega": solo si el texto da una fecha o plazo claro; calcula a partir de "hoy". Nunca en el pasado.
 - "dudas": lo que falta preguntar al cliente antes de arrancar (máximo 5, concretas).
-- Escribe objetivo y público en 1 a 3 frases cada uno, con las palabras del cliente cuando sirvan.`;
+- Escribe objetivo y público en 1 a 3 frases cada uno, con las palabras del cliente cuando sirvan.
+- Dentro de los strings no uses comillas dobles; si necesitas citar, usa comillas simples.`;
 
 export async function briefDesdeTexto(ctx: DbCtx, texto: string, clienteId?: string | null): Promise<BriefIA> {
   const [plantillas, tipos] = await Promise.all([listPlantillas(ctx, { clienteId: clienteId ?? null }), listTiposPieza(ctx)]);
