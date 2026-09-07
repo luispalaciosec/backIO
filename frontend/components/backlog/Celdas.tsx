@@ -3,9 +3,13 @@ import { useState } from 'react';
 import { iniciales } from '@/lib/format';
 
 /** Celda de color sólido con selector nativo superpuesto (click en toda la celda). */
-export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabledValues = [] }: {
+export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabledValues = [], disabledLabel, onDisabledPick }: {
   valor: string; opciones: readonly string[]; colores: Record<string, string>; labels: Record<string, string>;
   onChange: (v: string) => void | Promise<void>; disabledValues?: string[];
+  /** Sufijo que explica por qué una opción está apagada (ej. "· se completa desde Basecamp"). */
+  disabledLabel?: string;
+  /** Se llama si el usuario intenta elegir una opción apagada (algunos navegadores lo permiten). */
+  onDisabledPick?: (v: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -18,9 +22,9 @@ export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabl
         // y en Chrome/Windows las opciones salían blancas sobre blanco. Color explícito en select y options.
         style={{ color: '#1b2430', backgroundColor: '#ffffff' }}
         value={valor}
-        onChange={async (e) => { setBusy(true); await onChange(e.target.value); setBusy(false); }}
+        onChange={async (e) => { const v = e.target.value; if (disabledValues.includes(v)) { onDisabledPick?.(v); return; } setBusy(true); await onChange(v); setBusy(false); }}
       >
-        {opciones.map((o) => <option key={o} value={o} disabled={disabledValues.includes(o)} style={{ color: disabledValues.includes(o) ? '#9ca3af' : '#1b2430', backgroundColor: '#ffffff' }}>{labels[o] ?? o}</option>)}
+        {opciones.map((o) => <option key={o} value={o} disabled={disabledValues.includes(o)} title={disabledValues.includes(o) ? disabledLabel : undefined} style={{ color: disabledValues.includes(o) ? '#9ca3af' : '#1b2430', backgroundColor: '#ffffff' }}>{labels[o] ?? o}{disabledValues.includes(o) && disabledLabel ? ` ${disabledLabel}` : ''}</option>)}
       </select>
     </div>
   );

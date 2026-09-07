@@ -73,6 +73,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
 function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambio }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; bloqueada?: boolean; proyecto?: string; onCambio: () => void }) {
   const p = (patch: ActualizarRequerimientoInput) => onPatch(r.id, patch);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
+  const [avisoBasecamp, setAvisoBasecamp] = useState(false);
   return (
     <div className={`grid ${COLS} border-b border-gray-100 hover:bg-gray-50/70 items-stretch ${hecho ? 'opacity-70' : ''} ${bloqueada ? 'pointer-events-none select-text bg-gray-50/40' : ''}`} title={bloqueada ? 'Tarea de otra persona: solo lectura' : undefined}>
       <div className="flex min-w-0">
@@ -94,7 +95,16 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
         {r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega && <span className="absolute right-1 top-0.5 text-[10px] leading-none text-amber-700 pointer-events-none">↺{r.veces_reprogramado}</span>}
       </div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.prioridad} opciones={PRIOS} colores={COLOR_PRIORIDAD} labels={PRIORIDAD_LABEL} onChange={(v) => p({ prioridad: v as RequerimientoMetricas['prioridad'] })} /></div>
-      <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_operativo} opciones={ESTADOS} colores={COLOR_ESTADO} labels={ESTADO_LABEL} disabledValues={r.basecamp_todo_id ? ['completado'] : []} onChange={(v) => p({ estado_operativo: v as RequerimientoMetricas['estado_operativo'] })} /></div>
+      <div className="border-l border-gray-100 relative" title={r.basecamp_todo_id && !hecho ? 'Completado se marca en Basecamp: BackIO lo refleja en segundos' : undefined}>
+        <CeldaSelect valor={r.estado_operativo} opciones={ESTADOS} colores={COLOR_ESTADO} labels={ESTADO_LABEL} disabledValues={r.basecamp_todo_id ? ['completado'] : []} disabledLabel={r.basecamp_todo_id ? '· se marca en Basecamp' : undefined} onDisabledPick={() => setAvisoBasecamp(true)} onChange={(v) => p({ estado_operativo: v as RequerimientoMetricas['estado_operativo'] })} />
+        {avisoBasecamp && (
+          <div className="absolute z-30 left-0 top-full mt-1 w-72 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-lg pointer-events-auto" onMouseLeave={() => setAvisoBasecamp(false)}>
+            <b>Se completa desde Basecamp.</b> Marca el to-do como hecho allá y BackIO lo pasa a Completado en segundos.
+            {r.basecamp_url && <a className="block mt-2 btn-primary text-xs py-1 text-center" href={r.basecamp_url} target="_blank" rel="noreferrer">Abrir el to-do en Basecamp ↗</a>}
+            <button type="button" className="mt-2 link-action" onClick={() => setAvisoBasecamp(false)}>Cerrar</button>
+          </div>
+        )}
+      </div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_aprobacion} opciones={APROB} colores={COLOR_APROBACION} labels={APROBACION_LABEL} onChange={(v) => p({ estado_aprobacion: v as RequerimientoMetricas['estado_aprobacion'] })} /></div>
       <div className="border-l border-gray-100"><span className="h-9 flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: COLOR_TIPO[r.tipo_trabajo] }}>{TIPO_LABEL[r.tipo_trabajo]}</span></div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_atraso > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{r.dias_atraso || ''}</div>
