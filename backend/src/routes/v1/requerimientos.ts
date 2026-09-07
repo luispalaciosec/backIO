@@ -37,6 +37,9 @@ requerimientos.get('/', requireScope('read:backlog'), async (c) => {
   return c.json({ items, total: items.length });
 });
 
+// Antes de '/:id': si no, Hono intenta tratar 'causas-pendientes' como uuid.
+requerimientos.get('/causas-pendientes', requireScope('read:backlog'), async (c) => c.json(await listSinMotivo(ctxOf(c), 45)));
+
 requerimientos.get('/:id', requireScope('read:backlog'), async (c) => {
   const r = await getRequerimiento(ctxOf(c), c.req.param('id'));
   return r ? c.json(r) : c.json({ error: 'No encontrado' }, 404);
@@ -151,7 +154,6 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
 });
 
 // ---------------- Cumplimiento: historial, reprocesos y causas pendientes
-requerimientos.get('/causas-pendientes', requireScope('read:backlog'), async (c) => c.json(await listSinMotivo(ctxOf(c), 45)));
 
 requerimientos.patch('/reprogramaciones/:rid', escrituraOPropia, zValidator('json', z.object({ motivo: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]), observacion: z.string().max(1000).nullable().optional() })), async (c) => {
   const ctx = ctxOf(c);

@@ -67,6 +67,9 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
     res = await anthropic.messages.create({
       model: MODELO_IA,
       max_tokens: o.maxTokens ?? 900,
+      // La cuenta de producción activa el razonamiento extendido por defecto y sus bloques 'thinking'
+      // agotaban max_tokens sin escribir texto. Lo desactivamos: aquí solo queremos redacción.
+      thinking: { type: 'disabled' },
       system: `${ESTILO_GEEKS}\n\n${o.system}`,
       messages: [{ role: 'user', content: JSON.stringify(o.payload, null, 2) }],
     });

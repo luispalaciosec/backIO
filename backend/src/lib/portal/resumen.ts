@@ -67,6 +67,7 @@ export async function generarResumen(proyectoId: string, tenantId: string, safe:
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-5',
     max_tokens: 600,
+    thinking: { type: 'disabled' },
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: JSON.stringify(payload, null, 2) }],
   });
