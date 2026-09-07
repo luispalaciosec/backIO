@@ -27,6 +27,7 @@ export default function BacklogPage() {
   const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
   const [panel, setPanel] = useState(false);
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
+  const [celebracion, setCelebracion] = useState<{ n: number; titulos: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +58,25 @@ export default function BacklogPage() {
     api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(() => {});
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
+
+  // Celebración por lo completado desde la última visita (la mayoría se completa en Basecamp, sin pulsar nada aquí).
+  // La marca de última visita es una preferencia de UI en localStorage, no un dato de negocio.
+  useEffect(() => {
+    const KEY = 'backio:backlog:ultima_visita';
+    let desde: string | null = null;
+    try { desde = localStorage.getItem(KEY); } catch { /* ignore */ }
+    const ahora = new Date().toISOString();
+    try { localStorage.setItem(KEY, ahora); } catch { /* ignore */ }
+    if (!desde) return;
+    api<{ items: RequerimientoMetricas[] }>('/requerimientos?estado=completado').then((r) => {
+      const nuevos = r.items.filter((x) => x.completado_at && x.completado_at > (desde as string)).sort((a, b) => (b.completado_at ?? '').localeCompare(a.completado_at ?? ''));
+      if (nuevos.length === 0) return;
+      setCelebracion({ n: nuevos.length, titulos: nuevos.slice(0, 5).map((x) => x.titulo_interno) });
+      void celebrar({ x: 0.5, y: 0.35 });
+      if (nuevos.length >= 5) setTimeout(() => void celebrar({ x: 0.2, y: 0.4 }), 500);
+      if (nuevos.length >= 10) setTimeout(() => void celebrar({ x: 0.8, y: 0.4 }), 900);
+    }).catch(() => undefined);
+  }, []);
 
   const me = useMe();
   const colaborador = me?.rol === 'colaborador';
@@ -198,6 +218,15 @@ export default function BacklogPage() {
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
+      {celebracion && (
+        <div className="rounded-md border border-green-200 bg-green-50 text-green-900 px-4 py-3 text-sm flex items-start justify-between gap-3">
+          <div>
+            <div className="font-semibold">🎉 {celebracion.n === 1 ? '1 tarea completada' : `${celebracion.n} tareas completadas`} desde tu última visita</div>
+            <div className="text-xs text-green-800 mt-1">{celebracion.titulos.join(' · ')}{celebracion.n > 5 ? ` · y ${celebracion.n - 5} más` : ''}</div>
+          </div>
+          <button className="btn-ghost text-xs py-1" onClick={() => setCelebracion(null)}>×</button>
+        </div>
+      )}
       {reprog && (
         <MotivoReprogramacionModal titulo={reprog.r.titulo_interno} fechaOriginal={reprog.r.fecha_entrega_original} fechaAnterior={reprog.r.fecha_entrega} fechaNueva={reprog.fecha} veces={reprog.r.veces_reprogramado}
           onCancelar={() => { setReprog(null); void cargar(true); }}
