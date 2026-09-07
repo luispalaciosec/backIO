@@ -52,8 +52,8 @@ Devuelve JSON con esta forma exacta:
   "narrativa": "string",
   "agenda": [ { "causa": "string", "pregunta": "string" } ]
 }
-- "narrativa": 2 a 4 párrafos cortos con el estado real de la semana: qué se entregó, qué se arrastra y por qué, dónde está la presión (clientes, personas), qué cambió respecto a los números. Habla de personas y clientes por nombre cuando estén en los datos. Sin listas.
-- "agenda": una entrada por cada causa recibida en "grupos", en el mismo orden y con el mismo texto de "causa". "pregunta" es UNA pregunta concreta que la mesa debe decidir hoy (qué se reprograma, quién asume, a quién se escala, qué se le dice al cliente). Nada de preguntas genéricas tipo "¿cómo mejoramos?".`;
+- "narrativa": 2 a 4 párrafos cortos (máximo 1200 caracteres en total) con el estado real de la semana: qué se entregó, qué se arrastra y por qué, dónde está la presión (clientes, personas), qué cambió respecto a los números. Habla de personas y clientes por nombre cuando estén en los datos. Sin listas.
+- "agenda": una entrada por cada causa recibida en "grupos", en el mismo orden y con el mismo texto de "causa". "pregunta" es UNA pregunta concreta de una sola frase que la mesa debe decidir hoy (qué se reprograma, quién asume, a quién se escala, qué se le dice al cliente). Nada de preguntas genéricas tipo "¿cómo mejoramos?".`;
 
 export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<WeeklyIA> {
   const semana = await getSemana(ctx, semanaId);
@@ -75,7 +75,7 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
     grupos,
   };
   const out = await generarJson<{ narrativa: string; agenda: { causa: string; pregunta: string }[] }>(ctx, {
-    tipo: 'weekly', entidad: { tipo: 'semana', id: semanaId }, payload, system: SYSTEM_WEEKLY, maxTokens: 1500, cacheMs: 15 * 60_000,
+    tipo: 'weekly', entidad: { tipo: 'semana', id: semanaId }, payload, system: SYSTEM_WEEKLY, maxTokens: 4000, cacheMs: 15 * 60_000,
   });
   const agenda: AgendaIA[] = grupos.map((g) => ({ causa: g.causa, items: g.items, pregunta: out.agenda.find((a) => a.causa === g.causa)?.pregunta ?? '¿Qué decidimos hoy sobre esto?' }));
   return { narrativa: out.narrativa, agenda, generado_at: new Date().toISOString() };

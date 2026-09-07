@@ -41,7 +41,7 @@ export async function briefDesdeTexto(ctx: DbCtx, texto: string, clienteId?: str
     plantillas: plantillas.map((p) => ({ id: p.id, nombre: p.nombre, pilar: p.pilar, familia: p.familia, recurrente: p.recurrente, descripcion: p.descripcion })),
     tipos_pieza: tipos.map((t) => ({ id: t.id, nombre: t.nombre })),
   };
-  const out = await generarJson<BriefIA>(ctx, { tipo: 'brief', payload, system: SYSTEM_BRIEF, maxTokens: 1200, cacheMs: 0 });
+  const out = await generarJson<BriefIA>(ctx, { tipo: 'brief', payload, system: SYSTEM_BRIEF, maxTokens: 2500, cacheMs: 0 });
   const pl = plantillas.find((p) => p.id === out.plantilla_sugerida_id) ?? null;
   const tiposIds = new Set(tipos.map((t) => t.id));
   return {

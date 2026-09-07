@@ -109,7 +109,10 @@ export function traducirErrorIA(err: unknown): DbError {
 /** Igual que generarTexto pero exige JSON y lo parsea (tolera fences ```json). */
 export async function generarJson<T>(ctx: DbCtx, o: GenerarOpts): Promise<T> {
   const g = await generarTexto(ctx, { ...o, system: `${o.system}\n\nResponde ÚNICAMENTE con JSON válido, sin comentarios ni texto alrededor.` });
-  const limpio = g.texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  // Tolera fences y texto alrededor: se queda con el primer '{' y el último '}'.
+  const sinFences = g.texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const a = sinFences.indexOf('{'); const b = sinFences.lastIndexOf('}');
+  const limpio = a >= 0 && b > a ? sinFences.slice(a, b + 1) : sinFences;
   try { return JSON.parse(limpio) as T; }
   catch { console.error('[ia] JSON inválido', { tipo: o.tipo, muestra: limpio.slice(0, 300) }); throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502); }
 }
