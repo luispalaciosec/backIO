@@ -8,6 +8,7 @@ import { v1 } from './routes/v1';
 import { portal } from './routes/portal';
 import { basecampWebhook } from './routes/webhooks/basecamp';
 import { prometioWebhook } from './routes/webhooks/prometio';
+import { authPublico } from './routes/auth_publico';
 import { cron } from './routes/cron';
 import { basecampOAuth } from './routes/basecamp';
 import { mcp } from './routes/mcp';
@@ -28,6 +29,7 @@ export function createApp(): Hono {
 
   // Webhooks públicos ANTES de /api/v1: el router v1 exige auth en '*' y se tragaba estas rutas.
   app.route('/api/v1/webhooks/prometio', prometioWebhook);
+  app.route('/api/v1/auth', authPublico); // público: recuperación de contraseña (antes del router con auth)
   app.route('/api/v1', v1);
   app.route('/api/portal', portal);
   app.route('/api/webhooks/basecamp', basecampWebhook);

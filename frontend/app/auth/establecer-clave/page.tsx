@@ -70,7 +70,7 @@ export default function EstablecerClavePage() {
         {estado === 'ok' && <p className="text-sm text-green-700">Contraseña guardada. Entrando…</p>}
         {estado === 'listo' && (
           <form onSubmit={guardar} className="space-y-3">
-            <p className="text-sm text-gray-600">Define tu contraseña para entrar.</p>
+            <p className="text-sm text-gray-600">{typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('type') === 'recovery' ? 'Define tu contraseña nueva.' : 'Define tu contraseña para entrar.'}</p>
             <input className="input" type="password" autoComplete="new-password" placeholder="Nueva contraseña" value={clave} onChange={(e) => setClave(e.target.value)} required />
             <input className="input" type="password" autoComplete="new-password" placeholder="Repetir contraseña" value={clave2} onChange={(e) => setClave2(e.target.value)} required />
             {error && <p className="text-sm text-red-600">{error}</p>}

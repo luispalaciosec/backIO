@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { Suspense, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -38,6 +39,7 @@ function LoginForm() {
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button className="btn-primary w-full" disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</button>
+      <Link href="/auth/recuperar" className="block text-center text-sm link-action">¿Olvidaste tu contraseña?</Link>
     </form>
   );
 }
