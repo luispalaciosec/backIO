@@ -13,7 +13,7 @@ export async function listReprocesos(ctx: DbCtx, requerimientoId: string): Promi
 
 /** El trigger deja la fila con motivo null y origen 'desconocido'; el backend la completa justo después del update. */
 /** Reintenta sin `observacion` si la columna aún no existe (migración 17 pendiente). */
-async function conObservacionOpcional<T>(fn: (incluir: boolean) => Promise<{ error: { message?: string } | null; data?: T }>): Promise<{ error: { message?: string } | null; data?: T }> {
+async function conObservacionOpcional<T>(fn: (incluir: boolean) => PromiseLike<{ error: { message?: string } | null; data?: T | null }>): Promise<{ error: { message?: string } | null; data?: T | null }> {
   const r = await fn(true);
   if (r.error && /observacion/i.test(r.error.message ?? '')) return fn(false);
   return r;
