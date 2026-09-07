@@ -8,7 +8,7 @@ const COLOR: Record<EstadoOperativo, string> = {
   en_revision: 'bg-[#579BFC] text-white',
   reprogramado: 'bg-[#FDAB3D] text-white',
   bloqueado: 'bg-[#E2445C] text-white',
-  completado: 'bg-[#00C875] text-white',
+  completado: 'bg-[#0B7A3B] text-white',
   cancelado: 'bg-gray-400 text-white line-through',
 };
 

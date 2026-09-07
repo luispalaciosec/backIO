@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert';
 import { BacklogTable } from '@/components/backlog/BacklogTable';
 import { KanbanBoard } from '@/components/backlog/KanbanBoard';
 import { MotivoReprogramacionModal } from '@/components/backlog/MotivoReprogramacion';
+import { celebrar } from '@/lib/confetti';
 import { ESTADO_LABEL } from '@/lib/format';
 import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '@/lib/orden';
 
@@ -79,6 +80,7 @@ export default function BacklogPage() {
     setItems((prev) => prev.map((r) => (r.id === id ? { ...r, ...(p as Partial<RequerimientoMetricas>) } : r)));
     try {
       await api(`/requerimientos/${id}`, { method: 'PATCH', json: p });
+      if (p.estado_operativo === 'completado') void celebrar();
       await cargar(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo actualizar');

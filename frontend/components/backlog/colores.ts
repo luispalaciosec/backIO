@@ -6,7 +6,7 @@ export const COLOR_ESTADO: Record<string, string> = {
   en_revision: '#A25DDC',
   reprogramado: '#FF642E',
   bloqueado: '#E2445C',
-  completado: '#00C875',
+  completado: '#0B7A3B', // verde oscuro (pedido de Luis 04/09)
   cancelado: '#808080',
 };
 export const COLOR_APROBACION: Record<string, string> = {
