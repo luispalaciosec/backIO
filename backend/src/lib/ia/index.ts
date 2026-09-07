@@ -76,7 +76,7 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
   const texto = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('\n').trim();
   if (!texto) {
     console.error('[ia] respuesta sin texto', { tipo: o.tipo, stop_reason: res.stop_reason, bloques: res.content.map((b) => b.type), usage: res.usage });
-    const motivo = res.stop_reason === 'max_tokens' ? 'se agotó el límite de tokens antes de escribir' : res.stop_reason === 'refusal' ? 'el modelo rechazó la solicitud' : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
+    const motivo = res.stop_reason === 'max_tokens' ? 'se agotó el límite de tokens antes de escribir' : (res.stop_reason as string) === 'refusal' ? 'el modelo rechazó la solicitud' : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
     throw new DbError(`La IA no devolvió texto: ${motivo}. Vuelve a intentar; si persiste, avisa a Luis.`, 502);
   }
   const { error } = await serviceClient().from('ia_generaciones').insert({
