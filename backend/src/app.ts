@@ -42,8 +42,12 @@ export function createApp(): Hono {
 
   app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
   app.onError((err, c) => {
-    if (err instanceof DbError) return c.json({ error: err.message, detalle: env().NODE_ENV === 'production' ? undefined : err.detalle }, err.status as 400);
-    console.error(err);
+    if (err instanceof DbError) {
+      // Siempre al log (con detalle) para poder diagnosticar en Railway; al cliente solo el mensaje.
+      if (err.status >= 500) console.error(`[${c.req.method} ${c.req.path}] ${err.message}`, err.detalle ?? '');
+      return c.json({ error: err.message, detalle: env().NODE_ENV === 'production' ? undefined : err.detalle }, err.status as 400);
+    }
+    console.error(`[${c.req.method} ${c.req.path}]`, err);
     return c.json({ error: env().NODE_ENV === 'production' ? 'Error interno' : err.message }, 500);
   });
   return app;

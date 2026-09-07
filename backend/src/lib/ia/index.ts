@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../config/env';
-import { serviceClient, throwIf, type DbCtx } from '../db/client';
+import { serviceClient, throwIf, DbError, type DbCtx } from '../db/client';
 
 export const MODELO_IA = 'claude-sonnet-5';
 
@@ -61,15 +61,24 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
   const cache = await leerCache(ctx, o.tipo, hash, cacheMs);
   if (cache) return { texto: cache, desde_cache: true, modelo: MODELO_IA };
 
-  const anthropic = new Anthropic({ apiKey: key });
-  const res = await anthropic.messages.create({
-    model: MODELO_IA,
-    max_tokens: o.maxTokens ?? 900,
-    system: `${ESTILO_GEEKS}\n\n${o.system}`,
-    messages: [{ role: 'user', content: JSON.stringify(o.payload, null, 2) }],
-  });
+  const anthropic = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 60_000 });
+  let res: Anthropic.Message;
+  try {
+    res = await anthropic.messages.create({
+      model: MODELO_IA,
+      max_tokens: o.maxTokens ?? 900,
+      system: `${ESTILO_GEEKS}\n\n${o.system}`,
+      messages: [{ role: 'user', content: JSON.stringify(o.payload, null, 2) }],
+    });
+  } catch (err) {
+    throw traducirErrorIA(err);
+  }
   const texto = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('\n').trim();
-  if (!texto) throw new Error('La IA no devolvió texto');
+  if (!texto) {
+    console.error('[ia] respuesta sin texto', { tipo: o.tipo, stop_reason: res.stop_reason, bloques: res.content.map((b) => b.type), usage: res.usage });
+    const motivo = res.stop_reason === 'max_tokens' ? 'se agotó el límite de tokens antes de escribir' : res.stop_reason === 'refusal' ? 'el modelo rechazó la solicitud' : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
+    throw new DbError(`La IA no devolvió texto: ${motivo}. Vuelve a intentar; si persiste, avisa a Luis.`, 502);
+  }
   const { error } = await serviceClient().from('ia_generaciones').insert({
     tenant_id: ctx.tenantId, tipo: o.tipo, entidad_tipo: o.entidad?.tipo ?? null, entidad_id: o.entidad?.id ?? null,
     payload_hash: hash, texto, modelo: MODELO_IA, tokens_entrada: res.usage?.input_tokens ?? null, tokens_salida: res.usage?.output_tokens ?? null,
@@ -79,10 +88,25 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
   return { texto, desde_cache: false, modelo: MODELO_IA };
 }
 
+/** Convierte errores de la API de Anthropic en mensajes que la persona pueda entender. */
+export function traducirErrorIA(err: unknown): DbError {
+  const e = err as { status?: number; message?: string; error?: { error?: { type?: string; message?: string } } };
+  const msg = (e.error?.error?.message ?? e.message ?? '').toString();
+  const status = e.status ?? 0;
+  console.error('[ia] error de la API', { status, msg });
+  if (status === 401 || /invalid x-api-key|authentication/i.test(msg)) return new DbError('La clave de IA no es válida o fue revocada (ANTHROPIC_API_KEY). Avisa a Luis.', 502);
+  if (status === 402 || /credit balance|billing|insufficient/i.test(msg)) return new DbError('La cuenta de IA no tiene saldo. Hay que recargar créditos en Anthropic.', 502);
+  if (status === 429) return new DbError('La IA está al límite de uso por ahora. Espera un minuto y vuelve a intentar.', 503);
+  if (status === 529 || /overloaded/i.test(msg)) return new DbError('El servicio de IA está saturado en este momento. Vuelve a intentar en unos minutos.', 503);
+  if (status === 404 || /model/i.test(msg) && /not found|does not exist/i.test(msg)) return new DbError(`El modelo de IA (${MODELO_IA}) no está disponible para esta clave. Avisa a Luis.`, 502);
+  if (/timeout|timed out|ECONNRESET|fetch failed/i.test(msg)) return new DbError('La IA tardó demasiado en responder. Vuelve a intentar.', 504);
+  return new DbError(`Error de la IA: ${msg || 'desconocido'}`, 502);
+}
+
 /** Igual que generarTexto pero exige JSON y lo parsea (tolera fences ```json). */
 export async function generarJson<T>(ctx: DbCtx, o: GenerarOpts): Promise<T> {
   const g = await generarTexto(ctx, { ...o, system: `${o.system}\n\nResponde ÚNICAMENTE con JSON válido, sin comentarios ni texto alrededor.` });
   const limpio = g.texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   try { return JSON.parse(limpio) as T; }
-  catch { throw new Error('La IA devolvió un JSON inválido; vuelve a intentar'); }
+  catch { console.error('[ia] JSON inválido', { tipo: o.tipo, muestra: limpio.slice(0, 300) }); throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502); }
 }
