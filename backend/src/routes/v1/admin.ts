@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
 import { listUsuarios, audit, throwIf, serviceClient } from '../../lib/db';
 import { frontendOrigins } from '../../config/env';
+import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 
@@ -183,7 +184,79 @@ admin.post('/api-keys/:id/revocar', async (c) => {
 // ---------------- auditoría reciente
 admin.get('/audit', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await serviceClient().from('audit_log').select('*').eq('tenant_id', ctx.tenantId).order('created_at', { ascending: false }).limit(100);
-  throwIf(error);
-  return c.json({ items: data ?? [] });
+  const q = c.req.query();
+  const limit = Math.min(Number(q.limit ?? 200) || 200, 1000);
+  // Filtros como una cadena PostgREST (evita genéricos profundos del builder).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aplicar = (qb: any): any => {
+    let x = qb.eq('tenant_id', ctx.tenantId);
+    if (q.usuario) x = x.eq('usuario_id', q.usuario);
+    if (q.origen) x = x.eq('origen', q.origen);
+    if (q.accion) x = x.ilike('accion', `%${q.accion}%`);
+    if (q.entidad) x = x.ilike('entidad', `%${q.entidad}%`);
+    if (q.desde) x = x.gte('created_at', `${q.desde}T00:00:00-05:00`);
+    if (q.hasta) x = x.lte('created_at', `${q.hasta}T23:59:59-05:00`);
+    return x;
+  };
+  const db = serviceClient();
+  const [lista, total, errores] = await Promise.all([
+    aplicar(db.from('audit_log').select('*')).order('created_at', { ascending: false }).limit(limit),
+    aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })),
+    aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })).or('accion.ilike.%rechaz%,accion.ilike.%fall%,accion.ilike.%error%,accion.ilike.%invalid%,detalle->>error.not.is.null'),
+  ]);
+  throwIf(lista.error as never);
+  return c.json({ items: (lista.data as unknown[]) ?? [], total: (total.count as number | null) ?? 0, con_error: (errores.count as number | null) ?? 0 });
+});
+
+// ---------------- salud del sistema
+admin.get('/salud', async (c) => c.json(await verificarSalud(ctxOf(c).tenantId)));
+
+// ---------------- accesos: quitar (renuncia) y restaurar
+/**
+ * Quitar acceso: desactiva al usuario, cierra sus sesiones y le bloquea el login en Supabase Auth,
+ * revoca sus API keys y tokens OAuth, y reasigna (o desasigna) sus tareas abiertas.
+ */
+admin.post('/usuarios/:id/quitar-acceso', zValidator('json', z.object({ reasignar_a: z.string().uuid().nullable().optional(), motivo: z.string().max(300).optional() })), async (c) => {
+  const ctx = ctxOf(c);
+  const id = c.req.param('id');
+  const b = c.req.valid('json');
+  if (id === ctx.usuarioId) return c.json({ error: 'No puedes quitarte el acceso a ti mismo' }, 422);
+  const db = serviceClient();
+  const { data: u } = await db.from('usuarios').select('id, nombre, email, activo').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
+  if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
+  // 1) BackIO: inactivo (el middleware rechaza a inactivos aunque tengan sesión).
+  const { error: e1 } = await db.from('usuarios').update({ activo: false }).eq('id', id); throwIf(e1);
+  // 2) Supabase Auth: bloquear login y cerrar sesiones.
+  let auth = 'ok';
+  try { const r = await db.auth.admin.updateUserById(id, { ban_duration: '876600h' }); if (r.error) auth = r.error.message; await db.auth.admin.signOut(id, 'global').catch(() => undefined); } catch (err) { auth = err instanceof Error ? err.message : 'error'; }
+  // 3) Credenciales de agente creadas por la persona.
+  const ahora = new Date().toISOString();
+  await db.from('api_keys').update({ revocada_at: ahora }).eq('tenant_id', ctx.tenantId).eq('creado_por', id).is('revocada_at', null);
+  await db.from('oauth_tokens').delete().eq('usuario_id', id).then(() => undefined, () => undefined);
+  // 4) Tareas abiertas: reasignar o desasignar.
+  const { data: tareas } = await db.from('requerimientos').select('id, owner_agencia').eq('tenant_id', ctx.tenantId).is('deleted_at', null).not('estado_operativo', 'in', '("completado","cancelado")').contains('owner_agencia', [id]);
+  let reasignadas = 0;
+  for (const t of (tareas ?? []) as { id: string; owner_agencia: string[] }[]) {
+    const nuevos = t.owner_agencia.filter((x) => x !== id);
+    if (b.reasignar_a && !nuevos.includes(b.reasignar_a)) nuevos.push(b.reasignar_a);
+    const { error } = await db.from('requerimientos').update({ owner_agencia: nuevos, updated_by: ctx.usuarioId }).eq('id', t.id);
+    if (!error) reasignadas += 1;
+  }
+  await db.from('recurrencias').update({ owner_ejecutiva: b.reasignar_a ?? null }).eq('tenant_id', ctx.tenantId).eq('owner_ejecutiva', id).then(() => undefined, () => undefined);
+  await audit(ctx, { accion: 'quitar_acceso', entidad: 'usuario', entidad_id: id, detalle: { email: (u as { email: string }).email, reasignar_a: b.reasignar_a ?? null, tareas_reasignadas: reasignadas, auth, motivo: b.motivo ?? null } });
+  return c.json({ ok: true, tareas_reasignadas: reasignadas, auth_bloqueado: auth === 'ok' });
+});
+
+/** Restaurar acceso: reactiva, desbloquea en Auth y manda un enlace para definir contraseña nueva. */
+admin.post('/usuarios/:id/restaurar-acceso', async (c) => {
+  const ctx = ctxOf(c);
+  const id = c.req.param('id');
+  const db = serviceClient();
+  const { data: u } = await db.from('usuarios').select('id, nombre, email').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
+  if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
+  const { error } = await db.from('usuarios').update({ activo: true }).eq('id', id); throwIf(error);
+  try { await db.auth.admin.updateUserById(id, { ban_duration: 'none' }); } catch { /* si no existe en auth, la invitación lo crea */ }
+  const envio = await enviarInvitacion((u as { email: string }).email, (u as { nombre: string }).nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
+  await audit(ctx, { accion: 'restaurar_acceso', entidad: 'usuario', entidad_id: id, detalle: { email: (u as { email: string }).email, envio } });
+  return c.json({ ok: true, envio });
 });

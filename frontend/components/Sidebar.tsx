@@ -23,6 +23,8 @@ const ADMIN = [
   { href: '/admin/usuarios', label: 'Usuarios', icon: '⚇' },
   { href: '/admin/integraciones', label: 'Integraciones', icon: '⇄' },
   { href: '/admin/api-keys', label: 'API keys', icon: '⚿' },
+  { href: '/admin/servicios', label: 'Servicios', icon: '♡' },
+  { href: '/admin/auditoria', label: 'Auditoría', icon: '≡' },
 ];
 const KEY = 'backio:sidebar:colapsado'; // preferencia de UI, no dato de negocio
 

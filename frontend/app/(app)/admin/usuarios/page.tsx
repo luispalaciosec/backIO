@@ -13,8 +13,12 @@ export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
   const [vinculando, setVinculando] = useState(false);
   const [vinculo, setVinculo] = useState<Vinculo | null>(null);
+  const [quitar, setQuitar] = useState<Usuario | null>(null);
+  const [reasignarA, setReasignarA] = useState('');
+  const [busyAcceso, setBusyAcceso] = useState(false);
   const [inv, setInv] = useState({ email: '', nombre: '', rol: 'colaborador' as Rol, capacidad_semanal: 40 });
 
   const cargar = async () => {
@@ -45,7 +49,7 @@ export default function AdminUsuariosPage() {
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Usuarios</h1>
-          <p className="text-sm text-gray-500">Al guardar una invitación se crea la cuenta y la persona recibe un correo para definir su contraseña. Entra con el rol indicado; un correo @geeks sin invitación entra como colaborador.</p>
+          <p className="text-sm text-gray-500">Dar acceso: invita con correo y rol (abajo). Quitar acceso: botón en la fila; cierra sesión, bloquea el ingreso y reasigna sus tareas. Un correo @geeks sin invitación entra como colaborador.</p>
         </div>
         <button className="btn-secondary" disabled={vinculando} title="Lee las personas de la cuenta Basecamp y llena el Basecamp user id de cada usuario con el mismo correo" onClick={async () => {
           setVinculando(true); setError(null); setVinculo(null);
@@ -55,6 +59,33 @@ export default function AdminUsuariosPage() {
         }}>{vinculando ? 'Escaneando…' : '⇄ Vincular con Basecamp'}</button>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
+      {ok && <Alert tipo="ok">{ok}</Alert>}
+      {quitar && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setQuitar(null)}>
+          <div className="card w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <div className="font-semibold">Quitar acceso a {quitar.nombre}</div>
+              <p className="text-sm text-gray-600 mt-1">Se cierra su sesión, se bloquea el ingreso, se revocan sus API keys y tokens, y queda inactivo en BackIO. Sus tareas abiertas se reasignan a quien elijas o quedan sin responsable. Su historial (tareas, horas, auditoría) se conserva.</p>
+            </div>
+            <div>
+              <label className="label">Reasignar sus tareas abiertas a</label>
+              <select className="input" value={reasignarA} onChange={(e) => setReasignarA(e.target.value)}>
+                <option value="">Nadie (quedan sin responsable)</option>
+                {usuarios.filter((x) => x.activo && x.id !== quitar.id).map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setQuitar(null)}>Cancelar</button>
+              <button className="btn-danger" disabled={busyAcceso} onClick={async () => {
+                setBusyAcceso(true); setError(null);
+                try { const r = await api<{ tareas_reasignadas: number; auth_bloqueado: boolean }>(`/admin/usuarios/${quitar.id}/quitar-acceso`, { method: 'POST', json: { reasignar_a: reasignarA || null } }); setOk(`${quitar.nombre} ya no tiene acceso. ${r.tareas_reasignadas} tareas ${reasignarA ? 'reasignadas' : 'sin responsable'}.${r.auth_bloqueado ? '' : ' Aviso: no se pudo bloquear en Auth; revisa en Supabase.'}`); setQuitar(null); await cargar(); }
+                catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+                setBusyAcceso(false);
+              }}>{busyAcceso ? 'Quitando…' : 'Quitar acceso'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {vinculo && (
         <Alert tipo={vinculo.sin_coincidencia.length ? 'warn' : 'ok'}>
           <div>{vinculo.personas_basecamp} personas en Basecamp · {vinculo.vinculados.length} usuarios vinculados ahora{vinculo.vinculados.length ? `: ${vinculo.vinculados.map((v) => v.usuario).join(', ')}` : ''}.</div>
@@ -65,7 +96,7 @@ export default function AdminUsuariosPage() {
 
       <section className="card overflow-x-auto">
         <table className="w-full min-w-[820px]">
-          <thead><tr><th className="th">Nombre</th><th className="th">Email</th><th className="th">Rol</th><th className="th">Capacidad h/sem</th><th className="th">Basecamp user id</th><th className="th">Activo</th></tr></thead>
+          <thead><tr><th className="th">Nombre</th><th className="th">Email</th><th className="th">Rol</th><th className="th">Capacidad h/sem</th><th className="th">Basecamp user id</th><th className="th">Acceso</th></tr></thead>
           <tbody>
             {usuarios.map((u) => (
               <tr key={u.id}>
@@ -74,7 +105,11 @@ export default function AdminUsuariosPage() {
                 <td className="td"><select className="input" defaultValue={u.rol} onChange={(e) => patch(u.id, { rol: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></td>
                 <td className="td"><input className="input w-20" type="number" min={1} max={80} defaultValue={u.capacidad_semanal} onBlur={(e) => Number(e.target.value) !== u.capacidad_semanal && patch(u.id, { capacidad_semanal: Number(e.target.value) })} /></td>
                 <td className="td"><input className="input w-36" inputMode="numeric" defaultValue={u.basecamp_user_id ?? ''} placeholder="opcional" onBlur={(e) => { const v = e.target.value.trim(); const n = v ? Number(v) : null; if (n !== u.basecamp_user_id) void patch(u.id, { basecamp_user_id: n }); }} /></td>
-                <td className="td"><input type="checkbox" checked={u.activo} onChange={(e) => patch(u.id, { activo: e.target.checked })} /></td>
+                <td className="td whitespace-nowrap">
+                  {u.activo
+                    ? <span className="inline-flex items-center gap-2"><span className="rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs font-semibold">activo</span><button type="button" className="link-danger text-xs" onClick={() => { setQuitar(u); setReasignarA(''); }}>Quitar acceso</button></span>
+                    : <span className="inline-flex items-center gap-2"><span className="rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-semibold">sin acceso</span><button type="button" className="link-action text-xs" disabled={busyAcceso} onClick={async () => { if (!confirm(`Restaurar el acceso de ${u.nombre}. Se reactiva la cuenta y recibe un correo para definir contraseña nueva. ¿Continuar?`)) return; setBusyAcceso(true); setError(null); try { await api(`/admin/usuarios/${u.id}/restaurar-acceso`, { method: 'POST' }); setOk(`Acceso restaurado para ${u.nombre}; le llegará el correo para definir su contraseña.`); await cargar(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); } setBusyAcceso(false); }}>Restaurar</button></span>}
+                </td>
               </tr>
             ))}
           </tbody>
