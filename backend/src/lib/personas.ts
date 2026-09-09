@@ -58,7 +58,8 @@ export async function resumenPersonas(ctx: DbCtx, periodo: Periodo): Promise<{ p
   const enPeriodo = (iso: string | null) => !!iso && iso >= desdeIso && iso <= hastaIso;
   const capacidadPeriodo = (u: Usuario) => (periodo === 'dia' ? u.capacidad_semanal / 5 : periodo === 'semana' ? u.capacidad_semanal : (u.capacidad_semanal / 5) * (dias * 5 / 7));
 
-  const personas: PersonaResumen[] = usuarios.filter((u) => u.activo).map((u) => {
+  // Admin y gerencia no ejecutan tareas: no se miden aquí (pedido de Luis 08/09/2026).
+  const personas: PersonaResumen[] = usuarios.filter((u) => u.activo && u.rol !== 'admin' && u.rol !== 'gerencia').map((u) => {
     const mios = activos.filter((r) => r.owner_agencia.includes(u.id));
     const entregados = completados.filter((r) => r.owner_agencia.includes(u.id) && enPeriodo(r.completado_at));
     const esMio = (id: string) => reqPorId.get(id)?.owner_agencia.includes(u.id) ?? false;

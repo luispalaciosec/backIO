@@ -75,7 +75,7 @@ export default function PersonasPage() {
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Personas</h1>
-          <p className="text-sm text-gray-500">Rendimiento del equipo por periodo: entregas, cumplimiento sobre la fecha original, horas de Basecamp, reprocesos y carga. {d && <span className="text-gray-400">{d.etiqueta}: {fmt(d.desde)}{d.desde !== d.hasta ? ` – ${fmt(d.hasta)}` : ''}</span>}</p>
+          <p className="text-sm text-gray-500">Rendimiento del equipo operativo por periodo (admin y gerencia no se miden aquí): entregas, cumplimiento sobre la fecha original, horas de Basecamp, reprocesos y carga. {d && <span className="text-gray-400">{d.etiqueta}: {fmt(d.desde)}{d.desde !== d.hasta ? ` – ${fmt(d.hasta)}` : ''}</span>}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
