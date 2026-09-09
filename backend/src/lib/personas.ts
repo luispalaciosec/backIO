@@ -22,6 +22,9 @@ export interface PersonaResumen {
   reprogramaciones_equipo: number; reprocesos: number; horas_reproceso: number;
   clientes: { cliente: string; activos: number; entregados: number }[];
   serie_30d: { fecha: string; entregados: number; horas: number }[];
+  /** Timesheet: días laborables del periodo (hasta hoy) y cuántos tienen horas registradas. */
+  dias_laborables: number; dias_con_horas: number; dias_sin_horas: string[]; horas_esperadas: number;
+  dias: { fecha: string; horas: number; esperado: number; entregados: number }[];
   puntaje: number; // 0-100 orientativo
 }
 
@@ -64,6 +67,16 @@ export async function resumenPersonas(ctx: DbCtx, periodo: Periodo): Promise<{ p
     const hPeriodo = hMias.filter((h) => h.fecha >= desde && h.fecha <= hasta).reduce((s, h) => s + Number(h.horas), 0);
     const cap = capacidadPeriodo(u);
     const serie_30d = Array.from({ length: 30 }, (_, i) => { const f = sumarDias(desde30, i); return { fecha: f, entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && (r.completado_at ?? '').slice(0, 10) === f).length, horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s, h) => s + Number(h.horas), 0) * 10) / 10 }; });
+    // Timesheet día a día dentro del periodo (solo hasta hoy, lunes a viernes).
+    const esperadoDia = u.capacidad_semanal / 5;
+    const diasPeriodo: { fecha: string; horas: number; esperado: number; entregados: number }[] = [];
+    for (let f = desde; f <= (hasta < hoy ? hasta : hoy); f = sumarDias(f, 1)) {
+      const dow = new Date(`${f}T12:00:00Z`).getUTCDay();
+      const laborable = dow >= 1 && dow <= 5;
+      diasPeriodo.push({ fecha: f, horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s2, h) => s2 + Number(h.horas), 0) * 10) / 10, esperado: laborable ? Math.round(esperadoDia * 10) / 10 : 0, entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && (r.completado_at ?? '').slice(0, 10) === f).length });
+    }
+    const laborables = diasPeriodo.filter((d) => d.esperado > 0);
+    const diasSinHoras = laborables.filter((d) => d.horas === 0).map((d) => d.fecha);
     const porCliente = new Map<string, { activos: number; entregados: number }>();
     for (const r of mios) { const c = porCliente.get(r.cliente_id) ?? { activos: 0, entregados: 0 }; c.activos += 1; porCliente.set(r.cliente_id, c); }
     for (const r of entregados) { const c = porCliente.get(r.cliente_id) ?? { activos: 0, entregados: 0 }; c.entregados += 1; porCliente.set(r.cliente_id, c); }
@@ -82,7 +95,7 @@ export async function resumenPersonas(ctx: DbCtx, periodo: Periodo): Promise<{ p
       horas: Math.round(hPeriodo * 10) / 10, horas_por_entrega: entregados.length && hPeriodo ? Math.round((hPeriodo / entregados.length) * 10) / 10 : null, pct_capacidad: cap ? Math.round((hPeriodo / cap) * 100) : null,
       reprogramaciones_equipo: cu.reprogramaciones_equipo, reprocesos: cu.reprocesos, horas_reproceso: cu.horas_reproceso,
       clientes: [...porCliente.entries()].map(([id, c]) => ({ cliente: nombreC(id), ...c })).sort((a, b) => b.activos + b.entregados - (a.activos + a.entregados)).slice(0, 6),
-      serie_30d, puntaje,
+      serie_30d, dias_laborables: laborables.length, dias_con_horas: laborables.length - diasSinHoras.length, dias_sin_horas: diasSinHoras, horas_esperadas: Math.round(laborables.reduce((s2, d) => s2 + d.esperado, 0) * 10) / 10, dias: diasPeriodo, puntaje,
     };
   }).filter((p) => p.activos > 0 || p.entregados > 0 || p.horas > 0 || p.rol === 'colaborador' || p.rol === 'lider').sort((a, b) => b.activos - a.activos);
   return { periodo, desde, hasta, etiqueta, personas };

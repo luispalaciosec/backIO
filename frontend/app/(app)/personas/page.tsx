@@ -11,6 +11,7 @@ interface Persona {
   entregados: number; piezas: number; pct_a_tiempo_original: number | null; pct_a_tiempo_vigente: number | null; desvio_mediana_dias: number | null;
   horas: number; horas_por_entrega: number | null; pct_capacidad: number | null; reprogramaciones_equipo: number; reprocesos: number; horas_reproceso: number;
   clientes: { cliente: string; activos: number; entregados: number }[]; serie_30d: { fecha: string; entregados: number; horas: number }[]; puntaje: number;
+  dias_laborables: number; dias_con_horas: number; dias_sin_horas: string[]; horas_esperadas: number; dias: { fecha: string; horas: number; esperado: number; entregados: number }[];
 }
 interface Resumen { periodo: Periodo; desde: string; hasta: string; etiqueta: string; personas: Persona[] }
 
@@ -34,6 +35,20 @@ function Sparkline({ serie }: { serie: Persona['serie_30d'] }) {
   );
 }
 
+function BarrasHoras({ dias }: { dias: Persona['dias'] }) {
+  const max = Math.max(1, ...dias.map((d) => Math.max(d.horas, d.esperado)));
+  const w = Math.max(3, Math.min(10, Math.floor(120 / Math.max(dias.length, 1)) - 1));
+  return (
+    <svg viewBox="0 0 120 30" className="w-full h-8" preserveAspectRatio="none" aria-label="Horas por día vs. esperado">
+      {dias.map((d, i) => {
+        const x = i * (w + 1); const hE = (d.esperado / max) * 26; const hH = (d.horas / max) * 26;
+        const color = d.esperado === 0 ? '#e5e7eb' : d.horas === 0 ? '#c0392b' : d.horas < d.esperado * 0.6 ? '#d97706' : '#0073EA';
+        return <g key={d.fecha}><rect x={x} y={30 - hE} width={w} height={hE} fill="#eef2f7" rx={0.5} /><rect x={x} y={30 - hH} width={w} height={hH} fill={color} rx={0.5} /><title>{d.fecha}: {d.horas} h de {d.esperado} esperadas · {d.entregados} entregas</title></g>;
+      })}
+    </svg>
+  );
+}
+
 function Anillo({ valor }: { valor: number }) {
   const r = 22; const c = 2 * Math.PI * r; const v = Math.max(0, Math.min(100, valor));
   return (
@@ -45,12 +60,13 @@ export default function PersonasPage() {
   const [periodo, setPeriodo] = useState<Periodo>('semana');
   const [d, setD] = useState<Resumen | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [orden, setOrden] = useState<'puntaje' | 'activos' | 'entregados' | 'horas' | 'atrasados'>('puntaje');
+  const [orden, setOrden] = useState<'puntaje' | 'activos' | 'entregados' | 'horas' | 'atrasados' | 'dias_sin_horas_n'>('puntaje');
   const [abierta, setAbierta] = useState<Persona | null>(null);
   const cargar = useCallback(async () => { setError(null); try { setD(await api<Resumen>(`/personas?periodo=${periodo}`)); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); } }, [periodo]);
   useEffect(() => { void cargar(); }, [cargar]);
-  const personas = [...(d?.personas ?? [])].sort((a, b) => (b[orden] as number) - (a[orden] as number));
-  const totales = d ? { entregados: d.personas.reduce((s, p) => s + p.entregados, 0), horas: Math.round(d.personas.reduce((s, p) => s + p.horas, 0)), atrasados: d.personas.reduce((s, p) => s + p.atrasados, 0), reprocesos: d.personas.reduce((s, p) => s + p.reprocesos, 0) } : null;
+  const valor = (p: Persona) => (orden === 'dias_sin_horas_n' ? p.dias_sin_horas.length : (p[orden] as number));
+  const personas = [...(d?.personas ?? [])].sort((a, b) => valor(b) - valor(a));
+  const totales = d ? { entregados: d.personas.reduce((s, p) => s + p.entregados, 0), horas: Math.round(d.personas.reduce((s, p) => s + p.horas, 0)), esperadas: Math.round(d.personas.filter((p) => p.basecamp_user_id).reduce((s, p) => s + p.horas_esperadas, 0)), atrasados: d.personas.reduce((s, p) => s + p.atrasados, 0), reprocesos: d.personas.reduce((s, p) => s + p.reprocesos, 0), sin_timesheet: d.personas.filter((p) => p.basecamp_user_id && p.dias_laborables > 0 && p.dias_con_horas === 0).length } : null;
   const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
   const fmt = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('es-EC', { day: 'numeric', month: 'short' });
 
@@ -66,7 +82,7 @@ export default function PersonasPage() {
             {(['dia', 'semana', 'mes'] as Periodo[]).map((p) => <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 rounded ${periodo === p ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p === 'dia' ? 'Hoy' : p === 'semana' ? 'Semana' : 'Mes'}</button>)}
           </div>
           <select className="input w-44" value={orden} onChange={(e) => setOrden(e.target.value as typeof orden)}>
-            <option value="puntaje">Ordenar: puntaje</option><option value="activos">Ordenar: activos</option><option value="entregados">Ordenar: entregados</option><option value="horas">Ordenar: horas</option><option value="atrasados">Ordenar: atrasados</option>
+            <option value="puntaje">Ordenar: puntaje</option><option value="activos">Ordenar: activos</option><option value="entregados">Ordenar: entregados</option><option value="horas">Ordenar: horas</option><option value="atrasados">Ordenar: atrasados</option><option value="dias_sin_horas_n">Ordenar: días sin timesheet</option>
           </select>
         </div>
       </header>
@@ -74,7 +90,7 @@ export default function PersonasPage() {
       {totales && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="card p-3"><div className="text-xs uppercase tracking-wide text-gray-500">Entregados</div><div className="text-2xl font-bold text-green-700">{totales.entregados}</div></div>
-          <div className="card p-3"><div className="text-xs uppercase tracking-wide text-gray-500">Horas</div><div className="text-2xl font-bold">{totales.horas}</div></div>
+          <div className="card p-3"><div className="text-xs uppercase tracking-wide text-gray-500">Horas registradas</div><div className="text-2xl font-bold">{totales.horas}<span className="text-sm text-gray-400 font-normal"> / {totales.esperadas} esperadas</span></div>{totales.sin_timesheet > 0 && <div className="text-xs text-red-700 font-semibold">{totales.sin_timesheet} {totales.sin_timesheet === 1 ? 'persona' : 'personas'} sin ninguna hora</div>}</div>
           <div className="card p-3"><div className="text-xs uppercase tracking-wide text-gray-500">Atrasados hoy</div><div className={`text-2xl font-bold ${totales.atrasados ? 'text-red-700' : ''}`}>{totales.atrasados}</div></div>
           <div className="card p-3"><div className="text-xs uppercase tracking-wide text-gray-500">Reprocesos</div><div className={`text-2xl font-bold ${totales.reprocesos ? 'text-amber-600' : ''}`}>{totales.reprocesos}</div></div>
         </div>
@@ -96,8 +112,13 @@ export default function PersonasPage() {
               <div><div className="text-lg font-bold">{p.horas}</div><div className="text-[10px] uppercase text-gray-500">Horas{p.pct_capacidad !== null ? ` · ${p.pct_capacidad}%` : ''}</div></div>
               <div><div className={`text-lg font-bold ${p.atrasados ? 'text-red-700' : 'text-gray-700'}`}>{p.atrasados}<span className="text-xs text-gray-400 font-normal">/{p.activos}</span></div><div className="text-[10px] uppercase text-gray-500">Atrasados</div></div>
             </div>
-            <Sparkline serie={p.serie_30d} />
+            <div>
+              <div className="flex justify-between text-[10px] uppercase text-gray-500"><span>Timesheet {d?.etiqueta.toLowerCase()}</span><span className={p.dias_laborables && p.dias_con_horas === p.dias_laborables ? 'text-green-700' : p.dias_con_horas === 0 ? 'text-red-700 font-semibold' : 'text-amber-600'}>{p.dias_con_horas}/{p.dias_laborables} días · {p.horas}/{p.horas_esperadas} h</span></div>
+              <BarrasHoras dias={p.dias} />
+            </div>
             <div className="flex flex-wrap gap-1 text-[11px]">
+              {p.dias_sin_horas.length > 0 && p.basecamp_user_id && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5 font-semibold" title={p.dias_sin_horas.join(', ')}>⏱ {p.dias_sin_horas.length} {p.dias_sin_horas.length === 1 ? 'día' : 'días'} sin timesheet</span>}
+              {!p.basecamp_user_id && <span className="rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">⏱ sin timesheet (no vinculado a Basecamp)</span>}
               {p.reprocesos > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5">⟲ {p.reprocesos} reproceso{p.reprocesos > 1 ? 's' : ''}</span>}
               {p.reprogramaciones_equipo > 0 && <span className="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5">↺ {p.reprogramaciones_equipo} reprog. equipo</span>}
               {p.bloqueados > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5">{p.bloqueados} bloqueada{p.bloqueados > 1 ? 's' : ''}</span>}
@@ -126,6 +147,14 @@ export default function PersonasPage() {
                 ['Horas', `${abierta.horas}${abierta.pct_capacidad !== null ? ` · ${abierta.pct_capacidad}% cap.` : ''}`], ['Horas por entrega', abierta.horas_por_entrega ?? '—'], ['Reprocesos', `${abierta.reprocesos} (${abierta.horas_reproceso} h)`], ['Reprog. del equipo', abierta.reprogramaciones_equipo],
                 ['Activos', abierta.activos], ['En proceso', abierta.en_ejecucion], ['Atrasados', abierta.atrasados], ['Bloqueados', abierta.bloqueados],
               ].map(([k, v]) => <div key={String(k)} className="rounded-md bg-gray-50 p-3"><div className="text-[10px] uppercase tracking-wide text-gray-500">{k}</div><div className="font-semibold">{v as string}</div></div>)}
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Timesheet del periodo · {abierta.dias_con_horas}/{abierta.dias_laborables} días con horas · {abierta.horas} de {abierta.horas_esperadas} h esperadas</div>
+              {!abierta.basecamp_user_id ? <p className="text-sm text-amber-700">No está vinculado a Basecamp: sin timesheet. Admin → Usuarios → Vincular con Basecamp.</p> : (
+                <table className="w-full text-sm"><thead><tr><th className="th">Día</th><th className="th text-right">Horas</th><th className="th text-right">Esperadas</th><th className="th text-right">Entregas</th><th className="th"></th></tr></thead>
+                  <tbody>{abierta.dias.map((x) => { const dow = new Date(`${x.fecha}T12:00:00Z`).toLocaleDateString('es-EC', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); const falta = x.esperado > 0 && x.horas === 0; return (
+                    <tr key={x.fecha} className={falta ? 'bg-red-50/60' : ''}><td className="td">{dow}</td><td className={`td text-right tabular-nums ${falta ? 'text-red-700 font-semibold' : ''}`}>{x.horas || (x.esperado ? '0' : '—')}</td><td className="td text-right tabular-nums text-gray-500">{x.esperado || '—'}</td><td className="td text-right tabular-nums text-green-700">{x.entregados || ''}</td><td className="td text-xs">{falta ? 'sin timesheet' : x.esperado && x.horas < x.esperado * 0.6 ? 'parcial' : ''}</td></tr>); })}</tbody></table>
+              )}
             </div>
             <div>
               <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Últimos 30 días · entregas por día</div>
