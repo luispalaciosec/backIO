@@ -15,6 +15,7 @@ import { huerfanos } from './huerfanos';
 import { horas } from './horas';
 import { ia } from './ia';
 import { recurrencias } from './recurrencias';
+import { personas } from './personas';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -33,3 +34,4 @@ v1.route('/huerfanos', huerfanos);
 v1.route('/horas', horas);
 v1.route('/ia', ia);
 v1.route('/recurrencias', recurrencias);
+v1.route('/personas', personas);

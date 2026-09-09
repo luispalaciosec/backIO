@@ -28,8 +28,8 @@ admin.post('/usuarios/basecamp/vincular', async (c) => {
   for (const u of usuarios) {
     const p = porEmail.get(u.email.toLowerCase());
     if (!p) { sinCoincidencia.push(`${u.nombre} <${u.email}>`); continue; }
-    if (u.basecamp_user_id === p.id) continue;
-    const { error } = await serviceClient().from('usuarios').update({ basecamp_user_id: p.id }).eq('tenant_id', ctx.tenantId).eq('id', u.id);
+    if (u.basecamp_user_id === p.id && (u.avatar_url || !p.avatar_url)) continue;
+    const { error } = await serviceClient().from('usuarios').update({ basecamp_user_id: p.id, ...(p.avatar_url ? { avatar_url: p.avatar_url } : {}) }).eq('tenant_id', ctx.tenantId).eq('id', u.id);
     throwIf(error);
     vinculados.push({ usuario: u.nombre, basecamp_user_id: p.id });
   }
