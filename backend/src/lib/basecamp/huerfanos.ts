@@ -93,7 +93,9 @@ export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: strin
     owner_agencia: usuarios.filter((u) => u.basecamp_user_id === h.creador_basecamp_id).map((u) => u.id), piezas: 0,
   }]);
   if (!req) throw new Error('No se pudo crear el requerimiento');
-  await ctx.db.from('requerimientos').update({ basecamp_todo_id: h.basecamp_todo_id, basecamp_todolist_id: h.basecamp_todolist_id, basecamp_url: h.app_url }).eq('id', req.id);
+  // Enlace al to-do: si falla, mejor abortar que dejar un requerimiento suelto que la importación duplicará.
+  const { error: eEnlace } = await ctx.db.from('requerimientos').update({ basecamp_todo_id: h.basecamp_todo_id, basecamp_todolist_id: h.basecamp_todolist_id, basecamp_url: h.app_url }).eq('tenant_id', ctx.tenantId).eq('id', req.id);
+  if (eEnlace) { await ctx.db.from('requerimientos').update({ deleted_at: new Date().toISOString() }).eq('id', req.id); throw new Error(`No se pudo enlazar el to-do ${h.basecamp_todo_id}: ${eEnlace.message}`); }
   await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: req.id }).eq('id', id);
   await audit(ctx, { accion: 'adoptar_huerfano', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: h.basecamp_todo_id, proyecto_id: proyecto?.id ?? null } });
   return { requerimiento_id: req.id };
