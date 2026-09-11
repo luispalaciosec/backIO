@@ -14,6 +14,8 @@ import type { EstadoOperativo, Prioridad, MotivoReprogramacion, MotivoReproceso,
 import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO } from '@backio/shared';
 import { listReprogramaciones, listReprocesos, completarUltimaReprogramacion, setMotivoReprogramacion, listSinMotivo, updateReproceso } from '../../lib/db/historial';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
+import { ensureSemana } from '../../lib/db/semanas';
+import { fechaLocal } from '../../lib/rituals/daily';
 
 export const requerimientos = new Hono();
 
@@ -59,11 +61,23 @@ const crearSchema = z.object({
   fecha_entrega: fecha.nullable().optional(),
   owner_agencia: z.array(z.string().uuid()).default([]),
   piezas: z.number().int().min(0).default(0),
+  planificacion: z.enum(['planificado', 'no_planificado', 'urgente']).optional(),
 });
+
+/** Marca 'no_planificado' si la semana ya tiene plan y la tarea vence dentro de esa semana. */
+async function planificacionAutomatica(ctx: ReturnType<typeof ctxOf>, fechaEntrega: string | null | undefined): Promise<'planificado' | 'no_planificado'> {
+  if (!fechaEntrega) return 'planificado';
+  const semana = await ensureSemana(ctx, fechaLocal());
+  const { count } = await ctx.db.from('actas').select('id', { count: 'exact', head: true }).eq('tenant_id', ctx.tenantId).eq('semana_id', semana.id).eq('tipo', 'plan_operativo');
+  const hayPlan = !!semana.plan_publicado_at || (count ?? 0) > 0;
+  return hayPlan && fechaEntrega <= semana.fecha_fin ? 'no_planificado' : 'planificado';
+}
 
 requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json', crearSchema), async (c) => {
   const ctx = ctxOf(c);
-  const [r] = await insertRequerimientos(ctx, [c.req.valid('json')]);
+  const body = c.req.valid('json');
+  const planificacion = body.planificacion ?? (await planificacionAutomatica(ctx, body.fecha_entrega));
+  const [r] = await insertRequerimientos(ctx, [{ ...body, planificacion }]);
   if (!r) throw new DbError('No se pudo crear', 500);
   await audit(ctx, { accion: 'crear', entidad: 'requerimiento', entidad_id: r.id });
   // Si pertenece a un proyecto ya sincronizado y tiene fecha, baja a Basecamp (regla: cliente → BackIO → Basecamp).
@@ -95,10 +109,12 @@ const patchSchema = z.object({
   entregable_urls: z.array(z.string().url()).nullable().optional(),
   motivo_reprogramacion: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]).nullable().optional(),
   observacion_reprogramacion: z.string().max(1000).nullable().optional(),
+  planificacion: z.enum(['planificado', 'no_planificado', 'urgente']).optional(),
+  daily_fecha: fecha.nullable().optional(),
 });
 
 /** Campos que un colaborador puede cambiar en SUS tareas (owner_agencia lo incluye). El resto exige rol de gestión. */
-export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion'] as const;
+export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha'] as const;
 
 const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');
@@ -147,10 +163,13 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
     entidad_id: id,
     detalle: reprogramado ? { de: previo.fecha_entrega, a: patch.fecha_entrega, ...patch } : cambios,
   });
+  // La fecha baja a Basecamp de inmediato; se informa el resultado a la pantalla y a la auditoría.
+  let basecamp_due_on: 'ok' | 'error' | 'sin_todo' = 'sin_todo';
   if (reprogramado && r.basecamp_todo_id) {
-    pushDueDate(ctx, r).catch((err) => console.error('[basecamp] due_on no sincronizado', err));
+    try { await pushDueDate(ctx, r); basecamp_due_on = 'ok'; }
+    catch (err) { basecamp_due_on = 'error'; console.error('[basecamp] due_on no sincronizado', err); await audit(ctx, { accion: 'basecamp_due_on_error', entidad: 'requerimiento', entidad_id: id, detalle: { error: err instanceof Error ? err.message : String(err) } }); }
   }
-  return c.json(r);
+  return c.json({ ...r, basecamp_due_on });
 });
 
 // ---------------- Cumplimiento: historial, reprocesos y causas pendientes

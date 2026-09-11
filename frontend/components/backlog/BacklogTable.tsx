@@ -5,11 +5,14 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoInput } from '@backio/shared';
 import { CeldaSelect, CeldaFecha, CeldaTexto, CeldaOwners } from './Celdas';
-import { COLOR_ESTADO, COLOR_APROBACION, COLOR_PRIORIDAD, COLOR_TIPO, colorGrupo } from './colores';
+import { COLOR_ESTADO, COLOR_APROBACION, COLOR_PRIORIDAD, COLOR_TIPO, COLOR_PLANIFICACION, colorGrupo } from './colores';
+import { PLANIFICACION_LABEL } from '@backio/shared';
 import { ESTADO_LABEL, APROBACION_LABEL, PRIORIDAD_LABEL, TIPO_LABEL, haceCuanto } from '@/lib/format';
 
 const ESTADOS = Object.keys(ESTADO_LABEL);
 const APROB = Object.keys(APROBACION_LABEL);
+const PLANIF = Object.keys(PLANIFICACION_LABEL);
+const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const PRIOS = Object.keys(PRIORIDAD_LABEL);
 const TIPOS = Object.keys(TIPO_LABEL);
 
@@ -28,7 +31,7 @@ export interface BacklogTableProps {
   onCambio?: () => void;
 }
 
-const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_90px_80px_80px_70px_120px_120px]';
+const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_90px_80px_80px_70px_120px_120px]';
 
 export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined }: BacklogTableProps) {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
@@ -52,7 +55,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50`}>
                   <div className="flex"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
-                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
+                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
                     <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>
                   ))}
                 </div>
@@ -83,6 +86,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
           {r.visible_cliente && <span className="text-xs shrink-0 pr-1" title={`El cliente ve: ${r.etiqueta_cliente}`}>👁</span>}
           {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />}
           <HistorialReq r={r} onCambio={onCambio} />
+          {!hecho && <button type="button" className={`text-xs shrink-0 px-1 ${r.daily_fecha === hoyLocal() ? 'text-brand font-bold' : 'text-gray-300 hover:text-gray-600'}`} title={r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'} onClick={(e) => { e.stopPropagation(); void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() }); }}>☀</button>}
           {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0 pr-2" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
         </div>
       </div>
@@ -106,6 +110,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
         )}
       </div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_aprobacion} opciones={APROB} colores={COLOR_APROBACION} labels={APROBACION_LABEL} onChange={(v) => p({ estado_aprobacion: v as RequerimientoMetricas['estado_aprobacion'] })} /></div>
+      <div className="border-l border-gray-100" title="Planificado: entró por el weekly · No planificado: entró durante la semana · Urgente"><CeldaSelect valor={r.planificacion ?? 'planificado'} opciones={PLANIF} colores={COLOR_PLANIFICACION} labels={PLANIFICACION_LABEL} onChange={(v) => p({ planificacion: v as RequerimientoMetricas['planificacion'] })} /></div>
       <div className="border-l border-gray-100"><span className="h-9 flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: COLOR_TIPO[r.tipo_trabajo] }}>{TIPO_LABEL[r.tipo_trabajo]}</span></div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_atraso > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{r.dias_atraso || ''}</div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_sin_movimiento > 14 ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{r.dias_sin_movimiento}</div>

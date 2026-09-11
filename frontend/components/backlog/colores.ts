@@ -23,3 +23,4 @@ export const PALETA_GRUPOS = ['#0073EA', '#00C875', '#A25DDC', '#FDAB3D', '#E244
 export function colorGrupo(i: number, preferido?: string | null): string {
   return preferido && preferido !== '#0073EA' ? preferido : PALETA_GRUPOS[i % PALETA_GRUPOS.length]!;
 }
+export const COLOR_PLANIFICACION: Record<string, string> = { planificado: '#C4C4C4', no_planificado: '#FDAB3D', urgente: '#E2445C' };

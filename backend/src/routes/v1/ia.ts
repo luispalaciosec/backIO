@@ -22,7 +22,7 @@ ia.post('/daily', requireScope('write:actas'), zValidator('json', z.object({ mes
   if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
   const m = await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, c.get('auth').nombre);
   const texto = await narrarDaily(ctx, mesa, m);
-  return c.json({ texto, resumen: { vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length } });
+  return c.json({ texto, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length } });
 });
 
 ia.post('/weekly', requireScope('write:actas'), zValidator('json', z.object({ semana_id: z.string().uuid(), mesa_id: z.string().uuid().nullable().optional() })), async (c) => {

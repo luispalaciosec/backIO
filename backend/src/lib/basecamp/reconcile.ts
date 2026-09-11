@@ -6,6 +6,7 @@
 import type { DbCtx } from '../db/client';
 import { listBacklog } from '../db/requerimientos';
 import { getCliente } from '../db/clientes';
+import { pushDueDate } from './write';
 import { BasecampClient } from './client';
 import { applyBasecampUpdate, extractSafeTodo } from './sync';
 
@@ -25,6 +26,8 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
       const raw = await bc.getTodoRaw(bcProject, r.basecamp_todo_id as number);
       const safe = extractSafeTodo(raw);
       if (safe && (await applyBasecampUpdate(ctx, { ...safe, completed: safe.completed ?? false })).aplicado) aplicados += 1;
+      // Regla 3: BackIO manda sobre la fecha. Si Basecamp quedó desfasado, se reenvía.
+      if (safe && r.fecha_entrega && safe.due_on !== r.fecha_entrega) { await pushDueDate(ctx, r, bc).catch((e) => console.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e)); }
     } catch (err) {
       console.error('[reconcile] fallo en to-do', r.basecamp_todo_id, err);
     }

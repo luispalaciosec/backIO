@@ -232,6 +232,7 @@
     <tr><td>Prioridad</td><td>Alta, Media, Baja</td></tr>
     <tr><td>Estado</td><td>Backlog · Priorizado · En proceso · En revisión · Reprogramado · Bloqueado · Completado · Cancelado. "Completado" está deshabilitado si la tarea tiene to-do en Basecamp: se marca allá</td></tr>
     <tr><td>Aprobación</td><td>Sin estado · Pendiente interno · Pendiente cliente · Aprobado · Cambios solicitados. Pasar a "Cambios solicitados" registra un reproceso del cliente</td></tr>
+    <tr><td>Planificación</td><td>Planificado (entró por el weekly) · No planificado (se creó durante la semana; se marca solo) · Urgente. El filtro «Fuera del weekly» y el KPI del dashboard miden cuánto trabajo entra sin planificar</td></tr>
     <tr><td>Tipo</td><td>FEE (recurrente) o Proyecto (campaña)</td></tr>
     <tr><td>Atraso / Sin mov.</td><td>Días de atraso sobre la fecha vigente · días desde el último cambio</td></tr>
     <tr><td>Horas</td><td>Horas registradas en Basecamp para ese to-do (90 días)</td></tr>
@@ -249,7 +250,7 @@
   <ol class="steps">
     <li>En el backlog cambia la fecha de entrega.</li>
     <li>Se abre un cuadro con la fecha comprometida, la actual tachada y la nueva. Elige el <b>motivo</b>. Sin motivo no se guarda.</li>
-    <li>La tarea pasa a estado "Reprogramado", la fecha nueva se envía a Basecamp y el cambio queda en el historial ↺.</li>
+    <li>La tarea conserva su estado (si estaba En proceso, sigue En proceso), la fecha nueva se envía a Basecamp al instante (verás «Fecha enviada a Basecamp ✓») y el cambio queda en el historial ↺.</li>
   </ol>
   <figure class="half"><img src="img/modal-historial.jpg" alt="Historial de una tarea (botón ↺): fecha comprometida, reprogramaciones y reprocesos."><figcaption>Historial de una tarea (botón ↺): fecha comprometida, reprogramaciones y reprocesos.</figcaption></figure>
 <table>
@@ -348,6 +349,7 @@
   <h2>Daily: apertura y cierre de mesa</h2>
   <p>El daily no prioriza: desbloquea. Una sola pantalla, sin scroll, con tres columnas:</p>
   <ul>
+    <li><b>Hoy se trabaja</b>: las tareas que la mesa eligió para la jornada con «🎯 Elegir tareas de hoy» (o ☀ en el backlog). Una tarea en proceso o vencida no se trabaja necesariamente hoy: esta columna es la decisión explícita.</li>
     <li><b>Vence hoy o mañana sin iniciar</b>: priorizado y con fecha inminente.</li>
     <li><b>Bloqueos nuevos (24 h)</b>: pasaron a bloqueado desde ayer.</li>
     <li><b>Fechas cambiadas desde ayer</b>: reprogramaciones recientes.</li>

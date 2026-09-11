@@ -23,11 +23,13 @@ export default function BacklogPage() {
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [vista, setVista] = useState<Vista>('tabla');
-  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '' });
+  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' });
   const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
   const [panel, setPanel] = useState(false);
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
   const [celebracion, setCelebracion] = useState<{ n: number; titulos: string[] } | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 4000); return () => clearTimeout(t); }, [aviso]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -80,7 +82,7 @@ export default function BacklogPage() {
 
   const me = useMe();
   const colaborador = me?.rol === 'colaborador';
-  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion'];
+  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha'];
   /** Un colaborador solo edita sus tareas y solo estado, fecha y entregables; el backend lo exige igual. */
   const puedeEditar = (r: RequerimientoMetricas) => !colaborador || (!!me?.usuario_id && r.owner_agencia.includes(me.usuario_id));
 
@@ -99,8 +101,10 @@ export default function BacklogPage() {
     // Optimista: aplica en memoria y recarga en silencio.
     setItems((prev) => prev.map((r) => (r.id === id ? { ...r, ...(p as Partial<RequerimientoMetricas>) } : r)));
     try {
-      await api(`/requerimientos/${id}`, { method: 'PATCH', json: p });
+      const res = await api<{ basecamp_due_on?: 'ok' | 'error' | 'sin_todo' }>(`/requerimientos/${id}`, { method: 'PATCH', json: p });
       if (p.estado_operativo === 'completado') void celebrar();
+      if (p.fecha_entrega !== undefined && res.basecamp_due_on === 'ok') setAviso('Fecha enviada a Basecamp ✓');
+      if (p.fecha_entrega !== undefined && res.basecamp_due_on === 'error') setError('La fecha se guardó en BackIO pero Basecamp no la aceptó ahora; se reintenta en la reconciliación de 30 min.');
       await cargar(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo actualizar');
@@ -121,7 +125,7 @@ export default function BacklogPage() {
   const mesaDeCliente = Object.fromEntries(clientes.map((c) => [c.id, c.mesa_id]));
   /** Mesa del requerimiento: la del proyecto si tiene override, si no la del cliente. */
   const mesaDe = (r: RequerimientoMetricas) => (r.proyecto_id && proyectoMesa[r.proyecto_id]) || mesaDeCliente[r.cliente_id] || null;
-  const itemsFiltrados = items.filter((r) => (!filtro.proyecto || r.proyecto_id === filtro.proyecto) && (!filtro.mesa || mesaDe(r) === filtro.mesa));
+  const itemsFiltrados = items.filter((r) => (!filtro.proyecto || r.proyecto_id === filtro.proyecto) && (!filtro.mesa || mesaDe(r) === filtro.mesa) && (!filtro.planificacion || (filtro.planificacion === 'fuera' ? r.planificacion !== 'planificado' : r.planificacion === filtro.planificacion)));
   const itemsOrdenados = ordenarRequerimientos(itemsFiltrados, orden.campo, orden.dir, { nombres, proyectos, horas });
   const proyectosDelFiltro = Object.entries(proyectos).filter(([id]) => items.some((r) => r.proyecto_id === id)).sort((a, b) => a[1].localeCompare(b[1]));
   const clientesVisibles = filtro.cliente ? clientes.filter((c) => c.id === filtro.cliente) : clientes.filter((c) => itemsOrdenados.some((r) => r.cliente_id === c.id));
@@ -152,6 +156,7 @@ export default function BacklogPage() {
             {filtro.owner && <Chip>{nombres[filtro.owner]}</Chip>}
             {filtro.estado && <Chip>{ESTADO_LABEL[filtro.estado]}</Chip>}
             {filtro.proyecto && <Chip>{proyectos[filtro.proyecto]}</Chip>}
+            {filtro.planificacion && <Chip>{filtro.planificacion === 'fuera' ? 'Fuera del weekly' : filtro.planificacion}</Chip>}
             {filtro.q && <Chip>“{filtro.q}”</Chip>}
             {!filtro.activos && <Chip>incluye completados</Chip>}
             <Chip tono="gris">{CAMPOS_ORDEN.find((c) => c.campo === orden.campo)?.label} {orden.dir === 'asc' ? '↑' : '↓'}</Chip>
@@ -187,6 +192,12 @@ export default function BacklogPage() {
             {Object.keys(ESTADO_LABEL).map((s) => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
           </select>
         </div>
+        <div className="min-w-40">
+          <label className="label">Planificación</label>
+          <select className="input" value={filtro.planificacion} onChange={(e) => setFiltro({ ...filtro, planificacion: e.target.value })}>
+            <option value="">Todas</option><option value="fuera">Fuera del weekly (no planif. + urgente)</option><option value="no_planificado">No planificado</option><option value="urgente">Urgente</option><option value="planificado">Planificado</option>
+          </select>
+        </div>
         <div className="min-w-52">
           <label className="label">Proyecto</label>
           <select className="input" value={filtro.proyecto} onChange={(e) => setFiltro({ ...filtro, proyecto: e.target.value })}>
@@ -212,12 +223,13 @@ export default function BacklogPage() {
           {[{ campo: 'atraso', dir: 'desc', label: 'Más atrasados' }, { campo: 'sin_movimiento', dir: 'desc', label: 'Más tiempo sin mover' }, { campo: 'fecha_entrega', dir: 'asc', label: 'Próximos a vencer' }, { campo: 'prioridad', dir: 'asc', label: 'Prioridad alta primero' }].map((a) => (
             <button key={a.label} type="button" className={`text-xs rounded-full border px-3 py-1 ${orden.campo === a.campo && orden.dir === a.dir ? 'border-brand text-brand bg-brand/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`} onClick={() => setOrden({ campo: a.campo as CampoOrden, dir: a.dir as Dir })}>{a.label}</button>
           ))}
-          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '' }); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); }}>Limpiar</button>
+          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' }); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); }}>Limpiar</button>
         </div>
         </div>}
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
+      {aviso && <Alert tipo="ok">{aviso}</Alert>}
       {celebracion && (
         <div className="rounded-md border border-green-200 bg-green-50 text-green-900 px-4 py-3 text-sm flex items-start justify-between gap-3">
           <div>

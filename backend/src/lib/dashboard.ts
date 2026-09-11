@@ -36,6 +36,10 @@ export interface DashboardKpis {
   reprogramaciones_30d: number;
   reprocesos_30d: number;
   horas_reproceso_30d: number;
+  /** Trabajo que entró esta semana fuera del weekly (no planificado + urgente) y su % sobre lo activo de la semana. */
+  fuera_weekly_semana: number;
+  urgentes_activos: number;
+  pct_fuera_weekly_semana: number | null;
 }
 
 export interface FilaCliente {
@@ -126,6 +130,9 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     reprogramaciones_30d: cumplTotal.reprogramaciones,
     reprocesos_30d: cumplTotal.reprocesos,
     horas_reproceso_30d: cumplTotal.horas_reproceso,
+    fuera_weekly_semana: [...activos, ...completados30].filter((r) => r.planificacion !== 'planificado' && r.created_at >= `${lunes}T00:00:00-05:00`).length,
+    urgentes_activos: activos.filter((r) => r.planificacion === 'urgente').length,
+    pct_fuera_weekly_semana: (() => { const sem = [...activos, ...completados30].filter((r) => r.created_at >= `${lunes}T00:00:00-05:00`); const f = sem.filter((r) => r.planificacion !== 'planificado').length; return sem.length ? Math.round((f / sem.length) * 100) : null; })(),
   };
 
   const clientesIds = [...new Set([...activos.map((r) => r.cliente_id), ...completados30.map((r) => r.cliente_id), ...proyectosActivos.map((p) => p.cliente_id)])];

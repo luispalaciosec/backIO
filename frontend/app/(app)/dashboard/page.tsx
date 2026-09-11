@@ -56,6 +56,7 @@ export default function DashboardPage() {
           <Kpi etiqueta="Completados 30d" valor={k.completados_30d!} tono="ok" sub={`${k.piezas_completadas_30d} piezas · ${k.piezas_activas} en curso`} />
           <Kpi etiqueta="Horas 30d" valor={k.horas_30d!} sub="timesheet de Basecamp" />
           <Kpi etiqueta="A tiempo 30d" valor={k.pct_a_tiempo_original_30d === null || k.pct_a_tiempo_original_30d === undefined ? '—' : `${k.pct_a_tiempo_original_30d}%`} tono={(k.pct_a_tiempo_original_30d ?? 100) < 70 ? 'warn' : 'ok'} sub={`sobre fecha original · ${k.pct_a_tiempo_vigente_30d ?? '—'}% sobre vigente`} />
+          <Kpi etiqueta="Fuera del weekly" valor={k.fuera_weekly_semana ?? 0} tono={(k.fuera_weekly_semana ?? 0) > 0 ? 'warn' : 'ok'} sub={`esta semana${k.pct_fuera_weekly_semana !== null && k.pct_fuera_weekly_semana !== undefined ? ` · ${k.pct_fuera_weekly_semana}% de lo nuevo` : ''} · ${k.urgentes_activos ?? 0} urgentes`} />
           <Kpi etiqueta="Reprocesos 30d" valor={k.reprocesos_30d ?? 0} tono={(k.reprocesos_30d ?? 0) > 0 ? 'warn' : 'ok'} sub={`${k.horas_reproceso_30d ?? 0} h · ${k.reprogramaciones_30d ?? 0} reprogramaciones`} />
           <Kpi etiqueta="Huérfanos" valor={k.huerfanos_pendientes!} tono={k.huerfanos_pendientes! > 0 ? 'warn' : 'ok'} sub="to-dos fuera de BackIO" />
         </div>

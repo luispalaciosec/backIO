@@ -7,7 +7,7 @@ function req(p: Partial<RequerimientoMetricas>): RequerimientoMetricas {
     id: crypto.randomUUID(), tenant_id: 't', cliente_id: 'c1', proyecto_id: null, bloque_nombre: null, plantilla_tarea_id: null,
     titulo_interno: 'Tarea', etiqueta_cliente: null, visible_cliente: false, tipo_trabajo: 'fee',
     estado_operativo: 'priorizado', estado_aprobacion: 'no_aplica', prioridad: 'media', peso: 1,
-    fecha_pedido: null, fecha_entrega: '2026-08-12', fecha_entrega_original: '2026-08-12', veces_reprogramado: 0, veces_reproceso: 0,
+    fecha_pedido: null, fecha_entrega: '2026-08-12', fecha_entrega_original: '2026-08-12', veces_reprogramado: 0, veces_reproceso: 0, planificacion: 'planificado', daily_fecha: null,
     owner_agencia: ['u1'], owner_cliente: null, piezas: 0, tipo_pieza_id: null, brief_url: null, entregable_urls: null,
     basecamp_todo_id: null, basecamp_todolist_id: null, basecamp_url: null,
     ultima_actualizacion: '2026-08-09T00:00:00Z', completado_at: null, created_at: '', updated_at: '', created_by: null, deleted_at: null,

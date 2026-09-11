@@ -198,6 +198,10 @@ export interface Requerimiento {
   fecha_entrega_original: string | null;
   veces_reprogramado: number;
   veces_reproceso: number;
+  /** planificado (entró por el weekly) · no_planificado (entró durante la semana) · urgente */
+  planificacion: 'planificado' | 'no_planificado' | 'urgente';
+  /** Día en que la mesa decidió trabajarla (selección del daily). */
+  daily_fecha: string | null;
   owner_agencia: string[];
   owner_cliente: string[] | null;
   piezas: number;
@@ -370,3 +374,5 @@ export interface Recurrencia {
   dia_generacion: number; activa: boolean; ultimo_mes_generado: string | null; ultimo_proyecto_id: string | null; proyecto_origen_id: string | null;
   created_by: string | null; created_at: string; updated_at: string;
 }
+
+export const PLANIFICACION_LABEL: Record<'planificado' | 'no_planificado' | 'urgente', string> = { planificado: 'Planificado', no_planificado: 'No planificado', urgente: 'Urgente' };

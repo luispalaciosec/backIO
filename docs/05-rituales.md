@@ -188,3 +188,11 @@ antes de encender el motor:
 hizo fracasar los intentos anteriores de implementar WorkOS.
 
 **Decisión (03/09/2026): Opción A.** El weekly es de Marcia; Luis no participa ni aparece como responsable en el backlog operativo. No se implementa ninguna exención en el motor: simplemente no se le asignan requerimientos ni acuerdos.
+
+
+## Cambios del 10/09/2026 (feedback de Marcia)
+
+- **Reprogramar no cambia el estado.** Mover la fecha incrementa `veces_reprogramado` y queda en `reprogramaciones` con motivo, pero la tarea conserva su estado ("En proceso" sigue en proceso). El estado "Reprogramado" queda como estado manual.
+- **Planificación.** `requerimientos.planificacion`: `planificado` (entró por el weekly), `no_planificado` (se creó durante la semana, con plan ya generado y fecha dentro de la semana; automático al crear) o `urgente` (manual). Columna en el backlog, filtro "Fuera del weekly", KPI en el dashboard.
+- **Selección del daily.** `requerimientos.daily_fecha`: la mesa elige qué se trabaja hoy («Elegir tareas de hoy» en Daily o ☀ en el backlog). Columna «Hoy se trabaja» en el Daily y sección 🎯 en la apertura/cierre publicados.
+- **Fecha a Basecamp.** Al reprogramar, `due_on` se envía de inmediato y la pantalla confirma «Fecha enviada a Basecamp ✓»; si falla, se avisa y la reconciliación (cada 30 min) la reenvía.

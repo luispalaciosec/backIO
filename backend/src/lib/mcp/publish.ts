@@ -56,7 +56,7 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
 
 /** Línea del daily: título enlazado al to-do de Basecamp cuando existe. */
 export interface DailyItem { cliente: string; titulo: string; owner: string; fecha: string | null; url: string | null; atraso_dias?: number }
-export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string }
+export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; hoy: DailyItem[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string }
 
 export function dailyItemTexto(i: DailyItem): string {
   return `${i.cliente} · ${i.titulo} · ${i.owner}${i.fecha ? ` · ${i.fecha}` : ''}${i.atraso_dias ? ` (${i.atraso_dias} días de atraso)` : ''}`;
@@ -77,6 +77,7 @@ export function cuerpoDaily(m: DailyMensaje): string {
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
     ...(m.narrativa ? m.narrativa.split(/\n+/).map((p) => `<p>${esc(p)}</p>`) : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
+    `<p>🎯 <strong>Hoy se trabaja</strong></p>`, li(m.hoy),
     `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
     `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
     `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),

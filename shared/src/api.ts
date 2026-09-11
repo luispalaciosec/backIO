@@ -52,6 +52,7 @@ export interface CrearRequerimientoInput {
   fecha_entrega?: string | null;
   owner_agencia?: string[];
   piezas?: number;
+  planificacion?: 'planificado' | 'no_planificado' | 'urgente';
 }
 
 export type ActualizarRequerimientoInput = { motivo_reprogramacion?: import('./types').MotivoReprogramacion | null; observacion_reprogramacion?: string | null } & Partial<
@@ -71,6 +72,8 @@ export type ActualizarRequerimientoInput = { motivo_reprogramacion?: import('./t
     | 'piezas'
     | 'brief_url'
     | 'entregable_urls'
+    | 'planificacion'
+    | 'daily_fecha'
   >
 >;
 
@@ -119,6 +122,7 @@ export interface CapacidadPersona {
 }
 
 export interface DailyView {
+  hoy_se_trabaja: Requerimiento[];
   vencen_hoy_o_manana_sin_iniciar: Requerimiento[];
   bloqueos_nuevos: Requerimiento[];
   fechas_cambiadas: Requerimiento[];

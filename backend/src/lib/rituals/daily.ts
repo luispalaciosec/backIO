@@ -24,6 +24,7 @@ export async function getDaily(ctx: DbCtx): Promise<DailyView> {
 
   const strip = (r: Requerimiento): Requerimiento => r;
   return {
+    hoy_se_trabaja: activos.filter((r) => r.daily_fecha === hoy).map(strip),
     vencen_hoy_o_manana_sin_iniciar: activos
       .filter((r) => r.fecha_entrega && r.fecha_entrega <= manana && r.estado_operativo === 'priorizado')
       .map(strip),

@@ -16,17 +16,17 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
   async function redactar(tipo: 'apertura' | 'cierre') {
     setBusy(`ia-${tipo}`); setMsg(null);
     try {
-      const r = await api<{ texto: string; resumen: { vencen: number; bloqueos: number; cambios: number } }>('/ia/daily', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr() } });
+      const r = await api<{ texto: string; resumen: { hoy: number; vencen: number; bloqueos: number; cambios: number } }>('/ia/daily', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr() } });
       setNarrativa(r.texto);
-      setMsg({ tipo: 'info', texto: `Borrador de ${tipo} listo: ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios. Edítalo y luego publica.` });
+      setMsg({ tipo: 'info', texto: `Borrador de ${tipo} listo: ${r.resumen.hoy} para hoy, ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios. Edítalo y luego publica.` });
     } catch (e) { setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo redactar' }); }
     setBusy(null);
   }
   async function publicar(tipo: 'apertura' | 'cierre') {
     setBusy(tipo); setMsg(null);
     try {
-      const r = await api<{ url: string; resumen: { vencen: number; bloqueos: number; cambios: number } }>('/semanas/daily/publicar', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined } });
-      setMsg({ tipo: 'ok', texto: `${tipo === 'apertura' ? 'Apertura' : 'Cierre'} publicado en Basecamp: ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios.`, url: r.url });
+      const r = await api<{ url: string; resumen: { hoy: number; vencen: number; bloqueos: number; cambios: number } }>('/semanas/daily/publicar', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined } });
+      setMsg({ tipo: 'ok', texto: `${tipo === 'apertura' ? 'Apertura' : 'Cierre'} publicado en Basecamp: ${r.resumen.hoy} para hoy, ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios.`, url: r.url });
       setNotas(''); setNarrativa(null);
     } catch (e) { setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo publicar' }); }
     setBusy(null);
