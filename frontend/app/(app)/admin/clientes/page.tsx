@@ -75,6 +75,11 @@ export default function AdminClientesPage() {
                   catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
                 }}>{(c.config as { basecamp_webhook_id?: number })?.basecamp_webhook_id ? '✓ Webhook activo' : 'Activar webhook'}</button>
               )}
+              <button type="button" className={`${c.activo ? 'link-danger' : 'link-action'} text-xs`} title={c.activo ? 'Dar de baja: deja de aparecer en backlog, daily, weekly e informes; su historial se conserva' : 'Reactivar cliente'} onClick={async () => {
+                if (c.activo && !confirm(`Dar de baja a "${c.nombre}". Sus tareas y proyectos se conservan pero dejan de aparecer en el backlog y los rituales. ¿Continuar?`)) return;
+                setError(null); setOk(null);
+                try { await api(`/clientes/${c.id}`, { method: 'PATCH', json: { activo: !c.activo } }); setOk(`${c.nombre}: ${c.activo ? 'dado de baja' : 'reactivado'}.`); await cargar(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
+              }}>{c.activo ? 'Dar de baja' : 'Reactivar'}</button>
               {c.basecamp_project_id && (
                 <button type="button" className={`${c.basecamp_importado_at ? 'btn-ghost' : 'btn-primary'} text-xs`} title={c.basecamp_importado_at ? `Importado ${new Date(c.basecamp_importado_at).toLocaleString('es-EC')}. Volver a importar trae solo lo nuevo.` : 'Trae las listas y to-dos existentes del proyecto Basecamp (solo títulos, nunca comentarios)'} onClick={async () => {
                   if (!confirm(`Importar las listas de to-dos de "${c.nombre}" desde Basecamp. Solo entran títulos, fechas, asignados y estado; nunca descripciones ni comentarios. ¿Continuar?`)) return;

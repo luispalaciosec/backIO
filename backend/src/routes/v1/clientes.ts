@@ -48,6 +48,7 @@ const patchSchema = z.object({
   logo_url: z.string().url().nullable().optional(),
   config: z.record(z.unknown()).optional(),
   mesa_id: z.string().uuid().nullable().optional(),
+  activo: z.boolean().optional(),
 });
 
 /**
