@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
@@ -47,6 +48,32 @@ const patchSchema = z.object({
   logo_url: z.string().url().nullable().optional(),
   config: z.record(z.unknown()).optional(),
   mesa_id: z.string().uuid().nullable().optional(),
+});
+
+/**
+ * Alta manual de cliente (admin). Para cuentas que no pasan por PrometIO o que están divididas en ramas
+ * (p. ej. AB-Inbev con un proyecto Basecamp por rama). El id se genera aquí; si luego PrometIO manda la
+ * empresa, se enlaza por nombre desde Admin.
+ */
+clientes.post('/', requireScope('admin'), zValidator('json', z.object({
+  nombre: z.string().min(2).max(120),
+  basecamp_project_id: z.number().int().nullable().optional(),
+  mesa_id: z.string().uuid().nullable().optional(),
+  color_primario: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  grupo: z.string().max(80).nullable().optional(),
+})), async (c) => {
+  const ctx = ctxOf(c);
+  const b = c.req.valid('json');
+  const slug = b.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || `cliente-${Date.now()}`;
+  const { data: dup } = await ctx.db.from('clientes').select('id, nombre').eq('tenant_id', ctx.tenantId).or(`slug.eq.${slug}${b.basecamp_project_id ? `,basecamp_project_id.eq.${b.basecamp_project_id}` : ''}`).maybeSingle();
+  if (dup) return c.json({ error: `Ya existe un cliente con ese nombre o ese proyecto de Basecamp: ${(dup as { nombre: string }).nombre}` }, 409);
+  const { data, error } = await ctx.db.from('clientes').insert({
+    id: randomUUID(), tenant_id: ctx.tenantId, nombre: b.nombre, slug, basecamp_project_id: b.basecamp_project_id ?? null, mesa_id: b.mesa_id ?? null,
+    color_primario: b.color_primario ?? '#0073EA', activo: true, config: { origen: 'manual', ...(b.grupo ? { grupo: b.grupo } : {}) },
+  }).select().single();
+  if (error) return c.json({ error: error.message }, 500);
+  await audit(ctx, { accion: 'crear_cliente', entidad: 'cliente', entidad_id: (data as { id: string }).id, detalle: { nombre: b.nombre, basecamp_project_id: b.basecamp_project_id ?? null, origen: 'manual' } });
+  return c.json(data, 201);
 });
 
 clientes.patch('/:id', requireScope('admin'), zValidator('json', patchSchema), async (c) => {

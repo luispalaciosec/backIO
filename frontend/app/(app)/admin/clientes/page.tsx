@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { Cliente } from '@backio/shared';
+import type { Cliente, Mesa } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 
@@ -8,6 +8,10 @@ export default function AdminClientesPage() {
   const [items, setItems] = useState<Cliente[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [mesasAlta, setMesasAlta] = useState<Mesa[]>([]);
+  const [nuevo, setNuevo] = useState({ nombre: '', basecamp_project_id: '', mesa_id: '', grupo: '' });
+  const [creando, setCreando] = useState(false);
+  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesasAlta(r.items.filter((m) => m.activa))).catch(() => {}); }, []);
   const [diag, setDiag] = useState<Record<string, unknown> | null>(null);
   const cargar = () => api<{ items: Cliente[] }>('/clientes?todos=1').then((r) => setItems(r.items)).catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => { void cargar(); }, []);
@@ -32,10 +36,25 @@ export default function AdminClientesPage() {
     <div className="max-w-5xl space-y-4">
       <header>
         <h1 className="text-2xl font-bold">Clientes</h1>
-        <p className="text-sm text-gray-500">Vienen de PrometIO con el mismo id. Aquí solo se configura lo que PrometIO no conoce: proyecto de Basecamp, branding del portal y PIN.</p>
+        <p className="text-sm text-gray-500">Normalmente vienen de PrometIO con el mismo id. Aquí se configura lo que PrometIO no conoce (proyecto de Basecamp, mesa, branding del portal y PIN) y se dan de alta a mano los clientes que no pasan por PrometIO, como las ramas de una misma cuenta.</p>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
       {ok && <Alert tipo="ok">{ok}</Alert>}
+      <form className="card p-4 grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_1fr_auto] items-end border-brand/30 bg-brand/5" onSubmit={async (e) => {
+        e.preventDefault(); setCreando(true); setError(null); setOk(null);
+        try {
+          const c = await api<Cliente>('/clientes', { method: 'POST', json: { nombre: nuevo.nombre.trim(), basecamp_project_id: nuevo.basecamp_project_id ? Number(nuevo.basecamp_project_id) : null, mesa_id: nuevo.mesa_id || null, grupo: nuevo.grupo.trim() || null } });
+          setOk(`Cliente "${c.nombre}" creado.${c.basecamp_project_id ? ' Ahora activa el webhook e importa sus listas desde su fila.' : ''}`);
+          setNuevo({ nombre: '', basecamp_project_id: '', mesa_id: '', grupo: '' }); await cargar();
+        } catch (err) { setError(err instanceof ApiError ? err.message : 'Error'); }
+        setCreando(false);
+      }}>
+        <div><label className="label">Nuevo cliente (alta manual)</label><input className="input" required minLength={2} placeholder="AB-Inbev · OFFline ON" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} /></div>
+        <div><label className="label">Basecamp project id</label><input className="input" inputMode="numeric" placeholder="48850050" value={nuevo.basecamp_project_id} onChange={(e) => setNuevo({ ...nuevo, basecamp_project_id: e.target.value.replace(/\D/g, '') })} /></div>
+        <div><label className="label">Mesa</label><select className="input" value={nuevo.mesa_id} onChange={(e) => setNuevo({ ...nuevo, mesa_id: e.target.value })}><option value="">Sin mesa</option>{mesasAlta.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>
+        <div><label className="label">Grupo (cuenta madre)</label><input className="input" placeholder="AB-Inbev" value={nuevo.grupo} onChange={(e) => setNuevo({ ...nuevo, grupo: e.target.value })} /></div>
+        <button className="btn-primary" disabled={creando || nuevo.nombre.trim().length < 2}>{creando ? 'Creando…' : '+ Crear cliente'}</button>
+      </form>
       <div className="space-y-3">
         {items.map((c) => (
           <form key={c.id} className="card p-4 grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_0.7fr_0.6fr_auto] items-end" action={(fd) => guardar(c, fd)}>
