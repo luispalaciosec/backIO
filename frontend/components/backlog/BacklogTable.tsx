@@ -94,7 +94,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
           {r.visible_cliente && <span className="text-xs shrink-0 pr-1" title={`El cliente ve: ${r.etiqueta_cliente}`}>👁</span>}
           {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />}
           <HistorialReq r={r} onCambio={onCambio} />
-          {!hecho && <button type="button" className={`text-xs shrink-0 px-1 ${r.daily_fecha === hoyLocal() ? 'text-brand font-bold' : 'text-gray-300 hover:text-gray-600'}`} title={r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'} onClick={(e) => { e.stopPropagation(); void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() }); }}>☀</button>}
+          {!hecho && <button type="button" className={`text-xs shrink-0 px-1 rounded ${r.daily_fecha === hoyLocal() ? 'bg-amber-200 ring-1 ring-amber-400' : 'grayscale opacity-30 hover:opacity-80'}`} title={r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'} onClick={(e) => { e.stopPropagation(); void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() }); }}>☀</button>}
           {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0 pr-2" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
         </div>
       </div>
