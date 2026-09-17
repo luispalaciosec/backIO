@@ -204,7 +204,7 @@ Basecamp → BackIO, automático:
 |---|---|---|
 | To-do completado / reabierto | Estado completado / en proceso (+ reproceso) | Webhook, segundos |
 | To-do enviado a la papelera o archivado | Requerimiento **cancelado** (auditoría `basecamp_eliminado`); si se restaura, vuelve a En proceso | Webhook, segundos; verificación cada hora |
-| Título del to-do editado | `titulo_interno` (excepción D1) | Webhook o cada hora |
+| Título del to-do editado | `titulo_interno` (excepción D1, solo por la lectura de listas; el webhook sigue sin extraer texto) | Cada hora o con ↻ Sincronizar |
 | To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada hora |
 | Lista renombrada | Nombre del proyecto | Cada hora |
 | Responsables cambiados | `owner_agencia` (si la persona está vinculada) | Cada hora |

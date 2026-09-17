@@ -21,8 +21,6 @@ export interface BasecampSyncPayload {
   due_on: string | null;
   assignee_ids: number[];
   updated_at: string;
-  /** Título del to-do (excepción D1: es el nombre de la tarea, no una conversación). */
-  titulo?: string | null;
   /** true = el to-do fue enviado a la papelera o archivado; false = restaurado. */
   eliminado?: boolean;
 }
@@ -71,7 +69,6 @@ export function extractSafeTodo(recording: unknown): BasecampSyncPayload | null 
     due_on: typeof r.due_on === 'string' ? r.due_on : null,
     assignee_ids: assignees,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : new Date().toISOString(),
-    titulo: typeof r.title === 'string' ? r.title.slice(0, 300) : typeof r.content === 'string' && !/<[a-z]/i.test(r.content) ? r.content.slice(0, 300) : null,
   };
 }
 
@@ -101,10 +98,6 @@ export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload)
     await updateRequerimiento(tenantCtx0, req.id, { estado_operativo: reabrirEstado(req) });
     await audit(tenantCtx0, { accion: 'basecamp_restaurado', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: safe.todo_id } });
     return { aplicado: true, requerimiento_id: req.id, motivo: 'restaurado en Basecamp' };
-  }
-  // Título cambiado en Basecamp (excepción D1).
-  if (safe.titulo && safe.titulo !== req.titulo_interno) {
-    await updateRequerimiento(tenantCtx0, req.id, { titulo_interno: safe.titulo });
   }
   if (safe.completed === null) return { aplicado: false, requerimiento_id: req.id, motivo: 'evento sin estado; requiere consulta al to-do vivo' };
 
