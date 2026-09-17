@@ -194,3 +194,23 @@ manualmente como respaldo). A la quinta semana, el Card Table se archiva.
 
 No se migra automáticamente: se hace export CSV y se importa con el bulk import del Builder,
 asignando bloques y pesos a mano. Es una sola vez y garantiza limpieza.
+
+
+## Sincronización de estructura (17/09/2026, feedback de operaciones)
+
+Basecamp → BackIO, automático:
+
+| Cambio en Basecamp | Efecto en BackIO | Cuándo |
+|---|---|---|
+| To-do completado / reabierto | Estado completado / en proceso (+ reproceso) | Webhook, segundos |
+| To-do enviado a la papelera o archivado | Requerimiento **cancelado** (auditoría `basecamp_eliminado`); si se restaura, vuelve a En proceso | Webhook, segundos; verificación cada hora |
+| Título del to-do editado | `titulo_interno` (excepción D1) | Webhook o cada hora |
+| To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada hora |
+| Lista renombrada | Nombre del proyecto | Cada hora |
+| Responsables cambiados | `owner_agencia` (si la persona está vinculada) | Cada hora |
+| To-do nuevo creado a mano | Huérfano (no se importa solo) | Cada 30 min |
+| Horas del timesheet | Horas por tarea y persona | Cada 6 h |
+
+Manual e inmediato: Admin → Clientes → **↻ Sincronizar Basecamp** hace todo lo anterior y además trae los to-dos nuevos.
+BackIO → Basecamp: fecha de entrega (al instante), estructura de proyectos del Builder, reapertura por reproceso, mensajes de daily/weekly/informe.
+Nunca: comentarios, descripciones, adjuntos.

@@ -14,9 +14,17 @@ import { audit } from '../db/audit';
 import { generarPortalToken } from '../portal/token';
 import { BasecampClient } from './client';
 
-export interface ResultadoImport { listas: number; proyectos_creados: number; requerimientos_creados: number; ya_enlazados: number; omitidos_completados_viejos: number; responsables_actualizados: number }
+export interface ResultadoImport { listas: number; proyectos_creados: number; requerimientos_creados: number; ya_enlazados: number; omitidos_completados_viejos: number; responsables_actualizados: number; titulos_actualizados: number; movidos: number; proyectos_renombrados: number; eliminados_en_basecamp: number }
 
-export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opts: { incluirCompletados?: boolean; diasCompletados?: number } = {}): Promise<ResultadoImport> {
+/**
+ * Importa y SINCRONIZA la estructura del proyecto Basecamp de un cliente:
+ *  - to-dos nuevos → requerimientos (salvo `soloActualizar`, que los deja al flujo de huérfanos);
+ *  - en los ya enlazados: título (excepción D1), grupo → bloque, lista → proyecto (movimientos), responsables;
+ *  - listas renombradas → nombre del proyecto;
+ *  - to-dos eliminados/archivados en Basecamp → requerimiento cancelado (queda en historial).
+ * Nunca entran descripciones ni comentarios.
+ */
+export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opts: { incluirCompletados?: boolean; diasCompletados?: number; soloActualizar?: boolean } = {}): Promise<ResultadoImport> {
   const cliente = await getCliente(ctx, clienteId);
   if (!cliente?.basecamp_project_id) throw new Error('Cliente sin proyecto Basecamp');
   const bc = await BasecampClient.forTenant(ctx.tenantId);
@@ -25,16 +33,17 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
   const todosetId = await bc.getTodosetId(cliente.basecamp_project_id);
   const listas = await bc.listTodolists(cliente.basecamp_project_id, todosetId);
 
-  const { data: existentesP } = await ctx.db.from('proyectos').select('id, basecamp_todolist_id, basecamp_grupos').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).is('deleted_at', null);
-  type P = { id: string; basecamp_todolist_id: number | null; basecamp_grupos: Record<string, number> };
+  const { data: existentesP } = await ctx.db.from('proyectos').select('id, nombre, basecamp_todolist_id, basecamp_grupos').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).is('deleted_at', null);
+  type P = { id: string; nombre?: string; basecamp_todolist_id: number | null; basecamp_grupos: Record<string, number> };
   const proyectoPorLista = new Map(((existentesP ?? []) as P[]).filter((p) => p.basecamp_todolist_id).map((p) => [p.basecamp_todolist_id as number, p]));
-  const { data: existentesR } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id, owner_agencia').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).not('basecamp_todo_id', 'is', null).is('deleted_at', null);
-  type RX = { id: string; basecamp_todo_id: number; owner_agencia: string[] };
+  const { data: existentesR } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id, owner_agencia, titulo_interno, bloque_nombre, proyecto_id, estado_operativo').eq('tenant_id', ctx.tenantId).eq('cliente_id', clienteId).not('basecamp_todo_id', 'is', null).is('deleted_at', null);
+  type RX = { id: string; basecamp_todo_id: number; owner_agencia: string[]; titulo_interno: string; bloque_nombre: string | null; proyecto_id: string | null; estado_operativo: string };
+  const vistos = new Set<number>();
   const enlazadoPorTodo = new Map(((existentesR ?? []) as RX[]).map((x) => [x.basecamp_todo_id, x]));
   const yaEnlazados = new Set(enlazadoPorTodo.keys());
 
   const limiteCompletados = Date.now() - (opts.diasCompletados ?? 60) * 86_400_000;
-  const r: ResultadoImport = { listas: listas.length, proyectos_creados: 0, requerimientos_creados: 0, ya_enlazados: 0, omitidos_completados_viejos: 0, responsables_actualizados: 0 };
+  const r: ResultadoImport = { listas: listas.length, proyectos_creados: 0, requerimientos_creados: 0, ya_enlazados: 0, omitidos_completados_viejos: 0, responsables_actualizados: 0, titulos_actualizados: 0, movidos: 0, proyectos_renombrados: 0, eliminados_en_basecamp: 0 };
 
   for (const lista of listas) {
     const grupos = await bc.listGroups(cliente.basecamp_project_id, lista.id);
@@ -43,19 +52,33 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
     for (const t of await bc.listTodosSafe(cliente.basecamp_project_id, lista.id, opts.incluirCompletados ?? true)) todosPlanos.push({ ...t, bloque: null, grupoId: null });
     for (const g of grupos) for (const t of await bc.listTodosSafe(cliente.basecamp_project_id, g.id, opts.incluirCompletados ?? true)) todosPlanos.push({ ...t, bloque: g.name, grupoId: g.id });
 
-    const nuevos = todosPlanos.filter((t) => !yaEnlazados.has(t.id));
+    for (const t of todosPlanos) vistos.add(t.id);
+    // Lista renombrada en Basecamp → nombre del proyecto.
+    const pExist = proyectoPorLista.get(lista.id);
+    if (pExist && pExist.nombre !== undefined && pExist.nombre !== lista.name && lista.name) {
+      await updateProyecto(ctx, pExist.id, { nombre: lista.name, basecamp_grupos: Object.fromEntries(grupos.map((g) => [g.name, g.id])) });
+      pExist.nombre = lista.name; r.proyectos_renombrados += 1;
+    }
+    const nuevos = opts.soloActualizar ? [] : todosPlanos.filter((t) => !yaEnlazados.has(t.id));
     const filtrados = nuevos.filter((t) => !(t.completed && t.completed_at && new Date(t.completed_at).getTime() < limiteCompletados));
     r.ya_enlazados += todosPlanos.length - nuevos.length;
     // Reimportación: completar responsables de to-dos ya enlazados que quedaron sin owner
     // (p. ej. porque los usuarios aún no tenían basecamp_user_id al importar).
     for (const t of todosPlanos) {
       const ex = enlazadoPorTodo.get(t.id);
-      if (!ex || ex.owner_agencia.length) continue;
+      if (!ex) continue;
+      const patch: Record<string, unknown> = {};
+      // Título (excepción D1) y grupo → bloque.
+      if (t.titulo && t.titulo !== ex.titulo_interno) { patch.titulo_interno = t.titulo; r.titulos_actualizados += 1; }
+      if ((t.bloque ?? null) !== (ex.bloque_nombre ?? null)) patch.bloque_nombre = t.bloque;
+      // To-do movido a otra lista → otro proyecto.
+      const pDestino = proyectoPorLista.get(lista.id);
+      if (pDestino && ex.proyecto_id !== pDestino.id) { patch.proyecto_id = pDestino.id; patch.basecamp_todolist_id = t.grupoId ?? lista.id; r.movidos += 1; }
+      // Responsables: los asignados en Basecamp que tienen usuario en BackIO.
       const owners = t.assignee_ids.map((id) => porBcUser.get(id)).filter((x): x is string => !!x);
-      if (!owners.length) continue;
-      const { error } = await ctx.db.from('requerimientos').update({ owner_agencia: owners }).eq('id', ex.id);
-      throwIf(error);
-      r.responsables_actualizados += 1;
+      const igual = owners.length === ex.owner_agencia.length && owners.every((o) => ex.owner_agencia.includes(o));
+      if (owners.length && !igual) { patch.owner_agencia = owners; r.responsables_actualizados += 1; }
+      if (Object.keys(patch).length) { const { error } = await ctx.db.from('requerimientos').update(patch).eq('id', ex.id); throwIf(error); }
     }
     r.omitidos_completados_viejos += nuevos.length - filtrados.length;
     if (filtrados.length === 0 && (proyectoPorLista.has(lista.id) || todosPlanos.length === 0)) continue;
@@ -91,6 +114,21 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
       }
       r.requerimientos_creados += creados.length;
     }
+  }
+  // To-dos enlazados y abiertos que ya no aparecen en ninguna lista: se verifica uno a uno y, si Basecamp
+  // los tiene en la papelera o archivados (o ya no existen), el requerimiento se cancela.
+  for (const ex of enlazadoPorTodo.values()) {
+    if (vistos.has(ex.basecamp_todo_id) || ex.estado_operativo === 'completado' || ex.estado_operativo === 'cancelado') continue;
+    let eliminado = false;
+    try {
+      const raw = (await bc.getTodoRaw(cliente.basecamp_project_id, ex.basecamp_todo_id)) as { status?: string } | null;
+      eliminado = !raw || raw.status === 'trashed' || raw.status === 'archived';
+    } catch (err) { eliminado = /\b404\b/.test(err instanceof Error ? err.message : ''); }
+    if (!eliminado) continue;
+    const { error } = await ctx.db.from('requerimientos').update({ estado_operativo: 'cancelado', daily_fecha: null }).eq('id', ex.id);
+    throwIf(error);
+    await audit(ctx, { accion: 'basecamp_eliminado', entidad: 'requerimiento', entidad_id: ex.id, detalle: { todo_id: ex.basecamp_todo_id, titulo: ex.titulo_interno } });
+    r.eliminados_en_basecamp += 1;
   }
   await ctx.db.from('clientes').update({ basecamp_importado_at: new Date().toISOString() }).eq('id', clienteId);
   await audit(ctx, { accion: 'basecamp_importar', entidad: 'cliente', entidad_id: clienteId, detalle: r });

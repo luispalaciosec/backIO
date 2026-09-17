@@ -21,9 +21,15 @@ export interface BasecampSyncPayload {
   due_on: string | null;
   assignee_ids: number[];
   updated_at: string;
+  /** Título del to-do (excepción D1: es el nombre de la tarea, no una conversación). */
+  titulo?: string | null;
+  /** true = el to-do fue enviado a la papelera o archivado; false = restaurado. */
+  eliminado?: boolean;
 }
 
-const EVENTOS_TODO = new Set(['todo_completed', 'todo_uncompleted', 'todo_changed', 'todo_created', 'todo_assignment_changed', 'todo_due_on_changed', 'todo_unarchived']);
+const EVENTOS_TODO = new Set(['todo_completed', 'todo_uncompleted', 'todo_changed', 'todo_created', 'todo_assignment_changed', 'todo_due_on_changed', 'todo_unarchived', 'todo_untrashed', 'todo_trashed', 'todo_archived']);
+const EVENTOS_ELIMINADO = new Set(['todo_trashed', 'todo_archived']);
+const EVENTOS_RESTAURADO = new Set(['todo_untrashed', 'todo_unarchived']);
 
 /**
  * Extrae el payload seguro de un evento de webhook. Devuelve null si no es evento de to-do.
@@ -43,7 +49,7 @@ export function extractSafePayload(evento: unknown): BasecampSyncPayload | null 
     : e.kind === 'todo_uncompleted' ? false
     : typeof rec.completed === 'boolean' ? rec.completed
     : null;
-  return { ...base, completed };
+  return { ...base, completed, ...(EVENTOS_ELIMINADO.has(e.kind) ? { eliminado: true } : EVENTOS_RESTAURADO.has(e.kind) ? { eliminado: false } : {}) };
 }
 
 /** Extrae el payload seguro de un objeto to-do (webhook o polling). */
@@ -65,6 +71,7 @@ export function extractSafeTodo(recording: unknown): BasecampSyncPayload | null 
     due_on: typeof r.due_on === 'string' ? r.due_on : null,
     assignee_ids: assignees,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : new Date().toISOString(),
+    titulo: typeof r.title === 'string' ? r.title.slice(0, 300) : typeof r.content === 'string' && !/<[a-z]/i.test(r.content) ? r.content.slice(0, 300) : null,
   };
 }
 
@@ -82,6 +89,23 @@ export interface SyncResult {
 export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload): Promise<SyncResult> {
   const req = await findByBasecampTodo(ctx, safe.todo_id);
   if (!req) return { aplicado: false, motivo: 'to-do no gestionado por BackIO' };
+  const tenantCtx0: DbCtx = { ...ctx, tenantId: req.tenant_id };
+  // Eliminado o archivado en Basecamp → cancelado en BackIO. Restaurado → vuelve a En proceso.
+  if (safe.eliminado === true) {
+    if (req.estado_operativo === 'cancelado' || req.estado_operativo === 'completado') return { aplicado: false, requerimiento_id: req.id, motivo: 'ya cerrado' };
+    await updateRequerimiento(tenantCtx0, req.id, { estado_operativo: 'cancelado', daily_fecha: null });
+    await audit(tenantCtx0, { accion: 'basecamp_eliminado', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: safe.todo_id } });
+    return { aplicado: true, requerimiento_id: req.id, motivo: 'eliminado en Basecamp' };
+  }
+  if (safe.eliminado === false && req.estado_operativo === 'cancelado') {
+    await updateRequerimiento(tenantCtx0, req.id, { estado_operativo: reabrirEstado(req) });
+    await audit(tenantCtx0, { accion: 'basecamp_restaurado', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: safe.todo_id } });
+    return { aplicado: true, requerimiento_id: req.id, motivo: 'restaurado en Basecamp' };
+  }
+  // Título cambiado en Basecamp (excepción D1).
+  if (safe.titulo && safe.titulo !== req.titulo_interno) {
+    await updateRequerimiento(tenantCtx0, req.id, { titulo_interno: safe.titulo });
+  }
   if (safe.completed === null) return { aplicado: false, requerimiento_id: req.id, motivo: 'evento sin estado; requiere consulta al to-do vivo' };
 
   const yaCompletado = req.estado_operativo === 'completado';

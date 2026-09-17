@@ -62,7 +62,15 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
             <div className="font-semibold">{r.titulo_interno}</div>
             <div className="text-xs text-gray-500 mt-1">Comprometida {fecha(r.fecha_entrega_original)}{r.fecha_entrega !== r.fecha_entrega_original ? <> · vigente <b>{fecha(r.fecha_entrega)}</b></> : null} · {r.veces_reprogramado} reprogramaciones · {r.veces_reproceso ?? 0} reprocesos</div>
           </div>
-          <button className="btn-ghost" onClick={onClose}>×</button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button className="link-danger text-xs" disabled={busy} title="Quita la tarea de BackIO (queda en el historial de auditoría). No borra nada en Basecamp." onClick={async () => {
+              if (!confirm(`Eliminar "${r.titulo_interno}" de BackIO.${r.basecamp_todo_id ? ' El to-do de Basecamp no se toca: si sigue existiendo allá, aparecerá como huérfano.' : ''} ¿Continuar?`)) return;
+              setBusy(true); setErr(null);
+              try { await api(`/requerimientos/${r.id}`, { method: 'DELETE' }); onCambio(); onClose(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
+              setBusy(false);
+            }}>🗑 Eliminar tarea</button>
+            <button className="btn-ghost" onClick={onClose}>×</button>
+          </div>
         </div>
         <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
           <button className={`px-3 py-1 rounded ${tab === 'historial' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('historial')}>Historial</button>

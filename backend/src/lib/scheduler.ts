@@ -14,6 +14,7 @@ import { iaDisponible } from './ia';
 import { generarInformeMensual } from './ia/informe';
 import { listMesas } from './db/mesas';
 import { procesarRecurrencias } from './recurrencias';
+import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
 
 const TZ = 'America/Guayaquil';
@@ -48,6 +49,17 @@ export function startScheduler(): void {
   setInterval(() => void reconciliar(), 30 * 60_000);
   // Huérfanos cada 30 min (desfasado 10 min de la reconciliación) y horas cada 6 h.
   setTimeout(() => setInterval(async () => { for (const t of await tenants()) await detectarHuerfanos({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] huerfanos', e.message)); }, 30 * 60_000), 10 * 60_000);
+  // Estructura de Basecamp (renombres, movimientos, responsables, eliminados) cada 60 min, desfasado 20 min.
+  setTimeout(() => setInterval(async () => {
+    for (const t of await tenants()) {
+      const ctx = { db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' as const };
+      const { data } = await serviceClient().from('clientes').select('id, nombre').eq('tenant_id', t).eq('activo', true).not('basecamp_project_id', 'is', null).not('basecamp_importado_at', 'is', null);
+      for (const c of (data ?? []) as { id: string; nombre: string }[]) {
+        try { const r = await importarBasecampCliente(ctx, c.id, { soloActualizar: true }); if (r.titulos_actualizados || r.movidos || r.proyectos_renombrados || r.eliminados_en_basecamp || r.responsables_actualizados) console.log('[scheduler] estructura', c.nombre, JSON.stringify(r)); }
+        catch (e) { console.error('[scheduler] estructura', c.nombre, e instanceof Error ? e.message : e); }
+      }
+    }
+  }, 60 * 60_000), 20 * 60_000);
   setInterval(async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); }, 6 * 3600_000);
 
   setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);

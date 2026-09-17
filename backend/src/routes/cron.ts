@@ -6,6 +6,7 @@ import { recalcularSenales } from '../lib/rituals/service';
 import { procesarPendientes } from '../lib/notificaciones';
 import { detectarHuerfanos } from '../lib/basecamp/huerfanos';
 import { procesarRecurrencias } from '../lib/recurrencias';
+import { importarBasecampCliente } from '../lib/basecamp/importar';
 import { sincronizarHoras } from '../lib/horas';
 
 export const cron = new Hono();
@@ -51,6 +52,16 @@ cron.post('/senales', async (c) => {
 cron.post('/huerfanos', async (c) => {
   const out: Record<string, unknown> = {};
   for (const t of await tenants()) out[t] = await detectarHuerfanos({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({ error: e.message }));
+  return c.json(out);
+});
+/** Cada hora: estructura de Basecamp (renombres, movimientos, responsables, eliminados). */
+cron.post('/basecamp/estructura', async (c) => {
+  const out: Record<string, unknown> = {};
+  for (const t of await tenants()) {
+    const ctx = { db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' as const };
+    const { data } = await serviceClient().from('clientes').select('id, nombre').eq('tenant_id', t).eq('activo', true).not('basecamp_project_id', 'is', null).not('basecamp_importado_at', 'is', null);
+    for (const cl of (data ?? []) as { id: string; nombre: string }[]) out[cl.nombre] = await importarBasecampCliente(ctx, cl.id, { soloActualizar: true }).catch((e: Error) => ({ error: e.message }));
+  }
   return c.json(out);
 });
 /** Diario: recurrencias de fees. */

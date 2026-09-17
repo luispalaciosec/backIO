@@ -30,7 +30,7 @@ async function handle(raw: string) {
   const ctx = { db: serviceClient(), tenantId: '', usuarioId: null, origen: 'webhook:basecamp' as const };
 
   // Estado desconocido (p. ej. todo_changed): consultar el to-do vivo. Solo se extraen campos seguros.
-  if (safe.completed === null) {
+  if (safe.completed === null && safe.eliminado === undefined) {
     const req = await findByBasecampTodo(ctx, safe.todo_id);
     if (req && safe.bucket_id) {
       try {
