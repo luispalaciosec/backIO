@@ -29,11 +29,14 @@ export interface BacklogTableProps {
   proyectos?: Record<string, string>;
   /** Recargar tras registrar/cerrar un reproceso o completar una causa. */
   onCambio?: () => void;
+  /** Si se pasa, muestra ↻ junto al cliente para sincronizar con Basecamp (admin, operaciones, ejecutivas). */
+  onSincronizar?: (cliente: Cliente) => Promise<void>;
 }
 
 const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_90px_80px_80px_70px_120px_120px]';
 
-export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined }: BacklogTableProps) {
+export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
+  const [sincronizando, setSincronizando] = useState<string | null>(null);
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
   const grupos = clientes
     .map((c, i) => ({ cliente: c, color: colorGrupo(i, c.color_primario), reqs: items.filter((r) => r.cliente_id === c.id) }))
@@ -47,10 +50,15 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
         const cerrado = colapsados.has(cliente.id);
         return (
           <section key={cliente.id}>
-            <button type="button" onClick={() => toggle(cliente.id)} className="flex items-center gap-2 mb-1 text-lg font-semibold" style={{ color }}>
-              <span className={`inline-block transition-transform ${cerrado ? '' : 'rotate-90'}`}>▸</span>
-              {cliente.nombre} <span className="text-sm font-normal text-gray-400">{reqs.length} {reqs.length === 1 ? 'requerimiento' : 'requerimientos'}</span>
-            </button>
+            <div className="flex items-center gap-3 mb-1">
+              <button type="button" onClick={() => toggle(cliente.id)} className="flex items-center gap-2 text-lg font-semibold" style={{ color }}>
+                <span className={`inline-block transition-transform ${cerrado ? '' : 'rotate-90'}`}>▸</span>
+                {cliente.nombre} <span className="text-sm font-normal text-gray-400">{reqs.length} {reqs.length === 1 ? 'requerimiento' : 'requerimientos'}</span>
+              </button>
+              {onSincronizar && cliente.basecamp_project_id && (
+                <button type="button" className="btn-ghost text-xs py-1" disabled={sincronizando !== null} title="Trae de Basecamp los to-dos nuevos y actualiza títulos, listas, grupos, responsables y eliminados" onClick={async () => { setSincronizando(cliente.id); await onSincronizar(cliente); setSincronizando(null); }}>{sincronizando === cliente.id ? '⏳ Sincronizando…' : '↻ Sincronizar Basecamp'}</button>
+              )}
+            </div>
             {!cerrado && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50`}>

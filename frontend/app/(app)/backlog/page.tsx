@@ -29,7 +29,7 @@ export default function BacklogPage() {
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
   const [celebracion, setCelebracion] = useState<{ n: number; titulos: string[] } | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 4000); return () => clearTimeout(t); }, [aviso]);
+  useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 9000); return () => clearTimeout(t); }, [aviso]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -110,6 +110,16 @@ export default function BacklogPage() {
       setError(e instanceof ApiError ? e.message : 'No se pudo actualizar');
       await cargar(true);
     }
+  }
+
+  const puedeSincronizar = ['admin', 'operaciones', 'ejecutiva'].includes(me?.rol ?? '');
+  async function sincronizar(c: Cliente) {
+    setError(null);
+    try {
+      const r = await api<{ requerimientos_creados: number; titulos_actualizados: number; movidos: number; proyectos_renombrados: number; responsables_actualizados: number; eliminados_en_basecamp: number; proyectos_creados: number }>(`/clientes/${c.id}/basecamp/importar`, { method: 'POST' });
+      setAviso(`${c.nombre} sincronizado: ${r.requerimientos_creados} tareas nuevas · ${r.proyectos_creados} listas nuevas · ${r.proyectos_renombrados} listas renombradas · ${r.titulos_actualizados} títulos · ${r.movidos} movidas · ${r.responsables_actualizados} responsables · ${r.eliminados_en_basecamp} eliminadas en Basecamp`);
+      await cargar(true);
+    } catch (e) { setError(e instanceof ApiError ? e.message : 'No se pudo sincronizar'); }
   }
 
   async function crear(clienteId: string, titulo: string) {
@@ -248,7 +258,7 @@ export default function BacklogPage() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-x-auto pb-4">
-          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => void cargar(true)} />
+          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => void cargar(true)} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

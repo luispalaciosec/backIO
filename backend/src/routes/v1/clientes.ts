@@ -102,7 +102,10 @@ clientes.get('/:id/basecamp/webhook', requireScope('admin'), async (c) => {
 });
 
 /** Importa las listas de to-dos existentes en el proyecto Basecamp del cliente (excepción D1: solo títulos). */
-clientes.post('/:id/basecamp/importar', requireScope('admin'), async (c) => {
+/** Sincronizar con Basecamp: admin, operaciones y ejecutivas (decidido por Luis 17/09/2026). */
+clientes.post('/:id/basecamp/importar', requireScope('write:proyectos'), async (c) => {
+  const a = c.get('auth');
+  if (a.tipo === 'usuario' && !['admin', 'operaciones', 'ejecutiva'].includes(a.rol ?? '')) return c.json({ error: 'Solo admin, operaciones y ejecutivas pueden sincronizar con Basecamp' }, 403);
   try {
     const dias = Number(c.req.query('dias_completados') ?? 60);
     return c.json(await importarBasecampCliente(ctxOf(c), c.req.param('id'), { diasCompletados: Number.isFinite(dias) ? dias : 60 }));
