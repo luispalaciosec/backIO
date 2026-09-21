@@ -31,7 +31,7 @@ export default function DiaADiaPage() {
   const titulo = new Date(`${fecha}T12:00:00Z`).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   // Agrupar por hora para la línea de tiempo.
   const porHora = new Map<string, Evento[]>();
-  for (const e of d?.eventos ?? []) { const h = `${hora(e.fecha).slice(0, 2)}:00`; porHora.set(h, [...(porHora.get(h) ?? []), e]); }
+  for (const e of d?.eventos ?? []) { const h = `${new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Guayaquil', hour: '2-digit', hour12: false }).format(new Date(e.fecha)).slice(0, 2)}:00`; porHora.set(h, [...(porHora.get(h) ?? []), e]); }
 
   return (
     <div className="space-y-4 max-w-5xl">
