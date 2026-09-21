@@ -22,8 +22,19 @@ export async function detectarHuerfanos(ctx: DbCtx, opts: { notificar?: boolean 
   const clientes = (await listClientes(ctx)).filter((c) => c.basecamp_project_id && c.basecamp_importado_at);
   if (clientes.length === 0) return { clientes: 0, nuevos: 0, pendientes: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const { data: enlazados } = await ctx.db.from('requerimientos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null);
-  const conocidos = new Set(((enlazados ?? []) as { basecamp_todo_id: number }[]).map((r) => r.basecamp_todo_id));
+  // Paginado: PostgREST corta en 1000 filas y, con más tareas enlazadas, los to-dos ya conocidos salían como huérfanos.
+  const conocidos = new Set<number>();
+  for (let from = 0; ; from += 1000) {
+    const { data: enlazados, error: eEnl } = await ctx.db.from('requerimientos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null).order('id').range(from, from + 999);
+    throwIf(eEnl);
+    const filas = (enlazados ?? []) as { basecamp_todo_id: number }[];
+    for (const r of filas) conocidos.add(r.basecamp_todo_id);
+    if (filas.length < 1000) break;
+  }
+  // Huérfanos pendientes cuyo to-do ya está enlazado (falsos positivos): se cierran solos.
+  { const { data: pend } = await ctx.db.from('basecamp_huerfanos').select('id, basecamp_todo_id').eq('tenant_id', ctx.tenantId).is('resuelto_at', null);
+    const falsos = ((pend ?? []) as { id: string; basecamp_todo_id: number }[]).filter((h) => conocidos.has(h.basecamp_todo_id)).map((h) => h.id);
+    if (falsos.length) await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' }).in('id', falsos); }
   const { data: previos } = await ctx.db.from('basecamp_huerfanos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId);
   const yaRegistrados = new Set(((previos ?? []) as { basecamp_todo_id: number }[]).map((h) => h.basecamp_todo_id));
 
@@ -77,6 +88,15 @@ export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: strin
   const { data, error } = await ctx.db.from('basecamp_huerfanos').select('*').eq('tenant_id', ctx.tenantId).eq('id', id).single();
   throwIf(error);
   const h = data as Huerfano;
+  // Si el to-do ya tiene requerimiento (vivo o eliminado), no se crea otro: se reutiliza.
+  const { data: exist } = await ctx.db.from('requerimientos').select('id, deleted_at').eq('tenant_id', ctx.tenantId).eq('basecamp_todo_id', h.basecamp_todo_id).maybeSingle();
+  if (exist) {
+    const ex = exist as { id: string; deleted_at: string | null };
+    if (ex.deleted_at) await ctx.db.from('requerimientos').update({ deleted_at: null }).eq('id', ex.id);
+    await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: ex.id }).eq('id', id);
+    await audit(ctx, { accion: 'adoptar_huerfano', entidad: 'requerimiento', entidad_id: ex.id, detalle: { todo_id: h.basecamp_todo_id, reutilizado: true, restaurado: !!ex.deleted_at } });
+    return { requerimiento_id: ex.id };
+  }
   let pid = proyectoId ?? null;
   if (!pid && h.basecamp_todolist_id) {
     const { data: pg } = await ctx.db.from('proyectos').select('id, basecamp_todolist_id, basecamp_grupos').eq('tenant_id', ctx.tenantId).eq('cliente_id', h.cliente_id).is('deleted_at', null);

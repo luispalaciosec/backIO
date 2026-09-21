@@ -18,8 +18,14 @@ export async function sincronizarHoras(ctx: DbCtx, opts: { dias?: number; client
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const usuarios = await listUsuarios(ctx);
   const porPersona = new Map(usuarios.filter((u) => u.basecamp_user_id).map((u) => [u.basecamp_user_id as number, u.id]));
-  const { data: reqs } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null);
-  const porTodo = new Map(((reqs ?? []) as { id: string; basecamp_todo_id: number }[]).map((r) => [r.basecamp_todo_id, r.id]));
+  // Paginado: PostgREST corta en 1000 filas; sin esto las horas de los to-dos restantes quedaban sin tarea.
+  const porTodo = new Map<number, string>();
+  for (let from = 0; ; from += 1000) {
+    const { data: reqs } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null).order('id').range(from, from + 999);
+    const filas = (reqs ?? []) as { id: string; basecamp_todo_id: number }[];
+    for (const r of filas) porTodo.set(r.basecamp_todo_id, r.id);
+    if (filas.length < 1000) break;
+  }
 
   let entradas = 0, guardadas = 0, sinReq = 0;
   for (const c of clientes) {
