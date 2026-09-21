@@ -1,4 +1,4 @@
-import type { DbCtx } from './client';
+import { serviceClient, type DbCtx } from './client';
 
 export interface AuditEntry {
   accion: string;
@@ -23,8 +23,10 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
     }
   }
   // La auditoría nunca debe romper la operación principal.
+  // Se escribe SIEMPRE con service role: audit_log no tiene política de INSERT para sesiones de usuario
+  // (solo lectura para admin), y con el cliente del usuario el insert se rechazaba en silencio.
   try {
-    await ctx.db.from('audit_log').insert({
+    const { error } = await serviceClient().from('audit_log').insert({
       tenant_id: ctx.tenantId,
       usuario_id: ctx.usuarioId,
       api_key_id: ctx.apiKeyId ?? null,
@@ -34,6 +36,7 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
       entidad_id: e.entidad_id ?? null,
       detalle: e.detalle ?? null,
     });
+    if (error) console.error('[audit] insert rechazado', e.accion, error.message);
   } catch (err) {
     console.error('[audit] fallo al registrar', err);
   }
