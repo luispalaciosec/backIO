@@ -214,3 +214,17 @@ Basecamp → BackIO, automático:
 Manual e inmediato: Admin → Clientes → **↻ Sincronizar Basecamp** hace todo lo anterior y además trae los to-dos nuevos.
 BackIO → Basecamp: fecha de entrega (al instante), estructura de proyectos del Builder, reapertura por reproceso, mensajes de daily/weekly/informe.
 Nunca: comentarios, descripciones, adjuntos.
+
+
+## Incidente 22/09/2026: asignados borrados en Basecamp
+
+**Causa.** Basecamp trata `PUT /todos/:id.json` como reemplazo del to-do: un PUT que solo enviaba `due_on`
+dejaba los asignados vacíos y, además, no aplicaba la fecha (verificado en el sandbox: HTTP 200, assignees [],
+due_on sin cambio). Ese PUT lo hacía BackIO al reprogramar y, desde el 17/09, la reconciliación cada 30 min
+para cualquier tarea con fecha distinta entre BackIO y Basecamp. Efecto: a las pocas horas de asignar en
+Basecamp, la tarea quedaba sin dueño; y las fechas cambiadas en BackIO no llegaban a Basecamp (punto 1 de Marcia).
+
+**Corrección.** `BasecampClient.updateTodo` lee el to-do vivo y reenvía `content`, `description`, `due_on`,
+`starts_on`, `assignee_ids` y `completion_subscriber_ids` tal cual, cambiando solo lo pedido. La descripción se
+reenvía en memoria sin leerla ni guardarla (regla 1 intacta). Reparación: `scripts/reparar_asignados.ts` volvió a
+poner el responsable de BackIO en los to-dos abiertos que quedaron sin asignar (43 + 23).
