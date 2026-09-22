@@ -10,6 +10,8 @@ import { narrarWeekly } from '../../lib/ia/weekly';
 import { briefDesdeTexto } from '../../lib/ia/brief';
 import { redactarRecordatorio } from '../../lib/ia/recordatorio';
 import { generarInformeMensual } from '../../lib/ia/informe';
+import { informeCanal, gruposInforme } from '../../lib/informe_canal';
+import { fechaLocal } from '../../lib/rituals/daily';
 
 /** Capa de IA: redacta, nunca publica. Todo lo que sale de aquí lo revisa y publica una persona. */
 export const ia = new Hono();
@@ -55,4 +57,16 @@ ia.get('/informes', requireScope('read:senales'), async (c) => {
   const ctx = ctxOf(c);
   const { data } = await ctx.db.from('actas').select('id, tipo, mesa_id, semana_id, markdown, publicado_at, created_at').eq('tenant_id', ctx.tenantId).eq('tipo', 'informe_mensual').order('created_at', { ascending: false }).limit(24);
   return c.json({ items: data ?? [] });
+});
+
+// ---------------- Informe por canal (sin IA: puro cálculo)
+ia.get('/canal/grupos', requireScope('read:senales'), async (c) => c.json({ items: await gruposInforme(ctxOf(c)) }));
+ia.get('/canal', requireScope('read:senales'), async (c) => {
+  const ctx = ctxOf(c);
+  const ids = (c.req.query('clientes') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (!ids.length) return c.json({ error: 'Indica clientes=id1,id2' }, 400);
+  const hoy = fechaLocal();
+  const desde = c.req.query('desde') ?? '2026-09-01';
+  const hasta = c.req.query('hasta') ?? hoy;
+  return c.json(await informeCanal(ctx, { clienteIds: ids, desde, hasta, titulo: c.req.query('titulo') || undefined }));
 });

@@ -134,8 +134,23 @@ export class BasecampClient {
     return { id: r.id, app_url: r.app_url };
   }
 
-  async updateTodo(projectId: number, todoId: number, input: { due_on?: string | null; assignee_ids?: number[] }): Promise<void> {
-    await this.request('PUT', `/buckets/${projectId}/todos/${todoId}.json`, input);
+  /**
+   * PUT parcial seguro. Basecamp trata el PUT de un to-do como REEMPLAZO: si no se envían
+   * `assignee_ids`, `content`, `description`, etc., los borra. Por eso se lee el to-do vivo y se
+   * reenvían esos campos tal cual (sin leer ni guardar descripción: solo se reenvía la que ya está allá).
+   */
+  async updateTodo(projectId: number, todoId: number, input: { due_on?: string | null; assignee_ids?: number[]; content?: string }): Promise<void> {
+    const vivo = await this.request<{ content?: string; description?: string; due_on?: string | null; starts_on?: string | null; assignees?: { id: number }[]; completion_subscribers?: { id: number }[]; notify?: boolean }>('GET', `/buckets/${projectId}/todos/${todoId}.json`);
+    const cuerpo = {
+      content: input.content ?? vivo.content,
+      description: vivo.description ?? '',
+      due_on: input.due_on !== undefined ? input.due_on : vivo.due_on ?? null,
+      starts_on: vivo.starts_on ?? null,
+      assignee_ids: input.assignee_ids ?? (vivo.assignees ?? []).map((a) => a.id),
+      completion_subscriber_ids: (vivo.completion_subscribers ?? []).map((a) => a.id),
+      notify: false,
+    };
+    await this.request('PUT', `/buckets/${projectId}/todos/${todoId}.json`, cuerpo);
   }
 
   /** Desmarca un to-do completado (reproceso). */

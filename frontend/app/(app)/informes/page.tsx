@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { Mesa } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
@@ -41,7 +42,7 @@ export default function InformesPage() {
     <div className="space-y-4">
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Informes mensuales</h1>
+          <h1 className="text-2xl font-bold">Informes mensuales <Link href="/informes/canal" className="ml-3 text-sm font-normal link-action align-middle">Informe por canal (piezas y tareas) →</Link></h1>
           <p className="text-sm text-gray-500">Informe ejecutivo por mesa: entregas, piezas, horas de Basecamp, cotizado vs. horas, señales y arrastre, con lectura y decisiones redactadas por la IA. Se genera solo el día 1 de cada mes; aquí lo revisas y lo publicas en el board Weekly de la mesa.</p>
         </div>
         {ia ? (
