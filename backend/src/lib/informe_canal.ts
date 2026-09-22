@@ -74,5 +74,7 @@ export async function gruposInforme(ctx: DbCtx): Promise<{ id: string; nombre: s
   const out = [...porGrupo.entries()].map(([g, ids]) => ({ id: `grupo:${g}`, nombre: `${g} (todas las ramas)`, cliente_ids: ids }));
   const { data: t } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
   const presets = ((t as { config?: { informes_canal?: { id: string; nombre: string; cliente_ids: string[] }[] } } | null)?.config?.informes_canal) ?? [];
-  return [...presets, ...out];
+  // Además, cada cliente activo como opción propia: el informe sirve para cualquier cuenta, no solo grupos.
+  const individuales = clientes.filter((c) => !(c.config as { grupo?: string })?.grupo || true).map((c) => ({ id: `cliente:${c.id}`, nombre: c.nombre, cliente_ids: [c.id] })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return [...presets, ...out, ...individuales];
 }
