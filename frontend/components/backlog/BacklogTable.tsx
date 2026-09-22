@@ -1,7 +1,7 @@
 'use client';
 import { RecordatorioIA } from './RecordatorioIA';
 import { HistorialReq } from './HistorialReq';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoInput } from '@backio/shared';
 import { CeldaSelect, CeldaFecha, CeldaTexto, CeldaOwners } from './Celdas';
@@ -21,7 +21,7 @@ export interface BacklogTableProps {
   clientes: Cliente[];
   usuarios: Usuario[];
   onPatch: (id: string, patch: ActualizarRequerimientoInput) => Promise<void>;
-  onCrear?: (clienteId: string, titulo: string) => Promise<void>;
+  onCrear?: (clienteId: string, titulo: string, piezas: number) => Promise<void>;
   horas?: Record<string, number>;
   /** Si devuelve false, la fila se muestra sin editores (colaborador viendo tareas ajenas). */
   puedeEditar?: (r: RequerimientoMetricas) => boolean;
@@ -33,7 +33,7 @@ export interface BacklogTableProps {
   onSincronizar?: (cliente: Cliente) => Promise<void>;
 }
 
-const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_90px_80px_80px_70px_120px_120px]';
+const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_90px_80px_80px_70px_120px_120px]';
 
 export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
   const [sincronizando, setSincronizando] = useState<string | null>(null);
@@ -63,14 +63,14 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50`}>
                   <div className="flex"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
-                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
+                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Piezas', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
                     <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>
                   ))}
                 </div>
                 {reqs.map((r) => (
                   <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined} onCambio={onCambio} />
                 ))}
-                {onCrear && <NuevaFila color={color} onCrear={(t) => onCrear(cliente.id, t)} />}
+                {onCrear && <NuevaFila color={color} onCrear={(t, n) => onCrear(cliente.id, t, n)} />}
               </div>
             )}
           </section>
@@ -119,6 +119,7 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
       </div>
       <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_aprobacion} opciones={APROB} colores={COLOR_APROBACION} labels={APROBACION_LABEL} onChange={(v) => p({ estado_aprobacion: v as RequerimientoMetricas['estado_aprobacion'] })} /></div>
       <div className="border-l border-gray-100" title="Planificado: entró por el weekly · No planificado: entró durante la semana · Urgente"><CeldaSelect valor={r.planificacion ?? 'planificado'} opciones={PLANIF} colores={COLOR_PLANIFICACION} labels={PLANIFICACION_LABEL} onChange={(v) => p({ planificacion: v as RequerimientoMetricas['planificacion'] })} /></div>
+      <div className={`border-l border-gray-100 ${!r.piezas && !hecho ? 'bg-amber-50' : ''}`} title="Piezas del requerimiento (lo llena la ejecutiva). Alimenta el informe por canal."><CeldaPiezas valor={r.piezas ?? 0} onCommit={(n) => p({ piezas: n })} /></div>
       <div className="border-l border-gray-100"><span className="h-9 flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: COLOR_TIPO[r.tipo_trabajo] }}>{TIPO_LABEL[r.tipo_trabajo]}</span></div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_atraso > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{r.dias_atraso || ''}</div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_sin_movimiento > 14 ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{r.dias_sin_movimiento}</div>
@@ -129,9 +130,18 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
   );
 }
 
-function NuevaFila({ color, onCrear }: { color: string; onCrear: (titulo: string) => Promise<void> }) {
+function CeldaPiezas({ valor, onCommit }: { valor: number; onCommit: (n: number) => void | Promise<void> }) {
+  const [v, setV] = useState(String(valor || ''));
+  useEffect(() => { setV(String(valor || '')); }, [valor]);
+  const commit = () => { const n = Math.max(0, Math.floor(Number(v) || 0)); if (n !== valor) void onCommit(n); setV(String(n || '')); };
+  return <input className="h-9 w-full bg-transparent text-sm text-center tabular-nums placeholder:text-amber-500 focus:outline-none focus:ring-2 focus:ring-brand/40" inputMode="numeric" placeholder="¿piezas?" value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />;
+}
+
+function NuevaFila({ color, onCrear }: { color: string; onCrear: (titulo: string, piezas: number) => Promise<void> }) {
   const [v, setV] = useState('');
+  const [piezas, setPiezas] = useState('');
   const [busy, setBusy] = useState(false);
+  const crear = async () => { if (!v.trim()) return; setBusy(true); await onCrear(v.trim(), Math.max(0, Number(piezas) || 0)); setV(''); setPiezas(''); setBusy(false); };
   return (
     <div className="flex items-center">
       <span className="w-1.5 self-stretch" style={{ backgroundColor: color, opacity: 0.4 }} />
@@ -141,10 +151,9 @@ function NuevaFila({ color, onCrear }: { color: string; onCrear: (titulo: string
         value={v}
         disabled={busy}
         onChange={(e) => setV(e.target.value)}
-        onKeyDown={async (e) => {
-          if (e.key === 'Enter' && v.trim()) { setBusy(true); await onCrear(v.trim()); setV(''); setBusy(false); }
-        }}
+        onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }}
       />
+      <input className="h-9 w-24 bg-transparent text-sm text-center border-l border-gray-100 placeholder:text-gray-400 focus:outline-none" inputMode="numeric" placeholder="piezas" value={piezas} disabled={busy} onChange={(e) => setPiezas(e.target.value.replace(/\D/g, ''))} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
     </div>
   );
 }

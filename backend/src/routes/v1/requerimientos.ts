@@ -114,7 +114,7 @@ const patchSchema = z.object({
 });
 
 /** Campos que un colaborador puede cambiar en SUS tareas (owner_agencia lo incluye). El resto exige rol de gestión. */
-export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha'] as const;
+export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha', 'piezas'] as const;
 
 const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');

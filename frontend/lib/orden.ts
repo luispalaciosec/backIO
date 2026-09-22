@@ -1,6 +1,6 @@
 import type { RequerimientoMetricas } from '@backio/shared';
 
-export type CampoOrden = 'fecha_entrega' | 'fecha_pedido' | 'prioridad' | 'estado' | 'persona' | 'proyecto' | 'titulo' | 'atraso' | 'sin_movimiento' | 'ultima_actualizacion' | 'horas' | 'aprobacion';
+export type CampoOrden = 'fecha_entrega' | 'fecha_pedido' | 'prioridad' | 'estado' | 'persona' | 'proyecto' | 'titulo' | 'atraso' | 'sin_movimiento' | 'ultima_actualizacion' | 'horas' | 'aprobacion' | 'piezas';
 export type Dir = 'asc' | 'desc';
 
 export const CAMPOS_ORDEN: { campo: CampoOrden; label: string }[] = [
@@ -15,6 +15,7 @@ export const CAMPOS_ORDEN: { campo: CampoOrden; label: string }[] = [
   { campo: 'proyecto', label: 'Proyecto' },
   { campo: 'titulo', label: 'Título' },
   { campo: 'horas', label: 'Horas' },
+  { campo: 'piezas', label: 'Piezas' },
   { campo: 'ultima_actualizacion', label: 'Última actualización' },
 ];
 
@@ -42,6 +43,7 @@ export function ordenarRequerimientos(
       case 'sin_movimiento': return r.dias_sin_movimiento;
       case 'ultima_actualizacion': return r.ultima_actualizacion;
       case 'horas': return ctx.horas[r.id] ?? 0;
+      case 'piezas': return r.piezas ?? 0;
     }
   };
   const mult = dir === 'asc' ? 1 : -1;

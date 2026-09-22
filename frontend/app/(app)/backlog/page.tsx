@@ -82,7 +82,7 @@ export default function BacklogPage() {
 
   const me = useMe();
   const colaborador = me?.rol === 'colaborador';
-  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha'];
+  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha', 'piezas'];
   /** Un colaborador solo edita sus tareas y solo estado, fecha y entregables; el backend lo exige igual. */
   const puedeEditar = (r: RequerimientoMetricas) => !colaborador || (!!me?.usuario_id && r.owner_agencia.includes(me.usuario_id));
 
@@ -122,9 +122,9 @@ export default function BacklogPage() {
     } catch (e) { setError(e instanceof ApiError ? e.message : 'No se pudo sincronizar'); }
   }
 
-  async function crear(clienteId: string, titulo: string) {
+  async function crear(clienteId: string, titulo: string, piezas = 0) {
     try {
-      await api('/requerimientos', { method: 'POST', json: { cliente_id: clienteId, titulo_interno: titulo, tipo_trabajo: 'fee', fecha_pedido: new Date().toISOString().slice(0, 10) } });
+      await api('/requerimientos', { method: 'POST', json: { cliente_id: clienteId, titulo_interno: titulo, tipo_trabajo: 'fee', piezas, fecha_pedido: new Date().toISOString().slice(0, 10) } });
       await cargar(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo crear');
