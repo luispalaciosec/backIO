@@ -1,5 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, Mesa, EstadoOperativo, ActualizarRequerimientoInput } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
@@ -14,7 +15,7 @@ import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '
 
 type Vista = 'tabla' | 'kanban';
 
-export default function BacklogPage() {
+function BacklogInner() {
   const [items, setItems] = useState<RequerimientoMetricas[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -22,10 +23,34 @@ export default function BacklogPage() {
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
-  const [vista, setVista] = useState<Vista>('tabla');
-  const [filtro, setFiltro] = useState({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' });
-  const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>({ campo: 'fecha_entrega', dir: 'asc' });
+  // Filtros, orden y vista viven en la URL (sobreviven al refresh y se comparten) con respaldo en localStorage (preferencia de UI).
+  const router = useRouter();
+  const sp = useSearchParams();
+  const FILTRO0 = { cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' };
+  const leerInicial = () => {
+    const desdeUrl = sp.toString() ? Object.fromEntries(sp.entries()) : null;
+    let guardado: Record<string, string> | null = null;
+    if (!desdeUrl) { try { guardado = JSON.parse(localStorage.getItem('backio:backlog:filtros') ?? 'null'); } catch { /* ignore */ } }
+    const src = desdeUrl ?? guardado ?? {};
+    return {
+      filtro: { ...FILTRO0, cliente: src.cliente ?? '', owner: src.owner ?? '', estado: src.estado ?? '', proyecto: src.proyecto ?? '', mesa: src.mesa ?? '', planificacion: src.planificacion ?? '', q: src.q ?? '', activos: src.activos === undefined ? true : src.activos !== '0' },
+      orden: { campo: (src.orden as CampoOrden) || 'fecha_entrega', dir: (src.dir as Dir) || 'asc' },
+      vista: (src.vista === 'kanban' ? 'kanban' : 'tabla') as Vista,
+    };
+  };
+  const inicial = useRef(leerInicial());
+  const [vista, setVista] = useState<Vista>(inicial.current.vista);
+  const [filtro, setFiltro] = useState(inicial.current.filtro);
+  const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>(inicial.current.orden);
   const [panel, setPanel] = useState(false);
+  useEffect(() => {
+    const q: Record<string, string> = {};
+    for (const [k, v] of Object.entries(filtro)) { if (k === 'activos') { if (!v) q.activos = '0'; } else if (v) q[k] = String(v); }
+    if (orden.campo !== 'fecha_entrega') q.orden = orden.campo; if (orden.dir !== 'asc') q.dir = orden.dir; if (vista !== 'tabla') q.vista = vista;
+    const qs = new URLSearchParams(q).toString();
+    router.replace(qs ? `/backlog?${qs}` : '/backlog', { scroll: false });
+    try { localStorage.setItem('backio:backlog:filtros', JSON.stringify(q)); } catch { /* ignore */ }
+  }, [filtro, orden, vista, router]);
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
   const [celebracion, setCelebracion] = useState<{ n: number; titulos: string[] } | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -157,7 +182,7 @@ export default function BacklogPage() {
         </div>
       </header>
 
-      <div className="card">
+      <div className="card sticky top-0 z-30 shadow-sm">
         <button type="button" className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm" onClick={() => setPanel((v) => !v)}>
           <span className="flex items-center gap-2 flex-wrap">
             <span className="font-medium">{panel ? '▾' : '▸'} Buscar, filtrar y ordenar</span>
@@ -233,7 +258,7 @@ export default function BacklogPage() {
           {[{ campo: 'atraso', dir: 'desc', label: 'Más atrasados' }, { campo: 'sin_movimiento', dir: 'desc', label: 'Más tiempo sin mover' }, { campo: 'fecha_entrega', dir: 'asc', label: 'Próximos a vencer' }, { campo: 'prioridad', dir: 'asc', label: 'Prioridad alta primero' }].map((a) => (
             <button key={a.label} type="button" className={`text-xs rounded-full border px-3 py-1 ${orden.campo === a.campo && orden.dir === a.dir ? 'border-brand text-brand bg-brand/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`} onClick={() => setOrden({ campo: a.campo as CampoOrden, dir: a.dir as Dir })}>{a.label}</button>
           ))}
-          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro({ cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' }); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); }}>Limpiar</button>
+          <button type="button" className="ml-auto link-action text-xs" onClick={() => { setFiltro(FILTRO0); setOrden({ campo: 'fecha_entrega', dir: 'asc' }); try { localStorage.removeItem('backio:backlog:filtros'); } catch { /* ignore */ } }}>Limpiar</button>
         </div>
         </div>}
       </div>
@@ -257,7 +282,7 @@ export default function BacklogPage() {
       {loading && <div className="text-sm text-gray-500">Cargando…</div>}
 
       {!loading && vista === 'tabla' && (
-        <div className="overflow-x-auto pb-4">
+        <div className="overflow-auto pb-4 tablero" style={{ maxHeight: 'calc(100vh - 8.5rem)' }}>
           <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => void cargar(true)} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
         </div>
       )}
@@ -271,3 +296,6 @@ export default function BacklogPage() {
 function Chip({ children, tono = 'brand' }: { children: React.ReactNode; tono?: 'brand' | 'gris' }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs ${tono === 'brand' ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-600'}`}>{children}</span>;
 }
+
+
+export default function BacklogPage() { return <Suspense fallback={<div className="text-sm text-gray-500">Cargando…</div>}><BacklogInner /></Suspense>; }
