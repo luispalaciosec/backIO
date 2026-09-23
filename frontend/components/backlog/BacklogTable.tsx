@@ -61,7 +61,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
             </div>
             {!cerrado && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
-                <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50 sticky top-[2.5rem] z-10`}>
+                <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50 sticky top-0 z-10`}>
                   <div className="flex sticky left-0 z-10 bg-gray-50"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
                   {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Piezas', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
                     <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>

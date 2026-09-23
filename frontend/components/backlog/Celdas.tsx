@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { iniciales } from '@/lib/format';
 
 /** Celda de color sólido con selector nativo superpuesto (click en toda la celda). */
@@ -68,26 +68,48 @@ export function Avatar({ nombre, size = 28 }: { nombre: string; size?: number })
 /** Selector de owners: avatares apilados + select para agregar/quitar. */
 export function CeldaOwners({ ids, usuarios, onChange }: { ids: string[]; usuarios: { id: string; nombre: string }[]; onChange: (ids: string[]) => void | Promise<void> }) {
   const [abierto, setAbierto] = useState(false);
+  const [q, setQ] = useState('');
+  const [pos, setPos] = useState<{ x: number; y: number; arriba: boolean }>({ x: 0, y: 0, arriba: false });
+  const btn = useRef<HTMLButtonElement>(null);
   const seleccionados = ids.map((id) => usuarios.find((u) => u.id === id)).filter((u): u is { id: string; nombre: string } => !!u);
+  const abrir = () => {
+    const r = btn.current?.getBoundingClientRect();
+    if (r) { const arriba = window.innerHeight - r.bottom < 320; setPos({ x: r.left + r.width / 2, y: arriba ? r.top - 4 : r.bottom + 4, arriba }); }
+    setQ(''); setAbierto((a) => !a);
+  };
+  useEffect(() => {
+    if (!abierto) return;
+    const cerrar = (e: MouseEvent) => { const t = e.target as HTMLElement; if (!t.closest('[data-owners-pop]') && !btn.current?.contains(t)) setAbierto(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false); };
+    document.addEventListener('mousedown', cerrar); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', cerrar); document.removeEventListener('keydown', esc); };
+  }, [abierto]);
+  const filtrados = usuarios.filter((u) => !q || u.nombre.toLowerCase().includes(q.toLowerCase()));
+  const ordenados = [...filtrados].sort((a, b) => Number(ids.includes(b.id)) - Number(ids.includes(a.id)) || a.nombre.localeCompare(b.nombre));
   return (
     <div className="relative h-9 flex items-center justify-center">
-      <button type="button" className="flex -space-x-2 items-center" onClick={() => setAbierto((a) => !a)} title={seleccionados.map((u) => u.nombre).join(', ') || 'Asignar'}>
+      <button ref={btn} type="button" className="flex -space-x-2 items-center" onClick={abrir} title={seleccionados.map((u) => u.nombre).join(', ') || 'Asignar'}>
         {seleccionados.length === 0 && <span className="inline-flex items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400" style={{ width: 28, height: 28, fontSize: 14 }}>+</span>}
         {seleccionados.slice(0, 3).map((u) => <Avatar key={u.id} nombre={u.nombre} />)}
         {seleccionados.length > 3 && <span className="inline-flex items-center justify-center rounded-full bg-gray-200 text-gray-700 text-[10px] ring-2 ring-white" style={{ width: 28, height: 28 }}>+{seleccionados.length - 3}</span>}
       </button>
       {abierto && (
-        <div className="absolute z-20 top-full left-1/2 -translate-x-1/2 mt-1 w-56 card p-2 shadow-lg" onMouseLeave={() => setAbierto(false)}>
-          {usuarios.map((u) => {
-            const on = ids.includes(u.id);
-            return (
-              <label key={u.id} className="flex items-center gap-2 px-2 py-1 text-sm rounded hover:bg-gray-50 cursor-pointer">
-                <input type="checkbox" checked={on} onChange={() => onChange(on ? ids.filter((x) => x !== u.id) : [...ids, u.id])} />
-                <Avatar nombre={u.nombre} size={22} /> {u.nombre}
-              </label>
-            );
-          })}
-          {usuarios.length === 0 && <div className="text-xs text-gray-400 p-2">Sin usuarios</div>}
+        // Posición fija: escapa del overflow del tablero y del grupo.
+        <div data-owners-pop className="fixed z-50 w-64 card shadow-xl flex flex-col" style={{ left: pos.x, top: pos.arriba ? undefined : pos.y, bottom: pos.arriba ? window.innerHeight - pos.y : undefined, transform: 'translateX(-50%)', maxHeight: 320 }}>
+          <div className="p-2 border-b border-gray-100"><input autoFocus className="input py-1 text-sm" placeholder="Buscar persona…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <div className="overflow-y-auto p-1">
+            {ordenados.map((u) => {
+              const on = ids.includes(u.id);
+              return (
+                <label key={u.id} className={`flex items-center gap-2 px-2 py-1 text-sm rounded hover:bg-gray-50 cursor-pointer ${on ? 'bg-brand/5' : ''}`}>
+                  <input type="checkbox" checked={on} onChange={() => onChange(on ? ids.filter((x) => x !== u.id) : [...ids, u.id])} />
+                  <Avatar nombre={u.nombre} size={22} /> <span className="truncate">{u.nombre}</span>
+                </label>
+              );
+            })}
+            {ordenados.length === 0 && <div className="text-xs text-gray-400 p-2">Sin coincidencias</div>}
+          </div>
+          <div className="p-2 border-t border-gray-100 flex justify-between text-xs"><span className="text-gray-400">{ids.length} asignad{ids.length === 1 ? 'o' : 'os'}</span>{ids.length > 0 && <button type="button" className="link-danger" onClick={() => onChange([])}>Quitar todos</button>}</div>
         </div>
       )}
     </div>
