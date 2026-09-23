@@ -3,14 +3,15 @@ import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useIA } from '@/lib/useIA';
 
-export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }[] }) {
+/** Paso 3 del daily: notas, borrador con IA y publicación. La mesa viene fija del paso 1. */
+export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; mesaNombre: string; tieneBoard: boolean }) {
   const ia = useIA();
-  const [mesa, setMesa] = useState(mesas[0]?.id ?? '');
   const [notas, setNotas] = useState('');
   const [narrativa, setNarrativa] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'info'; texto: string; url?: string } | null>(null);
-  if (mesas.length === 0) return <span className="text-xs text-gray-400">Configura el board Daily de una mesa en Admin → Mesas para publicar desde aquí.</span>;
+  if (!mesa) return <span className="text-xs text-gray-400">Elige una mesa arriba para redactar y publicar su apertura o cierre.</span>;
+  if (!tieneBoard) return <span className="text-xs text-gray-400">{mesaNombre} no tiene board Daily configurado (Admin → Mesas), así que no se puede publicar desde aquí.</span>;
   const notasArr = () => notas.split('\n').map((s) => s.trim()).filter(Boolean);
 
   async function redactar(tipo: 'apertura' | 'cierre') {
@@ -34,7 +35,6 @@ export function DailyPublicar({ mesas }: { mesas: { id: string; nombre: string }
   return (
     <div className="flex flex-col gap-2 w-full lg:w-auto">
       <div className="flex flex-wrap items-center gap-2">
-        <select className="input w-40" value={mesa} onChange={(e) => setMesa(e.target.value)}>{mesas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>
         <input className="input w-72" placeholder="Notas clave del día (una por línea)" value={notas} onChange={(e) => setNotas(e.target.value)} />
         {ia && <button className="btn-secondary" disabled={!!busy} onClick={() => redactar('apertura')} title="La IA redacta la apertura con los datos del daily; tú la editas y publicas">{busy === 'ia-apertura' ? 'Redactando…' : '✨ Redactar apertura'}</button>}
         {ia && <button className="btn-secondary" disabled={!!busy} onClick={() => redactar('cierre')}>{busy === 'ia-cierre' ? 'Redactando…' : '✨ Redactar cierre'}</button>}

@@ -6,10 +6,10 @@ import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
 
 /** Elegir qué se trabaja hoy: marca daily_fecha = hoy en las tareas seleccionadas. */
-export function SeleccionDaily({ hoy, mesas }: { hoy: string; mesas: { id: string; nombre: string }[] }) {
+/** La mesa viene fija del paso 1 del daily: aquí solo se eligen tareas dentro de su alcance. */
+export function SeleccionDaily({ hoy, mesa, mesaNombre, seleccionadasHoy }: { hoy: string; mesa: string; mesaNombre: string; seleccionadasHoy: number }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
-  const [mesa, setMesa] = useState('');
   const [items, setItems] = useState<RequerimientoMetricas[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [q, setQ] = useState('');
@@ -17,10 +17,10 @@ export function SeleccionDaily({ hoy, mesas }: { hoy: string; mesas: { id: strin
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (!abierto) return;
-    Promise.all([api<{ items: RequerimientoMetricas[] }>('/requerimientos?activos=1'), api<{ items: Cliente[] }>('/clientes?todos=1')]).then(([r, c]) => { setItems(r.items); setClientes(c.items); }).catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
-  }, [abierto]);
+    Promise.all([api<{ items: RequerimientoMetricas[] }>(`/requerimientos?activos=1${mesa ? `&mesa=${mesa}` : ''}`), api<{ items: Cliente[] }>('/clientes?todos=1')]).then(([r, c]) => { setItems(r.items); setClientes(c.items); }).catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
+  }, [abierto, mesa]);
   const nc = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '';
-  const visibles = items.filter((r) => (!mesa || clientes.find((c) => c.id === r.cliente_id)?.mesa_id === mesa) && (!q || `${r.titulo_interno} ${nc(r.cliente_id)}`.toLowerCase().includes(q.toLowerCase())))
+  const visibles = items.filter((r) => (!q || `${r.titulo_interno} ${nc(r.cliente_id)}`.toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => (b.daily_fecha === hoy ? 1 : 0) - (a.daily_fecha === hoy ? 1 : 0) || (a.fecha_entrega ?? '9999').localeCompare(b.fecha_entrega ?? '9999'));
   async function toggle(r: RequerimientoMetricas) {
     setBusy(r.id); setErr(null);
@@ -29,7 +29,7 @@ export function SeleccionDaily({ hoy, mesas }: { hoy: string; mesas: { id: strin
     catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
     setBusy(null);
   }
-  const seleccionadas = items.filter((r) => r.daily_fecha === hoy).length;
+  const seleccionadas = items.length ? items.filter((r) => r.daily_fecha === hoy).length : seleccionadasHoy;
   return (
     <>
       <button className="btn-secondary" onClick={() => setAbierto(true)}>🎯 Elegir tareas de hoy{seleccionadas ? ` (${seleccionadas})` : ''}</button>
@@ -37,8 +37,7 @@ export function SeleccionDaily({ hoy, mesas }: { hoy: string; mesas: { id: strin
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setAbierto(false)}>
           <div className="card w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2 flex-wrap">
-              <div className="font-semibold flex-1">Qué se trabaja hoy · {fecha(hoy)}</div>
-              <select className="input w-40" value={mesa} onChange={(e) => setMesa(e.target.value)}><option value="">Todas las mesas</option>{mesas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>
+              <div className="font-semibold flex-1">Qué se trabaja hoy · {fecha(hoy)} · <span className="text-brand-dark">{mesaNombre}</span></div>
               <input className="input w-56" placeholder="Buscar tarea o cliente…" value={q} onChange={(e) => setQ(e.target.value)} />
               <button className="btn-primary" onClick={() => setAbierto(false)}>Listo</button>
             </div>
@@ -53,7 +52,7 @@ export function SeleccionDaily({ hoy, mesas }: { hoy: string; mesas: { id: strin
                   {r.planificacion === 'no_planificado' && <span className="rounded-full bg-amber-100 text-amber-800 px-2 text-[10px] font-semibold">no planif.</span>}
                 </label>
               ))}
-              {visibles.length === 0 && <p className="p-4 text-sm text-gray-400">Sin tareas activas con ese filtro.</p>}
+              {visibles.length === 0 && <p className="p-4 text-sm text-gray-400">Sin tareas activas de {mesaNombre} con ese filtro.</p>}
             </div>
             <p className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">Las marcadas salen en la columna «Hoy se trabaja» y en la apertura publicada en Basecamp. También se marcan desde el backlog con ☀. La selección es del día; mañana empieza vacía.</p>
           </div>

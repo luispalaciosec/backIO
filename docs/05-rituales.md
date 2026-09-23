@@ -141,6 +141,17 @@ rituales no fallan por falta de contenido, fallan por exceso.
 
 Vista dedicada: `/daily` — una sola pantalla, sin scroll, proyectable.
 
+**Construcción secuencial por mesa (22/09/2026).** El daily es de una mesa, no de la agencia:
+
+1. **Mesa.** Se elige primero (queda en la URL `?mesa=` y el navegador recuerda la última). Nada
+   se muestra hasta elegirla; existe la opción «toda la agencia» solo para gerencia.
+2. **Hoy.** «Elegir tareas de hoy» lista únicamente las tareas activas de la mesa
+   (`GET /requerimientos?mesa=`), y marca `daily_fecha`.
+3. **Tablero.** Las cuatro columnas salen de `GET /semanas/daily?mesa=`, acotadas a los clientes
+   y proyectos de la mesa (`alcanceMesa`).
+4. **Publicar.** Notas, borrador con IA y apertura/cierre van al board Daily de esa misma mesa.
+   Cambiar la mesa rearma los cuatro pasos.
+
 ---
 
 ## Generación de documentos

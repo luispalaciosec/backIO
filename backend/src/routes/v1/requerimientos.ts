@@ -1,3 +1,4 @@
+import { alcanceMesa } from '../../lib/db/mesas';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
@@ -35,6 +36,7 @@ requerimientos.get('/', requireScope('read:backlog'), async (c) => {
     desde: q.desde || undefined,
     hasta: q.hasta || undefined,
     query: q.q || undefined,
+    mesa: q.mesa ? await alcanceMesa(ctxOf(c), q.mesa) : undefined,
   });
   return c.json({ items, total: items.length });
 });
