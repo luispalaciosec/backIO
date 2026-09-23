@@ -1,5 +1,8 @@
 /**
- * Importación única de las listas de to-dos existentes en el proyecto Basecamp de un cliente (sprint 3).
+ * Importación y sincronización de las listas de to-dos del proyecto Basecamp de un cliente.
+ * Desde el 23/09/2026 Basecamp es un origen aceptado: lo que el equipo crea ahí (listas, grupos, to-dos)
+ * aparece solo en BackIO cada 30 min (listas → proyectos, grupos → bloques, to-dos → requerimientos) y la
+ * ejecutiva completa lo que Basecamp no sabe (prioridad, tipo, piezas, aprobación) desde «Entradas desde Basecamp».
  * Excepción D1 (aprobada por Luis 04/09/2026): entra el TÍTULO del to-do como titulo_interno, nunca visible
  * al cliente (visible_cliente=false, sin etiqueta). No entran descripciones, comentarios ni adjuntos.
  * Idempotente: se enlaza por basecamp_todo_id / basecamp_todolist_id.
@@ -111,7 +114,11 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
         const { error } = await ctx.db.from('requerimientos').update({ basecamp_todo_id: t.id, basecamp_todolist_id: t.grupoId ?? lista.id, basecamp_url: t.app_url, completado_at: t.completed ? t.completed_at : null }).eq('id', req.id);
         throwIf(error);
         yaEnlazados.add(t.id);
+        // Una entrada por to-do: alimenta la bandeja «Entradas desde Basecamp» y el Día a día.
+        if (!t.completed) await audit(ctx, { accion: 'basecamp_entrada', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: t.id, titulo: t.titulo, cliente_id: clienteId, proyecto_id: proyecto!.id, lista: lista.name, bloque: t.bloque, creador: t.creator_nombre, due_on: t.due_on, sin_responsable: t.assignee_ids.map((id) => porBcUser.get(id)).filter(Boolean).length === 0 } });
       }
+      // Si alguno estaba en la lista de huérfanos, queda resuelto como adoptado.
+      await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' }).eq('tenant_id', ctx.tenantId).is('resuelto_at', null).in('basecamp_todo_id', filtrados.map((t) => t.id));
       r.requerimientos_creados += creados.length;
     }
   }

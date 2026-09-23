@@ -50,6 +50,8 @@ function describir(accion: string, d: Record<string, unknown>): string {
     case 'publicar_daily_cierre': return 'publicó el cierre de mesa en Basecamp';
     case 'basecamp_importar': return `sincronizó con Basecamp (${d.requerimientos_creados ?? 0} nuevas · ${d.titulos_actualizados ?? 0} títulos · ${d.eliminados_en_basecamp ?? 0} eliminadas)`;
     case 'adoptar_huerfano': return 'adoptó un huérfano de Basecamp';
+    case 'basecamp_entrada': return `entró desde Basecamp${d.lista ? ` · lista ${d.lista}` : ''}${d.creador ? ` · creada por ${d.creador}` : ''}`;
+    case 'revisar_entrada': return 'revisó la entrada desde Basecamp';
     case 'ia_brief': return 'usó la IA para extraer un brief';
     case 'ia_recordatorio': return 'redactó un recordatorio al cliente con IA';
     case 'crear_cliente': return `dio de alta al cliente ${d.nombre ?? ''}`;

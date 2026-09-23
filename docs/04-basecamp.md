@@ -228,3 +228,22 @@ Basecamp, la tarea quedaba sin dueño; y las fechas cambiadas en BackIO no llega
 `starts_on`, `assignee_ids` y `completion_subscriber_ids` tal cual, cambiando solo lo pedido. La descripción se
 reenvía en memoria sin leerla ni guardarla (regla 1 intacta). Reparación: `scripts/reparar_asignados.ts` volvió a
 poner el responsable de BackIO en los to-dos abiertos que quedaron sin asignar (43 + 23).
+
+## Basecamp como origen aceptado (23/09/2026)
+
+Decisión de Luis tras una semana de uso real: 5 de 23 usuarios activos, producción sigue creando to-dos a mano
+en Basecamp y las ejecutivas gastaban su tiempo importando y adoptando huérfanos. El flujo
+cliente → ejecutiva → BackIO → Basecamp sigue siendo el preferido, pero deja de ser el único.
+
+- **Sincronización completa cada 30 min** (`importarBasecampCliente` sin `soloActualizar`, para todo cliente
+  activo con proyecto Basecamp): listas nuevas → proyectos, grupos → bloques, to-dos nuevos → requerimientos
+  (`tipo=fee`, `prioridad=media`, `visible_cliente=false`, responsables por `basecamp_user_id`), además de
+  renombres, movimientos, responsables y eliminados. Sigue entrando solo el título (excepción D1).
+- **Cada to-do nuevo deja `audit basecamp_entrada`** (todo, lista, bloque, creador, si quedó sin responsable) y
+  cierra su huérfano pendiente si lo había.
+- **«Entradas desde Basecamp»** (`/huerfanos`, `GET /huerfanos/entradas`): bandeja de lo que entró en 14 días y
+  nadie revisó. La ejecutiva completa responsables, prioridad, tipo, aprobación y piezas en línea y marca
+  «Revisada» (`POST /huerfanos/entradas/:id/revisada` → `audit revisar_entrada`). No bloquea nada: la tarea ya
+  está en el backlog y en su proyecto desde que entró.
+- El detector de huérfanos ya no corre por cron (queda el endpoint manual). La regla 2 no cambia: lo importado
+  nace oculto al cliente.

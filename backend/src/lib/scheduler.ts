@@ -9,7 +9,6 @@ import { reconcileTenant } from './basecamp/reconcile';
 import { recalcularSenales } from './rituals/service';
 import { notificar, procesarPendientes } from './notificaciones';
 import { temaAgenda } from './rituals/signals';
-import { detectarHuerfanos } from './basecamp/huerfanos';
 import { iaDisponible } from './ia';
 import { generarInformeMensual } from './ia/informe';
 import { listMesas } from './db/mesas';
@@ -47,19 +46,20 @@ export function startScheduler(): void {
     }
   };
   setInterval(() => void reconciliar(), 30 * 60_000);
-  // Huérfanos cada 30 min (desfasado 10 min de la reconciliación) y horas cada 6 h.
-  setTimeout(() => setInterval(async () => { for (const t of await tenants()) await detectarHuerfanos({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] huerfanos', e.message)); }, 30 * 60_000), 10 * 60_000);
-  // Estructura de Basecamp (renombres, movimientos, responsables, eliminados) cada 60 min, desfasado 20 min.
+  // Estructura de Basecamp cada 30 min (desfasado 10 min de la reconciliación): listas nuevas → proyectos,
+  // to-dos nuevos → requerimientos, renombres, movimientos, responsables y eliminados. Basecamp es origen aceptado
+  // (23/09/2026), así que el detector de huérfanos ya no corre por cron: lo creado a mano entra solo.
   setTimeout(() => setInterval(async () => {
     for (const t of await tenants()) {
       const ctx = { db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' as const };
-      const { data } = await serviceClient().from('clientes').select('id, nombre').eq('tenant_id', t).eq('activo', true).not('basecamp_project_id', 'is', null).not('basecamp_importado_at', 'is', null);
+      const { data } = await serviceClient().from('clientes').select('id, nombre').eq('tenant_id', t).eq('activo', true).not('basecamp_project_id', 'is', null);
       for (const c of (data ?? []) as { id: string; nombre: string }[]) {
-        try { const r = await importarBasecampCliente(ctx, c.id, { soloActualizar: true }); if (r.titulos_actualizados || r.movidos || r.proyectos_renombrados || r.eliminados_en_basecamp || r.responsables_actualizados) console.log('[scheduler] estructura', c.nombre, JSON.stringify(r)); }
+        try { const r = await importarBasecampCliente(ctx, c.id); if (r.requerimientos_creados || r.proyectos_creados || r.titulos_actualizados || r.movidos || r.proyectos_renombrados || r.eliminados_en_basecamp || r.responsables_actualizados) console.log('[scheduler] estructura', c.nombre, JSON.stringify(r)); }
         catch (e) { console.error('[scheduler] estructura', c.nombre, e instanceof Error ? e.message : e); }
       }
     }
-  }, 60 * 60_000), 20 * 60_000);
+  }, 30 * 60_000), 10 * 60_000);
+  // Horas cada 6 h.
   setInterval(async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); }, 6 * 3600_000);
 
   setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);

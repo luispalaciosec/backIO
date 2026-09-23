@@ -13,7 +13,7 @@ const GRUPOS: Grupo[] = [
   { id: 'operacion', label: 'Operación', icon: '☰', items: [
     { href: '/backlog', label: 'Backlog', icon: '☰' },
     { href: '/proyectos', label: 'Proyectos', icon: '▦' },
-    { href: '/huerfanos', label: 'Huérfanos', icon: '⚠' },
+    { href: '/huerfanos', label: 'Entradas Basecamp', icon: '⇣' },
   ] },
   { id: 'rituales', label: 'Rituales', icon: '◔', items: [
     { href: '/daily', label: 'Daily', icon: '◔' },

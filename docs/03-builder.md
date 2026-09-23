@@ -214,3 +214,10 @@ Cada día a las 08:05 (Guayaquil) el scheduler revisa las recurrencias activas: 
 y avisa a la ejecutiva y a operaciones. Nombre según `patron_nombre` de la plantilla (`{mes}`, `{año}`); inicio
 el día 1 y entrega el último día del mes. Idempotente por periodo. Admin → Recurrencias permite pausar, cambiar día,
 patrón y ejecutiva, y **generar ahora**.
+
+## Proyectos armados desde Basecamp (23/09/2026)
+
+El Builder sigue existiendo para proyectos que nacen de una cotización de PrometIO o de una plantilla. Pero la
+mayoría de los proyectos de fee nacen como listas en Basecamp: desde el 23/09 esas listas se convierten solas en
+proyectos cada 30 min (ver `04-basecamp.md`, «Basecamp como origen aceptado»), con `brief.origen =
+'importacion_basecamp'`, fechas tomadas de los to-dos y estado según su avance. La ejecutiva no crea: clasifica.

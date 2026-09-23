@@ -92,7 +92,7 @@
     <li><span>11</span>Fees mensuales: recurrencia automática</li>
     <li><span>12</span>Daily: apertura y cierre de mesa</li>
     <li><span>13</span>Weekly: señales, acuerdos, plan y acta</li>
-    <li><span>14</span>Huérfanos: tareas creadas fuera de BackIO</li>
+    <li><span>14</span>Entradas desde Basecamp: lo que el equipo crea en Basecamp</li>
     <li><span>15</span>Informes mensuales</li>
     <li><span>16</span>Portal del cliente</li>
     <li><span>17</span>Basecamp: qué entra, qué sale, qué nunca</li>
@@ -123,7 +123,7 @@
     <tr><td>Basecamp</td><td>Dónde el equipo produce: cada proyecto de BackIO es una lista de to-dos en el proyecto Basecamp del cliente; cada bloque es un grupo; cada requerimiento es un to-do. Los comentarios y archivos se quedan en Basecamp.</td></tr>
     <tr><td>Mesas</td><td>Orión y Omega. Cada cliente pertenece a una mesa. El daily, el weekly y el informe mensual se publican en el proyecto Basecamp de la mesa.</td></tr>
   </table>
-  <div class="callout"><b>La regla de oro del flujo</b>Todo trabajo nuevo entra por BackIO: <b>cliente → ejecutiva → BackIO → Basecamp</b>. Si alguien crea un to-do a mano en Basecamp, BackIO lo detecta como "huérfano" y avisa. La meta es que esa lista esté siempre en cero.</div>
+  <div class="callout"><b>Dos caminos para el trabajo nuevo</b>El preferido sigue siendo <b>cliente → ejecutiva → BackIO → Basecamp</b>. Pero lo que el equipo crea directamente en Basecamp también entra: cada 30 minutos las listas nuevas se vuelven proyectos, los grupos bloques y los to-dos tareas. La ejecutiva no crea; clasifica lo que entró en <b>Entradas desde Basecamp</b>.</div>
 </section>
 
 <!-- ============ 2 ============ -->
@@ -178,7 +178,7 @@
     <tr><td>Proyectos</td><td>Lista y detalle de proyectos, portal del cliente, avance</td><td>Ejecutivas, operaciones</td></tr>
     <tr><td>Daily</td><td>Las tres señales del día y la publicación de apertura y cierre</td><td>Quien lleva la mesa</td></tr>
     <tr><td>Weekly</td><td>Señales, acuerdos, plan operativo, acta de cierre, causas pendientes</td><td>Marcia</td></tr>
-    <tr><td>Huérfanos</td><td>To-dos creados a mano en Basecamp</td><td>Operaciones</td></tr>
+    <tr><td>Entradas Basecamp</td><td>Tareas que entraron solas desde Basecamp, pendientes de clasificar</td><td>Ejecutivas</td></tr>
     <tr><td>Informes</td><td>Informe ejecutivo mensual por mesa</td><td>Marcia, gerencia</td></tr>
     <tr><td>Admin</td><td>Clientes, mesas, plantillas, recurrencias, tipos de pieza, usuarios, integraciones, API keys</td><td>Solo admin</td></tr>
   </table>
@@ -202,7 +202,7 @@
     <tr><td>Horas 30d</td><td>Horas registradas en el timesheet de Basecamp</td></tr>
     <tr><td>A tiempo 30d</td><td>Porcentaje entregado antes de la <b>fecha original</b> comprometida. Debajo, el porcentaje sobre la fecha vigente</td></tr>
     <tr><td>Reprocesos 30d</td><td>Entregables que volvieron al equipo, con las horas que costaron</td></tr>
-    <tr><td>Huérfanos</td><td>To-dos creados fuera de BackIO pendientes de adoptar</td></tr>
+    <tr><td>Entradas Basecamp</td><td>Tareas creadas en Basecamp que entraron solas; la ejecutiva completa prioridad, tipo, piezas y responsables</td></tr>
   </table>
   <h3>Salud por cliente</h3>
   <p>Cada cliente aparece en verde, amarillo o rojo. Rojo: más de 2 atrasados, o más de 14 días sin movimiento, o algo con más de 30 días de atraso. Amarillo: algún atraso o más de 7 días sin movimiento. Además: horas del mes, valor cotizado activo y la relación USD por hora, porcentaje a tiempo y reprocesos.</p>
@@ -400,10 +400,10 @@
 <!-- ============ 14 ============ -->
 <section class="cap">
   <div class="eyebrow">Capítulo 14</div>
-  <h2>Huérfanos: tareas creadas fuera de BackIO</h2>
-  <p>Cada 30 minutos BackIO revisa los proyectos Basecamp de los clientes importados y detecta to-dos que no pasaron por BackIO. Operaciones recibe un correo.</p>
-  <p>En la pantalla se ve cliente, título, quién lo creó, fecha y antigüedad, y arriba un resumen de cuántos huérfanos creó cada persona. Dos acciones: <b>Adoptar</b> (crea el requerimiento en BackIO enlazado al to-do, dentro del proyecto de su lista si existe) o <b>Ignorar</b>. <span class="btn">↻ Revisar Basecamp ahora</span> fuerza la revisión.</p>
-<figure><img src="img/huerfanos.jpg" alt="Huérfanos: to-dos creados a mano en Basecamp, con quién los creó y las acciones Adoptar o Ignorar."><figcaption>Huérfanos: to-dos creados a mano en Basecamp, con quién los creó y las acciones Adoptar o Ignorar.</figcaption></figure>
+  <h2>Entradas desde Basecamp: lo que el equipo crea en Basecamp</h2>
+  <p>Cada 30 minutos BackIO lee los proyectos Basecamp de todos los clientes activos. Una lista nueva se convierte en proyecto, un grupo en bloque y un to-do en tarea, con sus responsables y su fecha. Nadie tiene que importar ni adoptar nada: la tarea ya está en el backlog y en su proyecto cuando la ejecutiva la ve.</p>
+  <p>Lo que Basecamp no sabe lo completa la ejecutiva en esta bandeja, en la misma fila: <b>responsables</b> (si el to-do no tenía asignado, la fila sale en rojo porque sin responsable no entra al daily), <b>prioridad</b>, <b>tipo</b>, <b>aprobación</b> y <b>piezas</b>. Al terminar pulsa <span class="btn">Revisada ✓</span> y la fila sale de la bandeja. Las entradas se muestran hasta 14 días; el filtro por cliente muestra cuántas tiene cada uno.</p>
+  <p>Lo importado nace oculto al cliente y solo entra el título del to-do: nunca descripciones, comentarios ni adjuntos.</p>
   <div class="callout ok"><b>Cómo leerlo</b>La lista debería tender a cero. Si una persona aparece repetidamente, la conversación no es con BackIO, es con el hábito: el trabajo entra por la ejecutiva.</div>
 </section>
 
@@ -441,7 +441,7 @@
   <table>
     <tr><th>Dirección</th><th>Qué</th><th>Cuándo</th></tr>
     <tr><td>BackIO → Basecamp</td><td>Lista por proyecto, grupo por bloque, to-do por requerimiento (título, fecha, asignados, "avisar al completar" a la ejecutiva), cambios de fecha, reapertura por reproceso, mensajes de daily, weekly e informe</td><td>Al crear el proyecto, al reprogramar, al registrar reproceso, al publicar</td></tr>
-    <tr><td>Basecamp → BackIO</td><td>Completado sí/no y cuándo, fecha, asignados; horas del timesheet (número, fecha, persona); títulos de to-dos al importar o detectar huérfanos</td><td>Webhook en segundos; reconciliación cada 30 min; horas cada 6 h</td></tr>
+    <tr><td>Basecamp → BackIO</td><td>Completado sí/no y cuándo, fecha, asignados; horas del timesheet (número, fecha, persona); títulos de to-dos, listas y grupos nuevos (entran solos)</td><td>Webhook en segundos; reconciliación y estructura cada 30 min; horas cada 6 h</td></tr>
     <tr><td>Nunca</td><td>Comentarios, descripciones, adjuntos, texto de las entradas de timesheet</td><td>—</td></tr>
   </table>
 <figure><img src="img/admin-clientes-top.jpg" alt="Admin → Clientes: mesa, Basecamp project id, PIN del portal, Webhook e Importar Basecamp."><figcaption>Admin → Clientes: mesa, Basecamp project id, PIN del portal, Webhook e Importar Basecamp.</figcaption></figure>
@@ -549,7 +549,7 @@
     <div class="card"><h4>Ejecutiva de cuenta · a diario</h4><ul><li>Backlog filtrado por tus clientes: nada "sin movimiento" más de 7 días.</li><li>Filas con ✉: mandar el recordatorio al cliente.</li><li>Pedidos nuevos: Builder (o "+ Agregar requerimiento" si es suelto). Nunca directo en Basecamp.</li><li>Borradores de PrometIO: convertirlos el mismo día.</li></ul></div>
     <div class="card"><h4>Quien lleva la mesa · a diario</h4><ul><li>09:00 Daily: revisar las tres columnas, ✨ redactar, publicar apertura.</li><li>18:00 publicar cierre.</li><li>Reprocesos del día: registrarlos con causa.</li></ul></div>
     <div class="card"><h4>Colaborador · a diario</h4><ul><li>Tus tareas al día en estado. Completar en Basecamp.</li><li>Si no llegas a la fecha: reprogramar con motivo antes de que venza, no después.</li><li>Horas en el timesheet de Basecamp.</li></ul></div>
-    <div class="card"><h4>Marcia · semanal</h4><ul><li>Domingo llega la agenda por correo.</li><li>Lunes: recalcular señales, ✨ Agenda IA, Plan Operativo con resumen, publicar. Completar causas pendientes.</li><li>Viernes: Acta de Cierre, acuerdos con fecha real, publicar.</li><li>Huérfanos en cero.</li></ul></div>
+    <div class="card"><h4>Marcia · semanal</h4><ul><li>Domingo llega la agenda por correo.</li><li>Lunes: recalcular señales, ✨ Agenda IA, Plan Operativo con resumen, publicar. Completar causas pendientes.</li><li>Viernes: Acta de Cierre, acuerdos con fecha real, publicar.</li><li>Entradas desde Basecamp revisadas.</li></ul></div>
     <div class="card"><h4>Marcia · mensual</h4><ul><li>Día 1: revisar el informe de cada mesa y publicarlo.</li><li>Día 25: confirmar que los fees del mes siguiente se generaron (Admin → Recurrencias) y revisar fechas y responsables.</li></ul></div>
     <div class="card"><h4>Admin · cuando haga falta</h4><ul><li>Nuevo cliente: mesa, Basecamp project id, webhook, importar.</li><li>Nueva persona: invitar, capacidad, vincular con Basecamp.</li><li>Nuevo servicio: plantilla.</li></ul></div>
   </div>
