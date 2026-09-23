@@ -30,8 +30,17 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
   });
   const sinResp = activos.filter((r) => r.owner_agencia.length === 0 && (r.daily_fecha === hoy || (r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado') || (r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h) || (r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h)));
   if (sinResp.length) throw new DailySinResponsable(sinResp.map((r) => `${r.titulo_interno} (${cliente(r.cliente_id)})`));
+  // Cierre: qué se completó hoy (completado_at desde las 00:00 de Guayaquil), separando lo que estaba en el daily de lo que no.
+  let completadas: DailyItem[] = [], completadasFuera: DailyItem[] = [];
+  if (tipo === 'cierre') {
+    const inicioDia = new Date(`${hoy}T00:00:00-05:00`).toISOString();
+    const hechas = (await listBacklog(ctx, { estado: 'completado', mesa: alcance })).filter((r) => r.completado_at && r.completado_at >= inicioDia);
+    completadas = hechas.filter((r) => r.daily_fecha === hoy).map(linea);
+    completadasFuera = hechas.filter((r) => r.daily_fecha !== hoy).map(linea);
+  }
   return {
     tipo, responsable, fecha: hoy, notas,
+    ...(tipo === 'cierre' ? { completadas, completadas_fuera: completadasFuera } : {}),
     hoy: activos.filter((r) => r.daily_fecha === hoy).map(linea),
     vencen: activos.filter((r) => r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado').map(linea),
     bloqueos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).map(linea),
@@ -42,16 +51,16 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
 const SYSTEM_DAILY = `Redacta el mensaje de {TIPO} de mesa para el board Daily de Basecamp que lee el equipo de producción.
 Formato OBLIGATORIO (markdown simple, se convierte a HTML):
 - Bloques separados por una línea en blanco.
-- Cada bloque empieza con un título en negrita con emoji, en su propia línea: **🎯 Foco del día**, **📋 En la mesa hoy**, **⏰ Vence hoy o mañana**, **⛔ Bloqueos**, **📅 Cambios de fecha** y, solo en un cierre, **➡️ Para mañana**.
+- Cada bloque empieza con un título en negrita con emoji, en su propia línea. En una apertura: **🎯 Foco del día**, **📋 En la mesa hoy**, **⏰ Vence hoy o mañana**, **⛔ Bloqueos**, **📅 Cambios de fecha**. En un cierre: **🎯 Balance del día**, **✅ Completado hoy** (viñetas por persona con sus tareas), **➕ Completadas fuera del daily** (lo que se cerró sin estar en la selección del día, por persona), **⏳ Quedó abierto** (lo de hoy que no se cerró, por persona), **⛔ Bloqueos**, **➡️ Para mañana**.
 - Debajo de cada título, viñetas con "- " (una idea por viñeta, máximo 4 por bloque). El foco del día es una sola frase sin viñeta.
 - Nombres de tareas en negrita (**así**) y el responsable después de dos puntos. Omite un bloque si no hay nada que decir en él.
 - Fechas como día/mes (22/09), nunca 2026-09-22. Sin títulos con #, sin tablas, sin saludos ni despedidas. El bloque **➡️ Para mañana** solo existe en un cierre; en una apertura no lo pongas.
 Contenido: el foco del día en una frase; qué se trabaja hoy (la selección de la mesa) agrupado por persona; qué vence y quién lo tiene; bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos); cambios de fecha.
-En un cierre: qué quedó hecho no lo sabes, así que habla de lo que queda abierto para mañana.
+En un cierre: completadas_hoy y completadas_fuera_del_daily son lo que sí se cerró (dilo por persona, reconociendo el trabajo sin exagerar); hoy_se_trabaja es lo que quedó abierto de la selección del día.
 Tono de compañero de mesa, no de jefe.`;
 
 export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<string> {
-  const payload = { mesa: mesa.nombre, tipo: m.tipo, fecha: m.fecha, notas_del_responsable: m.notas, hoy_se_trabaja: m.hoy.map(dailyItemTexto), vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto), bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto), fechas_cambiadas_24h: m.cambios.map(dailyItemTexto) };
+  const payload = { mesa: mesa.nombre, tipo: m.tipo, fecha: m.fecha, notas_del_responsable: m.notas, ...(m.tipo === 'cierre' ? { completadas_hoy: (m.completadas ?? []).map(dailyItemTexto), completadas_fuera_del_daily: (m.completadas_fuera ?? []).map(dailyItemTexto) } : {}), hoy_se_trabaja: m.hoy.map(dailyItemTexto), vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto), bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto), fechas_cambiadas_24h: m.cambios.map(dailyItemTexto) };
   const g = await generarTexto(ctx, { tipo: 'daily', entidad: { tipo: 'mesa', id: mesa.id }, payload, system: SYSTEM_DAILY.replace('{TIPO}', m.tipo), maxTokens: 900, cacheMs: 5 * 60_000 });
   return g.texto;
 }

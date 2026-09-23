@@ -26,7 +26,7 @@ ia.post('/daily', requireScope('write:actas'), zValidator('json', z.object({ mes
   try { m = await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, c.get('auth').nombre); }
   catch (err) { if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422); throw err; }
   const texto = await narrarDaily(ctx, mesa, m);
-  return c.json({ texto, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length } });
+  return c.json({ texto, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length, completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0) } });
 });
 
 ia.post('/weekly', requireScope('write:actas'), zValidator('json', z.object({ semana_id: z.string().uuid(), mesa_id: z.string().uuid().nullable().optional() })), async (c) => {

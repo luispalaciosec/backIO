@@ -56,7 +56,12 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
 
 /** Línea del daily: título enlazado al to-do de Basecamp cuando existe. */
 export interface DailyItem { cliente: string; titulo: string; owner: string; owners?: string[]; fecha: string | null; url: string | null; atraso_dias?: number }
-export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; hoy: DailyItem[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string }
+export interface DailyMensaje {
+  tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[];
+  hoy: DailyItem[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string;
+  /** Solo en el cierre: completadas hoy que estaban en el daily, y completadas hoy que no estaban. */
+  completadas?: DailyItem[]; completadas_fuera?: DailyItem[];
+}
 
 export function dailyItemTexto(i: DailyItem): string {
   return `${i.cliente} · ${i.titulo} · ${i.owner}${i.fecha ? ` · ${i.fecha}` : ''}${i.atraso_dias ? ` (${i.atraso_dias} días de atraso)` : ''}`;
@@ -81,7 +86,11 @@ export function cuerpoDaily(m: DailyMensaje): string {
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
     ...(m.narrativa ? [markdownBasico(m.narrativa, { saltos: true }), SALTO] : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
-    SALTO, `<p>🎯 <strong>Hoy se trabaja</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
+    ...(m.tipo === 'cierre' ? [
+      SALTO, `<p>✅ <strong>Completado hoy</strong></p>`, ...(m.completadas?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas), `<p><em>Por tarea</em></p>`] : []), li(m.completadas ?? []),
+      SALTO, `<p>➕ <strong>Completadas fuera del daily</strong></p>`, ...(m.completadas_fuera?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas_fuera), `<p><em>Por tarea</em></p>`] : []), li(m.completadas_fuera ?? []),
+    ] : []),
+    SALTO, `<p>🎯 <strong>${m.tipo === 'cierre' ? 'Quedó abierto de lo de hoy' : 'Hoy se trabaja'}</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
     SALTO, `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
     SALTO, `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
     SALTO, `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),

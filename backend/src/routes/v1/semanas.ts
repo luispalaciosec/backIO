@@ -116,7 +116,7 @@ semanas.post('/daily/publicar', requireScope('write:actas'), zValidator('json', 
   try {
     const r = await publicarDailyEnBasecamp(ctx, mesa, m);
     await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });
-    return c.json({ ...r, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length } });
+    return c.json({ ...r, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length, completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0) } });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
   }

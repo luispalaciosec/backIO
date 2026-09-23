@@ -34,3 +34,17 @@ describe('daily · narrativa con formato', () => {
     expect(html).not.toContain('<p>**');
   });
 });
+
+describe('daily · cierre', () => {
+  it('el cierre lleva Completado hoy y Completadas fuera del daily antes de lo que quedó abierto; la apertura no', () => {
+    const base = { responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [it2], vencen: [], bloqueos: [], cambios: [] };
+    const cierre = cuerpoDaily({ ...base, tipo: 'cierre', completadas: [it1], completadas_fuera: [] });
+    expect(cierre.indexOf('Completado hoy')).toBeLessThan(cierre.indexOf('Completadas fuera del daily'));
+    expect(cierre.indexOf('Completadas fuera del daily')).toBeLessThan(cierre.indexOf('Quedó abierto'));
+    expect(cierre).toContain('<strong>👤 Ana</strong> · 1 tarea');
+    expect(cierre).not.toContain('Hoy se trabaja');
+    const apertura = cuerpoDaily({ ...base, tipo: 'apertura' });
+    expect(apertura).not.toContain('Completado hoy');
+    expect(apertura).toContain('Hoy se trabaja');
+  });
+});

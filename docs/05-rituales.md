@@ -161,6 +161,11 @@ se bloquea con `DailySinResponsable` hasta que se asigne a alguien.
 (persona → board → tareas, una tarea con varios responsables aparece bajo cada uno; lista anidada porque
 Basecamp no admite tablas) y después la lista *Por tarea* de siempre. El resto del mensaje no cambia.
 
+**Cierre (22/09/2026).** Antes de lo que quedó abierto, el cierre lleva «✅ Completado hoy» (completadas con
+`completado_at` desde las 00:00 de Guayaquil que estaban en el daily, por persona → board → tarea) y
+«➕ Completadas fuera del daily» (completadas hoy sin `daily_fecha`). «Hoy se trabaja» pasa a llamarse
+«Quedó abierto de lo de hoy». El borrador de IA sigue esa misma estructura.
+
 ---
 
 ## Generación de documentos
