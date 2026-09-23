@@ -22,3 +22,10 @@ body { @apply bg-gray-50 text-gray-900 antialiased; }
   .th { @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200; }
   .td { @apply px-3 py-2 text-sm border-b border-gray-100 align-top; }
 }
+
+/* Barra de scroll siempre visible en el tablero del backlog (macOS la oculta y la tabla parece cortada). */
+.tablero::-webkit-scrollbar { height: 12px; width: 12px; }
+.tablero::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 6px; }
+.tablero::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 6px; border: 2px solid #f3f4f6; }
+.tablero::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+.tablero { scrollbar-width: thin; scrollbar-color: #9ca3af #f3f4f6; }

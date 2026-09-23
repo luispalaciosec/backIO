@@ -95,7 +95,8 @@ function Fila({ r, color, usuarios, onPatch, horas, bloqueada, proyecto, onCambi
           {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />}
           <HistorialReq r={r} onCambio={onCambio} />
           {!hecho && <button type="button" className={`text-xs shrink-0 px-1 rounded ${r.daily_fecha === hoyLocal() ? 'bg-amber-200 ring-1 ring-amber-400' : 'grayscale opacity-30 hover:opacity-80'}`} title={r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'} onClick={(e) => { e.stopPropagation(); void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() }); }}>☀</button>}
-          {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0 pr-2" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
+          {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
+          {r.basecamp_url && <a href={r.basecamp_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 pr-2 text-xs font-bold text-emerald-700 hover:text-emerald-900" title="Abrir el to-do en Basecamp">Bc↗</a>}
         </div>
       </div>
       <div className="border-l border-gray-100 flex items-center px-2 min-w-0 text-xs">{r.proyecto_id ? <Link href={`/proyectos/${r.proyecto_id}`} className="truncate text-gray-700 hover:text-brand" title={`${proyecto ?? 'Proyecto'}${r.bloque_nombre ? ` · ${r.bloque_nombre}` : ''}`}>{proyecto ?? '…'}</Link> : <span className="text-gray-300">—</span>}</div>
