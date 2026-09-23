@@ -40,13 +40,18 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
 }
 
 const SYSTEM_DAILY = `Redacta el mensaje de {TIPO} de mesa para el board Daily de Basecamp que lee el equipo de producción.
-Formato: 3 a 6 líneas de texto plano, sin títulos ni viñetas. Primera línea: foco del día en una frase.
-Luego: qué se trabaja hoy (la selección de la mesa), qué vence y quién lo tiene, bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos) y cambios de fecha.
+Formato OBLIGATORIO (markdown simple, se convierte a HTML):
+- Bloques separados por una línea en blanco.
+- Cada bloque empieza con un título en negrita con emoji, en su propia línea: **🎯 Foco del día**, **📋 En la mesa hoy**, **⏰ Vence hoy o mañana**, **⛔ Bloqueos**, **📅 Cambios de fecha** y, solo en un cierre, **➡️ Para mañana**.
+- Debajo de cada título, viñetas con "- " (una idea por viñeta, máximo 4 por bloque). El foco del día es una sola frase sin viñeta.
+- Nombres de tareas en negrita (**así**) y el responsable después de dos puntos. Omite un bloque si no hay nada que decir en él.
+- Fechas como día/mes (22/09), nunca 2026-09-22. Sin títulos con #, sin tablas, sin saludos ni despedidas. El bloque **➡️ Para mañana** solo existe en un cierre; en una apertura no lo pongas.
+Contenido: el foco del día en una frase; qué se trabaja hoy (la selección de la mesa) agrupado por persona; qué vence y quién lo tiene; bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos); cambios de fecha.
 En un cierre: qué quedó hecho no lo sabes, así que habla de lo que queda abierto para mañana.
-Tono de compañero de mesa, no de jefe. Sin saludos ni despedidas.`;
+Tono de compañero de mesa, no de jefe.`;
 
 export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<string> {
   const payload = { mesa: mesa.nombre, tipo: m.tipo, fecha: m.fecha, notas_del_responsable: m.notas, hoy_se_trabaja: m.hoy.map(dailyItemTexto), vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto), bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto), fechas_cambiadas_24h: m.cambios.map(dailyItemTexto) };
-  const g = await generarTexto(ctx, { tipo: 'daily', entidad: { tipo: 'mesa', id: mesa.id }, payload, system: SYSTEM_DAILY.replace('{TIPO}', m.tipo), maxTokens: 500, cacheMs: 5 * 60_000 });
+  const g = await generarTexto(ctx, { tipo: 'daily', entidad: { tipo: 'mesa', id: mesa.id }, payload, system: SYSTEM_DAILY.replace('{TIPO}', m.tipo), maxTokens: 900, cacheMs: 5 * 60_000 });
   return g.texto;
 }

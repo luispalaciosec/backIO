@@ -22,3 +22,15 @@ describe('daily · bloque por persona', () => {
     expect(cuerpoDaily({ ...base, hoy: [] })).not.toContain('Por persona');
   });
 });
+
+describe('daily · narrativa con formato', () => {
+  it('convierte negritas, viñetas y líneas en blanco en HTML con saltos visibles', () => {
+    const narrativa = '**🎯 Foco del día**\nCerrar AB-Inbev.\n\n**📋 En la mesa hoy**\n- **DIVERTRON**: Marcos Poveda\n- **CORONA CERO**: Marcos Poveda';
+    const html = cuerpoDaily({ tipo: 'apertura', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [], narrativa });
+    expect(html).toContain('<strong>🎯 Foco del día</strong>');
+    expect(html).toContain('<li><strong>DIVERTRON</strong>: Marcos Poveda</li>');
+    expect(html).toContain('<div><br></div>');
+    expect(html.indexOf('Cerrar AB-Inbev.')).toBeLessThan(html.indexOf('<div><br></div>'));
+    expect(html).not.toContain('<p>**');
+  });
+});

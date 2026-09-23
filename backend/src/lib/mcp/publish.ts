@@ -66,6 +66,9 @@ export function tituloDaily(m: DailyMensaje, mesa: Mesa): string {
   return `${m.tipo === 'apertura' ? '🟢APERTURA' : '🔴CIERRE'} DE MESA - ${fmtCorta(m.fecha)} - ${mesa.nombre.toUpperCase()}`;
 }
 
+/** Línea en blanco en un mensaje de Basecamp (Trix ignora <p> vacíos; <br> sí se respeta). */
+const SALTO = '<div><br></div>';
+
 export function cuerpoDaily(m: DailyMensaje): string {
   const item = (i: DailyItem) => {
     const titulo = i.url ? `<a href="${esc(i.url)}">${esc(i.titulo)}</a>` : esc(i.titulo);
@@ -76,12 +79,12 @@ export function cuerpoDaily(m: DailyMensaje): string {
   return [
 
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
-    ...(m.narrativa ? m.narrativa.split(/\n+/).map((p) => `<p>${esc(p)}</p>`) : []),
+    ...(m.narrativa ? [markdownBasico(m.narrativa, { saltos: true }), SALTO] : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
-    `<p>🎯 <strong>Hoy se trabaja</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
-    `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
-    `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
-    `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
+    SALTO, `<p>🎯 <strong>Hoy se trabaja</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
+    SALTO, `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
+    SALTO, `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
+    SALTO, `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
     `<p style="color:#888;font-size:12px">${m.narrativa ? `Redactado por BackIO, publicado por ${esc(m.responsable)}` : 'Generado por BackIO'}</p>`,
   ].join('\n');
 }
@@ -124,7 +127,7 @@ export async function detectarBoardsMesa(ctx: DbCtx, mesa: Mesa): Promise<{ dail
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Conversión mínima markdown → HTML (títulos, listas, tablas, negritas). Basecamp acepta HTML simple. */
-export function markdownBasico(md: string): string {
+export function markdownBasico(md: string, opts: { saltos?: boolean } = {}): string {
   const inline = (s: string) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/_(.+?)_/g, '<em>$1</em>');
   const out: string[] = [];
   const lineas = md.split('\n');
@@ -148,7 +151,8 @@ export function markdownBasico(md: string): string {
       out.push('<ul>' + items.map((x) => `<li>${inline(x.replace(/^\[ \] /, '☐ ').replace(/^\[x\] /, '☑ '))}</li>`).join('') + '</ul>');
       continue;
     }
-    if (l.trim() === '---' || l.trim() === '') continue;
+    if (l.trim() === '---') continue;
+    if (l.trim() === '') { const prev = out[out.length - 1]; if (opts.saltos && prev && prev !== SALTO && !/^<p><strong>[^<]*<\/strong><\/p>$/.test(prev)) out.push(SALTO); continue; }
     out.push(`<p>${inline(l)}</p>`);
   }
   return out.join('\n');
