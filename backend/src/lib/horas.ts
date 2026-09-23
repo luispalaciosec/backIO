@@ -27,25 +27,32 @@ export async function sincronizarHoras(ctx: DbCtx, opts: { dias?: number; client
     if (filas.length < 1000) break;
   }
 
-  let entradas = 0, guardadas = 0, sinReq = 0;
-  for (const c of clientes) {
-    try {
-      const items = await bc.timesheetSafe(c.basecamp_project_id as number, desde, hasta);
-      entradas += items.length;
-      if (!items.length) continue;
-      const filas = items.map((e) => {
-        const reqId = e.parent_id ? porTodo.get(e.parent_id) ?? null : null;
-        if (!reqId) sinReq += 1;
-        return { tenant_id: ctx.tenantId, cliente_id: c.id, requerimiento_id: reqId, usuario_id: e.person_id ? porPersona.get(e.person_id) ?? null : null, basecamp_entry_id: e.id, basecamp_person_id: e.person_id, basecamp_todo_id: e.parent_id, basecamp_project_id: c.basecamp_project_id, fecha: e.fecha, horas: Math.round(e.horas * 100) / 100, sincronizado_at: new Date().toISOString() };
-      });
-      const { data, error } = await ctx.db.from('horas').upsert(filas, { onConflict: 'tenant_id,basecamp_entry_id' }).select('id');
+  // Una sola llamada: el reporte ignora bucket_id (devuelve la cuenta entera), así que se atribuye cada
+  // entrada al cliente por el proyecto que trae la propia entrada. Antes se llamaba por cliente y todas
+  // las horas quedaban bajo el último cliente del bucle.
+  const porProyecto = new Map(clientes.map((c) => [c.basecamp_project_id as number, c]));
+  let entradas = 0, guardadas = 0, sinReq = 0, sinCliente = 0;
+  try {
+    const items = await bc.timesheetSafe(desde, hasta);
+    const filas = [] as Record<string, unknown>[];
+    for (const e of items) {
+      const c = e.bucket_id ? porProyecto.get(e.bucket_id) : undefined;
+      if (!c) { sinCliente += 1; continue; }
+      entradas += 1;
+      const reqId = e.parent_id ? porTodo.get(e.parent_id) ?? null : null;
+      if (!reqId) sinReq += 1;
+      filas.push({ tenant_id: ctx.tenantId, cliente_id: c.id, requerimiento_id: reqId, usuario_id: e.person_id ? porPersona.get(e.person_id) ?? null : null, basecamp_entry_id: e.id, basecamp_person_id: e.person_id, basecamp_todo_id: e.parent_id, basecamp_project_id: c.basecamp_project_id, fecha: e.fecha, horas: Math.round(e.horas * 100) / 100, sincronizado_at: new Date().toISOString() });
+    }
+    for (let i = 0; i < filas.length; i += 500) {
+      const { data, error } = await ctx.db.from('horas').upsert(filas.slice(i, i + 500), { onConflict: 'tenant_id,basecamp_entry_id' }).select('id');
       throwIf(error);
       guardadas += (data ?? []).length;
-    } catch (err) {
-      console.error('[horas] cliente', c.nombre, err instanceof Error ? err.message : err);
     }
+  } catch (err) {
+    console.error('[horas]', err instanceof Error ? err.message : err);
+    throw err;
   }
-  await audit(ctx, { accion: 'sincronizar_horas', entidad: 'tenant', entidad_id: ctx.tenantId, detalle: { clientes: clientes.length, entradas, guardadas, sin_requerimiento: sinReq, desde, hasta } });
+  await audit(ctx, { accion: 'sincronizar_horas', entidad: 'tenant', entidad_id: ctx.tenantId, detalle: { clientes: clientes.length, entradas, guardadas, sin_requerimiento: sinReq, sin_cliente: sinCliente, desde, hasta } });
   return { clientes: clientes.length, entradas, guardadas, sin_requerimiento: sinReq };
 }
 

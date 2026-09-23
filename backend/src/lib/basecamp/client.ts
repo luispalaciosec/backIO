@@ -206,15 +206,18 @@ export class BasecampClient {
   }
 
   /**
-   * Reporte de timesheet por proyecto y rango (no paginado). SOLO: id, date, hours, person id, parent id/type.
+   * Reporte de timesheet de TODA la cuenta en un rango (paginado). Basecamp ignora bucket_id en este
+   * reporte y devuelve siempre la cuenta completa, por eso se llama una sola vez y cada entrada trae su
+   * propio proyecto (bucket_id). SOLO: id, date, hours, person id, parent id/type, bucket id.
    * La description de cada entrada es texto de Basecamp y se descarta aquí mismo.
    */
-  async timesheetSafe(projectId: number, desde: string, hasta: string): Promise<{ id: number; fecha: string; horas: number; person_id: number | null; parent_id: number | null; parent_type: string | null }[]> {
-    type Raw = { id: number; date?: string; hours?: number | string; person?: { id: number }; parent?: { id: number; type?: string } };
-    const raw = await this.request<Raw[]>('GET', `/reports/timesheet.json?bucket_id=${projectId}&start_date=${desde}&end_date=${hasta}`);
-    return (Array.isArray(raw) ? raw : [])
-      .filter((e) => typeof e.id === 'number' && e.date)
-      .map((e) => ({ id: e.id, fecha: String(e.date).slice(0, 10), horas: parseHoras(e.hours), person_id: e.person?.id ?? null, parent_id: e.parent?.id ?? null, parent_type: e.parent?.type ?? null }));
+  async timesheetSafe(desde: string, hasta: string): Promise<{ id: number; fecha: string; horas: number; person_id: number | null; parent_id: number | null; parent_type: string | null; bucket_id: number | null }[]> {
+    type Raw = { id: number; date?: string; hours?: number | string; person?: { id: number }; parent?: { id: number; type?: string }; bucket?: { id: number } };
+    const raw = await this.requestAll<Raw>(`/reports/timesheet.json?start_date=${desde}&end_date=${hasta}`, 50);
+    const vistos = new Set<number>();
+    return raw
+      .filter((e) => typeof e.id === 'number' && e.date && !vistos.has(e.id) && vistos.add(e.id))
+      .map((e) => ({ id: e.id, fecha: String(e.date).slice(0, 10), horas: parseHoras(e.hours), person_id: e.person?.id ?? null, parent_id: e.parent?.id ?? null, parent_type: e.parent?.type ?? null, bucket_id: e.bucket?.id ?? null }));
   }
 
   /** Polling de reconciliación: devuelve el to-do crudo; el llamador DEBE pasar por extractSafeTodo. */
