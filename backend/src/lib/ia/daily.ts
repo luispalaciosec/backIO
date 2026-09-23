@@ -26,7 +26,7 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
   const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? 'sin asignar';
   const cliente = (id: string) => clientes.find((x) => x.id === id)?.nombre ?? '';
   const linea = (r: { titulo_interno: string; cliente_id: string; owner_agencia: string[]; fecha_entrega: string | null; basecamp_url: string | null; dias_atraso: number }): DailyItem => ({
-    cliente: cliente(r.cliente_id), titulo: r.titulo_interno, owner: nombre(r.owner_agencia[0]), fecha: r.fecha_entrega, url: r.basecamp_url, atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
+    cliente: cliente(r.cliente_id), titulo: r.titulo_interno, owner: nombre(r.owner_agencia[0]), owners: r.owner_agencia.map(nombre), fecha: r.fecha_entrega, url: r.basecamp_url, atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
   });
   const sinResp = activos.filter((r) => r.owner_agencia.length === 0 && (r.daily_fecha === hoy || (r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado') || (r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h) || (r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h)));
   if (sinResp.length) throw new DailySinResponsable(sinResp.map((r) => `${r.titulo_interno} (${cliente(r.cliente_id)})`));

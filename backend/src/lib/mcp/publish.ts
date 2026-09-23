@@ -55,7 +55,7 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
 }
 
 /** Línea del daily: título enlazado al to-do de Basecamp cuando existe. */
-export interface DailyItem { cliente: string; titulo: string; owner: string; fecha: string | null; url: string | null; atraso_dias?: number }
+export interface DailyItem { cliente: string; titulo: string; owner: string; owners?: string[]; fecha: string | null; url: string | null; atraso_dias?: number }
 export interface DailyMensaje { tipo: 'apertura' | 'cierre'; responsable: string; fecha: string; notas: string[]; hoy: DailyItem[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string }
 
 export function dailyItemTexto(i: DailyItem): string {
@@ -74,15 +74,33 @@ export function cuerpoDaily(m: DailyMensaje): string {
   };
   const li = (xs: DailyItem[]) => (xs.length ? `<ul>${xs.map(item).join('')}</ul>` : '<p><em>Nada.</em></p>');
   return [
+
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
     ...(m.narrativa ? m.narrativa.split(/\n+/).map((p) => `<p>${esc(p)}</p>`) : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
-    `<p>🎯 <strong>Hoy se trabaja</strong></p>`, li(m.hoy),
+    `<p>🎯 <strong>Hoy se trabaja</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
     `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
     `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
     `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
     `<p style="color:#888;font-size:12px">${m.narrativa ? `Redactado por BackIO, publicado por ${esc(m.responsable)}` : 'Generado por BackIO'}</p>`,
   ].join('\n');
+}
+
+/**
+ * Bloque "por persona" del daily: persona → board (cliente) → tareas. Basecamp no admite tablas en
+ * mensajes, así que va como lista anidada. Una tarea con varios responsables aparece bajo cada uno.
+ */
+export function porPersonaDaily(hoy: DailyItem[]): string {
+  const porPersona = new Map<string, DailyItem[]>();
+  for (const i of hoy) for (const o of (i.owners?.length ? i.owners : [i.owner])) porPersona.set(o, [...(porPersona.get(o) ?? []), i]);
+  const personas = [...porPersona.keys()].sort((a, b) => a.localeCompare(b, 'es'));
+  const tarea = (i: DailyItem) => `${i.url ? `<a href="${esc(i.url)}">${esc(i.titulo)}</a>` : esc(i.titulo)}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}`;
+  return `<ul>${personas.map((p) => {
+    const xs = porPersona.get(p)!;
+    const boards = new Map<string, DailyItem[]>();
+    for (const i of xs) boards.set(i.cliente, [...(boards.get(i.cliente) ?? []), i]);
+    return `<li><strong>👤 ${esc(p)}</strong> · ${xs.length} ${xs.length === 1 ? 'tarea' : 'tareas'}<ul>${[...boards.entries()].map(([b, ys]) => `<li><strong>${esc(b)}</strong><ul>${ys.map((i) => `<li>${tarea(i)}</li>`).join('')}</ul></li>`).join('')}</ul></li>`;
+  }).join('')}</ul>`;
 }
 
 export async function publicarDailyEnBasecamp(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<{ id: number; url: string }> {

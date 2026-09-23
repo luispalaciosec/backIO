@@ -157,6 +157,10 @@ tarea sin `owner_agencia` devuelve 422 (backlog ☀ y modal «Elegir tareas de h
 una alerta con las tareas sin responsable de las cuatro columnas y la publicación (y el borrador con IA)
 se bloquea con `DailySinResponsable` hasta que se asigne a alguien.
 
+**Mensaje publicado (22/09/2026).** Dentro de «🎯 Hoy se trabaja» va primero el bloque *Por persona*
+(persona → board → tareas, una tarea con varios responsables aparece bajo cada uno; lista anidada porque
+Basecamp no admite tablas) y después la lista *Por tarea* de siempre. El resto del mensaje no cambia.
+
 ---
 
 ## Generación de documentos
