@@ -160,9 +160,10 @@ export class BasecampClient {
 
   /** GET paginado (Link: rel="next"). Devuelve la unión de páginas. */
   /** Personas de la cuenta Basecamp: solo id, nombre y email (para enlazar usuarios). */
-  async listPeopleSafe(): Promise<{ id: number; nombre: string; email: string | null; admin: boolean; avatar_url: string | null }[]> {
-    const raw = await this.requestAll<{ id: number; name: string; email_address?: string | null; admin?: boolean; avatar_url?: string | null }>('/people.json');
-    return raw.map((p) => ({ id: p.id, nombre: p.name, email: p.email_address ? p.email_address.toLowerCase() : null, admin: Boolean(p.admin), avatar_url: typeof p.avatar_url === 'string' ? p.avatar_url : null }));
+  async listPeopleSafe(): Promise<{ id: number; nombre: string; email: string | null; admin: boolean; avatar_url: string | null; sgid: string | null }[]> {
+    const raw = await this.requestAll<{ id: number; name: string; email_address?: string | null; admin?: boolean; avatar_url?: string | null; attachable_sgid?: string | null }>('/people.json');
+    // attachable_sgid: identificador para @mencionar a la persona en mensajes (bc-attachment). Sin él no hay etiqueta.
+    return raw.map((p) => ({ id: p.id, nombre: p.name, email: p.email_address ? p.email_address.toLowerCase() : null, admin: Boolean(p.admin), avatar_url: typeof p.avatar_url === 'string' ? p.avatar_url : null, sgid: typeof p.attachable_sgid === 'string' ? p.attachable_sgid : null }));
   }
 
   async requestAll<T>(path: string, maxPages = 20): Promise<T[]> {

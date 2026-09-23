@@ -10,6 +10,7 @@ import { throwIf } from '../db/client';
 import { BasecampClient } from '../basecamp/client';
 import { getMesa } from '../db/mesas';
 import { getSemana } from '../db/semanas';
+import { listUsuarios } from '../db/usuarios';
 
 const fmtFecha = (iso: string) => iso.slice(0, 10);
 const fmtCorta = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split('-'); return `${Number(d)}/${m}/${y}`; };
@@ -74,23 +75,41 @@ export function tituloDaily(m: DailyMensaje, mesa: Mesa): string {
 /** Línea en blanco en un mensaje de Basecamp (Trix ignora <p> vacíos; <br> sí se respeta). */
 const SALTO = '<div><br></div>';
 
-export function cuerpoDaily(m: DailyMensaje): string {
+/** nombre de usuario en BackIO → attachable_sgid de Basecamp. Con esto el nombre sale como @mención real. */
+export type Menciones = Map<string, string>;
+const mencion = (nombre: string, men?: Menciones) => {
+  const sgid = men?.get(nombre);
+  return sgid ? `<bc-attachment sgid="${esc(sgid)}" content-type="application/vnd.basecamp.mention"></bc-attachment>` : esc(nombre);
+};
+/** Reemplaza los nombres conocidos por @menciones en el HTML ya generado (solo en texto, nunca dentro de etiquetas). */
+export function mencionarEnHtml(html: string, men?: Menciones): string {
+  if (!men?.size) return html;
+  const nombres = [...men.keys()].sort((a, b) => b.length - a.length);
+  return html.split(/(<[^>]+>)/).map((parte) => {
+    if (parte.startsWith('<')) return parte;
+    let t = parte;
+    for (const n of nombres) t = t.split(esc(n)).join(mencion(n, men));
+    return t;
+  }).join('');
+}
+
+export function cuerpoDaily(m: DailyMensaje, men?: Menciones): string {
   const item = (i: DailyItem) => {
     const titulo = i.url ? `<a href="${esc(i.url)}">${esc(i.titulo)}</a>` : esc(i.titulo);
     const atraso = i.atraso_dias ? ` <span style="color:#c0392b">(${i.atraso_dias} d de atraso)</span>` : '';
-    return `<li><strong>${esc(i.cliente)}</strong> · ${titulo} · ${esc(i.owner)}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}${atraso}</li>`;
+    return `<li><strong>${esc(i.cliente)}</strong> · ${titulo} · ${(i.owners?.length ? i.owners : [i.owner]).map((o) => mencion(o, men)).join(', ')}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}${atraso}</li>`;
   };
   const li = (xs: DailyItem[]) => (xs.length ? `<ul>${xs.map(item).join('')}</ul>` : '<p><em>Nada.</em></p>');
   return [
 
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
-    ...(m.narrativa ? [markdownBasico(m.narrativa, { saltos: true }), SALTO] : []),
+    ...(m.narrativa ? [mencionarEnHtml(markdownBasico(m.narrativa, { saltos: true }), men), SALTO] : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
     ...(m.tipo === 'cierre' ? [
-      SALTO, `<p>✅ <strong>Completado hoy</strong></p>`, ...(m.completadas?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas), `<p><em>Por tarea</em></p>`] : []), li(m.completadas ?? []),
-      SALTO, `<p>➕ <strong>Completadas fuera del daily</strong></p>`, ...(m.completadas_fuera?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas_fuera), `<p><em>Por tarea</em></p>`] : []), li(m.completadas_fuera ?? []),
+      SALTO, `<p>✅ <strong>Completado hoy</strong></p>`, ...(m.completadas?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas, men), `<p><em>Por tarea</em></p>`] : []), li(m.completadas ?? []),
+      SALTO, `<p>➕ <strong>Completadas fuera del daily</strong></p>`, ...(m.completadas_fuera?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas_fuera, men), `<p><em>Por tarea</em></p>`] : []), li(m.completadas_fuera ?? []),
     ] : []),
-    SALTO, `<p>🎯 <strong>${m.tipo === 'cierre' ? 'Quedó abierto de lo de hoy' : 'Hoy se trabaja'}</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
+    SALTO, `<p>🎯 <strong>${m.tipo === 'cierre' ? 'Quedó abierto de lo de hoy' : 'Hoy se trabaja'}</strong></p>`, ...(m.hoy.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.hoy, men), `<p><em>Por tarea</em></p>`] : []), li(m.hoy),
     SALTO, `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`, li(m.vencen),
     SALTO, `<p>⛔ <strong>Bloqueos nuevos</strong></p>`, li(m.bloqueos),
     SALTO, `<p>📅 <strong>Fechas cambiadas</strong></p>`, li(m.cambios),
@@ -102,7 +121,7 @@ export function cuerpoDaily(m: DailyMensaje): string {
  * Bloque "por persona" del daily: persona → board (cliente) → tareas. Basecamp no admite tablas en
  * mensajes, así que va como lista anidada. Una tarea con varios responsables aparece bajo cada uno.
  */
-export function porPersonaDaily(hoy: DailyItem[]): string {
+export function porPersonaDaily(hoy: DailyItem[], men?: Menciones): string {
   const porPersona = new Map<string, DailyItem[]>();
   for (const i of hoy) for (const o of (i.owners?.length ? i.owners : [i.owner])) porPersona.set(o, [...(porPersona.get(o) ?? []), i]);
   const personas = [...porPersona.keys()].sort((a, b) => a.localeCompare(b, 'es'));
@@ -111,15 +130,26 @@ export function porPersonaDaily(hoy: DailyItem[]): string {
     const xs = porPersona.get(p)!;
     const boards = new Map<string, DailyItem[]>();
     for (const i of xs) boards.set(i.cliente, [...(boards.get(i.cliente) ?? []), i]);
-    return `<li><strong>👤 ${esc(p)}</strong> · ${xs.length} ${xs.length === 1 ? 'tarea' : 'tareas'}<ul>${[...boards.entries()].map(([b, ys]) => `<li><strong>${esc(b)}</strong><ul>${ys.map((i) => `<li>${tarea(i)}</li>`).join('')}</ul></li>`).join('')}</ul></li>`;
+    return `<li><strong>👤 ${mencion(p, men)}</strong> · ${xs.length} ${xs.length === 1 ? 'tarea' : 'tareas'}<ul>${[...boards.entries()].map(([b, ys]) => `<li><strong>${esc(b)}</strong><ul>${ys.map((i) => `<li>${tarea(i)}</li>`).join('')}</ul></li>`).join('')}</ul></li>`;
   }).join('')}</ul>`;
 }
 
 export async function publicarDailyEnBasecamp(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<{ id: number; url: string }> {
   if (!mesa.basecamp_project_id || !mesa.basecamp_board_daily_id) throw new Error(`La mesa ${mesa.nombre} no tiene board Daily configurado`);
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const r = await bc.createMessage(mesa.basecamp_project_id, mesa.basecamp_board_daily_id, { subject: tituloDaily(m, mesa), content: cuerpoDaily(m) });
+  const r = await bc.createMessage(mesa.basecamp_project_id, mesa.basecamp_board_daily_id, { subject: tituloDaily(m, mesa), content: cuerpoDaily(m, await mencionesDailyBasecamp(ctx, bc)) });
   return { id: r.id, url: r.app_url };
+}
+
+/** Usuarios de BackIO con basecamp_user_id → sgid de mención. Si Basecamp falla, el mensaje sale con nombres sin etiqueta. */
+export async function mencionesDailyBasecamp(ctx: DbCtx, bc: BasecampClient): Promise<Menciones> {
+  const men: Menciones = new Map();
+  try {
+    const [usuarios, personas] = await Promise.all([listUsuarios(ctx), bc.listPeopleSafe()]);
+    const sgidPorId = new Map(personas.filter((p) => p.sgid).map((p) => [p.id, p.sgid as string]));
+    for (const u of usuarios) { const sgid = u.basecamp_user_id ? sgidPorId.get(u.basecamp_user_id) : undefined; if (sgid) men.set(u.nombre, sgid); }
+  } catch (err) { console.error('[daily] menciones', err instanceof Error ? err.message : err); }
+  return men;
 }
 
 /** Descubre en el dock del proyecto de la mesa los boards Daily y Weekly por título. */

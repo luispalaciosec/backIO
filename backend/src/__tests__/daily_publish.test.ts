@@ -48,3 +48,15 @@ describe('daily · cierre', () => {
     expect(apertura).toContain('Hoy se trabaja');
   });
 });
+
+describe('daily · @menciones', () => {
+  it('nombres con sgid salen como bc-attachment en secciones y narrativa; sin sgid, como texto', async () => {
+    const { mencionarEnHtml } = await import('../lib/mcp/publish');
+    const men = new Map([['Ana', 'SGID_ANA']]);
+    const html = cuerpoDaily({ tipo: 'apertura', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [it1], vencen: [], bloqueos: [], cambios: [], narrativa: 'Hoy **Ana** cierra y Beto apoya.' }, men);
+    expect((html.match(/sgid="SGID_ANA"/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(html).toContain('Beto');
+    expect(html).not.toContain('sgid="SGID_BETO"');
+    expect(mencionarEnHtml('<a href="x/Ana">Ana</a>', men)).toBe('<a href="x/Ana"><bc-attachment sgid="SGID_ANA" content-type="application/vnd.basecamp.mention"></bc-attachment></a>');
+  });
+});
