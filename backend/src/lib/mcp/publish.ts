@@ -62,6 +62,38 @@ export interface DailyMensaje {
   hoy: DailyItem[]; vencen: DailyItem[]; bloqueos: DailyItem[]; cambios: DailyItem[]; narrativa?: string;
   /** Solo en el cierre: completadas hoy que estaban en el daily, y completadas hoy que no estaban. */
   completadas?: DailyItem[]; completadas_fuera?: DailyItem[];
+  /** Solo en el cierre: indicadores del día. */
+  kpis?: DailyKpis;
+}
+export interface DailyKpis {
+  planificadas: number; cerradas_planificadas: number; cumplimiento_pct: number | null;
+  cerradas_fuera: number; cerradas_total: number;
+  nuevas_hoy: number; nuevas_no_planificadas: number; nuevas_urgentes: number;
+  reprocesos_hoy: number; reprogramaciones_24h: number; bloqueos_nuevos: number; vencidas_abiertas: number;
+  por_persona: { nombre: string; planificadas: number; cerradas: number; fuera: number }[];
+}
+
+/** Bloque de métricas del cierre. Lista, no tabla: Basecamp no admite tablas en mensajes. */
+export function kpisDaily(k: DailyKpis, men?: Menciones): string {
+  const pct = k.cumplimiento_pct === null ? 'sin plan' : `${k.cumplimiento_pct}%`;
+  const color = k.cumplimiento_pct === null ? '#888' : k.cumplimiento_pct >= 80 ? '#1e8449' : k.cumplimiento_pct >= 50 ? '#b9770e' : '#c0392b';
+  const fila = (etiqueta: string, valor: string) => `<li>${etiqueta}: <strong>${valor}</strong></li>`;
+  const general = `<ul>${[
+    fila('Cumplimiento del plan del día', `${k.cerradas_planificadas} de ${k.planificadas} · <span style="color:${color}">${pct}</span>`),
+    fila('Cerradas fuera del daily', String(k.cerradas_fuera)),
+    fila('Total cerradas hoy', String(k.cerradas_total)),
+    fila('Entraron hoy fuera de planificación', `${k.nuevas_no_planificadas + k.nuevas_urgentes} de ${k.nuevas_hoy} nuevas${k.nuevas_urgentes ? ` (${k.nuevas_urgentes} urgente${k.nuevas_urgentes === 1 ? '' : 's'})` : ''}`),
+    fila('Reprocesos abiertos hoy', String(k.reprocesos_hoy)),
+    fila('Reprogramaciones (24 h)', String(k.reprogramaciones_24h)),
+    fila('Bloqueos nuevos', String(k.bloqueos_nuevos)),
+    fila('Vencidas que siguen abiertas', String(k.vencidas_abiertas)),
+  ].join('')}</ul>`;
+  if (!k.por_persona.length) return general;
+  const personas = `<p><em>Por persona · cerradas / planificadas</em></p><ul>${k.por_persona.map((p) => {
+    const pp = p.planificadas ? ` · ${Math.round((p.cerradas / p.planificadas) * 100)}%` : '';
+    return `<li>${mencion(p.nombre, men)}: <strong>${p.cerradas} / ${p.planificadas}</strong>${pp}${p.fuera ? ` · +${p.fuera} fuera del daily` : ''}</li>`;
+  }).join('')}</ul>`;
+  return general + personas;
 }
 
 export function dailyItemTexto(i: DailyItem): string {
@@ -105,6 +137,7 @@ export function cuerpoDaily(m: DailyMensaje, men?: Menciones): string {
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
     ...(m.narrativa ? [mencionarEnHtml(markdownBasico(m.narrativa, { saltos: true }), men), SALTO] : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`, m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
+    ...(m.tipo === 'cierre' && m.kpis ? [SALTO, `<p>📊 <strong>Métricas del día</strong></p>`, kpisDaily(m.kpis, men)] : []),
     ...(m.tipo === 'cierre' ? [
       SALTO, `<p>✅ <strong>Completado hoy</strong></p>`, ...(m.completadas?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas, men), `<p><em>Por tarea</em></p>`] : []), li(m.completadas ?? []),
       SALTO, `<p>➕ <strong>Completadas fuera del daily</strong></p>`, ...(m.completadas_fuera?.length ? [`<p><em>Por persona</em></p>`, porPersonaDaily(m.completadas_fuera, men), `<p><em>Por tarea</em></p>`] : []), li(m.completadas_fuera ?? []),

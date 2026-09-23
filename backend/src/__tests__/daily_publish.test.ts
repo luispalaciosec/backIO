@@ -60,3 +60,17 @@ describe('daily · @menciones', () => {
     expect(mencionarEnHtml('<a href="x/Ana">Ana</a>', men)).toBe('<a href="x/Ana"><bc-attachment sgid="SGID_ANA" content-type="application/vnd.basecamp.mention"></bc-attachment></a>');
   });
 });
+
+describe('daily · métricas del cierre', () => {
+  it('muestra cumplimiento, entradas fuera de plan, reprocesos y detalle por persona', () => {
+    const kpis = { planificadas: 7, cerradas_planificadas: 5, cumplimiento_pct: 71, cerradas_fuera: 3, cerradas_total: 8, nuevas_hoy: 4, nuevas_no_planificadas: 1, nuevas_urgentes: 1, reprocesos_hoy: 1, reprogramaciones_24h: 4, bloqueos_nuevos: 0, vencidas_abiertas: 6, por_persona: [{ nombre: 'Ana', planificadas: 4, cerradas: 3, fuera: 1 }] };
+    const html = cuerpoDaily({ tipo: 'cierre', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [], completadas: [], completadas_fuera: [], kpis }, new Map([['Ana', 'SGID_ANA']]));
+    expect(html.indexOf('Métricas del día')).toBeLessThan(html.indexOf('Completado hoy'));
+    expect(html).toContain('5 de 7 · <span style="color:#b9770e">71%</span>');
+    expect(html).toContain('2 de 4 nuevas (1 urgente)');
+    expect(html).toContain('Reprocesos abiertos hoy: <strong>1</strong>');
+    expect(html).toContain('sgid="SGID_ANA"');
+    expect(html).toContain('<strong>3 / 4</strong> · 75% · +1 fuera del daily');
+    expect(cuerpoDaily({ tipo: 'apertura', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [] })).not.toContain('Métricas del día');
+  });
+});

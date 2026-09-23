@@ -166,6 +166,12 @@ Basecamp no admite tablas) y después la lista *Por tarea* de siempre. El resto 
 «➕ Completadas fuera del daily» (completadas hoy sin `daily_fecha`). «Hoy se trabaja» pasa a llamarse
 «Quedó abierto de lo de hoy». El borrador de IA sigue esa misma estructura.
 
+**Métricas del cierre (22/09/2026).** Bloque «📊 Métricas del día» antes de lo completado: cumplimiento del plan
+(cerradas / planificadas con `daily_fecha = hoy`, % en color), cerradas fuera del daily y total, nuevas de hoy
+fuera de planificación (no planificadas + urgentes), reprocesos abiertos hoy, reprogramaciones 24 h, bloqueos
+nuevos, vencidas que siguen abiertas, y detalle por persona (cerradas / planificadas · % · fuera del daily).
+La IA recibe `kpis` para el balance del día.
+
 ---
 
 ## Generación de documentos
