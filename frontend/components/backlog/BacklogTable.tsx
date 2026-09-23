@@ -33,7 +33,8 @@ export interface BacklogTableProps {
   onSincronizar?: (cliente: Cliente) => Promise<void>;
 }
 
-const COLS = 'grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_90px_80px_80px_70px_120px_120px]';
+// w-max min-w-full: la fila mide lo que suman sus columnas; sin esto el contenedor recortaba las últimas (Basecamp, Última act.).
+const COLS = 'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_90px_80px_80px_70px_120px_120px]';
 
 export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
   const [sincronizando, setSincronizando] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
               )}
             </div>
             {!cerrado && (
-              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+              <div className="rounded-md border border-gray-200 bg-white overflow-hidden w-max min-w-full">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50 sticky top-0 z-10`}>
                   <div className="flex sticky left-0 z-10 bg-gray-50"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
                   {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Piezas', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Basecamp', 'Última act.'].map((h) => (
