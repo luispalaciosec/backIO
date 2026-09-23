@@ -5,7 +5,7 @@ import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { audit } from '../../lib/db/audit';
 import { getMesa } from '../../lib/db/mesas';
 import { iaDisponible, MODELO_IA } from '../../lib/ia';
-import { armarDailyMensaje, narrarDaily } from '../../lib/ia/daily';
+import { armarDailyMensaje, narrarDaily, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly } from '../../lib/ia/weekly';
 import { briefDesdeTexto } from '../../lib/ia/brief';
 import { redactarRecordatorio } from '../../lib/ia/recordatorio';
@@ -22,7 +22,9 @@ ia.post('/daily', requireScope('write:actas'), zValidator('json', z.object({ mes
   const ctx = ctxOf(c); const b = c.req.valid('json');
   const mesa = await getMesa(ctx, b.mesa_id);
   if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
-  const m = await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, c.get('auth').nombre);
+  let m;
+  try { m = await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, c.get('auth').nombre); }
+  catch (err) { if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422); throw err; }
   const texto = await narrarDaily(ctx, mesa, m);
   return c.json({ texto, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length } });
 });

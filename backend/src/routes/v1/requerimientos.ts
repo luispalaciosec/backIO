@@ -143,6 +143,11 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
     return c.json({ error: 'Este requerimiento se completa desde Basecamp (fuente de verdad de completed).' }, 422);
   }
 
+  // Regla del daily (22/09): ninguna tarea entra al daily sin al menos un responsable.
+  if (patch.daily_fecha) {
+    const owners = patch.owner_agencia ?? previo.owner_agencia ?? [];
+    if (owners.length === 0) return c.json({ error: `«${previo.titulo_interno}» no tiene responsable. Asigna a alguien antes de ponerla en el daily.` }, 422);
+  }
   const reprogramado = patch.fecha_entrega !== undefined && patch.fecha_entrega !== previo.fecha_entrega && previo.fecha_entrega !== null;
   const { motivo_reprogramacion, observacion_reprogramacion, ...cambios } = patch;
   // Motivo obligatorio para toda reprogramación desde la UI (decidido 04/09). API/MCP pueden omitirlo: queda "sin causa" y sale como señal.

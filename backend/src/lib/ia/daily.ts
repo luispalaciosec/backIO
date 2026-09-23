@@ -12,6 +12,11 @@ import { fechaLocal, sumarDias } from '../rituals/daily';
 import { dailyItemTexto, type DailyItem, type DailyMensaje } from '../mcp/publish';
 import { generarTexto } from './index';
 
+/** El daily no se arma ni se publica con tareas sin responsable: nadie sabría a quién preguntar. */
+export class DailySinResponsable extends Error {
+  constructor(public tareas: string[]) { super(`El daily tiene ${tareas.length} tarea${tareas.length === 1 ? '' : 's'} sin responsable. Asigna a alguien antes de publicar: ${tareas.slice(0, 5).join('; ')}${tareas.length > 5 ? '…' : ''}`); }
+}
+
 export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura' | 'cierre', notas: string[], responsable: string): Promise<DailyMensaje> {
   const [alcance, usuarios, clientes] = await Promise.all([alcanceMesa(ctx, mesa.id), listUsuarios(ctx), listClientes(ctx, { incluirInactivos: true })]);
   const activos = await listBacklog(ctx, { solo_activos: true, mesa: alcance });
@@ -23,6 +28,8 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
   const linea = (r: { titulo_interno: string; cliente_id: string; owner_agencia: string[]; fecha_entrega: string | null; basecamp_url: string | null; dias_atraso: number }): DailyItem => ({
     cliente: cliente(r.cliente_id), titulo: r.titulo_interno, owner: nombre(r.owner_agencia[0]), fecha: r.fecha_entrega, url: r.basecamp_url, atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
   });
+  const sinResp = activos.filter((r) => r.owner_agencia.length === 0 && (r.daily_fecha === hoy || (r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado') || (r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h) || (r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h)));
+  if (sinResp.length) throw new DailySinResponsable(sinResp.map((r) => `${r.titulo_interno} (${cliente(r.cliente_id)})`));
   return {
     tipo, responsable, fecha: hoy, notas,
     hoy: activos.filter((r) => r.daily_fecha === hoy).map(linea),

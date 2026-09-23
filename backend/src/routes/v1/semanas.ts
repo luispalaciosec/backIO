@@ -7,7 +7,7 @@ import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCi
 import { getDaily, fechaLocal } from '../../lib/rituals/daily';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
-import { armarDailyMensaje } from '../../lib/ia/daily';
+import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 
 export const semanas = new Hono();
@@ -110,7 +110,9 @@ semanas.post('/daily/publicar', requireScope('write:actas'), zValidator('json', 
   const b = c.req.valid('json');
   const mesa = await getMesa(ctx, b.mesa_id);
   if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
-  const m: DailyMensaje = { ...(await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, b.responsable ?? c.get('auth').nombre)), narrativa: b.narrativa?.trim() || undefined };
+  let m: DailyMensaje;
+  try { m = { ...(await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, b.responsable ?? c.get('auth').nombre)), narrativa: b.narrativa?.trim() || undefined }; }
+  catch (err) { if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422); throw err; }
   try {
     const r = await publicarDailyEnBasecamp(ctx, mesa, m);
     await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });

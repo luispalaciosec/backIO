@@ -152,6 +152,11 @@ Vista dedicada: `/daily` — una sola pantalla, sin scroll, proyectable.
 4. **Publicar.** Notas, borrador con IA y apertura/cierre van al board Daily de esa misma mesa.
    Cambiar la mesa rearma los cuatro pasos.
 
+**Regla: ninguna tarea entra al daily sin responsable (22/09/2026).** Marcar `daily_fecha` en una
+tarea sin `owner_agencia` devuelve 422 (backlog ☀ y modal «Elegir tareas de hoy»); el tablero muestra
+una alerta con las tareas sin responsable de las cuatro columnas y la publicación (y el borrador con IA)
+se bloquea con `DailySinResponsable` hasta que se asigne a alguien.
+
 ---
 
 ## Generación de documentos

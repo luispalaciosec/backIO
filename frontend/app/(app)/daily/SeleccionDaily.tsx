@@ -45,16 +45,17 @@ export function SeleccionDaily({ hoy, mesa, mesaNombre, seleccionadasHoy }: { ho
             <div className="overflow-auto flex-1 divide-y divide-gray-100">
               {visibles.map((r) => (
                 <label key={r.id} className={`flex items-center gap-3 px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 ${r.daily_fecha === hoy ? 'bg-brand/5' : ''}`}>
-                  <input type="checkbox" checked={r.daily_fecha === hoy} disabled={busy === r.id} onChange={() => toggle(r)} />
+                  <input type="checkbox" checked={r.daily_fecha === hoy} disabled={busy === r.id || r.owner_agencia.length === 0} title={r.owner_agencia.length === 0 ? 'Sin responsable: asígnale a alguien en el backlog antes de ponerla en el daily' : undefined} onChange={() => toggle(r)} />
                   <span className="flex-1 min-w-0"><span className="font-medium">{r.titulo_interno}</span><span className="text-xs text-gray-500"> · {nc(r.cliente_id)}</span></span>
                   <span className={`text-xs whitespace-nowrap ${r.dias_atraso > 0 ? 'text-red-700' : 'text-gray-500'}`}>{fecha(r.fecha_entrega)}{r.dias_atraso > 0 ? ` · ${r.dias_atraso}d` : ''}</span>
+                  {r.owner_agencia.length === 0 && <span className="rounded-full bg-red-100 text-red-800 px-2 text-[10px] font-semibold" title="Asígnale responsable en el backlog">⚠ sin responsable</span>}
                   {r.planificacion === 'urgente' && <span className="rounded-full bg-red-100 text-red-800 px-2 text-[10px] font-semibold">urgente</span>}
                   {r.planificacion === 'no_planificado' && <span className="rounded-full bg-amber-100 text-amber-800 px-2 text-[10px] font-semibold">no planif.</span>}
                 </label>
               ))}
               {visibles.length === 0 && <p className="p-4 text-sm text-gray-400">Sin tareas activas de {mesaNombre} con ese filtro.</p>}
             </div>
-            <p className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">Las marcadas salen en la columna «Hoy se trabaja» y en la apertura publicada en Basecamp. También se marcan desde el backlog con ☀. La selección es del día; mañana empieza vacía.</p>
+            <p className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">Las marcadas salen en la columna «Hoy se trabaja» y en la apertura publicada en Basecamp. Una tarea sin responsable no puede entrar al daily: asígnala primero en el backlog. También se marcan desde el backlog con ☀. La selección es del día; mañana empieza vacía.</p>
           </div>
         </div>
       )}
