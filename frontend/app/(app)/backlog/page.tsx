@@ -6,7 +6,7 @@ import type { RequerimientoMetricas, Cliente, Usuario, Mesa, EstadoOperativo, Ac
 import { api, ApiError } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
-import { BacklogTable } from '@/components/backlog/BacklogTable';
+import { BacklogTable, type NuevoRequerimiento } from '@/components/backlog/BacklogTable';
 import { KanbanBoard } from '@/components/backlog/KanbanBoard';
 import { MotivoReprogramacionModal } from '@/components/backlog/MotivoReprogramacion';
 import { celebrar } from '@/lib/confetti';
@@ -22,6 +22,7 @@ function BacklogInner() {
   const [horas, setHoras] = useState<Record<string, number>>({});
   const [notas, setNotas] = useState<Record<string, Bitacora>>({});
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
+  const [proyectosCliente, setProyectosCliente] = useState<Record<string, { id: string; nombre: string; basecamp: boolean }[]>>({});
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
   // Filtros, orden y vista viven en la URL (sobreviven al refresh y se comparten) con respaldo en localStorage (preferencia de UI).
@@ -81,7 +82,12 @@ function BacklogInner() {
   useEffect(() => {
     api<{ items: Cliente[] }>('/clientes').then((r) => setClientes(r.items)).catch(() => {});
     api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {});
-    api<{ items: { id: string; nombre: string; mesa_id: string | null }[] }>('/proyectos').then((r) => { setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id]))); }).catch(() => {});
+    api<{ items: { id: string; nombre: string; mesa_id: string | null; cliente_id: string; estado: string; basecamp_todolist_id: number | null }[] }>('/proyectos').then((r) => {
+      setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id])));
+      const pc: Record<string, { id: string; nombre: string; basecamp: boolean }[]> = {};
+      for (const p of r.items.filter((x) => x.estado !== 'completado' && x.estado !== 'cancelado').sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))) (pc[p.cliente_id] ??= []).push({ id: p.id, nombre: p.nombre, basecamp: !!p.basecamp_todolist_id });
+      setProyectosCliente(pc);
+    }).catch(() => {});
     api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(() => {});
     api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(() => {});
     api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {});
@@ -149,9 +155,12 @@ function BacklogInner() {
     } catch (e) { setError(e instanceof ApiError ? e.message : 'No se pudo sincronizar'); }
   }
 
-  async function crear(clienteId: string, titulo: string, piezas = 0) {
+  async function crear(clienteId: string, d: NuevoRequerimiento) {
     try {
-      await api('/requerimientos', { method: 'POST', json: { cliente_id: clienteId, titulo_interno: titulo, tipo_trabajo: 'fee', piezas, fecha_pedido: new Date().toISOString().slice(0, 10) } });
+      const r = await api<{ basecamp: { todo_id: number } | { error: string } | null }>('/requerimientos', { method: 'POST', json: { cliente_id: clienteId, proyecto_id: d.proyecto_id, titulo_interno: d.titulo, tipo_trabajo: 'fee', piezas: d.piezas, owner_agencia: d.owner_agencia, fecha_entrega: d.fecha_entrega, fecha_pedido: new Date().toISOString().slice(0, 10) } });
+      if (r.basecamp && 'todo_id' in r.basecamp) setAviso('Requerimiento creado y to-do enviado a Basecamp ✓');
+      else if (r.basecamp && 'error' in r.basecamp) setError(`Se creó en BackIO pero Basecamp no aceptó el to-do: ${r.basecamp.error}`);
+      else setAviso(d.proyecto_id ? 'Requerimiento creado en BackIO (sin to-do: el proyecto no está enlazado a Basecamp o falta la fecha)' : 'Requerimiento creado en BackIO');
       await cargar(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo crear');
@@ -285,7 +294,7 @@ function BacklogInner() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-auto pb-4 tablero" style={{ maxHeight: 'calc(100vh - 8.5rem)' }}>
-          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} notas={notas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => { void cargar(true); api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {}); }} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
+          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} notas={notas} puedeEditar={puedeEditar} proyectos={proyectos} proyectosCliente={proyectosCliente} onCambio={() => { void cargar(true); api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {}); }} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

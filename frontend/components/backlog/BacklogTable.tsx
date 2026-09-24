@@ -23,7 +23,9 @@ export interface BacklogTableProps {
   clientes: Cliente[];
   usuarios: Usuario[];
   onPatch: (id: string, patch: ActualizarRequerimientoInput) => Promise<void>;
-  onCrear?: (clienteId: string, titulo: string, piezas: number) => Promise<void>;
+  onCrear?: (clienteId: string, datos: NuevoRequerimiento) => Promise<void>;
+  /** Proyectos activos por cliente para la fila de alta (id, nombre, si está enlazado a una lista de Basecamp). */
+  proyectosCliente?: Record<string, { id: string; nombre: string; basecamp: boolean }[]>;
   horas?: Record<string, number>;
   /** Última nota de bitácora por requerimiento (columna Observación). */
   notas?: Record<string, Bitacora>;
@@ -40,7 +42,7 @@ export interface BacklogTableProps {
 // w-max min-w-full: la fila mide lo que suman sus columnas; sin esto el contenedor recortaba las últimas (Basecamp, Última act.).
 const COLS = 'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_90px_80px_80px_70px_240px_120px_120px]';
 
-export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, notas = {}, puedeEditar, proyectos = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
+export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, notas = {}, puedeEditar, proyectos = {}, proyectosCliente = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
   const [sincronizando, setSincronizando] = useState<string | null>(null);
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
   const grupos = clientes
@@ -76,7 +78,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
                 {reqs.map((r) => (
                   <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} nota={notas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined} onCambio={onCambio} />
                 ))}
-                {onCrear && <NuevaFila color={color} onCrear={(t, n) => onCrear(cliente.id, t, n)} />}
+                {onCrear && <NuevaFila color={color} usuarios={usuarios} proyectos={proyectosCliente[cliente.id] ?? []} onCrear={(d) => onCrear(cliente.id, d)} />}
               </div>
             )}
           </section>
@@ -145,23 +147,40 @@ function CeldaPiezas({ valor, onCommit }: { valor: number; onCommit: (n: number)
   return <input className="h-9 w-full bg-transparent text-sm text-center tabular-nums placeholder:text-amber-500 focus:outline-none focus:ring-2 focus:ring-brand/40" inputMode="numeric" placeholder="¿piezas?" value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />;
 }
 
-function NuevaFila({ color, onCrear }: { color: string; onCrear: (titulo: string, piezas: number) => Promise<void> }) {
+export interface NuevoRequerimiento { titulo: string; proyecto_id: string | null; owner_agencia: string[]; fecha_entrega: string | null; piezas: number }
+
+/**
+ * Alta rápida desde el backlog: título, proyecto, responsables, entrega y piezas. Si el proyecto está enlazado a
+ * Basecamp y hay fecha, el to-do se crea allá al guardar (cliente → ejecutiva → BackIO → Basecamp).
+ */
+function NuevaFila({ color, usuarios, proyectos, onCrear }: { color: string; usuarios: Usuario[]; proyectos: { id: string; nombre: string; basecamp: boolean }[]; onCrear: (d: NuevoRequerimiento) => Promise<void> }) {
   const [v, setV] = useState('');
+  const [proyecto, setProyecto] = useState('');
+  const [owners, setOwners] = useState<string[]>([]);
+  const [fechaEnt, setFechaEnt] = useState('');
   const [piezas, setPiezas] = useState('');
   const [busy, setBusy] = useState(false);
-  const crear = async () => { if (!v.trim()) return; setBusy(true); await onCrear(v.trim(), Math.max(0, Number(piezas) || 0)); setV(''); setPiezas(''); setBusy(false); };
+  const p = proyectos.find((x) => x.id === proyecto);
+  const iraBasecamp = !!p?.basecamp && !!fechaEnt;
+  const crear = async () => {
+    if (!v.trim() || busy) return;
+    setBusy(true);
+    await onCrear({ titulo: v.trim(), proyecto_id: proyecto || null, owner_agencia: owners, fecha_entrega: fechaEnt || null, piezas: Math.max(0, Number(piezas) || 0) });
+    setV(''); setOwners([]); setFechaEnt(''); setPiezas(''); setBusy(false);
+  };
   return (
-    <div className="flex items-center">
+    <div className="flex items-center sticky left-0 z-[5] bg-white" style={{ width: 'max-content', maxWidth: 'calc(100vw - 20rem)' }}>
       <span className="w-1.5 self-stretch" style={{ backgroundColor: color, opacity: 0.4 }} />
-      <input
-        className="h-9 flex-1 bg-transparent text-sm px-3 placeholder:text-gray-400 focus:outline-none"
-        placeholder="+ Agregar requerimiento"
-        value={v}
-        disabled={busy}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }}
-      />
-      <input className="h-9 w-24 bg-transparent text-sm text-center border-l border-gray-100 placeholder:text-gray-400 focus:outline-none" inputMode="numeric" placeholder="piezas" value={piezas} disabled={busy} onChange={(e) => setPiezas(e.target.value.replace(/\D/g, ''))} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
+      <input className="h-9 w-72 bg-transparent text-sm px-3 placeholder:text-gray-400 focus:outline-none" placeholder="+ Agregar requerimiento" value={v} disabled={busy} onChange={(e) => setV(e.target.value)} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
+      <select className="h-9 w-48 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={proyecto} disabled={busy} onChange={(e) => setProyecto(e.target.value)} title="Proyecto (lista de Basecamp) donde entra la tarea">
+        <option value="">Sin proyecto</option>
+        {proyectos.map((x) => <option key={x.id} value={x.id}>{x.nombre}{x.basecamp ? '' : ' (sin Basecamp)'}</option>)}
+      </select>
+      <div className="w-32 border-l border-gray-100"><CeldaOwners ids={owners} usuarios={usuarios} onChange={setOwners} /></div>
+      <input type="date" className="h-9 w-36 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={fechaEnt} disabled={busy} onChange={(e) => setFechaEnt(e.target.value)} title="Fecha de entrega" />
+      <input className="h-9 w-20 bg-transparent text-sm text-center border-l border-gray-100 placeholder:text-gray-400 focus:outline-none" inputMode="numeric" placeholder="piezas" value={piezas} disabled={busy} onChange={(e) => setPiezas(e.target.value.replace(/\D/g, ''))} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
+      <span className={`text-xs px-2 whitespace-nowrap ${iraBasecamp ? 'text-emerald-700 font-semibold' : 'text-gray-400'}`} title={iraBasecamp ? 'Al guardar se crea el to-do en la lista de Basecamp del proyecto, con responsables y fecha' : p && !p.basecamp ? 'Ese proyecto no está enlazado a una lista de Basecamp' : !p ? 'Elige un proyecto enlazado a Basecamp para que el to-do se cree allá' : 'Pon fecha de entrega para crear el to-do en Basecamp'}>{iraBasecamp ? 'Bc↗ se crea en Basecamp' : 'solo en BackIO'}</span>
+      <button type="button" className="btn-primary text-xs py-1 mx-2" disabled={busy || !v.trim()} onClick={crear}>{busy ? 'Creando…' : 'Crear'}</button>
     </div>
   );
 }
