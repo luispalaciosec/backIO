@@ -9,7 +9,7 @@ import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoIn
 import { CeldaSelect, CeldaFecha, CeldaTexto, CeldaOwners } from './Celdas';
 import { COLOR_ESTADO, COLOR_APROBACION, COLOR_PRIORIDAD, COLOR_TIPO, COLOR_PLANIFICACION, colorGrupo } from './colores';
 import { PLANIFICACION_LABEL } from '@backio/shared';
-import { ESTADO_LABEL, APROBACION_LABEL, PRIORIDAD_LABEL, TIPO_LABEL, haceCuanto, fechaCorta } from '@/lib/format';
+import { ESTADO_LABEL, APROBACION_LABEL, PRIORIDAD_LABEL, TIPO_LABEL, haceCuanto, fechaCorta, diaLocal } from '@/lib/format';
 
 const ESTADOS = Object.keys(ESTADO_LABEL);
 const APROB = Object.keys(APROBACION_LABEL);
@@ -171,8 +171,8 @@ function CeldaNota({ r, nota, usuarios, onCambio }: { r: RequerimientoMetricas; 
   const [abierto, setAbierto] = useState(false);
   return (
     <>
-      <button type="button" className="h-9 w-full text-left px-2 text-xs truncate hover:bg-gray-100" title={nota ? `${fechaCorta(nota.created_at)} · ${nota.nota}\n\nClic para ver la bitácora o anotar` : 'Sin observaciones · clic para anotar'} onClick={(e) => { e.stopPropagation(); setAbierto(true); }}>
-        {nota ? <><span className="text-gray-400 mr-1">{fechaCorta(nota.created_at)}</span><span className="text-gray-700">{nota.nota}</span></> : <span className="text-gray-300">+ observación</span>}
+      <button type="button" className="h-9 w-full text-left px-2 text-xs truncate hover:bg-gray-100" title={nota ? `${fechaCorta(diaLocal(nota.created_at))} · ${nota.nota}\n\nClic para ver la bitácora o anotar` : 'Sin observaciones · clic para anotar'} onClick={(e) => { e.stopPropagation(); setAbierto(true); }}>
+        {nota ? <><span className="text-gray-400 mr-1">{fechaCorta(diaLocal(nota.created_at))}</span><span className="text-gray-700">{nota.nota}</span></> : <span className="text-gray-300">+ observación</span>}
       </button>
       {abierto && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setAbierto(false)}>

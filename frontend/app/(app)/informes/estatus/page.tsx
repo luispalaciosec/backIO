@@ -5,7 +5,7 @@ import type { Cliente, Usuario, RequerimientoMetricas, Bitacora } from '@backio/
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { EstadoChip } from '@/components/ui/EstadoChip';
-import { fecha, fechaCorta, APROBACION_LABEL } from '@/lib/format';
+import { fecha, fechaCorta, diaLocal, APROBACION_LABEL } from '@/lib/format';
 
 type Fila = RequerimientoMetricas & { ultima_nota: Bitacora | null };
 
@@ -89,7 +89,7 @@ function Estatus() {
                       <td className={`td whitespace-nowrap ${r.dias_atraso > 0 && r.estado_operativo !== 'completado' ? 'text-red-700 font-semibold' : ''}`}>{fecha(r.fecha_entrega)}{r.dias_atraso > 0 && r.estado_operativo !== 'completado' ? ` · ${r.dias_atraso} d` : ''}</td>
                       <td className="td"><EstadoChip estado={r.estado_operativo} /></td>
                       <td className="td text-xs">{r.estado_aprobacion === 'no_aplica' ? '' : APROBACION_LABEL[r.estado_aprobacion] ?? r.estado_aprobacion}</td>
-                      <td className="td text-xs whitespace-pre-wrap">{r.ultima_nota ? <><span className="text-gray-400">{fechaCorta(r.ultima_nota.created_at)} · </span>{r.ultima_nota.nota}</> : <span className="text-gray-300">—</span>}</td>
+                      <td className="td text-xs whitespace-pre-wrap">{r.ultima_nota ? <><span className="text-gray-400">{fechaCorta(diaLocal(r.ultima_nota.created_at))} · </span>{r.ultima_nota.nota}</> : <span className="text-gray-300">—</span>}</td>
                     </tr>
                   ))}
                 </tbody>

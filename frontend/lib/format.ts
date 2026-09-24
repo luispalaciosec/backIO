@@ -11,6 +11,13 @@ export function fechaCorta(iso: string | null | undefined): string {
   return `${Number(d)} ${MESES[Number(m) - 1]}.`;
 }
 
+/** Fecha (YYYY-MM-DD) de un instante ISO con hora, en hora de Guayaquil. Para created_at y similares. */
+export function diaLocal(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  if (iso.length <= 10) return iso;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+}
+
 export function fechaLarga(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Intl.DateTimeFormat('es-EC', { timeZone: 'America/Guayaquil', day: 'numeric', month: 'long', year: 'numeric' }).format(

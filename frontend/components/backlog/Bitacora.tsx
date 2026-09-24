@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { Bitacora, Usuario } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
-import { fecha, ESTADO_LABEL, APROBACION_LABEL } from '@/lib/format';
+import { fecha, diaLocal, ESTADO_LABEL, APROBACION_LABEL } from '@/lib/format';
 
 /** Bitácora de una tarea: observaciones fechadas con el estado del momento. Reemplaza la hoja "Control de tareas". */
 export function BitacoraReq({ requerimientoId, usuarios, visibleCliente, onCambio, compacto = false }: { requerimientoId: string; usuarios: Pick<Usuario, 'id' | 'nombre'>[]; visibleCliente: boolean; onCambio?: () => void; compacto?: boolean }) {
@@ -45,7 +45,7 @@ export function BitacoraReq({ requerimientoId, usuarios, visibleCliente, onCambi
           {items.map((b) => (
             <li key={b.id} className="ml-4">
               <span className={`absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white ${b.visible_cliente ? 'bg-brand' : 'bg-gray-300'}`} />
-              <div className="text-xs text-gray-500 flex flex-wrap gap-x-2"><b className="text-gray-700">{fecha(b.created_at.slice(0, 10))}</b><span>{nombre(b.usuario_id)}</span>{b.estado_operativo && <span>· {ESTADO_LABEL[b.estado_operativo] ?? b.estado_operativo}</span>}{b.estado_aprobacion && b.estado_aprobacion !== 'no_aplica' && <span>· {APROBACION_LABEL[b.estado_aprobacion] ?? b.estado_aprobacion}</span>}{b.visible_cliente && <span className="text-brand">· 👁 cliente</span>}<button className="text-gray-300 hover:text-red-600" title="Borrar nota" onClick={() => borrar(b)}>×</button></div>
+              <div className="text-xs text-gray-500 flex flex-wrap gap-x-2"><b className="text-gray-700">{fecha(diaLocal(b.created_at))}</b><span>{nombre(b.usuario_id)}</span>{b.estado_operativo && <span>· {ESTADO_LABEL[b.estado_operativo] ?? b.estado_operativo}</span>}{b.estado_aprobacion && b.estado_aprobacion !== 'no_aplica' && <span>· {APROBACION_LABEL[b.estado_aprobacion] ?? b.estado_aprobacion}</span>}{b.visible_cliente && <span className="text-brand">· 👁 cliente</span>}<button className="text-gray-300 hover:text-red-600" title="Borrar nota" onClick={() => borrar(b)}>×</button></div>
               <div className="text-sm whitespace-pre-wrap">{b.nota}</div>
             </li>
           ))}
