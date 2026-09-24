@@ -89,28 +89,20 @@ export interface BasecampConfig extends BasecampTokens {
   conectado_at: string;
 }
 
+/** Los tokens viven en `integracion_credenciales` (solo service role), nunca en `tenants.config`. Ver credenciales.ts. */
 export async function saveTokens(tenantId: string, tokens: BasecampTokens, extra: Omit<BasecampConfig, keyof BasecampTokens>): Promise<void> {
-  const db = serviceClient();
-  const { data, error } = await db.from('tenants').select('config').eq('id', tenantId).single();
-  throwIf(error);
-  const cfg = (data as { config: Record<string, unknown> }).config ?? {};
-  const { error: e2 } = await db.from('tenants').update({ config: { ...cfg, basecamp: { ...tokens, ...extra } } }).eq('id', tenantId);
-  throwIf(e2);
+  const { guardarCredencialesBasecamp } = await import('./credenciales');
+  await guardarCredencialesBasecamp(tenantId, { ...tokens, ...extra });
 }
 
 export async function getStatus(tenantId: string): Promise<{ conectado: boolean; cuenta?: string | null; cuenta_id?: number | null; autorizado_por?: string | null; expira_at?: string; conectado_at?: string }> {
-  const { data, error } = await serviceClient().from('tenants').select('config').eq('id', tenantId).single();
-  throwIf(error);
-  const bc = (data as { config: { basecamp?: BasecampConfig } }).config.basecamp;
+  const { leerCredencialesBasecamp } = await import('./credenciales');
+  const bc = await leerCredencialesBasecamp(tenantId);
   if (!bc?.access_token) return { conectado: false };
   return { conectado: true, cuenta: bc.cuenta_nombre, cuenta_id: bc.cuenta_id, autorizado_por: bc.autorizado_por, expira_at: bc.expires_at, conectado_at: bc.conectado_at };
 }
 
 export async function disconnect(tenantId: string): Promise<void> {
-  const db = serviceClient();
-  const { data, error } = await db.from('tenants').select('config').eq('id', tenantId).single();
-  throwIf(error);
-  const { basecamp: _b, ...rest } = ((data as { config: Record<string, unknown> }).config ?? {}) as Record<string, unknown>;
-  const { error: e2 } = await db.from('tenants').update({ config: rest }).eq('id', tenantId);
-  throwIf(e2);
+  const { borrarCredencialesBasecamp } = await import('./credenciales');
+  await borrarCredencialesBasecamp(tenantId);
 }

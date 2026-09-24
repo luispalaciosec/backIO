@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { detectarHuerfanos, listHuerfanos, adoptarHuerfano, ignorarHuerfano } from '../../lib/basecamp/huerfanos';
 import { audit } from '../../lib/db/audit';
+import { serviceClient } from '../../lib/db/client';
 
 export const huerfanos = new Hono();
 
@@ -22,13 +23,15 @@ huerfanos.get('/entradas', requireScope('read:backlog'), async (c) => {
   const ctx = ctxOf(c);
   const dias = Number(c.req.query('dias') ?? 14);
   const desde = new Date(Date.now() - (Number.isFinite(dias) ? dias : 14) * 86_400_000).toISOString();
-  const { data: ent } = await ctx.db.from('audit_log').select('entidad_id, created_at, detalle').eq('tenant_id', ctx.tenantId).eq('accion', 'basecamp_entrada').gte('created_at', desde).order('created_at', { ascending: false }).limit(500);
+  // audit_log no tiene política de lectura para usuarios: se lee con service role, acotado al tenant.
+  const svc = serviceClient();
+  const { data: ent } = await svc.from('audit_log').select('entidad_id, created_at, detalle').eq('tenant_id', ctx.tenantId).eq('accion', 'basecamp_entrada').gte('created_at', desde).order('created_at', { ascending: false }).limit(500);
   type E = { entidad_id: string; created_at: string; detalle: Record<string, unknown> };
   const entradas = (ent ?? []) as E[];
   if (!entradas.length) return c.json({ items: [] });
   const ids = entradas.map((e) => e.entidad_id);
   const [{ data: rev }, { data: reqs }] = await Promise.all([
-    ctx.db.from('audit_log').select('entidad_id').eq('tenant_id', ctx.tenantId).eq('accion', 'revisar_entrada').in('entidad_id', ids),
+    svc.from('audit_log').select('entidad_id').eq('tenant_id', ctx.tenantId).eq('accion', 'revisar_entrada').in('entidad_id', ids),
     ctx.db.from('v_requerimientos_metricas').select('id, titulo_interno, cliente_id, proyecto_id, bloque_nombre, owner_agencia, fecha_entrega, estado_operativo, prioridad, tipo_trabajo, piezas, estado_aprobacion, basecamp_url, planificacion').eq('tenant_id', ctx.tenantId).in('id', ids),
   ]);
   const revisadas = new Set(((rev ?? []) as { entidad_id: string }[]).map((r) => r.entidad_id));

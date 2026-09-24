@@ -28,12 +28,10 @@ export class BasecampClient {
   ) {}
 
   static async forTenant(tenantId: string): Promise<BasecampClient> {
-    const db = serviceClient();
-    const { data, error } = await db.from('tenants').select('config').eq('id', tenantId).single();
-    if (error) throw new Error(`No se pudo leer config del tenant: ${error.message}`);
-    const cfg = (data as { config: { basecamp?: BasecampTokens } }).config;
-    if (!cfg.basecamp?.access_token) throw new Error('Basecamp no está conectado para este tenant (falta OAuth)');
-    return new BasecampClient(tenantId, cfg.basecamp);
+    const { leerCredencialesBasecamp } = await import('./credenciales');
+    const cfg = await leerCredencialesBasecamp(tenantId);
+    if (!cfg?.access_token || !cfg.refresh_token || !cfg.expires_at) throw new Error('Basecamp no está conectado para este tenant (falta OAuth)');
+    return new BasecampClient(tenantId, { access_token: cfg.access_token, refresh_token: cfg.refresh_token, expires_at: cfg.expires_at });
   }
 
   private base(): string {
@@ -54,12 +52,15 @@ export class BasecampClient {
   private async refreshIfNeeded(): Promise<void> {
     if (new Date(this.tokens.expires_at).getTime() - Date.now() > 60_000) return;
     const { refreshTokens } = await import('./oauth');
+    const { leerCredencialesBasecamp, guardarCredencialesBasecamp } = await import('./credenciales');
+    // Si otra instancia (scheduler u otra petición) ya refrescó, se reutiliza ese token en vez de pisarlo.
+    const actual = await leerCredencialesBasecamp(this.tenantId);
+    if (actual?.access_token && actual.refresh_token && actual.expires_at && actual.access_token !== this.tokens.access_token && new Date(actual.expires_at).getTime() - Date.now() > 60_000) {
+      this.tokens = { access_token: actual.access_token, refresh_token: actual.refresh_token, expires_at: actual.expires_at };
+      return;
+    }
     this.tokens = await refreshTokens(this.tokens);
-    const db = serviceClient();
-    const { data } = await db.from('tenants').select('config').eq('id', this.tenantId).single();
-    const cfg = (data as { config: Record<string, unknown> } | null)?.config ?? {};
-    const prev = (cfg.basecamp as Record<string, unknown> | undefined) ?? {};
-    await db.from('tenants').update({ config: { ...cfg, basecamp: { ...prev, ...this.tokens } } }).eq('id', this.tenantId);
+    await guardarCredencialesBasecamp(this.tenantId, { ...(actual ?? {}), ...this.tokens });
   }
 
   async request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, intento = 0): Promise<T> {

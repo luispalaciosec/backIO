@@ -35,7 +35,14 @@ export function startScheduler(): void {
   if (process.env.ENABLE_INTERNAL_CRON !== '1') return;
   console.log('[scheduler] activo: reconciliación cada 30 min · señales domingo 18:00 Guayaquil');
 
-  const reconciliar = async () => {
+  // Lock por job: una corrida larga (muchos clientes) no debe solaparse con la siguiente; el solape duplicaba proyectos.
+  const enCurso = new Set<string>();
+  const exclusivo = (nombre: string, fn: () => Promise<void>) => async () => {
+    if (enCurso.has(nombre)) { console.warn(`[scheduler] ${nombre} sigue en curso; se omite esta corrida`); return; }
+    enCurso.add(nombre);
+    try { await fn(); } finally { enCurso.delete(nombre); }
+  };
+  const reconciliar = exclusivo('reconcile', async () => {
     for (const t of await tenants()) {
       try {
         const r = await reconcileTenant({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' });
@@ -44,12 +51,12 @@ export function startScheduler(): void {
         console.error('[scheduler] reconcile falló', t, err instanceof Error ? err.message : err);
       }
     }
-  };
+  });
   setInterval(() => void reconciliar(), 30 * 60_000);
   // Estructura de Basecamp cada 30 min (desfasado 10 min de la reconciliación): listas nuevas → proyectos,
   // to-dos nuevos → requerimientos, renombres, movimientos, responsables y eliminados. Basecamp es origen aceptado
   // (23/09/2026), así que el detector de huérfanos ya no corre por cron: lo creado a mano entra solo.
-  setTimeout(() => setInterval(async () => {
+  const estructura = exclusivo('estructura', async () => {
     for (const t of await tenants()) {
       const ctx = { db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' as const };
       const { data } = await serviceClient().from('clientes').select('id, nombre').eq('tenant_id', t).eq('activo', true).not('basecamp_project_id', 'is', null);
@@ -58,9 +65,11 @@ export function startScheduler(): void {
         catch (e) { console.error('[scheduler] estructura', c.nombre, e instanceof Error ? e.message : e); }
       }
     }
-  }, 30 * 60_000), 10 * 60_000);
+  });
+  setTimeout(() => setInterval(() => void estructura(), 30 * 60_000), 10 * 60_000);
   // Horas cada 6 h.
-  setInterval(async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); }, 6 * 3600_000);
+  const horas = exclusivo('horas', async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); });
+  setInterval(() => void horas(), 6 * 3600_000);
 
   setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);
 

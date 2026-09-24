@@ -8,7 +8,7 @@
  */
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env';
 import { serviceClient, upsertClienteDesdePrometio, audit, throwIf, getCliente } from '../../lib/db';
 import { notificar } from '../../lib/notificaciones';
@@ -48,6 +48,8 @@ async function tenantDefault(): Promise<string> {
   return (data as { id: string }).id;
 }
 
+const vistos = new Map<string, number>();
+
 prometioWebhook.post('/', async (c) => {
   const raw = await c.req.text();
   const sig = c.req.header('x-prometio-signature') ?? c.req.header('x-signature');
@@ -59,6 +61,14 @@ prometioWebhook.post('/', async (c) => {
     if (tenantId) await audit({ db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' }, { accion: 'webhook_rechazado', entidad: 'webhook', detalle: { evento, con_firma: !!sig, motivo: env().PROMETIO_WEBHOOK_SECRET ? 'firma inválida' : 'secreto no configurado' } });
     return c.text('unauthorized', 401);
   }
+  // Anti-replay: si viene X-Prometio-Timestamp debe estar dentro de ±5 min, y un mismo cuerpo no se procesa dos veces en 10 min.
+  const ts = Number(c.req.header('x-prometio-timestamp'));
+  if (Number.isFinite(ts) && ts > 0 && Math.abs(Date.now() / 1000 - (ts > 1e12 ? ts / 1000 : ts)) > 300) return c.json({ error: 'timestamp fuera de ventana' }, 401);
+  const huella = createHash('sha256').update(raw).digest('hex');
+  const ahora = Date.now();
+  for (const [k, v] of vistos) if (v < ahora - 10 * 60_000) vistos.delete(k);
+  if (vistos.has(huella)) return c.json({ ok: true, duplicado: true });
+  vistos.set(huella, ahora);
   let parsedRaw: unknown;
   try { parsedRaw = JSON.parse(raw); } catch { return c.json({ error: 'bad json' }, 400); }
   const env1 = envelope.safeParse(parsedRaw);

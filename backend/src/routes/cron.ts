@@ -1,5 +1,6 @@
 /** Jobs programados. Protegidos con CRON_SECRET (Vercel Cron / GitHub Actions). */
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { serviceClient, throwIf } from '../lib/db';
 import { reconcileTenant } from '../lib/basecamp/reconcile';
 import { recalcularSenales } from '../lib/rituals/service';
@@ -12,8 +13,12 @@ import { sincronizarHoras } from '../lib/horas';
 export const cron = new Hono();
 
 cron.use('*', async (c, next) => {
+  // Fail-closed: sin CRON_SECRET en producción nadie puede disparar jobs (antes quedaban públicos).
   const secret = process.env.CRON_SECRET;
-  if (secret && c.req.header('authorization') !== `Bearer ${secret}`) return c.text('unauthorized', 401);
+  if (!secret) return process.env.NODE_ENV === 'production' ? c.text('unauthorized', 401) : next();
+  const dado = Buffer.from((c.req.header('authorization') ?? '').replace(/^Bearer /, ''));
+  const esperado = Buffer.from(secret);
+  if (dado.length !== esperado.length || !timingSafeEqual(dado, esperado)) return c.text('unauthorized', 401);
   await next();
 });
 

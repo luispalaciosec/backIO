@@ -66,9 +66,11 @@ export async function procesarPendientes(tenantId?: string): Promise<{ enviadas:
   const base = frontendOrigins()[0] ?? '';
   for (const f of (data ?? []) as Fila[]) {
     if (!f.email_destino) { await db.from('notificaciones').update({ intentos: MAX_INTENTOS, ultimo_error: 'sin email' }).eq('id', f.id); continue; }
-    const [cuerpo, ruta] = f.cuerpo.split('\n__ruta__:');
+    const [cuerpo, rutaCruda] = f.cuerpo.split('\n__ruta__:');
+    // La ruta solo puede ser un path interno de BackIO: sin esto un título con "\n__ruta__:" desviaría el botón del correo.
+    const ruta = rutaCruda && /^\/(?!\/)[A-Za-z0-9_\-./?=&%]*$/.test(rutaCruda) ? rutaCruda : undefined;
     try {
-      await sendEmail({ to: f.email_destino, subject: `[BackIO] ${f.titulo}`, html: plantillaHtml(f.titulo, cuerpo ?? '', ruta ? `${base}${ruta}` : undefined), text: cuerpo });
+      await sendEmail({ to: f.email_destino, subject: `[BackIO] ${f.titulo.replace(/[\r\n]+/g, ' ')}`, html: plantillaHtml(f.titulo, cuerpo ?? '', ruta ? `${base}${ruta}` : undefined), text: cuerpo });
       await db.from('notificaciones').update({ enviada_at: new Date().toISOString(), intentos: f.intentos + 1, ultimo_error: null }).eq('id', f.id);
       enviadas += 1;
     } catch (err) {

@@ -125,7 +125,8 @@ admin.post('/invitaciones/:id/reenviar', async (c) => {
   if (!data) return c.json({ error: 'Invitación no encontrada' }, 404);
   const inv = data as { email: string; nombre: string };
   const envio = await enviarInvitacion(inv.email, inv.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
-  await audit(ctx, { accion: 'reenviar_invitacion', entidad: 'invitacion', entidad_id: c.req.param('id'), detalle: envio });
+  const { url: _url, ...sinEnlace } = envio as { url?: string; enviado: boolean; error?: string };
+  await audit(ctx, { accion: 'reenviar_invitacion', entidad: 'invitacion', entidad_id: c.req.param('id'), detalle: sinEnlace });
   return c.json(envio, envio.enviado ? 200 : 422);
 });
 
@@ -257,6 +258,7 @@ admin.post('/usuarios/:id/restaurar-acceso', async (c) => {
   const { error } = await db.from('usuarios').update({ activo: true }).eq('id', id); throwIf(error);
   try { await db.auth.admin.updateUserById(id, { ban_duration: 'none' }); } catch { /* si no existe en auth, la invitación lo crea */ }
   const envio = await enviarInvitacion((u as { email: string }).email, (u as { nombre: string }).nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
-  await audit(ctx, { accion: 'restaurar_acceso', entidad: 'usuario', entidad_id: id, detalle: { email: (u as { email: string }).email, envio } });
+  const { url: _url, ...sinEnlace } = envio as { url?: string; enviado: boolean; error?: string };
+  await audit(ctx, { accion: 'restaurar_acceso', entidad: 'usuario', entidad_id: id, detalle: { email: (u as { email: string }).email, envio: sinEnlace } });
   return c.json({ ok: true, envio });
 });

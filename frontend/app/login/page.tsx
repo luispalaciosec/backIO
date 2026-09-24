@@ -19,7 +19,9 @@ function LoginForm() {
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return setError('Credenciales inválidas');
-    router.replace(params.get('next') ?? '/backlog');
+    // Solo rutas internas: un `next` externo convertía el login en un redirector abierto (phishing).
+    const next = params.get('next') ?? '';
+    router.replace(/^\/(?![\/\\])/.test(next) ? next : '/backlog');
     router.refresh();
   }
 

@@ -91,6 +91,7 @@ En estas zonas: generar, detener, pedir revisión. No hacer commit automático.
 12. `docs/15-ia.md` — capa de IA: qué redacta, con qué datos, quién publica
 13. `docs/16-cumplimiento.md` — reprogramaciones y reprocesos: fecha original, causas, indicadores
 14. `docs/17-arquitectura-tecnica.md` — cómo está armado el código: rutas, auth, db, crons, deuda técnica
+15. `docs/18-seguridad.md` — revisión de seguridad del 23/09: hallazgos, qué se corrigió, qué depende de Luis
 
 ## Definition of Done por fase
 

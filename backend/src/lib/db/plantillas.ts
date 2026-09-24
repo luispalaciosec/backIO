@@ -34,13 +34,18 @@ export async function guardarPlantilla(ctx: DbCtx, input: PlantillaInput): Promi
   if (input.bloques.length && Math.abs(suma - 100) > 0.5) throw new DbError(`Los pesos de los bloques suman ${suma}, deben sumar 100`, 422);
   for (const b of input.bloques) for (const t of b.tareas) if (t.visible_cliente_default && !t.etiqueta_cliente) throw new DbError(`"${t.titulo_interno}": visible al cliente requiere etiqueta`, 422);
   const { bloques, id, ...cab } = input;
+  if (id) {
+    // Regla 5: el id debe ser del tenant (con service role el upsert re-asignaría una plantilla ajena).
+    const { data: propia } = await ctx.db.from('plantillas').select('id').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
+    if (!propia) throw new DbError('Plantilla no encontrada', 404);
+  }
   const { data, error } = await ctx.db
     .from('plantillas')
     .upsert({ ...(id ? { id } : {}), ...cab, tenant_id: ctx.tenantId }, { onConflict: id ? 'id' : 'tenant_id,nombre' })
     .select().single();
   throwIf(error);
   const pl = data as Plantilla;
-  const { error: ed } = await ctx.db.from('plantilla_bloques').delete().eq('plantilla_id', pl.id);
+  const { error: ed } = await ctx.db.from('plantilla_bloques').delete().eq('tenant_id', ctx.tenantId).eq('plantilla_id', pl.id);
   throwIf(ed);
   for (const [i, b] of bloques.entries()) {
     const { data: bl, error: eb } = await ctx.db.from('plantilla_bloques').insert({ tenant_id: ctx.tenantId, plantilla_id: pl.id, nombre: b.nombre, peso: b.peso, orden: i + 1, opcional: b.opcional }).select('id').single();

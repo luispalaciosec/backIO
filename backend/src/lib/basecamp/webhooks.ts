@@ -20,7 +20,9 @@ export async function registrarWebhookCliente(ctx: DbCtx, clienteId: string): Pr
   const existente = (cliente.config as { basecamp_webhook_id?: number }).basecamp_webhook_id;
   if (existente) return { webhook_id: existente, payload_url: url };
   const wh = await bc.registerWebhook(cliente.basecamp_project_id, url);
-  await updateClienteConfig(ctx, clienteId, { config: { ...cliente.config, basecamp_webhook_id: wh.id, basecamp_webhook_url: url } });
+  // Solo el id: la URL lleva el secreto del webhook y clientes.config era legible por todos los usuarios.
+  const { basecamp_webhook_url: _u, ...restoConfig } = cliente.config as Record<string, unknown>;
+  await updateClienteConfig(ctx, clienteId, { config: { ...restoConfig, basecamp_webhook_id: wh.id } });
   await audit(ctx, { accion: 'basecamp_registrar_webhook', entidad: 'cliente', entidad_id: clienteId, detalle: { webhook_id: wh.id, project: cliente.basecamp_project_id } });
   return { webhook_id: wh.id, payload_url: url };
 }

@@ -196,7 +196,7 @@ export async function detectarBoardsMesa(ctx: DbCtx, mesa: Mesa): Promise<{ dail
   return { daily, weekly, boards };
 }
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 /** Conversión mínima markdown → HTML (títulos, listas, tablas, negritas). Basecamp acepta HTML simple. */
 export function markdownBasico(md: string, opts: { saltos?: boolean } = {}): string {

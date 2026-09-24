@@ -49,7 +49,8 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
     .maybeSingle();
   if (!data || (data as { revocada_at: string | null }).revocada_at) return null;
   const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[]; perfil: string | null };
-  void db.from('api_keys').update({ ultimo_uso_at: new Date().toISOString() }).eq('id', row.id);
+  // El builder de PostgREST es perezoso: sin then/await la petición nunca salía y ultimo_uso_at quedaba muerto.
+  void db.from('api_keys').update({ ultimo_uso_at: new Date().toISOString() }).eq('id', row.id).then(() => undefined, () => undefined);
   return {
     tipo: 'api_key',
     ctx: { db, tenantId: row.tenant_id, usuarioId: null, origen: 'api', apiKeyId: row.id },
@@ -116,7 +117,8 @@ export function requireScope(...scopes: Scope[]): MiddlewareHandler {
   return async (c, next) => {
     const a = c.get('auth');
     if (a.tipo === 'usuario') {
-      if (a.perfil === 'oauth' && !scopes.every((s) => s === 'admin' || a.scopes.includes(s))) {
+      // Token OAuth (agente en nombre de un usuario): solo los scopes concedidos y nunca admin, aunque el dueño lo sea.
+      if (a.perfil === 'oauth' && (scopes.includes('admin') || !scopes.every((s) => a.scopes.includes(s)))) {
         return c.json({ error: `Scope OAuth requerido: ${scopes.join(', ')}` }, 403);
       }
       const esEscritura = scopes.some((s) => s.startsWith('write:') || s === 'admin');
@@ -126,6 +128,8 @@ export function requireScope(...scopes: Scope[]): MiddlewareHandler {
       if (scopes.includes('admin') && a.rol !== 'admin') return c.json({ error: 'Solo admin' }, 403);
       return next();
     }
+    // Las API keys de perfil cliente solo operan por el MCP, que sanitiza la salida. En la REST verían datos internos.
+    if (a.perfil === 'cliente') return c.json({ error: 'Esta credencial solo puede usarse a través del MCP' }, 403);
     const ok = a.scopes.includes('admin') || scopes.every((s) => a.scopes.includes(s));
     if (!ok) return c.json({ error: `Scope requerido: ${scopes.join(', ')}` }, 403);
     await next();

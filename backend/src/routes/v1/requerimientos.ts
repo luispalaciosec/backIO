@@ -1,5 +1,5 @@
 import { alcanceMesa } from '../../lib/db/mesas';
-import { Hono, type MiddlewareHandler } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
@@ -200,8 +200,24 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
 
 // ---------------- Cumplimiento: historial, reprocesos y causas pendientes
 
+/**
+ * Un colaborador solo toca lo suyo: devuelve una respuesta 403 si el requerimiento no es de la persona,
+ * o null si puede seguir (roles de gestión, API keys y OAuth ya pasaron por requireScope).
+ */
+async function soloSiEsSuya(c: Context, requerimientoId: string | null): Promise<Response | null> {
+  const a = c.get('auth');
+  if (!(a.tipo === 'usuario' && a.rol === 'colaborador' && a.perfil !== 'oauth')) return null;
+  const ctx = ctxOf(c);
+  const r = requerimientoId ? await getRequerimiento(ctx, requerimientoId) : null;
+  if (!r || !ctx.usuarioId || !r.owner_agencia.includes(ctx.usuarioId)) return c.json({ error: 'Solo puedes actualizar las tareas asignadas a ti.' }, 403);
+  return null;
+}
+
 requerimientos.patch('/reprogramaciones/:rid', escrituraOPropia, zValidator('json', z.object({ motivo: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]), observacion: z.string().max(1000).nullable().optional() })), async (c) => {
   const ctx = ctxOf(c);
+  const { data: rp } = await ctx.db.from('reprogramaciones').select('requerimiento_id').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('rid')).maybeSingle();
+  const bloqueo = await soloSiEsSuya(c, (rp as { requerimiento_id: string } | null)?.requerimiento_id ?? null);
+  if (bloqueo) return bloqueo;
   await setMotivoReprogramacion(ctx, c.req.param('rid'), c.req.valid('json').motivo as MotivoReprogramacion, c.req.valid('json').observacion ?? null);
   return c.body(null, 204);
 });
@@ -211,12 +227,24 @@ requerimientos.post('/:id/bitacora', escrituraOPropia, zValidator('json', z.obje
   const ctx = ctxOf(c); const id = c.req.param('id'); const b = c.req.valid('json');
   const r = await getRequerimiento(ctx, id);
   if (!r) return c.json({ error: 'No encontrado' }, 404);
-  const nota = await insertBitacora(ctx, { requerimiento_id: id, nota: b.nota, visible_cliente: b.visible_cliente, estado_operativo: r.estado_operativo, estado_aprobacion: r.estado_aprobacion });
+  const bloqueo = await soloSiEsSuya(c, id);
+  if (bloqueo) return bloqueo;
+  const a = c.get('auth');
+  // Lo que ve el cliente lo decide gestión: un colaborador anota, pero no publica al cliente.
+  const visible = b.visible_cliente && r.visible_cliente && !(a.tipo === 'usuario' && a.rol === 'colaborador');
+  const nota = await insertBitacora(ctx, { requerimiento_id: id, nota: b.nota, visible_cliente: visible, estado_operativo: r.estado_operativo, estado_aprobacion: r.estado_aprobacion });
   await audit(ctx, { accion: 'bitacora', entidad: 'requerimiento', entidad_id: id, detalle: { nota: b.nota.slice(0, 200), visible_cliente: b.visible_cliente } });
   return c.json(nota, 201);
 });
 requerimientos.delete('/:id/bitacora/:bid', escrituraOPropia, async (c) => {
   const ctx = ctxOf(c);
+  const a = c.get('auth');
+  if (a.tipo === 'usuario' && a.rol === 'colaborador') {
+    // Un colaborador solo borra sus propias notas.
+    const { data: nota } = await ctx.db.from('bitacora').select('usuario_id, requerimiento_id').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('bid')).maybeSingle();
+    const n = nota as { usuario_id: string | null; requerimiento_id: string } | null;
+    if (!n || n.requerimiento_id !== c.req.param('id') || n.usuario_id !== ctx.usuarioId) return c.json({ error: 'Solo puedes borrar tus propias notas.' }, 403);
+  }
   await deleteBitacora(ctx, c.req.param('bid'));
   await audit(ctx, { accion: 'bitacora_eliminar', entidad: 'requerimiento', entidad_id: c.req.param('id'), detalle: { bitacora_id: c.req.param('bid') } });
   return c.body(null, 204);
@@ -250,12 +278,18 @@ requerimientos.patch('/:id/reprocesos/:rid', escrituraOPropia, zValidator('json'
   observacion: z.string().max(1000).nullable().optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
+  const bloqueo = await soloSiEsSuya(c, c.req.param('id'));
+  if (bloqueo) return bloqueo;
+  const { data: rp } = await ctx.db.from('reprocesos').select('requerimiento_id').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('rid')).maybeSingle();
+  if ((rp as { requerimiento_id: string } | null)?.requerimiento_id !== c.req.param('id')) return c.json({ error: 'Reproceso no encontrado' }, 404);
   await updateReproceso(ctx, c.req.param('rid'), c.req.valid('json') as { motivo?: MotivoReproceso; paso_retorno?: string | null; observacion?: string | null });
   return c.body(null, 204);
 });
 
 requerimientos.post('/:id/reprocesos/:rid/cerrar', escrituraOPropia, async (c) => {
   const ctx = ctxOf(c);
+  const bloqueo = await soloSiEsSuya(c, c.req.param('id'));
+  if (bloqueo) return bloqueo;
   const rp = await cerrarReproceso(ctx, c.req.param('id'), c.req.param('rid'));
   return rp ? c.json(rp) : c.json({ error: 'Reproceso no encontrado' }, 404);
 });

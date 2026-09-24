@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
@@ -10,14 +10,21 @@ import { importarBasecampCliente } from '../../lib/basecamp/importar';
 
 export const clientes = new Hono();
 
+/** `config` guarda el PIN del portal e ids de webhook: solo la ve admin (o una API key con scope admin). */
+function sinConfig<T extends { config?: unknown }>(c: Context, x: T): T {
+  const a = c.get('auth');
+  const admin = a.tipo === 'usuario' ? a.rol === 'admin' : a.scopes.includes('admin');
+  return admin ? x : { ...x, config: {} };
+}
+
 clientes.get('/', requireScope('read:proyectos'), async (c) => {
-  const items = await listClientes(ctxOf(c), { incluirInactivos: c.req.query('todos') === '1' });
+  const items = (await listClientes(ctxOf(c), { incluirInactivos: c.req.query('todos') === '1' })).map((x) => sinConfig(c, x));
   return c.json({ items, total: items.length });
 });
 
 clientes.get('/:id', requireScope('read:proyectos'), async (c) => {
   const cl = await getCliente(ctxOf(c), c.req.param('id'));
-  return cl ? c.json(cl) : c.json({ error: 'No encontrado' }, 404);
+  return cl ? c.json(sinConfig(c, cl)) : c.json({ error: 'No encontrado' }, 404);
 });
 
 /** Widget para la ficha de cliente en PrometIO (docs/08 · Flujo 2). */
