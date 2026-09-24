@@ -22,7 +22,7 @@ function BacklogInner() {
   const [horas, setHoras] = useState<Record<string, number>>({});
   const [notas, setNotas] = useState<Record<string, Bitacora>>({});
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
-  const [proyectosCliente, setProyectosCliente] = useState<Record<string, { id: string; nombre: string; basecamp: boolean }[]>>({});
+  const [proyectosCliente, setProyectosCliente] = useState<Record<string, { id: string; nombre: string; basecamp: boolean; completado: boolean }[]>>({});
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
   // Filtros, orden y vista viven en la URL (sobreviven al refresh y se comparten) con respaldo en localStorage (preferencia de UI).
@@ -84,8 +84,10 @@ function BacklogInner() {
     api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {});
     api<{ items: { id: string; nombre: string; mesa_id: string | null; cliente_id: string; estado: string; basecamp_todolist_id: number | null }[] }>('/proyectos').then((r) => {
       setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id])));
-      const pc: Record<string, { id: string; nombre: string; basecamp: boolean }[]> = {};
-      for (const p of r.items.filter((x) => x.estado !== 'completado' && x.estado !== 'cancelado').sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))) (pc[p.cliente_id] ??= []).push({ id: p.id, nombre: p.nombre, basecamp: !!p.basecamp_todolist_id });
+      // También los proyectos completados: una campaña cerrada puede recibir una tarea nueva (se reabre sola).
+      const pc: Record<string, { id: string; nombre: string; basecamp: boolean; completado: boolean }[]> = {};
+      const orden = (x: { estado: string; nombre: string }) => `${x.estado === 'completado' ? 1 : 0}${x.nombre.toLowerCase()}`;
+      for (const p of r.items.filter((x) => x.estado !== 'cancelado').sort((a, b) => orden(a).localeCompare(orden(b), 'es'))) (pc[p.cliente_id] ??= []).push({ id: p.id, nombre: p.nombre, basecamp: !!p.basecamp_todolist_id, completado: p.estado === 'completado' });
       setProyectosCliente(pc);
     }).catch(() => {});
     api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(() => {});
