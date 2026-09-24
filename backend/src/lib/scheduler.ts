@@ -53,7 +53,7 @@ export function startScheduler(): void {
     }
   });
   setInterval(() => void reconciliar(), 30 * 60_000);
-  // Estructura de Basecamp cada 30 min (desfasado 10 min de la reconciliación): listas nuevas → proyectos,
+  // Estructura de Basecamp cada 15 min como red de seguridad (el webhook todo_created ya trae lo nuevo en segundos):
   // to-dos nuevos → requerimientos, renombres, movimientos, responsables y eliminados. Basecamp es origen aceptado
   // (23/09/2026), así que el detector de huérfanos ya no corre por cron: lo creado a mano entra solo.
   const estructura = exclusivo('estructura', async () => {
@@ -66,7 +66,7 @@ export function startScheduler(): void {
       }
     }
   });
-  setTimeout(() => setInterval(() => void estructura(), 30 * 60_000), 10 * 60_000);
+  setTimeout(() => setInterval(() => void estructura(), 15 * 60_000), 10 * 60_000);
   // Horas cada 6 h.
   const horas = exclusivo('horas', async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); });
   setInterval(() => void horas(), 6 * 3600_000);

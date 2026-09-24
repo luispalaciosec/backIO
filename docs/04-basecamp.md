@@ -247,3 +247,11 @@ cliente → ejecutiva → BackIO → Basecamp sigue siendo el preferido, pero de
   está en el backlog y en su proyecto desde que entró.
 - El detector de huérfanos ya no corre por cron (queda el endpoint manual). La regla 2 no cambia: lo importado
   nace oculto al cliente.
+
+### Entrada en segundos por webhook (24/09/2026)
+
+El webhook de Basecamp ya avisaba `todo_created`, pero solo se usaba para estados. Ahora, si llega un
+`todo_created` (o `untrashed`/`unarchived`/`changed`) de un to-do que BackIO no conoce, se programa una
+sincronización de estructura **solo de ese cliente** con 20 s de debounce (`routes/webhooks/basecamp.ts`,
+`programarImportacion`). Resultado: lo creado a mano en Basecamp entra en menos de un minuto. La corrida
+periódica baja a 15 min y queda como red de seguridad (renombres, movimientos, eliminados, webhook caído).

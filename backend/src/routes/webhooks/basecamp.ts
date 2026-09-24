@@ -10,8 +10,30 @@ import { extractSafePayload, extractSafeTodo, applyBasecampUpdate, type Basecamp
 import { findByBasecampTodo } from '../../lib/db/requerimientos';
 import { audit } from '../../lib/db/audit';
 import { BasecampClient } from '../../lib/basecamp/client';
+import { importarBasecampCliente } from '../../lib/basecamp/importar';
 
 export const basecampWebhook = new Hono();
+
+/**
+ * To-do nuevo (o restaurado) que BackIO aún no conoce: se sincroniza la estructura de ESE cliente en segundos,
+ * sin esperar la corrida periódica. Debounce de 20 s por cliente para agrupar varias creaciones seguidas.
+ */
+const importacionesPendientes = new Map<string, NodeJS.Timeout>();
+async function programarImportacion(bucketId: number): Promise<void> {
+  const db = serviceClient();
+  const { data } = await db.from('clientes').select('id, tenant_id, nombre').eq('basecamp_project_id', bucketId).eq('activo', true).is('deleted_at', null).maybeSingle();
+  const cl = data as { id: string; tenant_id: string; nombre: string } | null;
+  if (!cl) return;
+  const previo = importacionesPendientes.get(cl.id);
+  if (previo) clearTimeout(previo);
+  importacionesPendientes.set(cl.id, setTimeout(async () => {
+    importacionesPendientes.delete(cl.id);
+    try {
+      const r = await importarBasecampCliente({ db: serviceClient(), tenantId: cl.tenant_id, usuarioId: null, origen: 'webhook:basecamp' }, cl.id);
+      if (r.requerimientos_creados || r.proyectos_creados) console.log('[webhook basecamp] estructura', cl.nombre, JSON.stringify({ tareas: r.requerimientos_creados, proyectos: r.proyectos_creados }));
+    } catch (err) { console.error('[webhook basecamp] importación', cl.nombre, err instanceof Error ? err.message : err); }
+  }, 20_000));
+}
 
 function tokenValido(t: string | undefined): boolean {
   const secret = env().BASECAMP_WEBHOOK_SECRET;
@@ -28,6 +50,12 @@ async function handle(raw: string) {
   if (!safe) return { status: 200 as const, body: 'ok' };
   const kind = (evento as { kind?: string }).kind ?? '';
   const ctx = { db: serviceClient(), tenantId: '', usuarioId: null, origen: 'webhook:basecamp' as const };
+
+  // Creado a mano en Basecamp (o devuelto de la papelera) y todavía sin requerimiento: entra en segundos.
+  if (['todo_created', 'todo_untrashed', 'todo_unarchived', 'todo_changed'].includes(kind) && safe.bucket_id && !(await findByBasecampTodo(ctx, safe.todo_id))) {
+    void programarImportacion(safe.bucket_id);
+    if (kind === 'todo_created') return { status: 200 as const, body: 'ok' };
+  }
 
   // Estado desconocido (p. ej. todo_changed): consultar el to-do vivo. Solo se extraen campos seguros.
   if (safe.completed === null && safe.eliminado === undefined) {
