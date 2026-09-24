@@ -90,6 +90,7 @@ En estas zonas: generar, detener, pedir revisión. No hacer commit automático.
 11. `docs/10-core.md` — CoreIO, capa compartida de la suite
 12. `docs/15-ia.md` — capa de IA: qué redacta, con qué datos, quién publica
 13. `docs/16-cumplimiento.md` — reprogramaciones y reprocesos: fecha original, causas, indicadores
+14. `docs/17-arquitectura-tecnica.md` — cómo está armado el código: rutas, auth, db, crons, deuda técnica
 
 ## Definition of Done por fase
 

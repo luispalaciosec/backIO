@@ -1,126 +1,133 @@
 # BackIO
 
-Sistema de backlog y gestión de cuenta de **Geeks Ecuador** (Moderzacorp S.A.).
-Reemplaza Monday.com. Se apoya en Basecamp como capa de ejecución.
+**Sistema operativo de backlog de Geeks Ecuador.** Reemplaza Monday.com como tablero de
+requerimientos y vista de cuenta del cliente, apoyándose en Basecamp como sistema de ejecución.
+
+En producción desde el 04/09/2026 · `backio.vercel.app` · 15 clientes sincronizados con Basecamp.
 
 ---
 
-## Contexto en 60 segundos
+## Qué hace
 
-Geeks opera hoy con tres sistemas desconectados: Monday (~$15,000/año) para la vista de
-cuenta del cliente, Basecamp para ejecución, y documentos manuales para el Plan Operativo
-y el Acta de Cierre semanal.
+| Para | Qué resuelve |
+|---|---|
+| **Ejecutivas de cuenta** | Backlog por cliente estilo Monday (filtros en la URL, columnas fijas, edición en línea), bitácora con el cliente, hoja de estatus imprimible, reprogramaciones con motivo, reprocesos |
+| **Mesas de operación** | Daily por mesa (elegir tareas, tablero, apertura y cierre publicados en Basecamp con menciones y métricas), Weekly con motor de señales, Plan Operativo y Acta de Cierre |
+| **Gerencia** | Dashboard, cumplimiento a fecha original vs vigente, personas (performance con evidencia del timesheet), informes mensuales y por canal |
+| **Clientes** | Portal por token con lo que la agencia decidió mostrar. Nada interno puede llegar ahí por diseño |
+| **Agentes de IA** | API REST con scopes y MCP Server con preview + confirmación para toda escritura |
 
-Los tres artefactos del ritual semanal son **la misma data digitada tres veces**. BackIO
-unifica la capa de gestión sin tocar la capa de ejecución.
-
-### La suite Geeks
-
-| Sistema | Dominio | Estado |
-|---|---|---|
-| **PrometIO** | CRM comercial | En uso |
-| **DatIO** | Reporting de performance al cliente | En producción, independiente |
-| **BackIO** | Operación y backlog | Este repo |
-| **Basecamp** | Ejecución de producción | Externo |
-| **CoreIO** | Capa compartida | Propuesto, sin decidir |
+Basecamp sigue siendo donde el equipo trabaja. BackIO lee de ahí solo lo estructural (títulos,
+fechas, responsables, completado, horas) y escribe de vuelta fechas, to-dos nuevos y mensajes.
 
 ---
 
 ## Las cinco reglas que nunca se rompen
 
-1. **El texto de Basecamp jamás entra a BackIO.** Solo `completed`, `completed_at`,
-   `due_on`, `assignee_ids`. Es la garantía estructural de que un comentario interno no
-   pueda llegar al cliente.
-2. **La visibilidad se hereda de la plantilla, no se decide por tarea.** Solo se puede
-   restringir, nunca abrir. Enforced por trigger de base de datos.
-3. **Los estados no se sincronizan bidireccionalmente.** Basecamp manda sobre `completed`.
-   BackIO manda sobre todo lo demás.
+1. **El texto de Basecamp jamás entra a BackIO.** Descripciones, comentarios y adjuntos se quedan
+   allá. Solo entran títulos (excepción D1), fechas, responsables, completado y horas. Es la
+   garantía estructural de que un comentario interno no llegue al cliente.
+2. **La visibilidad al cliente se hereda, nunca se abre.** Un trigger de base de datos impide
+   pasar de oculto a visible.
+3. **Los estados no se sincronizan en dos direcciones.** Basecamp manda sobre `completed`;
+   BackIO sobre todo lo demás.
 4. **Toda escritura desde un agente requiere preview + confirmación.**
 5. **`tenant_id` y RLS en toda tabla**, aunque hoy solo exista un tenant.
 
----
-
-## Documentos
-
-| # | Archivo | Contenido |
-|---|---|---|
-| — | `CLAUDE.md` | Convenciones, stack, zonas de revisión humana |
-| 00 | `docs/00-arquitectura.md` | Modelo mental, tres capas, alcance de la suite |
-| 01 | `docs/01-modelo-datos.md` | Esquema SQL completo, RLS, índices |
-| 02 | `docs/02-visibilidad.md` | **Frontera cliente/interno. El documento más importante** |
-| 03 | `docs/03-builder.md` | Builder multistep, carga masiva |
-| 04 | `docs/04-basecamp.md` | Integración de ejecución |
-| 05 | `docs/05-rituales.md` | Weekly, Daily, motor de señales |
-| 06 | `docs/06-portal-cliente.md` | Portal público, resumen ejecutivo IA |
-| 07 | `docs/07-api-mcp.md` | API REST, MCP para Claude/ChatGPT/Gemini |
-| 08 | `docs/08-prometio.md` | Interconexión con el CRM |
-| 09 | `docs/09-fases.md` | Plan de ejecución, DoD, riesgos |
-| 10 | `docs/10-core.md` | CoreIO, capa compartida (propuesto) |
-| 11 | `docs/11-setup.md` | Estructura del repo, variables de entorno, cómo correr |
-| 12 | `docs/12-despliegue.md` | Railway (backend) + Vercel (frontend), variables por plataforma |
-| 13 | `docs/13-mcp.md` | Conectar Claude y otros agentes al MCP Server |
-| 14 | `docs/14-plan-v2.md` | Plan v2: fidelidad Basecamp, plantillas, horas, IA, adopción |
+Detalle y defensas en `docs/02-visibilidad.md`. Zonas que no se cambian sin revisión humana:
+`lib/visibility/`, `lib/basecamp/write.ts`, tools MCP de escritura y políticas RLS (`CLAUDE.md`).
 
 ---
 
-## Estado del código
+## Stack
 
-Monorepo pnpm con backend y frontend separados. Ver `docs/11-setup.md`.
-
-| Paquete | Qué es | Estado |
-|---|---|---|
-| `shared/` | Tipos + `sanitizeForClient` (única salida al cliente) | Tests pasando |
-| `backend/` | API Hono + migraciones Supabase Fase 0 + Basecamp + señales + portal | Tests pasando |
-| `frontend/` | Next.js 14: backlog, Builder 5 pasos, import CSV, daily, weekly, portal `/p/:token` | Build pasando |
-
-## Plan: 37 días hábiles (~7-8 semanas)
-
-| Fase | Alcance | Días |
-|---|---|---|
-| 0 | Esquema, RLS, `cliente_id` unificado con PrometIO | 3 |
-| 1 | Builder, tabla, Kanban, notificaciones | 5 |
-| 2 | Integración Basecamp | 5 |
-| 2.5 | Motor de señales, Plan Operativo, Acta, Daily | 4 |
-| 2.7 | API REST + MCP + scopes | 4 |
-| 3 | Portal cliente + resumen IA | 5 |
-| 3.5 | Webhooks con PrometIO | 2 |
-| 4 | Dashboards, weekly con arrastre | 4 |
-| 5 | Migración y baja de Monday | 5 |
-
-**Nota de calibración:** PrometIO se construyó en semana y media. BackIO no es comparable —
-tiene integración con un sistema de producción vivo, una frontera de visibilidad con
-consecuencias comerciales y una capa MCP con scopes. Planificar con 7-8 semanas.
+| Capa | Tecnología |
+|---|---|
+| Base de datos y auth | Supabase (Postgres + RLS + Auth) |
+| Backend | Hono sobre Node 20, TypeScript estricto, zod · Railway |
+| Frontend | Next.js 14 (App Router) + Tailwind · Vercel |
+| Ejecución | Basecamp 3 API (OAuth2, webhooks, polling) |
+| CRM | PrometIO (webhook, `cliente_id` compartido) |
+| IA | Claude (Anthropic API): redacta dailies, weeklies, briefs e informes; una persona publica |
+| Agentes | MCP Server + API REST con OpenAPI |
 
 ---
 
-## Decisiones tomadas (03/09/2026)
+## Correr en local
 
-| # | Decisión | Resultado |
-|---|---|---|
-| 1 | Product owner | **Marcia**, jefe de operaciones. Luis último recurso |
-| 2 | ¿CoreIO antes de Fase 0? | **No.** Se revisa cuando BackIO esté en uso |
-| 3 | ¿Gantt y Calendario? | **Fase 2** |
-| 4 | Canal de notificación | **Correo** |
-| 5 | ¿El GG en el backlog operativo? | **No (opción A).** El weekly es de Marcia; Luis no participa |
-| 6 | Límite de to-dos por operación en Basecamp | **50** |
+```bash
+pnpm install
+cp backend/.env.example backend/.env      # Supabase, Basecamp, Anthropic, Resend
+cp frontend/.env.example frontend/.env.local
+pnpm dev                                   # backend :4000 · frontend :3000
+pnpm test && pnpm typecheck
+```
 
----
-
-## Riesgo #1 del proyecto
-
-**Fuga de contenido interno al cliente.** Un comentario de dirección de arte visible en el
-portal es la pérdida de una cuenta — y el costo excede varios años del ahorro que justifica
-todo el proyecto.
-
-Mitigación: las tres defensas de `docs/02-visibilidad.md` y revisión humana obligatoria
-sobre `lib/visibility/`, `lib/basecamp/write.ts`, tools MCP de escritura y políticas RLS.
-
-**Ninguna de esas zonas se commitea automáticamente.**
+Variables, usuarios de prueba y verificación de RLS: `docs/11-setup.md`. Despliegue:
+`docs/12-despliegue.md`.
 
 ---
 
-## Nota para Claude Code
+## Estructura
 
-Leer en orden: `CLAUDE.md` → `00` → `01`. Ejecutar **solo la Fase 0**. No avanzar a Fase 1
-hasta que la verificación de RLS con un tenant de prueba devuelva cero filas y los IDs de
-cliente coincidan exactamente con PrometIO.
+```
+shared/     tipos compartidos y sanitizeForClient (única salida al cliente)
+backend/    src/app.ts (routers) · src/routes/v1 · src/lib (dominio, db, basecamp, ia, mcp)
+            supabase/migrations (SQL versionado, 01–20) · scripts (operación)
+frontend/   app/(app) área interna · app/p portal · components · lib
+docs/       specs, arquitectura técnica, manual de uso (HTML + PDF)
+```
+
+Cómo está armado por dentro, ciclo de una petición, crons, integraciones y deuda técnica:
+**`docs/17-arquitectura-tecnica.md`**.
+
+---
+
+## Documentación
+
+| Doc | Contenido |
+|---|---|
+| `CLAUDE.md` | Reglas, convenciones, zonas de revisión humana |
+| `docs/00-arquitectura.md` | Modelo mental y alcance de la suite (PrometIO, DatIO, BackIO) |
+| `docs/01-modelo-datos.md` | Esquema, RLS, índices |
+| `docs/02-visibilidad.md` | Frontera cliente/interno. **El documento más importante** |
+| `docs/03-builder.md` | Creación de proyectos (Builder, importación, desde Basecamp) |
+| `docs/04-basecamp.md` | Integración: qué entra, qué sale, incidentes y lecciones |
+| `docs/05-rituales.md` | Daily, Weekly, motor de señales, formato de mensajes |
+| `docs/06-portal-cliente.md` | Portal público y resumen ejecutivo |
+| `docs/07-api-mcp.md` · `docs/13-mcp.md` | API REST, scopes, MCP Server |
+| `docs/08-prometio.md` | Interconexión con el CRM |
+| `docs/09-fases.md` · `docs/14-plan-v2.md` | Plan de ejecución y v2 |
+| `docs/11-setup.md` · `docs/12-despliegue.md` | Entorno local, Railway, Vercel, Supabase |
+| `docs/15-ia.md` | Capa de IA: qué redacta, con qué datos, quién publica |
+| `docs/16-cumplimiento.md` | Reprogramaciones, reprocesos, bitácora, estatus por cliente |
+| `docs/17-arquitectura-tecnica.md` | Arquitectura a nivel de código, operación, deuda técnica |
+| `docs/manual/` | Manual de uso para el equipo (HTML y PDF con pantallas) |
+
+---
+
+## Estado y deuda técnica
+
+Fases 0 a 4 y sprints v2 1 a 4 en producción. Pendiente de plataforma: CI en GitHub Actions,
+ambiente de staging, alertas de crons, tests de integración con Basecamp y despliegue automático
+del frontend. Lista completa y priorizada en `docs/17-arquitectura-tecnica.md` §8.
+
+## Decisiones vigentes
+
+| Decisión | Resultado |
+|---|---|
+| Product owner | Marcia (jefa de operaciones) |
+| Basecamp como origen de trabajo | **Aceptado (23/09/2026).** Lo creado allá entra solo cada 30 min; la ejecutiva clasifica en «Entradas desde Basecamp» |
+| Colaboradores | Editan solo sus tareas (estado, fecha con motivo, entregables, piezas, daily) |
+| Daily | Es de una mesa; ninguna tarea entra sin responsable |
+| Canal de notificación | Correo |
+| Todo SQL | Archivo numerado en `backend/supabase/migrations/`, lo aplica Luis |
+
+---
+
+## Riesgo #1
+
+**Fuga de contenido interno al cliente.** Un comentario de dirección de arte visible en el portal
+es la pérdida de una cuenta. Mitigación: las tres defensas de `docs/02-visibilidad.md`, tests que
+las protegen (`sanitize.test.ts`, `sync.test.ts`, `portal.test.ts`) y revisión humana obligatoria
+en las zonas listadas arriba.
