@@ -248,6 +248,11 @@ export class BasecampClient {
       types: ['Todo'],
     });
   }
+
+  /** Cambia la URL de un webhook ya registrado (rotación del secreto). */
+  async updateWebhook(projectId: number, webhookId: number, payloadUrl: string): Promise<void> {
+    await this.request('PUT', `/buckets/${projectId}/webhooks/${webhookId}.json`, { payload_url: payloadUrl, types: ['Todo'], active: true });
+  }
 }
 
 /** "1.5" | "1:30" | 1.5 → horas decimales */

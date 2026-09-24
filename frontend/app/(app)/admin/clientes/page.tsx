@@ -34,9 +34,17 @@ export default function AdminClientesPage() {
 
   return (
     <div className="max-w-5xl space-y-4">
-      <header>
-        <h1 className="text-2xl font-bold">Clientes</h1>
-        <p className="text-sm text-gray-500">Normalmente vienen de PrometIO con el mismo id. Aquí se configura lo que PrometIO no conoce (proyecto de Basecamp, mesa, branding del portal y PIN) y se dan de alta a mano los clientes que no pasan por PrometIO, como las ramas de una misma cuenta.</p>
+      <header className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Clientes</h1>
+          <p className="text-sm text-gray-500">Normalmente vienen de PrometIO con el mismo id. Aquí se configura lo que PrometIO no conoce (proyecto de Basecamp, mesa, branding del portal y PIN) y se dan de alta a mano los clientes que no pasan por PrometIO, como las ramas de una misma cuenta.</p>
+        </div>
+        <button type="button" className="btn-secondary text-xs" title="Reescribe la URL del webhook en Basecamp para todos los clientes activos. Úsalo después de cambiar BASECAMP_WEBHOOK_SECRET en Railway." onClick={async () => {
+          if (!confirm('Se reescribirá la URL del webhook de todos los clientes activos con el secreto vigente. ¿Continuar?')) return;
+          setError(null); setOk(null);
+          try { const r = await api<{ actualizados: string[]; registrados: string[]; errores: { cliente: string; error: string }[] }>('/clientes/basecamp/webhooks/actualizar', { method: 'POST' }); setOk(`Webhooks: ${r.actualizados.length} actualizados, ${r.registrados.length} registrados${r.errores.length ? ` · errores: ${r.errores.map((e) => `${e.cliente} (${e.error})`).join('; ')}` : ''}`); await cargar(); }
+          catch (err) { setError(err instanceof ApiError ? err.message : 'Error'); }
+        }}>↻ Actualizar webhooks (rotar secreto)</button>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
       {ok && <Alert tipo="ok">{ok}</Alert>}
