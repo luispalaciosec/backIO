@@ -9,7 +9,7 @@ Este documento es el registro: qué se encontró, qué se corrigió y qué queda
 | Estado | Significado |
 |---|---|
 | ✅ Corregido | Código desplegado el 23/09 |
-| 🗄️ Migración 21 | Corregido en `20260923000021_seguridad_rls.sql`, pendiente de que Luis la revise y aplique |
+| 🗄️ Migración 21 | Corregido en `20260923000021_seguridad_rls.sql`, aplicada por Luis el 23/09 (verificado: tokens en `integracion_credenciales`, `tenants.config` sin `basecamp`, sin URLs de webhook) |
 | ⏳ Pendiente | Requiere decisión o trabajo aparte |
 
 ## Críticos
@@ -75,7 +75,7 @@ producción.
 
 ## Pasos que dependen de Luis
 
-1. Revisar y aplicar `backend/supabase/migrations/20260923000021_seguridad_rls.sql`.
+1. ~~Revisar y aplicar la migración 21~~ Hecho el 23/09.
 2. Desconectar y reconectar Basecamp (Admin → Integraciones) para rotar los tokens.
 3. Cambiar `BASECAMP_WEBHOOK_SECRET` en Railway y re-registrar los webhooks de cada cliente.
 4. Definir `CRON_SECRET` en Railway (o dejar `/api/cron` cerrado, que es el estado actual en producción).
