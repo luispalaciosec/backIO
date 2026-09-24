@@ -361,6 +361,12 @@ export interface Reprogramacion {
   id: string; tenant_id: string; requerimiento_id: string; fecha_anterior: string | null; fecha_nueva: string | null;
   motivo: MotivoReprogramacion | null; origen: string; usuario_id: string | null; created_at: string; observacion?: string | null;
 }
+/** Observación fechada de una tarea (bitácora con el cliente). */
+export interface Bitacora {
+  id: string; tenant_id: string; requerimiento_id: string; usuario_id: string | null;
+  nota: string; estado_operativo: EstadoOperativo | null; estado_aprobacion: string | null;
+  visible_cliente: boolean; created_at: string;
+}
 export interface Reproceso {
   id: string; tenant_id: string; requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null;
   fecha_entrega_antes: string | null; abierto_at: string; cerrado_at: string | null; horas_reproceso: number | null; usuario_id: string | null; created_at: string; observacion?: string | null;

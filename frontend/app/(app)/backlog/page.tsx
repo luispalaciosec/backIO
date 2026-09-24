@@ -2,7 +2,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { RequerimientoMetricas, Cliente, Usuario, Mesa, EstadoOperativo, ActualizarRequerimientoInput } from '@backio/shared';
+import type { RequerimientoMetricas, Cliente, Usuario, Mesa, EstadoOperativo, ActualizarRequerimientoInput, Bitacora } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
@@ -20,6 +20,7 @@ function BacklogInner() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [horas, setHoras] = useState<Record<string, number>>({});
+  const [notas, setNotas] = useState<Record<string, Bitacora>>({});
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
@@ -83,6 +84,7 @@ function BacklogInner() {
     api<{ items: { id: string; nombre: string; mesa_id: string | null }[] }>('/proyectos').then((r) => { setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id]))); }).catch(() => {});
     api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(() => {});
     api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(() => {});
+    api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {});
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -283,7 +285,7 @@ function BacklogInner() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-auto pb-4 tablero" style={{ maxHeight: 'calc(100vh - 8.5rem)' }}>
-          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => void cargar(true)} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
+          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} notas={notas} puedeEditar={puedeEditar} proyectos={proyectos} onCambio={() => { void cargar(true); api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {}); }} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

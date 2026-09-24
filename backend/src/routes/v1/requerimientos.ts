@@ -14,6 +14,7 @@ import { generarPortalToken } from '../../lib/portal/token';
 import type { EstadoOperativo, Prioridad, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
 import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO } from '@backio/shared';
 import { listReprogramaciones, listReprocesos, completarUltimaReprogramacion, setMotivoReprogramacion, listSinMotivo, updateReproceso } from '../../lib/db/historial';
+import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
 import { ensureSemana } from '../../lib/db/semanas';
 import { fechaLocal } from '../../lib/rituals/daily';
@@ -43,6 +44,24 @@ requerimientos.get('/', requireScope('read:backlog'), async (c) => {
 
 // Antes de '/:id': si no, Hono intenta tratar 'causas-pendientes' como uuid.
 requerimientos.get('/causas-pendientes', requireScope('read:backlog'), async (c) => c.json(await listSinMotivo(ctxOf(c), 45)));
+
+// ---------------- Bitácora (observaciones fechadas por tarea): lecturas antes de '/:id'
+/** Última nota por requerimiento (columna Observación del backlog). */
+requerimientos.get('/bitacora/ultimas', requireScope('read:backlog'), async (c) => c.json({ items: await ultimaBitacoraPorRequerimiento(ctxOf(c), { dias: Number(c.req.query('dias') ?? 120) || 120 }) }));
+/**
+ * Estatus por cliente para la reunión semanal: tareas activas (o completadas dentro del rango) con su última
+ * observación hasta `hasta`. Reemplaza la hoja "Control de tareas".
+ */
+requerimientos.get('/estatus', requireScope('read:backlog'), async (c) => {
+  const ctx = ctxOf(c); const q = c.req.query();
+  if (!q.cliente) return c.json({ error: 'cliente requerido' }, 400);
+  const hastaIso = q.hasta ? new Date(`${q.hasta}T23:59:59-05:00`).toISOString() : new Date().toISOString();
+  const desdeIso = q.desde ? new Date(`${q.desde}T00:00:00-05:00`).toISOString() : null;
+  const todas = await listBacklog(ctx, { cliente_id: q.cliente });
+  const items = todas.filter((r) => !['completado', 'cancelado'].includes(r.estado_operativo) || (r.estado_operativo === 'completado' && r.completado_at && (!desdeIso || r.completado_at >= desdeIso) && r.completado_at <= hastaIso));
+  const notas = await ultimaBitacoraPorRequerimiento(ctx, { ids: items.map((r) => r.id), hasta: hastaIso });
+  return c.json({ items: items.map((r) => ({ ...r, ultima_nota: notas[r.id] ?? null })) });
+});
 
 requerimientos.get('/:id', requireScope('read:backlog'), async (c) => {
   const r = await getRequerimiento(ctxOf(c), c.req.param('id'));
@@ -184,6 +203,22 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
 requerimientos.patch('/reprogramaciones/:rid', escrituraOPropia, zValidator('json', z.object({ motivo: z.enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]]), observacion: z.string().max(1000).nullable().optional() })), async (c) => {
   const ctx = ctxOf(c);
   await setMotivoReprogramacion(ctx, c.req.param('rid'), c.req.valid('json').motivo as MotivoReprogramacion, c.req.valid('json').observacion ?? null);
+  return c.body(null, 204);
+});
+
+requerimientos.get('/:id/bitacora', requireScope('read:backlog'), async (c) => c.json({ items: await listBitacora(ctxOf(c), c.req.param('id')) }));
+requerimientos.post('/:id/bitacora', escrituraOPropia, zValidator('json', z.object({ nota: z.string().trim().min(1).max(2000), visible_cliente: z.boolean().default(false) })), async (c) => {
+  const ctx = ctxOf(c); const id = c.req.param('id'); const b = c.req.valid('json');
+  const r = await getRequerimiento(ctx, id);
+  if (!r) return c.json({ error: 'No encontrado' }, 404);
+  const nota = await insertBitacora(ctx, { requerimiento_id: id, nota: b.nota, visible_cliente: b.visible_cliente, estado_operativo: r.estado_operativo, estado_aprobacion: r.estado_aprobacion });
+  await audit(ctx, { accion: 'bitacora', entidad: 'requerimiento', entidad_id: id, detalle: { nota: b.nota.slice(0, 200), visible_cliente: b.visible_cliente } });
+  return c.json(nota, 201);
+});
+requerimientos.delete('/:id/bitacora/:bid', escrituraOPropia, async (c) => {
+  const ctx = ctxOf(c);
+  await deleteBitacora(ctx, c.req.param('bid'));
+  await audit(ctx, { accion: 'bitacora_eliminar', entidad: 'requerimiento', entidad_id: c.req.param('id'), detalle: { bitacora_id: c.req.param('bid') } });
   return c.body(null, 204);
 });
 

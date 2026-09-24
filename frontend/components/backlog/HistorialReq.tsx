@@ -4,13 +4,15 @@ import type { RequerimientoMetricas, HistorialRequerimiento, MotivoReproceso, Mo
 import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, PASOS_RETORNO } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
+import { BitacoraReq } from './Bitacora';
+import type { Usuario } from '@backio/shared';
 
 const labelRp = (m: string | null) => MOTIVOS_REPROGRAMACION.find((x) => x.valor === m)?.label ?? 'Sin causa';
 const labelRc = (m: string | null) => MOTIVOS_REPROCESO.find((x) => x.valor === m)?.label ?? 'Sin causa';
 const ORIGEN: Record<string, string> = { cliente: 'Cliente', interno: 'Revisión interna', basecamp: 'Desmarcado en Basecamp' };
 
 /** Botón ↺ en la fila: registrar reproceso, ver historial de reprogramaciones/reprocesos y completar causas. */
-export function HistorialReq({ r, onCambio }: { r: RequerimientoMetricas; onCambio: () => void }) {
+export function HistorialReq({ r, onCambio, usuarios = [] }: { r: RequerimientoMetricas; onCambio: () => void; usuarios?: Pick<Usuario, 'id' | 'nombre'>[] }) {
   const [abierto, setAbierto] = useState(false);
   const tiene = r.veces_reprogramado > 0 || (r.veces_reproceso ?? 0) > 0;
   return (
@@ -18,14 +20,14 @@ export function HistorialReq({ r, onCambio }: { r: RequerimientoMetricas; onCamb
       <button type="button" className={`text-xs shrink-0 px-1 ${tiene ? 'text-amber-700 font-semibold' : 'text-gray-300 hover:text-gray-600'}`} title={`Reprogramaciones: ${r.veces_reprogramado} · Reprocesos: ${r.veces_reproceso ?? 0}. Clic para historial y reproceso`} onClick={(e) => { e.stopPropagation(); setAbierto(true); }}>
         ↺{tiene ? `${r.veces_reprogramado}/${r.veces_reproceso ?? 0}` : ''}
       </button>
-      {abierto && <Modal r={r} onClose={() => setAbierto(false)} onCambio={onCambio} />}
+      {abierto && <Modal r={r} usuarios={usuarios} onClose={() => setAbierto(false)} onCambio={onCambio} />}
     </>
   );
 }
 
-function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: () => void; onCambio: () => void }) {
+function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; usuarios: Pick<Usuario, 'id' | 'nombre'>[]; onClose: () => void; onCambio: () => void }) {
   const [h, setH] = useState<HistorialRequerimiento | null>(null);
-  const [tab, setTab] = useState<'historial' | 'reproceso'>('historial');
+  const [tab, setTab] = useState<'bitacora' | 'historial' | 'reproceso'>('bitacora');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<{ origen: 'cliente' | 'interno'; motivo: MotivoReproceso | ''; paso: string; reabrir: boolean; observacion: string }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true, observacion: '' });
@@ -73,10 +75,13 @@ function Modal({ r, onClose, onCambio }: { r: RequerimientoMetricas; onClose: ()
           </div>
         </div>
         <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
+          <button className={`px-3 py-1 rounded ${tab === 'bitacora' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('bitacora')}>📝 Bitácora</button>
           <button className={`px-3 py-1 rounded ${tab === 'historial' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('historial')}>Historial</button>
           <button className={`px-3 py-1 rounded ${tab === 'reproceso' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('reproceso')} disabled={!!abiertoRp}>{abiertoRp ? 'Reproceso abierto' : '⟲ Registrar reproceso'}</button>
         </div>
         {err && <p className="text-sm text-red-600">{err}</p>}
+
+        {tab === 'bitacora' && <BitacoraReq requerimientoId={r.id} usuarios={usuarios} visibleCliente={r.visible_cliente} onCambio={onCambio} />}
 
         {tab === 'reproceso' && !abiertoRp && (
           <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">

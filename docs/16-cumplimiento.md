@@ -76,3 +76,20 @@ GET   /requerimientos/causas-pendientes         (últimos 45 días sin motivo)
 ```
 
 Colaboradores: pueden reprogramar (con motivo), registrar y cerrar reprocesos solo en sus tareas.
+
+## Bitácora por tarea y estatus por cliente (23/09/2026)
+
+Las ejecutivas llevaban con el cliente una hoja "Control de tareas" (campaña, tarea, status, observación fechada por
+reunión). Eso ahora vive en BackIO:
+
+- **`bitacora`** (migración 20): nota fechada por requerimiento con quién la escribió y el estado operativo y de
+  aprobación del momento. `visible_cliente` solo tiene efecto si la tarea es `visible_cliente` (regla 2: nunca abre lo
+  oculto). Se anota desde el historial ↺ (pestaña Bitácora) y desde la columna **Observación** del backlog, que muestra
+  la última nota. Rutas: `GET/POST /requerimientos/:id/bitacora`, `DELETE /requerimientos/:id/bitacora/:bid`,
+  `GET /requerimientos/bitacora/ultimas`.
+- **Estatus por cliente** (`/informes/estatus`, `GET /requerimientos/estatus?cliente&desde&hasta`): la hoja de la
+  reunión, por proyecto, con tarea, responsable, entrega, estado, aprobación y la última observación hasta la fecha
+  `hasta` (así la semana pasada se reconstruye tal cual se presentó). Imprimible en A4 horizontal. Acceso desde el
+  encabezado de cada cliente en el backlog («📝 Estatus») y desde Informes.
+- Pendiente (zona de revisión humana `lib/visibility/`): mostrar en el portal las notas `visible_cliente` de tareas
+  visibles.

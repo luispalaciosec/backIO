@@ -26,6 +26,7 @@ const GRUPOS: Grupo[] = [
   { id: 'informes', label: 'Informes', icon: '◈', items: [
     { href: '/informes', label: 'Informes mensuales', icon: '◈' },
     { href: '/informes/canal', label: 'Informe por canal', icon: '▥' },
+    { href: '/informes/estatus', label: 'Estatus por cliente', icon: '📝' },
   ] },
 ];
 const ADMIN_GRUPOS: Grupo[] = [
