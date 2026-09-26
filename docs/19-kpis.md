@@ -10,7 +10,7 @@ Arte y Diseño, Creatividad, Content). Cada KPI se mide **a cada persona del ár
 | Equipo → KPIs (`/kpis`) | Roles de gestión | Vista por equipo (valor del equipo + matriz de integrantes, tendencia de 6 meses) y por persona. Clic en una celda: tareas que componen el cálculo y formulario de seguimiento |
 | Personas → modal → pestaña KPIs | Roles de gestión | Ficha de la persona en el mes en curso |
 | Admin → Catálogo → KPIs | Admin | Meta, operador, periodicidad, cálculo, textos, activo |
-| Admin → Usuarios → Área | Admin | Área de cada persona: define qué KPIs le aplican |
+| Admin → Usuarios → Área | Admin | Área de cada persona: define qué KPIs le aplican. Admin, gerencia y operaciones no se miden (Marcia, 26/09) |
 
 | Menú → Mis KPIs (`/kpis`, `GET /kpis/mios`) | Colaboradores | Solo su propia ficha y el agregado de su equipo, nunca a sus compañeros |
 

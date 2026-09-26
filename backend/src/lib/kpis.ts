@@ -211,7 +211,7 @@ export async function tableroKpis(ctx: DbCtx, mes: string): Promise<KpiTablero> 
     }
     areas.push({ area, integrantes: integrantes.length, kpis });
   }
-  return { periodo: mes, en_curso: !cerrado(mes), areas, resumen, sin_area: usuarios.filter((u) => !u.area && !['admin', 'gerencia'].includes(u.rol)).map((u) => ({ usuario_id: u.id, nombre: u.nombre })) };
+  return { periodo: mes, en_curso: !cerrado(mes), areas, resumen, sin_area: usuarios.filter((u) => !u.area && !['admin', 'gerencia', 'operaciones'].includes(u.rol)).map((u) => ({ usuario_id: u.id, nombre: u.nombre })) };
 }
 
 /** Tareas que componen A y B de un KPI (equipo o una persona). */
