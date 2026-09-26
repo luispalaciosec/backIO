@@ -5,17 +5,17 @@
  */
 import type { CalculoKpi, KpiDefinicion, KpiValor } from '@backio/shared';
 
-interface Guia { emoji: string; ficha: string; regla: string; suma: string; resta: string; tip: string }
+interface Guia { emoji: string; ficha: string; regla: string; suma: string; sumaPl: string; resta: string; restaPl: string; tip: string }
 const GUIA: Record<CalculoKpi, Guia> = {
-  a_tiempo: { emoji: '⏱️', ficha: 'entrega', regla: 'Cada tarea que terminas en la fecha que se comprometió (o antes) es una ficha verde. Si el cliente movió la fecha, vale la nueva; si la movimos nosotros, cuenta la original.', suma: 'entregada a tiempo', resta: 'entregada tarde', tip: 'Si ves que no llegas, avisa antes y reprograma con el motivo correcto: si es por el cliente, no te resta.' },
-  retrabajo: { emoji: '🔁', ficha: 'entrega', regla: 'Cada tarea que tuvo que volver por un error nuestro es una ficha roja. Si el cambio lo pidió el cliente, no cuenta.', suma: 'bien a la primera', resta: 'con retrabajo del equipo', tip: 'Revisa el brief y la checklist antes de entregar: un minuto de revisión ahorra una ronda completa.' },
-  levantamiento: { emoji: '📋', ficha: 'requerimiento', regla: 'Cada requerimiento que llegó completo al equipo es una ficha verde. Si tuvo que volver porque faltaba información del levantamiento, es roja.', suma: 'bien levantado', resta: 'volvió por info incompleta', tip: 'Antes de pasar un requerimiento, confirma objetivo, formato, fecha y materiales del cliente.' },
-  aprobacion_primera: { emoji: '🎯', ficha: 'propuesta', regla: 'Cada pieza que el cliente aprobó en la primera revisión es una ficha verde. Si pasó por un rechazo antes, es gris.', suma: 'aprobada a la primera', resta: 'necesitó otra ronda', tip: 'Muestra avances tempranos al líder: los ajustes internos salen más baratos que un rechazo del cliente.' },
-  propuestas_aprobadas: { emoji: '🏆', ficha: 'propuesta', regla: 'Cada propuesta (marcada como Propuesta) que el cliente aprueba es una ficha verde; las rechazadas son grises.', suma: 'aprobada por el cliente', resta: 'rechazada', tip: 'Marca tus tareas como «Propuesta» en el backlog para que cuenten.' },
-  sla_respuesta: { emoji: '⚡', ficha: 'requerimiento', regla: 'Cada requerimiento nuevo que respondes dentro del tiempo de su prioridad (Alta 30 min, Media 1,5 h, Baja 8 h, en horario laboral) es una ficha verde.', suma: 'respondido a tiempo', resta: 'respondido tarde o sin marcar', tip: 'Pulsa «Respondido» en la tarea apenas contestes al cliente: si no lo marcas, cuenta como tarde.' },
-  sla_incidencia: { emoji: '🚑', ficha: 'incidencia', regla: 'Cada incidencia resuelta dentro del tiempo de su prioridad (en horario laboral) es una ficha verde.', suma: 'resuelta a tiempo', resta: 'resuelta tarde', tip: 'Marca las urgencias como «Incidencia» y dales prioridad Alta para que el reloj sea el correcto.' },
-  proactividad: { emoji: '💡', ficha: 'idea', regla: 'Cada propuesta que haces sin que el cliente la pida (marcada con ✦) enciende una ficha. La meta es llenar todas las del mes.', suma: 'idea proactiva', resta: 'por encender', tip: 'Márcala con ✦ en el backlog o escribe [PROACTIVA] al inicio del título en Basecamp.' },
-  manual: { emoji: '✍️', ficha: 'punto', regla: 'Este indicador no sale de las tareas: lo registra gestión cada periodo con su fuente (encuesta o dato financiero).', suma: 'obtenido', resta: 'posible', tip: 'Pregunta a tu líder cómo va este indicador y qué lo mueve.' },
+  a_tiempo: { emoji: '⏱️', ficha: 'entrega', regla: 'Cada tarea que terminas en la fecha que se comprometió (o antes) es una ficha verde. Si el cliente movió la fecha, vale la nueva; si la movimos nosotros, cuenta la original.', suma: 'entregada a tiempo', sumaPl: 'entregadas a tiempo', resta: 'entregada tarde', restaPl: 'entregadas tarde', tip: 'Si ves que no llegas, avisa antes y reprograma con el motivo correcto: si es por el cliente, no te resta.' },
+  retrabajo: { emoji: '🔁', ficha: 'entrega', regla: 'Cada tarea que tuvo que volver por un error nuestro es una ficha roja. Si el cambio lo pidió el cliente, no cuenta.', suma: 'bien a la primera', sumaPl: 'bien a la primera', resta: 'con retrabajo del equipo', restaPl: 'con retrabajo del equipo', tip: 'Revisa el brief y la checklist antes de entregar: un minuto de revisión ahorra una ronda completa.' },
+  levantamiento: { emoji: '📋', ficha: 'requerimiento', regla: 'Cada requerimiento que llegó completo al equipo es una ficha verde. Si tuvo que volver porque faltaba información del levantamiento, es roja.', suma: 'bien levantado', sumaPl: 'bien levantados', resta: 'volvió por info incompleta', restaPl: 'volvieron por info incompleta', tip: 'Antes de pasar un requerimiento, confirma objetivo, formato, fecha y materiales del cliente.' },
+  aprobacion_primera: { emoji: '🎯', ficha: 'propuesta', regla: 'Cada pieza que el cliente aprobó en la primera revisión es una ficha verde. Si pasó por un rechazo antes, es gris.', suma: 'aprobada a la primera', sumaPl: 'aprobadas a la primera', resta: 'necesitó otra ronda', restaPl: 'necesitaron otra ronda', tip: 'Muestra avances tempranos al líder: los ajustes internos salen más baratos que un rechazo del cliente.' },
+  propuestas_aprobadas: { emoji: '🏆', ficha: 'propuesta', regla: 'Cada propuesta (marcada como Propuesta) que el cliente aprueba es una ficha verde; las rechazadas son grises.', suma: 'aprobada por el cliente', sumaPl: 'aprobadas por el cliente', resta: 'rechazada', restaPl: 'rechazadas', tip: 'Marca tus tareas como «Propuesta» en el backlog para que cuenten.' },
+  sla_respuesta: { emoji: '⚡', ficha: 'requerimiento', regla: 'Cada requerimiento nuevo que respondes dentro del tiempo de su prioridad (Alta 30 min, Media 1,5 h, Baja 8 h, en horario laboral) es una ficha verde.', suma: 'respondido a tiempo', sumaPl: 'respondidos a tiempo', resta: 'respondido tarde o sin marcar', restaPl: 'respondidos tarde o sin marcar', tip: 'Pulsa «Respondido» en la tarea apenas contestes al cliente: si no lo marcas, cuenta como tarde.' },
+  sla_incidencia: { emoji: '🚑', ficha: 'incidencia', regla: 'Cada incidencia resuelta dentro del tiempo de su prioridad (en horario laboral) es una ficha verde.', suma: 'resuelta a tiempo', sumaPl: 'resueltas a tiempo', resta: 'resuelta tarde', restaPl: 'resueltas tarde', tip: 'Marca las urgencias como «Incidencia» y dales prioridad Alta para que el reloj sea el correcto.' },
+  proactividad: { emoji: '💡', ficha: 'idea', regla: 'Cada propuesta que haces sin que el cliente la pida (marcada con ✦) enciende una ficha. La meta es llenar todas las del mes.', suma: 'idea proactiva', sumaPl: 'ideas proactivas', resta: 'por encender', restaPl: 'por encender', tip: 'Márcala con ✦ en el backlog o escribe [PROACTIVA] al inicio del título en Basecamp.' },
+  manual: { emoji: '✍️', ficha: 'punto', regla: 'Este indicador no sale de las tareas: lo registra gestión cada periodo con su fuente (encuesta o dato financiero).', suma: 'obtenido', sumaPl: 'obtenidos', resta: 'posible', restaPl: 'posibles', tip: 'Pregunta a tu líder cómo va este indicador y qué lo mueve.' },
 };
 
 const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
@@ -41,13 +41,13 @@ function proximoPaso(def: KpiDefinicion, v: KpiValor, g: Guia): { texto: string;
   if (def.operador === '>=') {
     const necesarias = Math.ceil(v.meta * b - 1e-9);
     const faltan = Math.max(0, necesarias - a);
-    if (faltan === 0) return { texto: `¡Meta cumplida! Llevas ${a} ${g.suma}${a === 1 ? '' : 's'} y necesitabas ${necesarias}. 🎉`, logro: true };
-    return { texto: `Te ${faltan === 1 ? 'falta' : 'faltan'} ${faltan} ${g.ficha}${faltan === 1 ? '' : 's'} ${g.suma} para llegar al ${pct(v.meta)}.`, logro: false };
+    if (faltan === 0) return { texto: `¡Meta cumplida! Llevas ${a} ${a === 1 ? g.suma : g.sumaPl} y necesitabas ${necesarias}. 🎉`, logro: true };
+    return { texto: `Te ${faltan === 1 ? 'falta' : 'faltan'} ${faltan} ${faltan === 1 ? g.suma : g.sumaPl} más para llegar al ${pct(v.meta)}.`, logro: false };
   }
   const permitidas = Math.floor(v.meta * b + 1e-9);
   const margen = permitidas - a;
   if (margen >= 0) return { texto: v.meta === 0 ? (a === 0 ? '¡Cero! Justo lo que pide la meta. 🎉' : '') : `Vas bien: te ${margen === 1 ? 'queda' : 'quedan'} ${margen} de margen antes de pasar el ${pct(v.meta)}. 🎉`, logro: true };
-  return { texto: `Te pasaste por ${-margen} ${g.ficha}${-margen === 1 ? '' : 's'}: la meta permite hasta ${permitidas} de ${b}.`, logro: false };
+  return { texto: `Te pasaste por ${-margen}: la meta permite hasta ${permitidas} ${permitidas === 1 ? g.resta : g.restaPl} de ${b}.`, logro: false };
 }
 
 export function ComoSeCalcula({ def, v, equipo }: { def: KpiDefinicion; v: KpiValor; equipo: KpiValor }) {
@@ -71,8 +71,9 @@ export function ComoSeCalcula({ def, v, equipo }: { def: KpiDefinicion; v: KpiVa
         <>
           <Fichas a={v.dato_a!} b={v.dato_b!} menosEsMejor={menosEsMejor} />
           <div className="text-sm">
-            <span className={`font-bold ${menosEsMejor ? 'text-red-600' : 'text-emerald-700'}`}>{v.dato_a} {g.resta && menosEsMejor ? g.resta : g.suma}</span>
-            <span className="text-gray-500"> de {v.dato_b} {def.calculo === 'proactividad' ? 'de la meta del mes' : `${g.ficha}s`} = </span>
+            <span className="text-gray-500">De {v.dato_b} {def.calculo === 'proactividad' ? 'que pide la meta del mes' : `${g.ficha}${v.dato_b === 1 ? '' : 's'}`}, </span>
+            <span className={`font-bold ${menosEsMejor ? 'text-red-600' : 'text-emerald-700'}`}>{v.dato_a} {menosEsMejor ? (v.dato_a === 1 ? g.resta : g.restaPl) : (v.dato_a === 1 ? g.suma : g.sumaPl)}</span>
+            <span className="text-gray-500"> = </span>
             <span className="font-bold text-gray-900">{pct(v.resultado ?? 0)}</span>
           </div>
           {/* Barra con la meta marcada */}
