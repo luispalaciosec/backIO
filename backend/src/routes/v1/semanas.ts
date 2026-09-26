@@ -9,6 +9,8 @@ import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } fr
 import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
+import { fotoDaily } from '../../lib/evolutivo';
+import { serviceClient } from '../../lib/db/client';
 
 export const semanas = new Hono();
 
@@ -29,6 +31,9 @@ semanas.get('/:id/senales', requireScope('read:senales'), async (c) => {
 });
 
 semanas.post('/:id/senales/recalcular', requireScope('write:actas'), async (c) => {
+  // Una semana cerrada queda congelada: recalcular con el estado de hoy reescribiría su historia.
+  const s = await getSemana(ctxOf(c), c.req.param('id'));
+  if (s && s.fecha_fin < fechaLocal()) return c.json({ error: 'Esa semana ya cerró: sus señales quedan como estaban.' }, 409);
   const items = await recalcularSenales(ctxOf(c), c.req.param('id'));
   return c.json({ items, total: items.length });
 });
@@ -116,6 +121,8 @@ semanas.post('/daily/publicar', requireScope('write:actas'), zValidator('json', 
   try {
     const r = await publicarDailyEnBasecamp(ctx, mesa, m);
     await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });
+    // Evolutivo: el cierre publicado deja la foto del día (no bloquea la respuesta si falla).
+    if (b.tipo === 'cierre') await fotoDaily({ ...ctx, db: serviceClient() }, mesa, undefined, 'cierre').catch((e: Error) => console.error('[evolutivo] foto del cierre', e.message));
     return c.json({ ...r, resumen: { hoy: m.hoy.length, vencen: m.vencen.length, bloqueos: m.bloqueos.length, cambios: m.cambios.length, completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0) } });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);

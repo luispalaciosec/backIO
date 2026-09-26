@@ -18,6 +18,7 @@ import { recurrencias } from './recurrencias';
 import { personas } from './personas';
 import { actividad } from './actividad';
 import { kpis } from './kpis';
+import { evolutivo } from './evolutivo';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -39,3 +40,4 @@ v1.route('/recurrencias', recurrencias);
 v1.route('/personas', personas);
 v1.route('/actividad', actividad);
 v1.route('/kpis', kpis);
+v1.route('/evolutivo', evolutivo);

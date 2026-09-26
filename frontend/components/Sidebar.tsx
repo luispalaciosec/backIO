@@ -18,6 +18,7 @@ const GRUPOS: Grupo[] = [
   { id: 'rituales', label: 'Rituales', icon: '◔', items: [
     { href: '/daily', label: 'Daily', icon: '◔' },
     { href: '/weekly', label: 'Weekly', icon: '◷' },
+    { href: '/evolutivo', label: 'Evolutivo', icon: '↗' },
   ] },
   { id: 'equipo', label: 'Equipo', icon: '⚇', items: [
     { href: '/personas', label: 'Personas', icon: '⚇' },
@@ -101,7 +102,7 @@ export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         <Item href="/dashboard" label="Dashboard" icon="◧" />
         {/* KPIs: gestión ve el tablero; un colaborador ve «Mis KPIs» (solo lo suyo, lo acota el backend). */}
-        {GRUPOS.map((g) => <GrupoNav key={g.id} g={escribe ? g : { ...g, items: g.items.map((i) => (i.href === '/kpis' ? { ...i, label: 'Mis KPIs' } : i)) }} />)}
+        {GRUPOS.map((g) => <GrupoNav key={g.id} g={escribe ? g : { ...g, items: g.items.filter((i) => i.href !== '/evolutivo').map((i) => (i.href === '/kpis' ? { ...i, label: 'Mis KPIs' } : i)) }} />)}
         {esAdmin && <div className={`pt-3 mt-3 border-t border-gray-100 text-[10px] uppercase tracking-wide text-gray-400 ${colapsado ? 'text-center' : 'px-3'}`}>{colapsado ? '•' : 'Admin'}</div>}
         {esAdmin && ADMIN_GRUPOS.map((g) => <GrupoNav key={g.id} g={g} />)}
         {escribe && <Link href="/proyectos/nuevo" title="Nuevo proyecto" className={`btn-primary w-full mt-4 ${colapsado ? 'px-0' : ''}`}>{colapsado ? '+' : '+ Nuevo proyecto'}</Link>}

@@ -167,6 +167,9 @@ API key hace más de 20 escrituras en 5 min (`audit.ts`).
 | Diario 08:05 | Recurrencias de fees (D2) | `procesarRecurrencias` |
 | Día 1, 08:00 | Informe ejecutivo mensual por mesa (solo redacta) | `informe.ts` |
 | Domingo 18:00 | Señales del weekly + agenda por correo | `recalcularSenales` |
+| L-V 19:30 | Foto del daily por mesa (evolutivo) | `fotoDaily` |
+| Domingo 17:55 | Foto de la semana por mesa (evolutivo) | `fotoWeekly` |
+| Día 1, 08:10 | Congela los KPIs del mes anterior | `congelarPeriodo` |
 
 Todos usan `serviceClient()` con `origen: 'cron'` y escriben en `audit_log`. Si un cron falla solo
 se ve en los logs de Railway: **no hay alerta todavía** (ver §8).

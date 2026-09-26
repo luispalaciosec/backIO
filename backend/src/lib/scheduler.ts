@@ -16,6 +16,7 @@ import { procesarRecurrencias } from './recurrencias';
 import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
 import { congelarPeriodo, trimestreDe } from './kpis';
+import { fotoDaily, fotoWeekly } from './evolutivo';
 
 const TZ = 'America/Guayaquil';
 
@@ -78,6 +79,8 @@ export function startScheduler(): void {
   let ultimoInforme = '';
   let ultimaRecurrencia = '';
   let ultimoKpi = '';
+  let ultimaFotoDia = '';
+  let ultimaFotoSemana = '';
   setInterval(async () => {
     const t = ahoraLocal();
     // Diario 08:05: recurrencias de fees (genera el mes siguiente cuando llega el día configurado).
@@ -86,6 +89,24 @@ export function startScheduler(): void {
       for (const id of await tenants()) {
         try { const r = await procesarRecurrencias({ db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' }); if (r.generadas.length || r.errores.length) console.log('[scheduler] recurrencias', JSON.stringify(r)); }
         catch (err) { console.error('[scheduler] recurrencias', err instanceof Error ? err.message : err); }
+      }
+    }
+    // Evolutivo: L-V 19:30 foto del día de cada mesa (el cierre publicado ya la deja; esto cubre los días sin cierre).
+    if (t.dia >= 1 && t.dia <= 5 && t.hora === 19 && t.minuto === 30 && ultimaFotoDia !== t.clave) {
+      ultimaFotoDia = t.clave;
+      for (const id of await tenants()) {
+        const ctx = { db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' as const };
+        for (const mesa of (await listMesas(ctx)).filter((m) => m.activa)) {
+          try { await fotoDaily(ctx, mesa, t.clave, 'cron'); } catch (err) { console.error('[scheduler] foto daily', mesa.nombre, err instanceof Error ? err.message : err); }
+        }
+      }
+    }
+    // Evolutivo: domingo 17:55, antes de recalcular señales, foto de la semana que cierra.
+    if (t.dia === 0 && t.hora === 17 && t.minuto === 55 && ultimaFotoSemana !== t.clave) {
+      ultimaFotoSemana = t.clave;
+      for (const id of await tenants()) {
+        try { const n = await fotoWeekly({ db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' }, t.clave); console.log(`[scheduler] foto semanal: ${n} mesas`); }
+        catch (err) { console.error('[scheduler] foto semanal', err instanceof Error ? err.message : err); }
       }
     }
     // Día 1 08:10: congela los KPIs automáticos del mes anterior (y del trimestre si cerró). No pisa ajustes.

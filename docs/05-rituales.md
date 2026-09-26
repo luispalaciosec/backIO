@@ -227,3 +227,25 @@ hizo fracasar los intentos anteriores de implementar WorkOS.
 - **Planificación.** `requerimientos.planificacion`: `planificado` (entró por el weekly), `no_planificado` (se creó durante la semana, con plan ya generado y fecha dentro de la semana; automático al crear) o `urgente` (manual). Columna en el backlog, filtro "Fuera del weekly", KPI en el dashboard.
 - **Selección del daily.** `requerimientos.daily_fecha`: la mesa elige qué se trabaja hoy («Elegir tareas de hoy» en Daily o ☀ en el backlog). Columna «Hoy se trabaja» en el Daily y sección 🎯 en la apertura/cierre publicados.
 - **Fecha a Basecamp.** Al reprogramar, `due_on` se envía de inmediato y la pantalla confirma «Fecha enviada a Basecamp ✓»; si falla, se avisa y la reconciliación (cada 30 min) la reenvía.
+
+## Evolutivo (26/09/2026)
+
+Antes, las métricas del cierre del daily se calculaban, iban a Basecamp y se perdían, y la selección del daily
+se sobrescribía cada día. Ahora queda una **foto por mesa y día hábil** y una **por mesa y semana**
+(migración 23: `daily_snapshots`, `weekly_snapshots`; lógica en `backend/src/lib/evolutivo.ts`).
+
+- **Cuándo se toma**: al publicar el cierre (`origen = cierre`), L-V 19:30 para las mesas sin cierre
+  (`cron`) y el domingo 17:55 la semana que cierra. Una foto en vivo nunca se reemplaza por una reconstruida.
+- **Día**: plan del día (elegidas vs cerradas), cerradas fuera del daily, nuevas (por `fecha_pedido`, así una
+  importación masiva no cuenta como trabajo nuevo) y cuántas fuera de planificación, reprocesos,
+  reprogramaciones, bloqueos, vencidas abiertas (las completadas sin fecha de cierre son histórico y no
+  cuentan), y detalle por persona.
+- **Semana**: comprometidas, a tiempo original y vigente, % del plan operativo cumplido (si se generó),
+  arrastre, cerradas, reprocesos, reprogramaciones por atribución, señales de la mesa, acuerdos (de toda la
+  agencia: no tienen mesa) y dailies publicados.
+- **Reconstrucción**: `POST /evolutivo/reconstruir` (admin; botón en la pantalla) rehace desde el 21/09 con la
+  auditoría. La selección de cada día es el último `daily_fecha` de cada tarea antes del cierre publicado (o del
+  fin del día). Verificado contra el cierre publicado del 22/09: coinciden cerradas fuera del daily y vencidas.
+- **Semanas cerradas congeladas**: `POST /semanas/:id/senales/recalcular` devuelve 409 si la semana ya cerró.
+- **Pantalla**: Rituales → Evolutivo (gestión): resumen del mes con comparación vs mes anterior, gráficas día a
+  día, tabla con detalle por persona, tabla semanal y CSV.
