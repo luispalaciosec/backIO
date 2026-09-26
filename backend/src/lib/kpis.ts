@@ -13,6 +13,12 @@ import { dentroSla } from './horas_habiles';
 
 /** Desde aquí existen clase, proactiva, primera_respuesta_at y rondas de revisión (migración 22). */
 export const FEATURES_DESDE = '2026-09-25T05:00:00.000Z';
+/**
+ * Inicio de BackIO en producción. Las tareas comprometidas antes (fecha original anterior) son backlog heredado:
+ * el 7-8/09 se cerraron en bloque cientos con meses de atraso, y medirlas castigaría al equipo por la limpieza.
+ */
+export const OPERACION_DESDE = '2026-09-04';
+const heredada = (r: ReqKpi) => !!r.fecha_entrega_original && r.fecha_entrega_original < OPERACION_DESDE;
 
 // ---------------------------------------------------------------- periodos (hora Guayaquil)
 export function periodoMes(d = new Date()): string {
@@ -69,8 +75,10 @@ function esRetrabajoDelArea(rp: DatosKpi['reprocesos'][number], area: Area): boo
 }
 
 export function calcular(def: KpiDefinicion, d: DatosKpi, rango: { desde: string; hasta: string }): CalculoResultado {
-  const antesDeFeatures = rango.hasta <= FEATURES_DESDE;
-  const completadas = d.completadas.filter((r) => enRango(r.completado_at, rango));
+  // Los que dependen de datos nuevos (clase, proactiva, Respondido) solo miden meses completos desde que existen:
+  // un mes a medias saldría «no cumple» sin que nadie haya podido marcar nada.
+  const antesDeFeatures = rango.desde < FEATURES_DESDE;
+  const completadas = d.completadas.filter((r) => enRango(r.completado_at, rango) && !heredada(r));
   const repPorReq = new Map<string, DatosKpi['reprocesos']>();
   for (const rp of d.reprocesos) repPorReq.set(rp.requerimiento_id, [...(repPorReq.get(rp.requerimiento_id) ?? []), rp]);
   const rgPorReq = new Map<string, DatosKpi['reprogramaciones']>();

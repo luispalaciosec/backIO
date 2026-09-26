@@ -30,6 +30,20 @@ const mesValido = (m: string | undefined) => (m && /^\d{4}-(0[1-9]|1[0-2])$/.tes
 
 kpis.get('/', verKpis, async (c) => c.json(await tableroKpis(ctxOf(c), mesValido(c.req.query('periodo')))));
 
+/**
+ * «Mis KPIs»: cualquier usuario ve SOLO su ficha (su área, su fila y el agregado del equipo, sin otras personas).
+ * Así un colaborador entiende cómo se le mide sin ver el rendimiento de sus compañeros.
+ */
+kpis.get('/mios', async (c) => {
+  const a = c.get('auth'); const ctx = ctxOf(c);
+  if (a.tipo !== 'usuario' || !ctx.usuarioId) return c.json({ error: 'Solo para usuarios' }, 403);
+  const t = await tableroKpis(ctx, mesValido(c.req.query('periodo')));
+  const areas = t.areas
+    .filter((x) => x.kpis.some((k) => k.personas.some((p) => p.usuario_id === ctx.usuarioId)))
+    .map((x) => ({ ...x, kpis: x.kpis.map((k) => ({ ...k, personas: k.personas.filter((p) => p.usuario_id === ctx.usuarioId) })) }));
+  return c.json({ ...t, areas, sin_area: [] });
+});
+
 kpis.get('/definiciones', verKpis, async (c) => c.json({ items: await listDefiniciones(ctxOf(c)) }));
 
 kpis.put('/definiciones/:codigo', adminKpis, zValidator('json', z.object({
@@ -59,7 +73,17 @@ kpis.get('/export', verKpis, async (c) => {
   return c.body(`﻿${csv}`, 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="kpis-${hasta}.csv"` });
 });
 
-kpis.get('/:codigo', verKpis, async (c) => {
+/** Detalle: gestión ve cualquiera; el resto solo su propio detalle (usuario = uno mismo). */
+const verDetalle: MiddlewareHandler = async (c, next) => {
+  const a = c.get('auth');
+  if (a.tipo === 'usuario' && a.perfil !== 'oauth' && a.rol && !ROLES_INTERNOS_GESTION.includes(a.rol)) {
+    if (c.req.query('usuario') !== ctxOf(c).usuarioId) return c.json({ error: 'Solo puedes ver tus propios KPIs' }, 403);
+    return next();
+  }
+  return verKpis(c, next);
+};
+
+kpis.get('/:codigo', verDetalle, async (c) => {
   try { return c.json(await detalleKpi(ctxOf(c), c.req.param('codigo'), mesValido(c.req.query('periodo')), c.req.query('usuario') || undefined)); }
   catch (err) { return c.json({ error: err instanceof Error ? err.message : String(err) }, 404); }
 });

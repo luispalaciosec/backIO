@@ -14,7 +14,9 @@ function Kpis() {
   const mes = sp.get('mes') && /^\d{4}-\d{2}$/.test(sp.get('mes')!) ? sp.get('mes')! : mesActual();
   const persona = sp.get('persona');
   const me = useMe();
-  const { tablero, error, recargar } = useTableroKpis(mes);
+  // Colaboradores: solo su propia ficha («Mis KPIs»), sin ver a sus compañeros.
+  const soloMios = me?.rol === 'colaborador';
+  const { tablero, error, recargar } = useTableroKpis(mes, soloMios);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [sel, setSel] = useState<Seleccion | null>(null);
   useEffect(() => { api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {}); }, []);
@@ -24,6 +26,23 @@ function Kpis() {
     router.replace(`/kpis?${q.toString()}`);
   };
   const puedeRegistrar = ['admin', 'gerencia', 'operaciones'].includes(me?.rol ?? '');
+  if (!me) return <p className="text-sm text-gray-400">Cargando…</p>;
+  if (soloMios) return (
+    <div className="space-y-4 max-w-5xl">
+      <header className="flex items-end justify-between gap-4 flex-wrap">
+        <div><h1 className="text-2xl font-bold">Mis KPIs</h1><p className="text-sm text-gray-500">Así se mide tu trabajo este mes, con tus propias tareas. Abajo está la explicación de cada indicador.</p></div>
+        <div className="flex items-center gap-2">
+          <button className="btn-ghost" onClick={() => ir({ mes: moverMes(mes, -1) })}>‹</button>
+          <div className="text-sm font-medium w-36 text-center capitalize">{nombreMes(mes)}</div>
+          <button className="btn-ghost" onClick={() => ir({ mes: moverMes(mes, 1) })} disabled={mes >= mesActual()}>›</button>
+        </div>
+      </header>
+      {error && <Alert tipo="error">{error}</Alert>}
+      {!tablero && !error && <p className="text-sm text-gray-400">Calculando tus KPIs…</p>}
+      {tablero && me.usuario_id && <section className="card p-4"><FichaPersona tablero={tablero} usuarioId={me.usuario_id} onAbrir={setSel} /></section>}
+      {sel && <DetalleKpi sel={sel} mes={mes} puedeRegistrar={false} usuarios={[]} onClose={() => setSel(null)} onGuardado={recargar} />}
+    </div>
+  );
   const personas = tablero ? tablero.areas.flatMap((a) => (a.kpis[0]?.personas ?? []).map((p) => ({ ...p, area: a.area }))) : [];
 
   return (

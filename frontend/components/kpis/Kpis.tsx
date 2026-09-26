@@ -7,6 +7,7 @@ import type { KpiTablero, KpiValor, KpiDefinicion, KpiDetalleTarea, Usuario, Atr
 import { AREA_LABEL, ATRIBUIBLE_LABEL, CALCULO_KPI_LABEL } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { fecha, diaLocal, iniciales } from '@/lib/format';
+import { ComoSeCalcula } from './ComoSeCalcula';
 
 type Kpi = KpiTablero['areas'][number]['kpis'][number];
 
@@ -111,7 +112,7 @@ export function VistaEquipo({ tablero, onAbrir, onPersona }: { tablero: KpiTable
 /** Ficha de una persona: todos los KPIs de su área, su valor vs meta y el del equipo. */
 export function FichaPersona({ tablero, usuarioId, onAbrir }: { tablero: KpiTablero; usuarioId: string; onAbrir: (s: Seleccion) => void }) {
   const area = tablero.areas.find((a) => a.kpis.some((k) => k.personas.some((p) => p.usuario_id === usuarioId)));
-  if (!area) return <p className="text-sm text-gray-500">Esta persona no tiene área asignada, así que no tiene KPIs. Se asigna en Admin → Usuarios.</p>;
+  if (!area) return <p className="text-sm text-gray-500">Todavía no hay un área asignada, así que no hay KPIs que mostrar. La asigna un administrador en Admin → Usuarios.</p>;
   const filas = area.kpis.map((k) => ({ k, p: k.personas.find((x) => x.usuario_id === usuarioId)! }));
   const cumple = filas.filter((f) => f.p.valor.estado === 'cumple').length;
   const conDato = filas.filter((f) => f.p.valor.estado !== 'sin_dato').length;
@@ -136,6 +137,15 @@ export function FichaPersona({ tablero, usuarioId, onAbrir }: { tablero: KpiTabl
           </button>
         ))}
       </div>
+      <section className="pt-4 space-y-3">
+        <div>
+          <h3 className="text-lg font-bold">¿Cómo se calcula cada KPI?</h3>
+          <p className="text-sm text-gray-500">Con tus números de este periodo: cada cuadrito es una tarea, y abajo ves cuánto te falta para la meta.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {filas.map(({ k, p }) => <ComoSeCalcula key={k.definicion.id} def={k.definicion} v={p.valor} equipo={k.equipo} />)}
+        </div>
+      </section>
     </div>
   );
 }
@@ -270,13 +280,13 @@ export function DetalleKpi({ sel, mes, puedeRegistrar, usuarios, onClose, onGuar
 }
 
 /** Carga el tablero de un mes (lo usan /kpis y el modal de Personas). */
-export function useTableroKpis(mes: string) {
+export function useTableroKpis(mes: string, soloMios = false) {
   const [tablero, setTablero] = useState<KpiTablero | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cargar = useCallback(() => {
     setError(null);
-    api<KpiTablero>(`/kpis?periodo=${mes}`).then(setTablero).catch((e) => setError(e instanceof ApiError ? (/kpi_definiciones|does not exist|schema cache/i.test(e.message) ? 'Falta aplicar la migración 22 de KPIs en Supabase.' : e.message) : 'Error cargando KPIs'));
-  }, [mes]);
+    api<KpiTablero>(`/kpis${soloMios ? '/mios' : ''}?periodo=${mes}`).then(setTablero).catch((e) => setError(e instanceof ApiError ? (/kpi_definiciones|does not exist|schema cache/i.test(e.message) ? 'Falta aplicar la migración 22 de KPIs en Supabase.' : e.message) : 'Error cargando KPIs'));
+  }, [mes, soloMios]);
   useEffect(() => { cargar(); }, [cargar]);
   return { tablero, error, recargar: cargar };
 }

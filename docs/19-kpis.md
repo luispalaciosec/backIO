@@ -12,7 +12,14 @@ Arte y Diseño, Creatividad, Content). Cada KPI se mide **a cada persona del ár
 | Admin → Catálogo → KPIs | Admin | Meta, operador, periodicidad, cálculo, textos, activo |
 | Admin → Usuarios → Área | Admin | Área de cada persona: define qué KPIs le aplican |
 
+| Menú → Mis KPIs (`/kpis`, `GET /kpis/mios`) | Colaboradores | Solo su propia ficha y el agregado de su equipo, nunca a sus compañeros |
+
 Registrar mediciones (manuales, ajustes, causa, plan de mejora): **admin, gerencia y operaciones**.
+
+**Ficha lúdica (26/09).** Debajo de la ficha de cada persona, «¿Cómo se calcula cada KPI?» explica cada
+indicador con sus propios números: la regla en lenguaje simple, un cuadrito por tarea (verde suma, rojo
+resta), la cuenta A de B = %, una barra con la meta marcada, cuánto le falta (o cuánto margen le queda) y un
+consejo concreto para mejorarlo (`frontend/components/kpis/ComoSeCalcula.tsx`).
 
 ## Cómo se mide
 
@@ -40,7 +47,12 @@ Registrar mediciones (manuales, ajustes, causa, plan de mejora): **admin, gerenc
 | `manual` | CUE-02, PRO-03 | se ingresa | se ingresa |
 
 SLA (`lib/horas_habiles.ts`): Alta 30 min, Media 1,5 h, Baja 8 h, en horas hábiles L-V 09:00–18:00 Guayaquil.
-Los cálculos que dependen de datos nuevos solo cuentan desde el 25/09/2026 (`FEATURES_DESDE`).
+Los cálculos que dependen de datos nuevos solo miden meses completos desde el 25/09/2026 (`FEATURES_DESDE`):
+septiembre sale «sin dato» y arrancan en octubre.
+
+**Backlog heredado excluido (`OPERACION_DESDE = 2026-09-04`).** Las tareas con fecha original anterior al
+inicio de BackIO no cuentan: el 7-8/09 se cerraron en bloque 385 tareas importadas con una mediana de 62 días
+de atraso, y medirlas castigaba al equipo por la limpieza (a tiempo de Diseño pasaba de 47% a 19%).
 
 ## Datos nuevos que los alimentan (migración 22)
 

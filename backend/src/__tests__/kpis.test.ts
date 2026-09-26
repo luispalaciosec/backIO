@@ -69,10 +69,16 @@ describe('calculadores', () => {
     expect(proxy.estimado).toBe(true);
     expect(proxy.items.map((i) => i.a)).toEqual([true, false]);
   });
-  it('los KPIs que dependen de datos nuevos no se calculan antes de la migración', () => {
-    const agosto = rangoPeriodo('2026-08');
-    expect(agosto.hasta <= FEATURES_DESDE).toBe(true);
-    expect(calcular(def({ calculo: 'proactividad', denominador_fijo: 3 }), datos({}), agosto).sin_dato).toBe(true);
+  it('los KPIs que dependen de datos nuevos no miden meses anteriores ni el mes a medias', () => {
+    expect(rangoPeriodo('2026-09').desde < FEATURES_DESDE).toBe(true);
+    expect(calcular(def({ calculo: 'proactividad', denominador_fijo: 3 }), datos({}), rangoPeriodo('2026-08')).sin_dato).toBe(true);
+    expect(calcular(def({ calculo: 'proactividad', denominador_fijo: 3 }), datos({}), rangoPeriodo('2026-09')).sin_dato).toBe(true);
+    expect(calcular(def({ calculo: 'proactividad', denominador_fijo: 3 }), datos({}), oct).sin_dato).toBe(false);
+  });
+  it('excluye el backlog heredado: tareas con fecha original anterior al inicio de BackIO', () => {
+    const vieja = req({ id: 'v', fecha_entrega_original: '2026-07-01', fecha_entrega: '2026-07-01' });
+    const nueva = req({ id: 'n' });
+    expect(calcular(def({}), datos({ completadas: [vieja, nueva] }), oct).items.map((i) => i.req.id)).toEqual(['n']);
   });
 });
 
