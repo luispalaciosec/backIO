@@ -3,10 +3,31 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { iniciales } from '@/lib/format';
+import type { Area } from '@backio/shared';
+import { AREAS, AREA_LABEL } from '@backio/shared';
+import { useMe } from '@/lib/useMe';
+import { FichaPersona, DetalleKpi, useTableroKpis, mesActual, nombreMes, type Seleccion } from '@/components/kpis/Kpis';
+
+/** Pestaña KPIs del modal: ficha del mes en curso (solo gestión). */
+function KpisDePersona({ usuarioId }: { usuarioId: string }) {
+  const mes = mesActual();
+  const me = useMe();
+  const { tablero, error, recargar } = useTableroKpis(mes);
+  const [sel, setSel] = useState<Seleccion | null>(null);
+  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (!tablero) return <p className="text-sm text-gray-400">Calculando KPIs…</p>;
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-gray-500 capitalize">{nombreMes(mes)} · <a className="link-action" href={`/kpis?persona=${usuarioId}`}>ver historial en KPIs</a></div>
+      <FichaPersona tablero={tablero} usuarioId={usuarioId} onAbrir={setSel} />
+      {sel && <DetalleKpi sel={sel} mes={mes} puedeRegistrar={['admin', 'gerencia', 'operaciones'].includes(me?.rol ?? '')} usuarios={[]} onClose={() => setSel(null)} onGuardado={recargar} />}
+    </div>
+  );
+}
 
 type Periodo = 'dia' | 'semana' | 'mes';
 interface Persona {
-  usuario_id: string; nombre: string; email: string; rol: string; avatar_url: string | null; capacidad_semanal: number; basecamp_user_id: number | null;
+  usuario_id: string; nombre: string; email: string; rol: string; area: Area | null; avatar_url: string | null; capacidad_semanal: number; basecamp_user_id: number | null;
   activos: number; atrasados: number; en_ejecucion: number; bloqueados: number; esperando_cliente: number; sin_movimiento_7: number;
   entregados: number; piezas: number; pct_a_tiempo_original: number | null; pct_a_tiempo_vigente: number | null; desvio_mediana_dias: number | null;
   horas: number; horas_por_entrega: number | null; pct_capacidad: number | null; reprogramaciones_equipo: number; reprocesos: number; horas_reproceso: number;
@@ -62,10 +83,14 @@ export default function PersonasPage() {
   const [error, setError] = useState<string | null>(null);
   const [orden, setOrden] = useState<'puntaje' | 'activos' | 'entregados' | 'horas' | 'atrasados' | 'dias_sin_horas_n'>('puntaje');
   const [abierta, setAbierta] = useState<Persona | null>(null);
+  const [pestana, setPestana] = useState<'rendimiento' | 'kpis'>('rendimiento');
+  const [area, setArea] = useState<Area | ''>('');
+  const me = useMe();
+  const veKpis = !!me?.rol && me.rol !== 'colaborador';
   const cargar = useCallback(async () => { setError(null); try { setD(await api<Resumen>(`/personas?periodo=${periodo}`)); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); } }, [periodo]);
   useEffect(() => { void cargar(); }, [cargar]);
   const valor = (p: Persona) => (orden === 'dias_sin_horas_n' ? p.dias_sin_horas.length : (p[orden] as number));
-  const personas = [...(d?.personas ?? [])].sort((a, b) => valor(b) - valor(a));
+  const personas = [...(d?.personas ?? [])].filter((p) => !area || p.area === area).sort((a, b) => valor(b) - valor(a));
   const totales = d ? { entregados: d.personas.reduce((s, p) => s + p.entregados, 0), horas: Math.round(d.personas.reduce((s, p) => s + p.horas, 0)), esperadas: Math.round(d.personas.filter((p) => p.basecamp_user_id).reduce((s, p) => s + p.horas_esperadas, 0)), atrasados: d.personas.reduce((s, p) => s + p.atrasados, 0), reprocesos: d.personas.reduce((s, p) => s + p.reprocesos, 0), sin_timesheet: d.personas.filter((p) => p.basecamp_user_id && p.dias_laborables > 0 && p.dias_con_horas === 0).length } : null;
   const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
   const fmt = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('es-EC', { day: 'numeric', month: 'short' });
@@ -81,6 +106,7 @@ export default function PersonasPage() {
           <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
             {(['dia', 'semana', 'mes'] as Periodo[]).map((p) => <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 rounded ${periodo === p ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p === 'dia' ? 'Hoy' : p === 'semana' ? 'Semana' : 'Mes'}</button>)}
           </div>
+          <select className="input w-44" value={area} onChange={(e) => setArea(e.target.value as Area | '')}><option value="">Todas las áreas</option>{AREAS.map((a) => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}</select>
           <select className="input w-44" value={orden} onChange={(e) => setOrden(e.target.value as typeof orden)}>
             <option value="puntaje">Ordenar: puntaje</option><option value="activos">Ordenar: activos</option><option value="entregados">Ordenar: entregados</option><option value="horas">Ordenar: horas</option><option value="atrasados">Ordenar: atrasados</option><option value="dias_sin_horas_n">Ordenar: días sin timesheet</option>
           </select>
@@ -102,7 +128,7 @@ export default function PersonasPage() {
               <Avatar p={p} />
               <div className="min-w-0 flex-1">
                 <div className="font-semibold truncate">{p.nombre}</div>
-                <div className="flex items-center gap-2 text-xs"><span className={`rounded-full px-2 py-0.5 font-semibold ${COLOR_ROL[p.rol] ?? 'bg-gray-100'}`}>{p.rol}</span><span className="text-gray-500">{p.capacidad_semanal} h/sem</span>{!p.basecamp_user_id && <span className="text-amber-700" title="Sin vincular con Basecamp: no hay horas">sin Basecamp</span>}</div>
+                <div className="flex items-center gap-2 text-xs"><span className={`rounded-full px-2 py-0.5 font-semibold ${COLOR_ROL[p.rol] ?? 'bg-gray-100'}`}>{p.rol}</span>{p.area && <span className="rounded-full px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200">{AREA_LABEL[p.area]}</span>}<span className="text-gray-500">{p.capacidad_semanal} h/sem</span>{!p.basecamp_user_id && <span className="text-amber-700" title="Sin vincular con Basecamp: no hay horas">sin Basecamp</span>}</div>
               </div>
               <Anillo valor={p.puntaje} />
             </div>
@@ -140,6 +166,13 @@ export default function PersonasPage() {
               <Anillo valor={abierta.puntaje} />
               <button className="btn-ghost" onClick={() => setAbierta(null)}>×</button>
             </div>
+            {veKpis && (
+              <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
+                <button className={`px-3 py-1 rounded ${pestana === 'rendimiento' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setPestana('rendimiento')}>Rendimiento</button>
+                <button className={`px-3 py-1 rounded ${pestana === 'kpis' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setPestana('kpis')}>◎ KPIs</button>
+              </div>
+            )}
+            {pestana === 'kpis' && veKpis ? <KpisDePersona usuarioId={abierta.usuario_id} /> : <>
             <p className="text-xs text-gray-500">Puntaje orientativo: 40 % cumplimiento sobre fecha original, 30 % tareas sin atraso, 20 % bien a la primera, 10 % tareas con movimiento. {d?.etiqueta}.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {[
@@ -167,6 +200,7 @@ export default function PersonasPage() {
                   <tbody>{abierta.clientes.map((c) => <tr key={c.cliente}><td className="td">{c.cliente}</td><td className="td text-right tabular-nums">{c.activos}</td><td className="td text-right tabular-nums text-green-700">{c.entregados}</td></tr>)}</tbody></table>
               </div>
             )}
+            </>}
           </div>
         </div>
       )}

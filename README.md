@@ -103,6 +103,7 @@ Cómo está armado por dentro, ciclo de una petición, crons, integraciones y de
 | `docs/16-cumplimiento.md` | Reprogramaciones, reprocesos, bitácora, estatus por cliente |
 | `docs/17-arquitectura-tecnica.md` | Arquitectura a nivel de código, operación, deuda técnica |
 | `docs/18-seguridad.md` | Revisión de seguridad: hallazgos, correcciones y pendientes |
+| `docs/19-kpis.md` | KPIs por persona y por equipo |
 | `docs/manual/` | Manual de uso para el equipo (HTML y PDF con pantallas) |
 
 ---

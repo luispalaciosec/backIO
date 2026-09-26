@@ -52,6 +52,10 @@ function describir(accion: string, d: Record<string, unknown>): string {
     case 'adoptar_huerfano': return 'adoptó un huérfano de Basecamp';
     case 'basecamp_entrada': return `entró desde Basecamp${d.lista ? ` · lista ${d.lista}` : ''}${d.creador ? ` · creada por ${d.creador}` : ''}`;
     case 'revisar_entrada': return 'revisó la entrada desde Basecamp';
+    case 'respondido': return 'marcó la primera respuesta al cliente';
+    case 'respondido_deshacer': return 'deshizo la marca de primera respuesta';
+    case 'kpi_medicion': return `registró el KPI ${d.codigo ?? ''} (${d.periodo ?? ''})${d.origen === 'ajustado' ? ' con ajuste' : ''}`;
+    case 'kpi_definicion': return `editó la definición del KPI ${d.codigo ?? ''}`;
     case 'bitacora': return `anotó en la bitácora${d.visible_cliente ? ' (visible al cliente)' : ''}: “${String(d.nota ?? '').slice(0, 120)}”`;
     case 'bitacora_eliminar': return 'borró una nota de la bitácora';
     case 'ia_brief': return 'usó la IA para extraer un brief';

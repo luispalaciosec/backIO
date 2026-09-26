@@ -93,7 +93,7 @@ export function resumirCumplimiento(completados: RequerimientoMetricas[], reprog
  * Registra un reproceso: fila + contador + reabre la tarea (y el to-do en Basecamp si se pide).
  * Idempotente por tarea: si ya hay un reproceso abierto, lo devuelve sin crear otro.
  */
-export async function registrarReproceso(ctx: DbCtx, requerimientoId: string, o: { origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno?: string | null; reabrir_basecamp?: boolean; observacion?: string | null }): Promise<Reproceso> {
+export async function registrarReproceso(ctx: DbCtx, requerimientoId: string, o: { origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno?: string | null; reabrir_basecamp?: boolean; observacion?: string | null; area_responsable?: string | null; atribuible?: string | null }): Promise<Reproceso> {
   const req = await getRequerimiento(ctx, requerimientoId);
   if (!req) throw new Error('Requerimiento no encontrado');
   const abierto = await reprocesoAbierto(ctx, requerimientoId);
@@ -101,7 +101,11 @@ export async function registrarReproceso(ctx: DbCtx, requerimientoId: string, o:
     if ((o.motivo && !abierto.motivo) || o.observacion) await updateReproceso(ctx, abierto.id, { motivo: o.motivo ?? abierto.motivo, paso_retorno: o.paso_retorno ?? abierto.paso_retorno, ...(o.observacion ? { observacion: o.observacion } : {}) });
     return abierto;
   }
-  const rp = await insertReproceso(ctx, { requerimiento_id: requerimientoId, origen: o.origen, motivo: o.motivo, paso_retorno: o.paso_retorno ?? null, fecha_entrega_antes: req.fecha_entrega, observacion: o.observacion ?? null });
+  // Atribución por defecto desde el motivo si no viene explícita (KPIs de retrabajo por área).
+  const resp = MOTIVOS_REPROCESO.find((m) => m.valor === o.motivo)?.responsable;
+  const atribuible = o.atribuible ?? (resp === 'cliente' ? 'cliente' : resp ? 'equipo' : null);
+  const area_responsable = o.area_responsable ?? (resp === 'ejecutiva' ? 'cuentas' : null);
+  const rp = await insertReproceso(ctx, { requerimiento_id: requerimientoId, origen: o.origen, motivo: o.motivo, paso_retorno: o.paso_retorno ?? null, fecha_entrega_antes: req.fecha_entrega, observacion: o.observacion ?? null, atribuible, area_responsable });
   const { error } = await ctx.db.from('requerimientos').update({ veces_reproceso: req.veces_reproceso + 1 }).eq('tenant_id', ctx.tenantId).eq('id', requerimientoId);
   throwIf(error);
   const patch: Parameters<typeof updateRequerimiento>[2] = { ultima_actualizacion: new Date().toISOString() };

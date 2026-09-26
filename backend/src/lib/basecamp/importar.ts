@@ -17,6 +17,16 @@ import { audit } from '../db/audit';
 import { generarPortalToken } from '../portal/token';
 import { BasecampClient } from './client';
 
+/** Prefijos en el título del to-do que fijan clase y proactividad al importarlo. null si no hay ninguno. */
+export function marcasDeTitulo(titulo: string | null | undefined): { clase?: 'propuesta' | 'incidencia'; proactiva?: true } | null {
+  const t = (titulo ?? '').toUpperCase();
+  const out: { clase?: 'propuesta' | 'incidencia'; proactiva?: true } = {};
+  if (/\[\s*PROPUESTA\s*\]/.test(t)) out.clase = 'propuesta';
+  if (/\[\s*INCIDENCIA\s*\]/.test(t)) out.clase = 'incidencia';
+  if (/\[\s*PROACTIVA\s*\]/.test(t)) out.proactiva = true;
+  return Object.keys(out).length ? out : null;
+}
+
 export interface ResultadoImport { listas: number; proyectos_creados: number; requerimientos_creados: number; ya_enlazados: number; omitidos_completados_viejos: number; responsables_actualizados: number; titulos_actualizados: number; movidos: number; proyectos_renombrados: number; eliminados_en_basecamp: number }
 
 /**
@@ -114,6 +124,9 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
         const { error } = await ctx.db.from('requerimientos').update({ basecamp_todo_id: t.id, basecamp_todolist_id: t.grupoId ?? lista.id, basecamp_url: t.app_url, completado_at: t.completed ? t.completed_at : null }).eq('id', req.id);
         throwIf(error);
         yaEnlazados.add(t.id);
+        // Convenciones de título para KPIs (docs/19): [PROPUESTA], [INCIDENCIA], [PROACTIVA]. El título no se toca.
+        const marcas = marcasDeTitulo(t.titulo);
+        if (marcas) await ctx.db.from('requerimientos').update(marcas).eq('id', req.id).then(() => undefined, () => undefined);
         // Una entrada por to-do: alimenta la bandeja «Entradas desde Basecamp» y el Día a día.
         if (!t.completed) await audit(ctx, { accion: 'basecamp_entrada', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: t.id, titulo: t.titulo, cliente_id: clienteId, proyecto_id: proyecto!.id, lista: lista.name, bloque: t.bloque, creador: t.creator_nombre, due_on: t.due_on, sin_responsable: t.assignee_ids.map((id) => porBcUser.get(id)).filter(Boolean).length === 0 } });
       }

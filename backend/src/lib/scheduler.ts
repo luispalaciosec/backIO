@@ -15,6 +15,7 @@ import { listMesas } from './db/mesas';
 import { procesarRecurrencias } from './recurrencias';
 import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
+import { congelarPeriodo, trimestreDe } from './kpis';
 
 const TZ = 'America/Guayaquil';
 
@@ -76,6 +77,7 @@ export function startScheduler(): void {
   let ultimaCorrida = '';
   let ultimoInforme = '';
   let ultimaRecurrencia = '';
+  let ultimoKpi = '';
   setInterval(async () => {
     const t = ahoraLocal();
     // Diario 08:05: recurrencias de fees (genera el mes siguiente cuando llega el día configurado).
@@ -84,6 +86,18 @@ export function startScheduler(): void {
       for (const id of await tenants()) {
         try { const r = await procesarRecurrencias({ db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' }); if (r.generadas.length || r.errores.length) console.log('[scheduler] recurrencias', JSON.stringify(r)); }
         catch (err) { console.error('[scheduler] recurrencias', err instanceof Error ? err.message : err); }
+      }
+    }
+    // Día 1 08:10: congela los KPIs automáticos del mes anterior (y del trimestre si cerró). No pisa ajustes.
+    if (t.hora === 8 && t.minuto === 10 && t.clave.endsWith('-01') && ultimoKpi !== t.clave) {
+      ultimoKpi = t.clave;
+      const [y, m] = t.clave.split('-').map(Number);
+      const prev = new Date(Date.UTC(y!, (m ?? 1) - 2, 1));
+      const mes = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+      const periodos = [mes, ...((m ?? 1) % 3 === 1 ? [trimestreDe(mes)] : [])];
+      for (const id of await tenants()) for (const p of periodos) {
+        try { const n = await congelarPeriodo({ db: serviceClient(), tenantId: id, usuarioId: null, origen: 'cron' }, p); console.log(`[scheduler] KPIs ${p} congelados: ${n}`); }
+        catch (err) { console.error('[scheduler] KPIs', p, err instanceof Error ? err.message : err); }
       }
     }
     // Día 1 de cada mes 08:00: informe ejecutivo del mes anterior por mesa (solo se redacta; Marcia lo publica).

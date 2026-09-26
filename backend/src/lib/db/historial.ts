@@ -30,12 +30,17 @@ export async function setMotivoReprogramacion(ctx: DbCtx, id: string, motivo: Mo
   const { error } = await conObservacionOpcional((inc) => ctx.db.from('reprogramaciones').update({ motivo, ...(inc && observacion ? { observacion } : {}) }).eq('tenant_id', ctx.tenantId).eq('id', id));
   throwIf(error as never);
 }
-export async function insertReproceso(ctx: DbCtx, r: { requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null; fecha_entrega_antes: string | null; observacion?: string | null }): Promise<Reproceso> {
-  const { observacion, ...resto } = r;
-  const { data, error } = await conObservacionOpcional<Reproceso>((inc) => ctx.db.from('reprocesos').insert({ ...resto, tenant_id: ctx.tenantId, usuario_id: ctx.usuarioId, ...(inc && observacion ? { observacion } : {}) }).select().single());
+export async function insertReproceso(ctx: DbCtx, r: { requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null; fecha_entrega_antes: string | null; observacion?: string | null; area_responsable?: string | null; atribuible?: string | null }): Promise<Reproceso> {
+  const { observacion, area_responsable, atribuible, ...resto } = r;
+  // Atribución (migración 22): si la columna aún no existe, se inserta sin ella.
+  const atrib = { ...(area_responsable ? { area_responsable } : {}), ...(atribuible ? { atribuible } : {}) };
+  const insertar = (conAtrib: boolean) => conObservacionOpcional<Reproceso>((inc) => ctx.db.from('reprocesos').insert({ ...resto, ...(conAtrib ? atrib : {}), tenant_id: ctx.tenantId, usuario_id: ctx.usuarioId, ...(inc && observacion ? { observacion } : {}) }).select().single());
+  let res = await insertar(true);
+  if (res.error && /area_responsable|atribuible/i.test(res.error.message ?? '')) res = await insertar(false);
+  const { data, error } = res;
   throwIf(error as never); return data as Reproceso;
 }
-export async function updateReproceso(ctx: DbCtx, id: string, patch: Partial<Pick<Reproceso, 'motivo' | 'paso_retorno' | 'cerrado_at' | 'horas_reproceso' | 'observacion'>>): Promise<void> {
+export async function updateReproceso(ctx: DbCtx, id: string, patch: Partial<Pick<Reproceso, 'motivo' | 'paso_retorno' | 'cerrado_at' | 'horas_reproceso' | 'observacion' | 'area_responsable' | 'atribuible'>>): Promise<void> {
   const { observacion, ...resto } = patch;
   const { error } = await conObservacionOpcional((inc) => ctx.db.from('reprocesos').update({ ...resto, ...(inc && observacion !== undefined ? { observacion } : {}) }).eq('tenant_id', ctx.tenantId).eq('id', id));
   throwIf(error as never);

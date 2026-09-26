@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { Usuario, Rol } from '@backio/shared';
+import { AREAS, AREA_LABEL } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 
@@ -96,13 +97,14 @@ export default function AdminUsuariosPage() {
 
       <section className="card overflow-x-auto">
         <table className="w-full min-w-[820px]">
-          <thead><tr><th className="th">Nombre</th><th className="th">Email</th><th className="th">Rol</th><th className="th">Capacidad h/sem</th><th className="th">Basecamp user id</th><th className="th">Acceso</th></tr></thead>
+          <thead><tr><th className="th">Nombre</th><th className="th">Email</th><th className="th">Rol</th><th className="th" title="Equipo funcional: define qué KPIs le aplican">Área (KPIs)</th><th className="th">Capacidad h/sem</th><th className="th">Basecamp user id</th><th className="th">Acceso</th></tr></thead>
           <tbody>
             {usuarios.map((u) => (
               <tr key={u.id}>
                 <td className="td font-medium">{u.nombre}</td>
                 <td className="td text-gray-600">{u.email}</td>
                 <td className="td"><select className="input" defaultValue={u.rol} onChange={(e) => patch(u.id, { rol: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></td>
+                <td className="td"><select className="input" defaultValue={u.area ?? ''} onChange={(e) => patch(u.id, { area: e.target.value || null })}><option value="">Sin área</option>{AREAS.map((a) => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}</select></td>
                 <td className="td"><input className="input w-20" type="number" min={1} max={80} defaultValue={u.capacidad_semanal} onBlur={(e) => Number(e.target.value) !== u.capacidad_semanal && patch(u.id, { capacidad_semanal: Number(e.target.value) })} /></td>
                 <td className="td"><input className="input w-36" inputMode="numeric" defaultValue={u.basecamp_user_id ?? ''} placeholder="opcional" onBlur={(e) => { const v = e.target.value.trim(); const n = v ? Number(v) : null; if (n !== u.basecamp_user_id) void patch(u.id, { basecamp_user_id: n }); }} /></td>
                 <td className="td whitespace-nowrap">

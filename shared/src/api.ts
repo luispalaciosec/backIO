@@ -74,6 +74,8 @@ export type ActualizarRequerimientoInput = { motivo_reprogramacion?: import('./t
     | 'entregable_urls'
     | 'planificacion'
     | 'daily_fecha'
+    | 'clase'
+    | 'proactiva'
   >
 >;
 

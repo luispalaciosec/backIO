@@ -159,7 +159,7 @@ function BacklogInner() {
 
   async function crear(clienteId: string, d: NuevoRequerimiento) {
     try {
-      const r = await api<{ basecamp: { todo_id: number } | { error: string } | null }>('/requerimientos', { method: 'POST', json: { cliente_id: clienteId, proyecto_id: d.proyecto_id, titulo_interno: d.titulo, tipo_trabajo: 'fee', piezas: d.piezas, owner_agencia: d.owner_agencia, fecha_entrega: d.fecha_entrega, fecha_pedido: new Date().toISOString().slice(0, 10) } });
+      const r = await api<{ basecamp: { todo_id: number } | { error: string } | null }>('/requerimientos', { method: 'POST', json: { cliente_id: clienteId, proyecto_id: d.proyecto_id, titulo_interno: d.titulo, tipo_trabajo: 'fee', piezas: d.piezas, owner_agencia: d.owner_agencia, fecha_entrega: d.fecha_entrega, fecha_pedido: new Date().toISOString().slice(0, 10), ...(d.clase !== 'tarea' ? { clase: d.clase } : {}), ...(d.proactiva ? { proactiva: true } : {}) } });
       if (r.basecamp && 'todo_id' in r.basecamp) setAviso('Requerimiento creado y to-do enviado a Basecamp ✓');
       else if (r.basecamp && 'error' in r.basecamp) setError(`Se creó en BackIO pero Basecamp no aceptó el to-do: ${r.basecamp.error}`);
       else setAviso(d.proyecto_id ? 'Requerimiento creado en BackIO (sin to-do: el proyecto no está enlazado a Basecamp o falta la fecha)' : 'Requerimiento creado en BackIO');

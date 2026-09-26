@@ -8,7 +8,7 @@ import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoInput } from '@backio/shared';
 import { CeldaSelect, CeldaFecha, CeldaTexto, CeldaOwners } from './Celdas';
 import { COLOR_ESTADO, COLOR_APROBACION, COLOR_PRIORIDAD, COLOR_TIPO, COLOR_PLANIFICACION, colorGrupo } from './colores';
-import { PLANIFICACION_LABEL } from '@backio/shared';
+import { PLANIFICACION_LABEL, CLASE_LABEL, type ClaseTarea } from '@backio/shared';
 import { ESTADO_LABEL, APROBACION_LABEL, PRIORIDAD_LABEL, TIPO_LABEL, haceCuanto, fechaCorta, diaLocal } from '@/lib/format';
 
 const ESTADOS = Object.keys(ESTADO_LABEL);
@@ -40,7 +40,7 @@ export interface BacklogTableProps {
 }
 
 // w-max min-w-full: la fila mide lo que suman sus columnas; sin esto el contenedor recortaba las últimas (Basecamp, Última act.).
-const COLS = 'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_90px_80px_80px_70px_240px_120px_120px]';
+const COLS = 'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_130px_90px_80px_80px_70px_240px_120px_120px]';
 
 export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, notas = {}, puedeEditar, proyectos = {}, proyectosCliente = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
   const [sincronizando, setSincronizando] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden w-max min-w-full">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50 sticky top-0 z-10`}>
                   <div className="flex sticky left-0 z-10 bg-gray-50"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
-                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Piezas', 'Tipo', 'Atraso', 'Sin mov.', 'Horas', 'Observación', 'Basecamp', 'Última act.'].map((h) => (
+                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Piezas', 'Tipo', 'Clase', 'Atraso', 'Sin mov.', 'Horas', 'Observación', 'Basecamp', 'Última act.'].map((h) => (
                     <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>
                   ))}
                 </div>
@@ -130,6 +130,12 @@ function Fila({ r, color, usuarios, onPatch, horas, nota, bloqueada, proyecto, o
       <div className="border-l border-gray-100" title="Planificado: entró por el weekly · No planificado: entró durante la semana · Urgente"><CeldaSelect valor={r.planificacion ?? 'planificado'} opciones={PLANIF} colores={COLOR_PLANIFICACION} labels={PLANIFICACION_LABEL} onChange={(v) => p({ planificacion: v as RequerimientoMetricas['planificacion'] })} /></div>
       <div className={`border-l border-gray-100 ${!r.piezas && !hecho ? 'bg-amber-50' : ''}`} title="Piezas del requerimiento (lo llena la ejecutiva). Alimenta el informe por canal."><CeldaPiezas valor={r.piezas ?? 0} onCommit={(n) => p({ piezas: n })} /></div>
       <div className="border-l border-gray-100"><span className="h-9 flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: COLOR_TIPO[r.tipo_trabajo] }}>{TIPO_LABEL[r.tipo_trabajo]}</span></div>
+      <div className="border-l border-gray-100 h-9 flex items-center gap-1 px-1" title="Clase de tarea (KPIs): Propuesta cuenta para campañas aprobadas; Incidencia para SLA de resolución. ✦ = propuesta proactiva.">
+        <select className={`h-7 flex-1 min-w-0 rounded text-xs px-1 border ${r.clase === 'propuesta' ? 'bg-violet-50 border-violet-300 text-violet-800' : r.clase === 'incidencia' ? 'bg-orange-50 border-orange-300 text-orange-800' : 'bg-transparent border-transparent text-gray-500'}`} value={r.clase ?? 'tarea'} onChange={(e) => void p({ clase: e.target.value as ClaseTarea })}>
+          {(Object.keys(CLASE_LABEL) as ClaseTarea[]).map((c) => <option key={c} value={c}>{CLASE_LABEL[c]}</option>)}
+        </select>
+        <button type="button" className={`text-sm shrink-0 ${r.proactiva ? 'text-amber-500' : 'text-gray-200 hover:text-gray-400'}`} title={r.proactiva ? 'Propuesta proactiva (clic para quitar)' : 'Marcar como propuesta proactiva'} onClick={(e) => { e.stopPropagation(); void p({ proactiva: !r.proactiva }); }}>✦</button>
+      </div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_atraso > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{r.dias_atraso || ''}</div>
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_sin_movimiento > 14 ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{r.dias_sin_movimiento}</div>
       <div className="border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums text-gray-600" title="Horas registradas en Basecamp (últimos 90 días)">{horas ? horas.toFixed(1) : ''}</div>
@@ -147,7 +153,7 @@ function CeldaPiezas({ valor, onCommit }: { valor: number; onCommit: (n: number)
   return <input className="h-9 w-full bg-transparent text-sm text-center tabular-nums placeholder:text-amber-500 focus:outline-none focus:ring-2 focus:ring-brand/40" inputMode="numeric" placeholder="¿piezas?" value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />;
 }
 
-export interface NuevoRequerimiento { titulo: string; proyecto_id: string | null; owner_agencia: string[]; fecha_entrega: string | null; piezas: number }
+export interface NuevoRequerimiento { titulo: string; proyecto_id: string | null; owner_agencia: string[]; fecha_entrega: string | null; piezas: number; clase: ClaseTarea; proactiva: boolean }
 
 /**
  * Alta rápida desde el backlog: título, proyecto, responsables, entrega y piezas. Si el proyecto está enlazado a
@@ -159,14 +165,16 @@ function NuevaFila({ color, usuarios, proyectos, onCrear }: { color: string; usu
   const [owners, setOwners] = useState<string[]>([]);
   const [fechaEnt, setFechaEnt] = useState('');
   const [piezas, setPiezas] = useState('');
+  const [clase, setClase] = useState<ClaseTarea>('tarea');
+  const [proactiva, setProactiva] = useState(false);
   const [busy, setBusy] = useState(false);
   const p = proyectos.find((x) => x.id === proyecto);
   const iraBasecamp = !!p?.basecamp && !!fechaEnt;
   const crear = async () => {
     if (!v.trim() || busy) return;
     setBusy(true);
-    await onCrear({ titulo: v.trim(), proyecto_id: proyecto || null, owner_agencia: owners, fecha_entrega: fechaEnt || null, piezas: Math.max(0, Number(piezas) || 0) });
-    setV(''); setOwners([]); setFechaEnt(''); setPiezas(''); setBusy(false);
+    await onCrear({ titulo: v.trim(), proyecto_id: proyecto || null, owner_agencia: owners, fecha_entrega: fechaEnt || null, piezas: Math.max(0, Number(piezas) || 0), clase, proactiva });
+    setV(''); setOwners([]); setFechaEnt(''); setPiezas(''); setClase('tarea'); setProactiva(false); setBusy(false);
   };
   return (
     <div className="flex items-center sticky left-0 z-[5] bg-white" style={{ width: 'max-content', maxWidth: 'calc(100vw - 20rem)' }}>
@@ -179,6 +187,10 @@ function NuevaFila({ color, usuarios, proyectos, onCrear }: { color: string; usu
       <div className="w-32 border-l border-gray-100"><CeldaOwners ids={owners} usuarios={usuarios} onChange={setOwners} /></div>
       <input type="date" className="h-9 w-36 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={fechaEnt} disabled={busy} onChange={(e) => setFechaEnt(e.target.value)} title="Fecha de entrega" />
       <input className="h-9 w-20 bg-transparent text-sm text-center border-l border-gray-100 placeholder:text-gray-400 focus:outline-none" inputMode="numeric" placeholder="piezas" value={piezas} disabled={busy} onChange={(e) => setPiezas(e.target.value.replace(/\D/g, ''))} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
+      <select className="h-9 w-28 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={clase} disabled={busy} onChange={(e) => setClase(e.target.value as ClaseTarea)} title="Clase de tarea (KPIs)">
+        {(Object.keys(CLASE_LABEL) as ClaseTarea[]).map((c) => <option key={c} value={c}>{CLASE_LABEL[c]}</option>)}
+      </select>
+      <label className="h-9 flex items-center gap-1 px-2 border-l border-gray-100 text-xs text-gray-600 whitespace-nowrap" title="Propuesta proactiva: no la pidió el cliente"><input type="checkbox" checked={proactiva} disabled={busy} onChange={(e) => setProactiva(e.target.checked)} /> ✦ Proactiva</label>
       <span className={`text-xs px-2 whitespace-nowrap ${iraBasecamp ? 'text-emerald-700 font-semibold' : 'text-gray-400'}`} title={iraBasecamp ? 'Al guardar se crea el to-do en la lista de Basecamp del proyecto, con responsables y fecha' : p && !p.basecamp ? 'Ese proyecto no está enlazado a una lista de Basecamp' : !p ? 'Elige un proyecto enlazado a Basecamp para que el to-do se cree allá' : 'Pon fecha de entrega para crear el to-do en Basecamp'}>{iraBasecamp ? 'Bc↗ se crea en Basecamp' : 'solo en BackIO'}</span>
       <button type="button" className="btn-primary text-xs py-1 mx-2" disabled={busy || !v.trim()} onClick={crear}>{busy ? 'Creando…' : 'Crear'}</button>
     </div>

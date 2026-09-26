@@ -83,6 +83,9 @@ const crearSchema = z.object({
   owner_agencia: z.array(z.string().uuid()).default([]),
   piezas: z.number().int().min(0).default(0),
   planificacion: z.enum(['planificado', 'no_planificado', 'urgente']).optional(),
+  // Migración 22: sin default para no romper el alta antes de aplicarla (solo viajan si se envían).
+  clase: z.enum(['tarea', 'propuesta', 'incidencia']).optional(),
+  proactiva: z.boolean().optional(),
 });
 
 /** Marca 'no_planificado' si la semana ya tiene plan y la tarea vence dentro de esa semana. */
@@ -132,6 +135,8 @@ const patchSchema = z.object({
   observacion_reprogramacion: z.string().max(1000).nullable().optional(),
   planificacion: z.enum(['planificado', 'no_planificado', 'urgente']).optional(),
   daily_fecha: fecha.nullable().optional(),
+  clase: z.enum(['tarea', 'propuesta', 'incidencia']).optional(),
+  proactiva: z.boolean().optional(),
 });
 
 /** Campos que un colaborador puede cambiar en SUS tareas (owner_agencia lo incluye). El resto exige rol de gestión. */
@@ -262,13 +267,15 @@ requerimientos.post('/:id/reprocesos', escrituraOPropia, zValidator('json', z.ob
   paso_retorno: z.string().max(60).nullable().optional(),
   observacion: z.string().max(1000).nullable().optional(),
   reabrir_basecamp: z.boolean().default(true),
+  area_responsable: z.enum(['cuentas', 'produccion', 'diseno', 'creatividad', 'content']).nullable().optional(),
+  atribuible: z.enum(['equipo', 'cliente', 'externo']).nullable().optional(),
 })), async (c) => {
   const ctx = ctxOf(c); const b = c.req.valid('json');
   const previo = await getRequerimiento(ctx, c.req.param('id'));
   if (!previo) return c.json({ error: 'No encontrado' }, 404);
   const a = c.get('auth');
   if (a.tipo === 'usuario' && a.rol === 'colaborador' && !(ctx.usuarioId && previo.owner_agencia.includes(ctx.usuarioId))) return c.json({ error: 'Solo puedes registrar reprocesos en tus tareas' }, 403);
-  const rp = await registrarReproceso(ctx, previo.id, { origen: b.origen as OrigenReproceso, motivo: b.motivo as MotivoReproceso, paso_retorno: b.paso_retorno ?? null, observacion: b.observacion ?? null, reabrir_basecamp: b.reabrir_basecamp });
+  const rp = await registrarReproceso(ctx, previo.id, { origen: b.origen as OrigenReproceso, motivo: b.motivo as MotivoReproceso, paso_retorno: b.paso_retorno ?? null, observacion: b.observacion ?? null, reabrir_basecamp: b.reabrir_basecamp, area_responsable: b.area_responsable ?? null, atribuible: b.atribuible ?? null });
   return c.json(rp, 201);
 });
 
@@ -276,13 +283,15 @@ requerimientos.patch('/:id/reprocesos/:rid', escrituraOPropia, zValidator('json'
   motivo: z.enum(MOTIVOS_REPROCESO.map((m) => m.valor) as [string, ...string[]]).optional(),
   paso_retorno: z.string().max(60).nullable().optional(),
   observacion: z.string().max(1000).nullable().optional(),
+  area_responsable: z.enum(['cuentas', 'produccion', 'diseno', 'creatividad', 'content']).nullable().optional(),
+  atribuible: z.enum(['equipo', 'cliente', 'externo']).nullable().optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
   const bloqueo = await soloSiEsSuya(c, c.req.param('id'));
   if (bloqueo) return bloqueo;
   const { data: rp } = await ctx.db.from('reprocesos').select('requerimiento_id').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('rid')).maybeSingle();
   if ((rp as { requerimiento_id: string } | null)?.requerimiento_id !== c.req.param('id')) return c.json({ error: 'Reproceso no encontrado' }, 404);
-  await updateReproceso(ctx, c.req.param('rid'), c.req.valid('json') as { motivo?: MotivoReproceso; paso_retorno?: string | null; observacion?: string | null });
+  await updateReproceso(ctx, c.req.param('rid'), c.req.valid('json') as Parameters<typeof updateReproceso>[2]);
   return c.body(null, 204);
 });
 
@@ -292,6 +301,23 @@ requerimientos.post('/:id/reprocesos/:rid/cerrar', escrituraOPropia, async (c) =
   if (bloqueo) return bloqueo;
   const rp = await cerrarReproceso(ctx, c.req.param('id'), c.req.param('rid'));
   return rp ? c.json(rp) : c.json({ error: 'Reproceso no encontrado' }, 404);
+});
+
+/**
+ * «Respondido»: primera respuesta efectiva al cliente (KPI-CUE-03). Se fija una sola vez; nunca se lee de
+ * comentarios de Basecamp (regla 1). `deshacer` la borra por si se marcó por error.
+ */
+requerimientos.post('/:id/respondido', requireScope('write:requerimientos'), zValidator('json', z.object({ deshacer: z.boolean().default(false) })), async (c) => {
+  const ctx = ctxOf(c); const id = c.req.param('id');
+  const r = await getRequerimiento(ctx, id);
+  if (!r) return c.json({ error: 'No encontrado' }, 404);
+  const deshacer = c.req.valid('json').deshacer;
+  if (!deshacer && r.primera_respuesta_at) return c.json({ primera_respuesta_at: r.primera_respuesta_at, ya_estaba: true });
+  const valor = deshacer ? null : new Date().toISOString();
+  const { error } = await ctx.db.from('requerimientos').update({ primera_respuesta_at: valor }).eq('tenant_id', ctx.tenantId).eq('id', id);
+  if (error) return c.json({ error: /primera_respuesta_at/.test(error.message) ? 'Falta aplicar la migración 22 (KPIs).' : error.message }, 422);
+  await audit(ctx, { accion: deshacer ? 'respondido_deshacer' : 'respondido', entidad: 'requerimiento', entidad_id: id, detalle: { primera_respuesta_at: valor } });
+  return c.json({ primera_respuesta_at: valor });
 });
 
 requerimientos.delete('/:id', requireScope('write:requerimientos'), async (c) => {

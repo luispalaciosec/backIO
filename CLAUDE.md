@@ -92,6 +92,7 @@ En estas zonas: generar, detener, pedir revisión. No hacer commit automático.
 13. `docs/16-cumplimiento.md` — reprogramaciones y reprocesos: fecha original, causas, indicadores
 14. `docs/17-arquitectura-tecnica.md` — cómo está armado el código: rutas, auth, db, crons, deuda técnica
 15. `docs/18-seguridad.md` — revisión de seguridad del 23/09: hallazgos, qué se corrigió, qué depende de Luis
+16. `docs/19-kpis.md` — KPIs por persona y equipo: cálculos, datos que los alimentan, permisos
 
 ## Definition of Done por fase
 

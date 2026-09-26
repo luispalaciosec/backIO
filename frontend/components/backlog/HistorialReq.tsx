@@ -4,6 +4,7 @@ import type { RequerimientoMetricas, HistorialRequerimiento, MotivoReproceso, Mo
 import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, PASOS_RETORNO } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
+import { AREAS, AREA_LABEL, ATRIBUIBLE_LABEL, type Area, type Atribuible } from '@backio/shared';
 import { BitacoraReq } from './Bitacora';
 import type { Usuario } from '@backio/shared';
 
@@ -12,7 +13,7 @@ const labelRc = (m: string | null) => MOTIVOS_REPROCESO.find((x) => x.valor === 
 const ORIGEN: Record<string, string> = { cliente: 'Cliente', interno: 'Revisión interna', basecamp: 'Desmarcado en Basecamp' };
 
 /** Botón ↺ en la fila: registrar reproceso, ver historial de reprogramaciones/reprocesos y completar causas. */
-export function HistorialReq({ r, onCambio, usuarios = [] }: { r: RequerimientoMetricas; onCambio: () => void; usuarios?: Pick<Usuario, 'id' | 'nombre'>[] }) {
+export function HistorialReq({ r, onCambio, usuarios = [] }: { r: RequerimientoMetricas; onCambio: () => void; usuarios?: Pick<Usuario, 'id' | 'nombre' | 'area'>[] }) {
   const [abierto, setAbierto] = useState(false);
   const tiene = r.veces_reprogramado > 0 || (r.veces_reproceso ?? 0) > 0;
   return (
@@ -25,12 +26,14 @@ export function HistorialReq({ r, onCambio, usuarios = [] }: { r: RequerimientoM
   );
 }
 
-function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; usuarios: Pick<Usuario, 'id' | 'nombre'>[]; onClose: () => void; onCambio: () => void }) {
+function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; usuarios: Pick<Usuario, 'id' | 'nombre' | 'area'>[]; onClose: () => void; onCambio: () => void }) {
   const [h, setH] = useState<HistorialRequerimiento | null>(null);
   const [tab, setTab] = useState<'bitacora' | 'historial' | 'reproceso'>('bitacora');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState<{ origen: 'cliente' | 'interno'; motivo: MotivoReproceso | ''; paso: string; reabrir: boolean; observacion: string }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true, observacion: '' });
+  const areaResp = usuarios.find((u) => u.id === r.owner_agencia[0])?.area ?? '';
+  const [f, setF] = useState<{ origen: 'cliente' | 'interno'; motivo: MotivoReproceso | ''; paso: string; reabrir: boolean; observacion: string; area: Area | ''; atribuible: Atribuible | '' }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true, observacion: '', area: areaResp, atribuible: '' });
+  const [respondido, setRespondido] = useState<string | null>(r.primera_respuesta_at ?? null);
   const cargar = () => api<HistorialRequerimiento>(`/requerimientos/${r.id}/historial`).then(setH).catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => { void cargar(); }, [r.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const abiertoRp = h?.reprocesos.find((x) => !x.cerrado_at);
@@ -39,7 +42,7 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
   async function registrar() {
     if (!f.motivo) return;
     setBusy(true); setErr(null);
-    try { await api(`/requerimientos/${r.id}/reprocesos`, { method: 'POST', json: { origen: f.origen, motivo: f.motivo, paso_retorno: f.paso || null, observacion: f.observacion.trim() || null, reabrir_basecamp: f.reabrir } }); await cargar(); onCambio(); setTab('historial'); }
+    try { await api(`/requerimientos/${r.id}/reprocesos`, { method: 'POST', json: { origen: f.origen, motivo: f.motivo, paso_retorno: f.paso || null, observacion: f.observacion.trim() || null, reabrir_basecamp: f.reabrir, area_responsable: f.area || null, atribuible: f.atribuible || null } }); await cargar(); onCambio(); setTab('historial'); }
     catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
     setBusy(false);
   }
@@ -65,6 +68,10 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
             <div className="text-xs text-gray-500 mt-1">Comprometida {fecha(r.fecha_entrega_original)}{r.fecha_entrega !== r.fecha_entrega_original ? <> · vigente <b>{fecha(r.fecha_entrega)}</b></> : null} · {r.veces_reprogramado} reprogramaciones · {r.veces_reproceso ?? 0} reprocesos</div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button type="button" className={`text-xs rounded border px-2 py-0.5 ${respondido ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-300 hover:bg-gray-50'}`} disabled={busy} title={respondido ? `Primera respuesta al cliente: ${new Date(respondido).toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}. Clic para deshacer.` : 'Marca la primera respuesta efectiva al cliente (SLA de Cuentas, KPI-CUE-03)'} onClick={async () => {
+              setErr(null);
+              try { const x = await api<{ primera_respuesta_at: string | null }>(`/requerimientos/${r.id}/respondido`, { method: 'POST', json: { deshacer: !!respondido } }); setRespondido(x.primera_respuesta_at); onCambio(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
+            }}>{respondido ? '✓ Respondido' : 'Respondido'}</button>
             <button className="link-danger text-xs" disabled={busy} title="Quita la tarea de BackIO (queda en el historial de auditoría). No borra nada en Basecamp." onClick={async () => {
               if (!confirm(`Eliminar "${r.titulo_interno}" de BackIO.${r.basecamp_todo_id ? ' El to-do de Basecamp no se toca: si sigue existiendo allá, aparecerá como huérfano.' : ''} ¿Continuar?`)) return;
               setBusy(true); setErr(null);
@@ -88,9 +95,11 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
             <p className="text-sm text-amber-900">El entregable vuelve al equipo. La tarea pasa a «En ejecución»{r.basecamp_todo_id ? ' y el to-do se reabre en Basecamp' : ''}. La causa alimenta los indicadores; la observación es para el equipo (no se copia del comentario de Basecamp y nunca la ve el cliente).</p>
             <div className="grid gap-3 md:grid-cols-2">
               <div><label className="label">Quién lo pide</label><select className="input" value={f.origen} onChange={(e) => setF({ ...f, origen: e.target.value as 'cliente' | 'interno' })}><option value="cliente">Cliente</option><option value="interno">Revisión interna</option></select></div>
-              <div><label className="label">Causa *</label><select className="input" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value as MotivoReproceso })}><option value="">Selecciona…</option>{MOTIVOS_REPROCESO.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>{info && <p className="text-xs text-gray-600 mt-1">Responsable natural: {info.responsable}.</p>}</div>
+              <div><label className="label">Causa *</label><select className="input" value={f.motivo} onChange={(e) => { const mo = e.target.value as MotivoReproceso; const resp = MOTIVOS_REPROCESO.find((m) => m.valor === mo)?.responsable; setF({ ...f, motivo: mo, atribuible: resp === 'cliente' ? 'cliente' : resp ? 'equipo' : '', area: resp === 'ejecutiva' ? 'cuentas' : f.area === 'cuentas' ? areaResp : f.area }); }}><option value="">Selecciona…</option>{MOTIVOS_REPROCESO.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>{info && <p className="text-xs text-gray-600 mt-1">Responsable natural: {info.responsable}.</p>}</div>
               <div><label className="label">Regresa al paso</label><select className="input" value={f.paso} onChange={(e) => setF({ ...f, paso: e.target.value })}><option value="">No aplica / pieza simple</option>{PASOS_RETORNO.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
               {r.basecamp_todo_id && <label className="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" checked={f.reabrir} onChange={(e) => setF({ ...f, reabrir: e.target.checked })} /> Reabrir el to-do en Basecamp</label>}
+              <div><label className="label">Atribuible a</label><select className="input" value={f.atribuible} onChange={(e) => setF({ ...f, atribuible: e.target.value as Atribuible | '' })}><option value="">—</option>{(Object.keys(ATRIBUIBLE_LABEL) as Atribuible[]).map((a) => <option key={a} value={a}>{ATRIBUIBLE_LABEL[a]}</option>)}</select></div>
+              <div><label className="label">Área responsable</label><select className="input" value={f.area} onChange={(e) => setF({ ...f, area: e.target.value as Area | '' })} disabled={f.atribuible !== 'equipo'}><option value="">—</option>{AREAS.map((a) => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}</select><p className="text-[11px] text-gray-500 mt-0.5">Solo si es del equipo: cuenta en el KPI de retrabajo de esa área.</p></div>
               <div className="md:col-span-2"><label className="label">Observación</label><textarea className="input" rows={3} maxLength={1000} placeholder="Qué hay que corregir y por qué. Ej.: el cliente pidió cambiar el color del logo a la versión 2024 y quitar el claim." value={f.observacion} onChange={(e) => setF({ ...f, observacion: e.target.value })} /></div>
             </div>
             <div className="flex justify-end"><button className="btn-danger" disabled={!f.motivo || busy} onClick={registrar}>{busy ? 'Registrando…' : '⟲ Registrar reproceso'}</button></div>

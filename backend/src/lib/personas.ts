@@ -15,7 +15,7 @@ import { fechaLocal, sumarDias } from './rituals/daily';
 export type Periodo = 'dia' | 'semana' | 'mes';
 
 export interface PersonaResumen {
-  usuario_id: string; nombre: string; email: string; rol: string; avatar_url: string | null; capacidad_semanal: number; basecamp_user_id: number | null;
+  usuario_id: string; nombre: string; email: string; rol: string; area: string | null; avatar_url: string | null; capacidad_semanal: number; basecamp_user_id: number | null;
   activos: number; atrasados: number; en_ejecucion: number; bloqueados: number; esperando_cliente: number; sin_movimiento_7: number;
   entregados: number; piezas: number; pct_a_tiempo_original: number | null; pct_a_tiempo_vigente: number | null; desvio_mediana_dias: number | null;
   horas: number; horas_por_entrega: number | null; pct_capacidad: number | null;
@@ -89,7 +89,7 @@ export async function resumenPersonas(ctx: DbCtx, periodo: Periodo): Promise<{ p
     const pctMov = mios.length ? Math.round(100 * (1 - mios.filter((r) => r.dias_sin_movimiento > 7).length / mios.length)) : 100;
     const puntaje = Math.round(pctAt * 0.4 + pctSinAtraso * 0.3 + pctPrimera * 0.2 + pctMov * 0.1);
     return {
-      usuario_id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, avatar_url: u.avatar_url, capacidad_semanal: u.capacidad_semanal, basecamp_user_id: u.basecamp_user_id,
+      usuario_id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, area: u.area ?? null, avatar_url: u.avatar_url, capacidad_semanal: u.capacidad_semanal, basecamp_user_id: u.basecamp_user_id,
       activos: mios.length, atrasados, en_ejecucion: mios.filter((r) => r.estado_operativo === 'en_ejecucion').length, bloqueados: mios.filter((r) => r.estado_operativo === 'bloqueado').length,
       esperando_cliente: mios.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length, sin_movimiento_7: mios.filter((r) => r.dias_sin_movimiento > 7).length,
       entregados: entregados.length, piezas: entregados.reduce((s, r) => s + (r.piezas || 0), 0), pct_a_tiempo_original: cu.pct_original, pct_a_tiempo_vigente: cu.pct_vigente, desvio_mediana_dias: cu.desvio_mediana_dias,

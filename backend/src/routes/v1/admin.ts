@@ -44,6 +44,7 @@ admin.patch('/usuarios/:id', zValidator('json', z.object({
   basecamp_user_id: z.number().int().nullable().optional(),
   activo: z.boolean().optional(),
   nombre: z.string().min(2).optional(),
+  area: z.enum(['cuentas', 'produccion', 'diseno', 'creatividad', 'content']).nullable().optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
   const id = c.req.param('id');
