@@ -53,24 +53,37 @@ export async function notificar(ctx: Pick<DbCtx, 'tenantId'>, n: Notificacion, d
   return (data ?? []).length;
 }
 
-interface Fila { id: string; tenant_id: string; email_destino: string | null; titulo: string; cuerpo: string; intentos: number }
+interface Fila { id: string; tenant_id: string; usuario_id: string | null; email_destino: string | null; titulo: string; cuerpo: string; intentos: number }
 
 export async function procesarPendientes(tenantId?: string): Promise<{ enviadas: number; fallidas: number }> {
   if (!emailHabilitado()) return { enviadas: 0, fallidas: 0 };
   const db = serviceClient();
-  let q = db.from('notificaciones').select('id, tenant_id, email_destino, titulo, cuerpo, intentos').eq('canal', 'email').is('enviada_at', null).lt('intentos', MAX_INTENTOS).order('created_at').limit(50);
+  let q = db.from('notificaciones').select('id, tenant_id, usuario_id, email_destino, titulo, cuerpo, intentos').eq('canal', 'email').is('enviada_at', null).lt('intentos', MAX_INTENTOS).order('created_at').limit(50);
   if (tenantId) q = q.eq('tenant_id', tenantId);
   const { data, error } = await q;
   throwIf(error);
   let enviadas = 0, fallidas = 0;
   const base = frontendOrigins()[0] ?? '';
-  for (const f of (data ?? []) as Fila[]) {
-    if (!f.email_destino) { await db.from('notificaciones').update({ intentos: MAX_INTENTOS, ultimo_error: 'sin email' }).eq('id', f.id); continue; }
+  const filas = (data ?? []) as Fila[];
+  // El destinatario es SIEMPRE el correo actual del usuario dueño de la fila (mismo tenant), nunca email_destino:
+  // el dueño puede editar su fila por PostgREST y así convertía BackIO en un relay de correos (auditoría run-1).
+  const ids = [...new Set(filas.map((f) => f.usuario_id).filter((x): x is string => !!x))];
+  const correos = new Map<string, { email: string | null; tenant_id: string; activo: boolean }>();
+  if (ids.length) {
+    const { data: us, error: e2 } = await db.from('usuarios').select('id, email, tenant_id, activo').in('id', ids);
+    throwIf(e2);
+    for (const u of (us ?? []) as { id: string; email: string | null; tenant_id: string; activo: boolean }[]) correos.set(u.id, u);
+  }
+  for (const f of filas) {
+    const u = f.usuario_id ? correos.get(f.usuario_id) : undefined;
+    const destino = u && u.activo && u.tenant_id === f.tenant_id ? u.email : null;
+    if (!destino) { await db.from('notificaciones').update({ intentos: MAX_INTENTOS, ultimo_error: 'sin destinatario válido' }).eq('id', f.id); continue; }
+    if (f.email_destino && f.email_destino.trim().toLowerCase() !== destino.trim().toLowerCase()) console.warn('[notificaciones] email_destino no coincide con el usuario; se envía al correo del usuario', f.id);
     const [cuerpo, rutaCruda] = f.cuerpo.split('\n__ruta__:');
     // La ruta solo puede ser un path interno de BackIO: sin esto un título con "\n__ruta__:" desviaría el botón del correo.
     const ruta = rutaCruda && /^\/(?!\/)[A-Za-z0-9_\-./?=&%]*$/.test(rutaCruda) ? rutaCruda : undefined;
     try {
-      await sendEmail({ to: f.email_destino, subject: `[BackIO] ${f.titulo.replace(/[\r\n]+/g, ' ')}`, html: plantillaHtml(f.titulo, cuerpo ?? '', ruta ? `${base}${ruta}` : undefined), text: cuerpo });
+      await sendEmail({ to: destino, subject: `[BackIO] ${f.titulo.replace(/[\r\n]+/g, ' ')}`, html: plantillaHtml(f.titulo, cuerpo ?? '', ruta ? `${base}${ruta}` : undefined), text: cuerpo });
       await db.from('notificaciones').update({ enviada_at: new Date().toISOString(), intentos: f.intentos + 1, ultimo_error: null }).eq('id', f.id);
       enviadas += 1;
     } catch (err) {

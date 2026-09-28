@@ -4,6 +4,8 @@
  *  #1 oauth-approve-accepts-oauth-access-token
  *  #4 portal-pin-lockout-counter-never-increments
  *  #8 kpis/evolutivo: oauth-token-skips-role-gate
+ *  #2 frontend/oauth-consent/denegar-unvalidated-redirect-uri (el servidor valida el retorno de «Denegar»)
+ *  #3 oauth-dcr-redirect-uri-scheme-not-restricted
  * Sin Supabase ni red: lib/db, lib/oauth, lib/kpis y lib/evolutivo van mockeados.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
@@ -56,7 +58,11 @@ vi.mock('../lib/oauth', async (orig) => {
   return {
     ...mod,
     resolverAccessToken: async (t: string) => (TOKENS[t] ? { tenant_id: TENANT, client_id: 'cli-1', ...TOKENS[t] } : null),
-    getCliente: async (id: string) => (id === 'cli-1' ? { id, secret_hash: null, nombre: 'Agente de prueba', redirect_uris: ['http://localhost:9999/cb'] } : null),
+    getCliente: async (id: string) =>
+      id === 'cli-1' ? { id, secret_hash: null, nombre: 'Agente de prueba', redirect_uris: ['http://localhost:9999/cb'] }
+      // Cliente registrado antes del arreglo con un esquema peligroso guardado.
+      : id === 'cli-malo' ? { id, secret_hash: null, nombre: 'Claude', redirect_uris: ['javascript://localhost/%0aalert(1)//'] }
+      : null,
     emitirCodigo: async () => 'codigo-emitido',
   };
 });
@@ -160,5 +166,50 @@ describe('#8 KPIs y evolutivo por persona: un colaborador no ve a sus pares, tam
 
   it('GET /evolutivo (detalle por persona) → 403 para colaborador con bko_', async () => {
     expect((await app.request('/api/v1/evolutivo', { headers: bearer('bko_colab_lectura') })).status).toBe(403);
+  });
+});
+
+describe('#3 registro dinámico: redirect_uri solo https o http en loopback', () => {
+  const registrar = (redirect_uris: string[]) => app.request('/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'X', redirect_uris }) });
+
+  it('control: https y http://localhost se aceptan', async () => {
+    expect((await registrar(['https://claude.ai/api/mcp/auth_callback'])).status).toBe(201);
+    expect((await registrar(['http://localhost:6274/oauth/callback'])).status).toBe(201);
+  });
+
+  it.each(['javascript://localhost/%0aalert(1)//', 'data://localhost/x', 'http://evil.example/cb', 'vbscript://127.0.0.1/x'])('rechaza %s', async (u) => {
+    expect((await registrar([u])).status).toBe(400);
+  });
+
+  it('/oauth/approve no devuelve un esquema peligroso ya guardado en un cliente viejo', async () => {
+    const res = await app.request('/oauth/approve', { method: 'POST', headers: { ...bearer('jwt-lider'), 'content-type': 'application/json' },
+      body: JSON.stringify({ client_id: 'cli-malo', redirect_uri: 'javascript://localhost/%0aalert(1)//', code_challenge: 'x'.repeat(43) }) });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('#2 «Denegar» del consentimiento: el retorno lo valida el servidor', () => {
+  const denegar = (client_id: string, redirect_uri: string) => app.request('/oauth/deny', { method: 'POST', headers: { ...bearer('jwt-lider'), 'content-type': 'application/json' },
+    body: JSON.stringify({ client_id, redirect_uri, state: 'st' }) });
+
+  it('control: con la URI registrada devuelve el retorno con access_denied', async () => {
+    const res = await denegar('cli-1', 'http://localhost:9999/cb');
+    expect(res.status).toBe(200);
+    const { redirect } = (await res.json()) as { redirect: string };
+    expect(redirect).toBe('http://localhost:9999/cb?error=access_denied&state=st');
+  });
+
+  it.each([
+    ['cli-1', 'javascript:alert(document.cookie)//'],
+    ['cli-1', 'https://evil.example/'],
+    ['cli-malo', 'javascript://localhost/%0aalert(1)//'],
+    ['no-existe', 'http://localhost:9999/cb'],
+  ])('rechaza %s → %s', async (id, uri) => {
+    expect((await denegar(id, uri)).status).toBe(400);
+  });
+
+  it('exige sesión', async () => {
+    const res = await app.request('/oauth/deny', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_id: 'cli-1', redirect_uri: 'http://localhost:9999/cb' }) });
+    expect(res.status).toBe(401);
   });
 });

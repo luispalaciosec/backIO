@@ -14,6 +14,14 @@ const DESCRIPCION: Record<string, string> = {
   'write:actas': 'Generar y publicar Plan Operativo y Acta de Cierre',
 };
 
+/** Solo se navega a https o a http en loopback; nunca a javascript:, data:, etc. El servidor valida además el registro. */
+function navegable(u: string): boolean {
+  try {
+    const url = new URL(u);
+    return url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  } catch { return false; }
+}
+
 function Consent() {
   const params = useSearchParams();
   const router = useRouter();
@@ -39,14 +47,22 @@ function Consent() {
       const r = await apiRaw<{ redirect: string }>('/oauth/approve', { method: 'POST', json: {
         client_id: params.get('client_id'), redirect_uri: redirect, code_challenge: params.get('code_challenge'), scope: params.get('scope') ?? undefined, state: params.get('state') ?? undefined,
       } });
+      if (!navegable(r.redirect)) throw new Error('Dirección de retorno no válida');
       window.location.href = r.redirect;
-    } catch (e) { setError(e instanceof ApiError ? e.message : 'No se pudo autorizar'); setBusy(false); }
+    } catch (e) { setError(e instanceof ApiError || e instanceof Error ? e.message : 'No se pudo autorizar'); setBusy(false); }
   }
-  function denegar() {
-    const u = new URL(redirect);
-    u.searchParams.set('error', 'access_denied');
-    if (params.get('state')) u.searchParams.set('state', params.get('state')!);
-    window.location.href = u.toString();
+  async function denegar() {
+    setBusy(true); setError(null);
+    try {
+      const r = await apiRaw<{ redirect: string }>('/oauth/deny', { method: 'POST', json: {
+        client_id: params.get('client_id'), redirect_uri: redirect, state: params.get('state') ?? undefined,
+      } });
+      if (!navegable(r.redirect)) throw new Error('Dirección de retorno no válida');
+      window.location.href = r.redirect;
+    } catch {
+      // Enlace manipulado o cliente desconocido: no se navega a ningún lado.
+      setError('Acceso denegado. Puedes cerrar esta ventana.'); setBusy(false);
+    }
   }
 
   if (sesion === null) return <div className="text-gray-500 text-center py-20">Verificando sesión…</div>;

@@ -5,7 +5,7 @@ import { frontendOrigins } from '../config/env';
 import { DbError } from '../lib/db/client';
 import { requireAuth, ctxOf } from '../lib/auth/middleware';
 import { audit } from '../lib/db/audit';
-import { metadataAuthServer, metadataProtectedResource, registrarCliente, getCliente, validarScopes, emitirCodigo, canjearCodigo, refrescar, revocar } from '../lib/oauth';
+import { metadataAuthServer, metadataProtectedResource, registrarCliente, getCliente, validarScopes, emitirCodigo, canjearCodigo, refrescar, revocar, redirectUriSegura } from '../lib/oauth';
 
 export const wellKnown = new Hono();
 wellKnown.get('/oauth-authorization-server', (c) => c.json(metadataAuthServer()));
@@ -30,7 +30,7 @@ oauth.get('/authorize', async (c) => {
   const q = c.req.query();
   const cliente = q.client_id ? await getCliente(q.client_id) : null;
   if (!cliente) return c.json({ error: 'invalid_client' }, 400);
-  if (!q.redirect_uri || !cliente.redirect_uris.includes(q.redirect_uri)) return c.json({ error: 'invalid_request', error_description: 'redirect_uri no registrada' }, 400);
+  if (!q.redirect_uri || !cliente.redirect_uris.includes(q.redirect_uri) || !redirectUriSegura(q.redirect_uri)) return c.json({ error: 'invalid_request', error_description: 'redirect_uri no registrada' }, 400);
   const fallo = (e: string, d: string) => c.redirect(`${q.redirect_uri}?${new URLSearchParams({ error: e, error_description: d, ...(q.state ? { state: q.state } : {}) })}`);
   if (q.response_type !== 'code') return fallo('unsupported_response_type', 'solo code');
   if (!q.code_challenge || (q.code_challenge_method ?? 'S256') !== 'S256') return fallo('invalid_request', 'PKCE S256 obligatorio');
@@ -46,11 +46,26 @@ oauth.post('/approve', requireAuth, zValidator('json', z.object({ client_id: z.s
   if (auth.tipo !== 'usuario' || !auth.ctx.usuarioId || auth.perfil === 'oauth') return c.json({ error: 'Solo usuarios pueden autorizar clientes' }, 403);
   const b = c.req.valid('json');
   const cliente = await getCliente(b.client_id);
-  if (!cliente || !cliente.redirect_uris.includes(b.redirect_uri)) return c.json({ error: 'invalid_client' }, 400);
+  // Clientes registrados antes del arreglo pueden tener esquemas peligrosos guardados: se revalida aquí también.
+  if (!cliente || !cliente.redirect_uris.includes(b.redirect_uri) || !redirectUriSegura(b.redirect_uri)) return c.json({ error: 'invalid_client' }, 400);
   const scopes = validarScopes(b.scope);
   const code = await emitirCodigo({ client_id: b.client_id, redirect_uri: b.redirect_uri, code_challenge: b.code_challenge, scope: scopes, tenant_id: auth.ctx.tenantId, usuario_id: auth.ctx.usuarioId });
   await audit(ctxOf(c), { accion: 'oauth_autorizar', entidad: 'oauth_client', detalle: { client_id: b.client_id, cliente: cliente.nombre, scopes } });
   return c.json({ redirect: `${b.redirect_uri}?${new URLSearchParams({ code, ...(b.state ? { state: b.state } : {}) })}` });
+});
+
+/**
+ * Denegar: el frontend ya no navega a la redirect_uri de la query sin validar (permitía javascript: y open redirect).
+ * El servidor confirma que la URI está registrada para el cliente y es segura, y devuelve la URL de retorno con access_denied.
+ */
+oauth.post('/deny', requireAuth, zValidator('json', z.object({ client_id: z.string(), redirect_uri: z.string(), state: z.string().optional() })), async (c) => {
+  const b = c.req.valid('json');
+  const cliente = await getCliente(b.client_id);
+  if (!cliente || !cliente.redirect_uris.includes(b.redirect_uri) || !redirectUriSegura(b.redirect_uri)) return c.json({ error: 'invalid_client' }, 400);
+  const u = new URL(b.redirect_uri);
+  u.searchParams.set('error', 'access_denied');
+  if (b.state) u.searchParams.set('state', b.state);
+  return c.json({ redirect: u.toString() });
 });
 
 oauth.post('/token', async (c) => {

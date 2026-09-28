@@ -36,15 +36,24 @@ export function metadataProtectedResource() {
   return { resource: `${base}/mcp`, authorization_servers: [base], scopes_supported: SCOPES_SOPORTADOS, bearer_methods_supported: ['header'] };
 }
 
+/**
+ * redirect_uri aceptable: https, o http solo en loopback. Antes se miraba solo el hostname y pasaba
+ * `javascript://localhost/...`, que el consentimiento terminaba ejecutando en el origen de BackIO (auditoría run-1).
+ */
+export function redirectUriSegura(u: string): boolean {
+  let url: URL;
+  try { url = new URL(u); } catch { return false; }
+  if (url.protocol === 'https:') return true;
+  return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+}
+
 export interface OAuthClient { id: string; secret_hash: string | null; nombre: string; redirect_uris: string[] }
 
 export async function registrarCliente(body: { client_name?: string; redirect_uris?: unknown; token_endpoint_auth_method?: string }): Promise<{ client_id: string; client_secret?: string; client_name: string; redirect_uris: string[]; token_endpoint_auth_method: string; grant_types: string[]; response_types: string[] }> {
   const uris = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter((u): u is string => typeof u === 'string') : [];
   if (uris.length === 0) throw new DbError('redirect_uris requerido', 400);
   for (const u of uris) {
-    const url = new URL(u);
-    const localhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    if (url.protocol !== 'https:' && !localhost) throw new DbError(`redirect_uri debe ser https (o localhost): ${u}`, 400);
+    if (!redirectUriSegura(u)) throw new DbError(`invalid_redirect_uri: debe ser https (o http en localhost): ${u}`, 400);
   }
   const publico = (body.token_endpoint_auth_method ?? 'none') === 'none';
   const id = `mcp_${randomBytes(12).toString('hex')}`;
