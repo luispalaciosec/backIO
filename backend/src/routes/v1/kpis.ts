@@ -16,9 +16,10 @@ export const kpis = new Hono();
 const ROLES_REGISTRO: Rol[] = ['admin', 'gerencia', 'operaciones'];
 const soloRoles = (roles: readonly Rol[], scope: 'read:capacidad' | 'admin'): MiddlewareHandler => async (c, next) => {
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.perfil !== 'oauth') {
+  // El rol se exige también con token OAuth: un colaborador no ve a sus pares desde un agente.
+  if (a.tipo === 'usuario') {
     if (!a.rol || !roles.includes(a.rol)) return c.json({ error: 'No tienes acceso a los KPIs' }, 403);
-    return next();
+    return a.perfil === 'oauth' ? requireScope(scope)(c, next) : next();
   }
   return requireScope(scope)(c, next);
 };
@@ -76,9 +77,9 @@ kpis.get('/export', verKpis, async (c) => {
 /** Detalle: gestión ve cualquiera; el resto solo su propio detalle (usuario = uno mismo). */
 const verDetalle: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.perfil !== 'oauth' && a.rol && !ROLES_INTERNOS_GESTION.includes(a.rol)) {
+  if (a.tipo === 'usuario' && (!a.rol || !ROLES_INTERNOS_GESTION.includes(a.rol))) {
     if (c.req.query('usuario') !== ctxOf(c).usuarioId) return c.json({ error: 'Solo puedes ver tus propios KPIs' }, 403);
-    return next();
+    return a.perfil === 'oauth' ? requireScope('read:capacidad')(c, next) : next();
   }
   return verKpis(c, next);
 };

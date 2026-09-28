@@ -42,7 +42,8 @@ oauth.get('/authorize', async (c) => {
 /** Paso 2: el frontend, con la sesión del usuario, aprueba y recibe la URL de retorno con el code. */
 oauth.post('/approve', requireAuth, zValidator('json', z.object({ client_id: z.string(), redirect_uri: z.string().url(), code_challenge: z.string().min(20), scope: z.string().optional(), state: z.string().optional() })), async (c) => {
   const auth = c.get('auth');
-  if (auth.tipo !== 'usuario' || !auth.ctx.usuarioId) return c.json({ error: 'Solo usuarios pueden autorizar clientes' }, 403);
+  // Solo la sesión interactiva de la UI consiente: un token OAuth de agente no puede autoemitirse grants nuevos.
+  if (auth.tipo !== 'usuario' || !auth.ctx.usuarioId || auth.perfil === 'oauth') return c.json({ error: 'Solo usuarios pueden autorizar clientes' }, 403);
   const b = c.req.valid('json');
   const cliente = await getCliente(b.client_id);
   if (!cliente || !cliente.redirect_uris.includes(b.redirect_uri)) return c.json({ error: 'invalid_client' }, 400);

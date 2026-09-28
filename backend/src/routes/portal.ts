@@ -21,7 +21,7 @@ portal.use('*', async (c, next) => {
  * PIN del portal: comparación en tiempo constante y bloqueo tras 8 fallos por token+IP durante 15 min
  * (antes se podía forzar por bruta: 6 dígitos sin límite). Devuelve null si pasa, o la respuesta de error.
  */
-const fallosPin = new Map<string, { n: number; hasta: number }>();
+const fallosPin = new Map<string, { n: number; desde: number; hasta: number }>();
 function verificarPin(c: Context, token: string, pin: string | null): Response | null {
   if (!pin) return null;
   const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? 'ip';
@@ -31,8 +31,10 @@ function verificarPin(c: Context, token: string, pin: string | null): Response |
   const dado = Buffer.from(c.req.header('x-portal-pin') ?? '');
   const esperado = Buffer.from(pin);
   if (dado.length === esperado.length && timingSafeEqual(dado, esperado)) { fallosPin.delete(k); return null; }
-  const n = (f && f.hasta > Date.now() - 15 * 60_000 ? f.n : 0) + 1;
-  fallosPin.set(k, { n, hasta: n >= 8 ? Date.now() + 15 * 60_000 : 0 });
+  // La ventana se mide desde el primer fallo (antes se medía con `hasta`, que vale 0 sin bloqueo: el contador volvía a 1 y nunca bloqueaba).
+  const vigente = f && f.desde > Date.now() - 15 * 60_000;
+  const n = (vigente ? f.n : 0) + 1;
+  fallosPin.set(k, { n, desde: vigente ? f.desde : Date.now(), hasta: n >= 8 ? Date.now() + 15 * 60_000 : 0 });
   if (fallosPin.size > 10_000) fallosPin.clear();
   return c.json({ error: 'PIN requerido', requiere_pin: true }, 401);
 }

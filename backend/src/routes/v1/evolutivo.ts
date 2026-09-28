@@ -10,7 +10,10 @@ export const evolutivo = new Hono();
 
 const soloGestion: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.perfil !== 'oauth') return a.rol && ROLES_INTERNOS_GESTION.includes(a.rol) ? next() : c.json({ error: 'Sin acceso' }, 403);
+  if (a.tipo === 'usuario') {
+    if (!a.rol || !ROLES_INTERNOS_GESTION.includes(a.rol)) return c.json({ error: 'Sin acceso' }, 403);
+    return a.perfil === 'oauth' ? requireScope('read:backlog')(c, next) : next();
+  }
   return requireScope('read:backlog')(c, next);
 };
 const mesValido = (m?: string) => (m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m) ? m : new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 7));
