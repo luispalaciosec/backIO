@@ -158,6 +158,8 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     description: 'Salud de una cuenta: proyectos activos, atrasos, días sin movimiento, esperas del cliente.',
     inputSchema: { cliente: z.string().describe('id, slug o parte del nombre') },
   }, ({ cliente }) => guard(['read:proyectos'], async () => {
+    // Vista interna (atrasos, avance interno, títulos de tareas ocultas) y sin vínculo key→cliente: no para scope cliente.
+    if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
     const c = await resolverCliente(ctx, cliente);
     if (!c) return fail(`Cliente "${cliente}" no encontrado`);
     const [proyectos, activos] = await Promise.all([listProyectos(ctx, { cliente_id: c.id }), listBacklog(ctx, { cliente_id: c.id, solo_activos: true })]);
@@ -168,7 +170,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
       requerimientos_activos: activos.length,
       atrasados: activos.filter((r) => r.dias_atraso > 0).length,
       dias_sin_movimiento_min: activos.length ? Math.min(...activos.map((r) => r.dias_sin_movimiento)) : null,
-      esperando_cliente: activos.filter((r) => r.estado_aprobacion === 'pendiente_cliente').map((r) => ({ titulo: esScopeCliente(auth) ? r.etiqueta_cliente : r.titulo_interno, dias: r.dias_sin_movimiento })).filter((x) => x.titulo),
+      esperando_cliente: activos.filter((r) => r.estado_aprobacion === 'pendiente_cliente').map((r) => ({ titulo: r.titulo_interno, dias: r.dias_sin_movimiento })),
     };
     return ok(salida);
   })());

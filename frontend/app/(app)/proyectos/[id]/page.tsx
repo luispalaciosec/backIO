@@ -7,6 +7,7 @@ import { EstadoChip } from '@/components/ui/EstadoChip';
 import { fecha } from '@/lib/format';
 import { PortalControls } from './PortalControls';
 import { VistaCliente } from '@/components/VistaCliente';
+import { hrefExterno } from '@/lib/url';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,7 @@ function BloqueRows({ bloque, reqs }: { bloque: string; reqs: ProyectoDetalle['r
       <tr><td className="td bg-gray-50 font-semibold text-xs uppercase tracking-wide text-gray-600" colSpan={6}>{bloque}</td></tr>
       {reqs.map((r) => (
         <tr key={r.id}>
-          <td className="td">{r.titulo_interno}{r.basecamp_url && <a className="ml-2 text-xs underline text-gray-500" href={r.basecamp_url} target="_blank" rel="noreferrer">BC</a>}</td>
+          <td className="td">{r.titulo_interno}{r.basecamp_url && <a className="ml-2 text-xs underline text-gray-500" href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer">BC</a>}</td>
           <td className="td whitespace-nowrap">{fecha(r.fecha_entrega)}{r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega && <div className="text-[10px] text-gray-400 line-through">{fecha(r.fecha_entrega_original)}</div>}</td>
           <td className="td text-xs whitespace-nowrap">{r.veces_reprogramado ? <span className="text-amber-700" title="reprogramaciones">↺{r.veces_reprogramado}</span> : null}{r.veces_reproceso ? <span className="ml-1 text-red-700" title="reprocesos">⟲{r.veces_reproceso}</span> : null}</td>
           <td className="td tabular-nums">{Number(r.peso).toFixed(1)}</td>

@@ -9,33 +9,44 @@
  * Sin Supabase ni red: lib/db, lib/oauth, lib/kpis y lib/evolutivo van mockeados.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { createHash, createHmac } from 'node:crypto';
 
 process.env.SUPABASE_URL = 'https://test.supabase.co';
 process.env.SUPABASE_ANON_KEY = 'anon';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
 process.env.NODE_ENV = 'test';
+process.env.PROMETIO_WEBHOOK_SECRET = 'secreto-prometio'; // env() se cachea: debe estar antes de crear la app
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
 const USUARIOS: Record<string, { rol: string; nombre: string; activo: boolean; tenant_id: string }> = {
   'u-colab': { rol: 'colaborador', nombre: 'Colaboradora', activo: true, tenant_id: TENANT },
   'u-otra': { rol: 'colaborador', nombre: 'Compañera', activo: true, tenant_id: TENANT },
   'u-lider': { rol: 'lider', nombre: 'Líder', activo: true, tenant_id: TENANT },
+  'u-admin': { rol: 'admin', nombre: 'Admin', activo: true, tenant_id: TENANT },
 };
+const KEY_ADMIN = 'bk_admin_prueba';
 // Tokens OAuth de prueba → a quién pertenecen y qué scopes tienen.
 const TOKENS: Record<string, { usuario_id: string; scopes: string[] }> = {
   bko_colab_lectura: { usuario_id: 'u-colab', scopes: ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad'] },
   bko_lider_lectura: { usuario_id: 'u-lider', scopes: ['read:backlog', 'read:capacidad'] },
 };
 
-/** Cliente Supabase falso: solo responde la búsqueda de usuarios por id que hace el middleware. */
+/**
+ * Cliente Supabase falso: responde la búsqueda de usuarios por id, la API key de admin de prueba, el tenant por defecto
+ * y los insert/update encadenados. Todo lo demás devuelve vacío.
+ */
 function fakeDb() {
-  let id: string | null = null;
+  let tabla = ''; let id: string | null = null; let hash: string | null = null;
   const q = {
-    from: () => q,
-    select: () => q,
-    eq: (col: string, v: string) => { if (col === 'id') id = v; return q; },
-    insert: async () => ({ data: null, error: null }),
-    maybeSingle: async () => ({ data: id ? USUARIOS[id] ?? null : null, error: null }),
+    from: (t: string) => { tabla = t; return q; },
+    select: () => q, order: () => q, limit: () => q, is: () => q, in: () => q, update: () => q, insert: () => q, upsert: () => q,
+    eq: (col: string, v: string) => { if (col === 'id') id = v; if (col === 'key_hash') hash = v; return q; },
+    then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(res, rej),
+    single: async () => ({ data: tabla === 'tenants' ? { id: TENANT } : tabla === 'api_keys' ? { id: 'k-nueva', nombre: 'nueva', prefijo: 'bk_live_xxxx', scopes: [], perfil: 'custom' } : null, error: null }),
+    maybeSingle: async () => {
+      if (tabla === 'api_keys') return { data: hash === createHash('sha256').update(KEY_ADMIN).digest('hex') ? { id: 'k-admin', tenant_id: TENANT, nombre: 'Key admin', scopes: ['admin'], perfil: 'custom', revocada_at: null } : null, error: null };
+      return { data: id ? USUARIOS[id] ?? null : null, error: null };
+    },
   };
   return q;
 }
@@ -47,7 +58,7 @@ vi.mock('../lib/db/client', async (orig) => {
     serviceClient: () => fakeDb() as never,
     // JWT de la UI: 'jwt-lider' es una sesión interactiva del líder.
     userClient: () => Object.assign(fakeDb(), {
-      auth: { getUser: async (jwt: string) => (jwt === 'jwt-lider' ? { data: { user: { id: 'u-lider' } }, error: null } : { data: { user: null }, error: new Error('jwt') }) },
+      auth: { getUser: async (jwt: string) => ({ 'jwt-lider': 'u-lider', 'jwt-admin': 'u-admin' } as Record<string, string>)[jwt] ? { data: { user: { id: ({ 'jwt-lider': 'u-lider', 'jwt-admin': 'u-admin' } as Record<string, string>)[jwt] } }, error: null } : { data: { user: null }, error: new Error('jwt') } },
     }) as never,
   };
 });
@@ -69,7 +80,7 @@ vi.mock('../lib/oauth', async (orig) => {
 
 vi.mock('../lib/db/proyectos', () => ({
   getProyectoByPortalToken: async (_c: unknown, token: string) =>
-    token === 'p'.repeat(43)
+    /^[pqr]{43}$/.test(token)
       ? {
           proyecto: { id: 'p1', tenant_id: TENANT, nombre: 'Campaña', fecha_entrega: '2099-12-15', cliente_id: 'c1' },
           cliente: { nombre: 'Cliente', logo_url: null, color_primario: '#000', config: { portal_pin: '123456' } },
@@ -211,5 +222,51 @@ describe('#2 «Denegar» del consentimiento: el retorno lo valida el servidor', 
   it('exige sesión', async () => {
     const res = await app.request('/oauth/deny', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_id: 'cli-1', redirect_uri: 'http://localhost:9999/cb' }) });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('#17 bloqueo del PIN: la IP la pone el proxy y hay tope por token', () => {
+  const intento = (token: string, xff: string, pin = '000000') => app.request(`/api/portal/${token}`, { headers: { 'x-portal-pin': pin, 'x-forwarded-for': xff } });
+
+  it('cambiar la primera entrada de X-Forwarded-For no da un contador nuevo (cuenta la que agrega el proxy)', async () => {
+    const q = 'q'.repeat(43);
+    for (let i = 0; i < 8; i++) expect((await intento(q, `10.0.0.${i}, 203.0.113.9`)).status).toBe(401);
+    expect((await intento(q, '10.0.0.99, 203.0.113.9')).status).toBe(429);
+  });
+
+  it('aunque cambie la IP en cada intento, a los 30 fallos el token queda bloqueado', async () => {
+    const r = 'r'.repeat(43);
+    for (let i = 0; i < 30; i++) expect((await intento(r, `198.18.0.${i}`)).status).toBe(401);
+    expect((await intento(r, '198.18.1.1', '123456')).status).toBe(429);
+  });
+});
+
+describe('#13 las API keys solo las crea una persona admin', () => {
+  const crear = (token: string) => app.request('/api/v1/admin/api-keys', { method: 'POST', headers: { ...bearer(token), 'content-type': 'application/json' }, body: JSON.stringify({ nombre: 'otra', perfil: 'custom', scopes: ['admin'] }) });
+
+  it('control: un admin con su sesión la crea', async () => {
+    expect((await crear('jwt-admin')).status).toBe(201);
+  });
+
+  it('una API key con scope admin no puede crear otra key (quedaría sin dueño)', async () => {
+    expect((await crear(KEY_ADMIN)).status).toBe(403);
+  });
+});
+
+describe('#18 webhook de PrometIO: timestamp firmado obligatorio', () => {
+  const firmar = (body: string) => `sha256=${createHmac('sha256', 'secreto-prometio').update(body).digest('hex')}`;
+  const enviar = (cuerpo: object) => { const body = JSON.stringify(cuerpo); return app.request('/api/v1/webhooks/prometio', { method: 'POST', headers: { 'content-type': 'application/json', 'x-prometio-signature': firmar(body) }, body }); };
+
+  it('control: un envío firmado y reciente se procesa', async () => {
+    const res = await enviar({ evento: 'evento.desconocido', timestamp: new Date().toISOString(), data: { n: 1 } });
+    expect(res.status).not.toBe(401);
+  });
+
+  it('sin timestamp en el cuerpo se rechaza', async () => {
+    expect((await enviar({ evento: 'empresa.actualizada', data: { n: 2 } })).status).toBe(401);
+  });
+
+  it('un envío firmado viejo (repetido más tarde) se rechaza', async () => {
+    expect((await enviar({ evento: 'empresa.actualizada', timestamp: new Date(Date.now() - 60 * 60_000).toISOString(), data: { n: 3 } })).status).toBe(401);
   });
 });

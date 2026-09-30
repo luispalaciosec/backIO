@@ -8,6 +8,7 @@ import { env } from '../../config/env';
 import { serviceClient } from '../../lib/db';
 import { extractSafePayload, extractSafeTodo, applyBasecampUpdate, type BasecampSyncPayload } from '../../lib/basecamp/sync';
 import { findByBasecampTodo } from '../../lib/db/requerimientos';
+import type { Requerimiento } from '@backio/shared';
 import { audit } from '../../lib/db/audit';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { importarBasecampCliente } from '../../lib/basecamp/importar';
@@ -35,6 +36,32 @@ async function programarImportacion(bucketId: number): Promise<void> {
   }, 20_000));
 }
 
+/**
+ * Basecamp no firma los webhooks y el secreto de la URL es el mismo para todos los proyectos: el payload no prueba
+ * nada sobre el estado. Para un to-do que BackIO gestiona, el estado se lee SIEMPRE del to-do vivo, en el proyecto
+ * del cliente guardado en BackIO (no en el bucket que diga el payload). Auditoría run-1: con el secreto se podía
+ * marcar cualquier tarea como completada o cancelada.
+ * Devuelve null si el evento no corresponde al proyecto del cliente o el to-do no se pudo leer.
+ */
+async function estadoVivo(req: Requerimiento, safe: BasecampSyncPayload): Promise<BasecampSyncPayload | null> {
+  const { data } = await serviceClient().from('clientes').select('basecamp_project_id').eq('id', req.cliente_id).eq('tenant_id', req.tenant_id).maybeSingle();
+  const proyecto = (data as { basecamp_project_id: number | null } | null)?.basecamp_project_id ?? null;
+  if (!proyecto || (safe.bucket_id !== null && safe.bucket_id !== proyecto)) return null;
+  const bc = await BasecampClient.forTenant(req.tenant_id);
+  let raw: unknown;
+  try { raw = await bc.getTodoRaw(proyecto, safe.todo_id); }
+  catch (err) {
+    // 404: el to-do ya no está accesible (papelera o eliminado). Solo cuenta si el evento dice justamente eso.
+    if (err instanceof Error && err.message.startsWith('Basecamp 404 ') && safe.eliminado === true) return { ...safe, bucket_id: proyecto, completed: null };
+    throw err;
+  }
+  const vivo = extractSafeTodo(raw);
+  if (!vivo) return null;
+  const status = (raw as { status?: unknown }).status;
+  const eliminado = status === 'trashed' || status === 'archived' ? true : safe.eliminado === false && status === 'active' ? false : undefined;
+  return { ...vivo, bucket_id: proyecto, completed: vivo.completed ?? false, ...(eliminado !== undefined ? { eliminado } : {}) };
+}
+
 function tokenValido(t: string | undefined): boolean {
   const secret = env().BASECAMP_WEBHOOK_SECRET;
   if (!secret) return env().NODE_ENV !== 'production';
@@ -57,17 +84,16 @@ async function handle(raw: string) {
     if (kind === 'todo_created') return { status: 200 as const, body: 'ok' };
   }
 
-  // Estado desconocido (p. ej. todo_changed): consultar el to-do vivo. Solo se extraen campos seguros.
-  if (safe.completed === null && safe.eliminado === undefined) {
-    const req = await findByBasecampTodo(ctx, safe.todo_id);
-    if (req && safe.bucket_id) {
-      try {
-        const bc = await BasecampClient.forTenant(req.tenant_id);
-        const vivo = extractSafeTodo(await bc.getTodoRaw(safe.bucket_id, safe.todo_id));
-        if (vivo) safe = { ...vivo, completed: vivo.completed ?? false };
-      } catch (err) {
-        console.error('[webhook basecamp] no se pudo consultar el to-do vivo', err instanceof Error ? err.message : err);
-      }
+  // To-do gestionado: el estado sale del to-do vivo, nunca del payload. Solo se extraen campos seguros.
+  const req = await findByBasecampTodo(ctx, safe.todo_id);
+  if (req) {
+    try {
+      const vivo = await estadoVivo(req, safe);
+      if (!vivo) return { status: 200 as const, body: JSON.stringify({ aplicado: false, motivo: 'evento no verificado contra Basecamp' }) };
+      safe = vivo;
+    } catch (err) {
+      console.error('[webhook basecamp] no se pudo consultar el to-do vivo', err instanceof Error ? err.message : err);
+      return { status: 503 as const, body: 'reintentar' }; // Basecamp reintenta la entrega
     }
   }
 

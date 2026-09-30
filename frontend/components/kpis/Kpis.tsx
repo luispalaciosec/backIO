@@ -8,6 +8,7 @@ import { AREA_LABEL, ATRIBUIBLE_LABEL, CALCULO_KPI_LABEL } from '@backio/shared'
 import { api, ApiError } from '@/lib/api';
 import { fecha, diaLocal, iniciales } from '@/lib/format';
 import { ComoSeCalcula } from './ComoSeCalcula';
+import { hrefExterno } from '@/lib/url';
 
 type Kpi = KpiTablero['areas'][number]['kpis'][number];
 
@@ -228,7 +229,7 @@ export function DetalleKpi({ sel, mes, puedeRegistrar, usuarios, onClose, onGuar
                     {[...fuera, ...enA].map((t) => (
                       <tr key={t.id} className="border-b border-gray-100">
                         <td className="px-2 py-1 w-6">{t.cuenta_en_a ? <span className="text-emerald-600">✓</span> : <span className="text-red-600">✗</span>}</td>
-                        <td className="px-2 py-1">{t.titulo}{t.basecamp_url && <a className="ml-1 font-bold text-emerald-700" href={t.basecamp_url} target="_blank" rel="noreferrer">Bc↗</a>}{t.nota && <span className="ml-1 text-amber-700">· {t.nota}</span>}</td>
+                        <td className="px-2 py-1">{t.titulo}{t.basecamp_url && <a className="ml-1 font-bold text-emerald-700" href={hrefExterno(t.basecamp_url)} target="_blank" rel="noreferrer">Bc↗</a>}{t.nota && <span className="ml-1 text-amber-700">· {t.nota}</span>}</td>
                         <td className="px-2 py-1 text-gray-500">{t.cliente}</td>
                         <td className="px-2 py-1 text-gray-500">{t.responsables}</td>
                         <td className="px-2 py-1 text-gray-500 whitespace-nowrap">{fecha(diaLocal(t.fecha))}</td>

@@ -162,6 +162,9 @@ admin.post('/api-keys', zValidator('json', z.object({
   scopes: z.array(z.enum(SCOPES)).optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
+  // Solo una persona admin crea keys: una key creada por otra key quedaba sin dueño (creado_por null) y
+  // sobrevivía a «Quitar acceso» de quien la originó (auditoría run-1).
+  if (c.get('auth').tipo !== 'usuario' || !ctx.usuarioId) return c.json({ error: 'Las API keys solo las crea un administrador desde BackIO' }, 403);
   const body = c.req.valid('json');
   const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : PERFILES[body.perfil]!;
   const key = `bk_live_${randomBytes(24).toString('base64url')}`;

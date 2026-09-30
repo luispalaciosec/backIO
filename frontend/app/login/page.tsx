@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Suspense, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import { rutaInterna } from '@/lib/url';
 
 function LoginForm() {
   const router = useRouter();
@@ -20,8 +21,8 @@ function LoginForm() {
     setLoading(false);
     if (error) return setError('Credenciales inválidas');
     // Solo rutas internas: un `next` externo convertía el login en un redirector abierto (phishing).
-    const next = params.get('next') ?? '';
-    router.replace(/^\/(?![\/\\])/.test(next) ? next : '/backlog');
+    // Se resuelve como lo haría el navegador; la regex anterior dejaba pasar «/\t/evil.com» (auditoría run-1).
+    router.replace(rutaInterna(params.get('next')));
     router.refresh();
   }
 

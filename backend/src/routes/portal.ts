@@ -22,20 +22,41 @@ portal.use('*', async (c, next) => {
  * (antes se podía forzar por bruta: 6 dígitos sin límite). Devuelve null si pasa, o la respuesta de error.
  */
 const fallosPin = new Map<string, { n: number; desde: number; hasta: number }>();
+const VENTANA = 15 * 60_000;
+/** Tope global por token (todas las IPs): rotar la IP no permite seguir probando PIN. */
+const MAX_POR_TOKEN = 30;
+/**
+ * IP del cliente: la ÚLTIMA entrada de X-Forwarded-For, que agrega el proxy de Railway. La primera la puede
+ * escribir el propio cliente y con eso obtenía un contador nuevo en cada intento (auditoría run-1).
+ */
+function ipCliente(c: Context): string {
+  const xff = c.req.header('x-forwarded-for')?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+  return xff[xff.length - 1] ?? c.req.header('x-real-ip') ?? 'ip';
+}
+function registrarFallo(k: string, max: number) {
+  const f = fallosPin.get(k);
+  const vigente = f && f.desde > Date.now() - VENTANA;
+  const n = (vigente ? f.n : 0) + 1;
+  fallosPin.set(k, { n, desde: vigente ? f.desde : Date.now(), hasta: n >= max ? Date.now() + VENTANA : 0 });
+}
 function verificarPin(c: Context, token: string, pin: string | null): Response | null {
   if (!pin) return null;
-  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? 'ip';
-  const k = `${token}:${ip}`;
+  const k = `${token}:${ipCliente(c)}`;
+  const kToken = `${token}:*`;
   const f = fallosPin.get(k);
-  if (f && f.hasta > Date.now()) return c.json({ error: 'Demasiados intentos. Espera 15 minutos.', requiere_pin: true }, 429);
+  const ft = fallosPin.get(kToken);
+  if ((f && f.hasta > Date.now()) || (ft && ft.hasta > Date.now())) return c.json({ error: 'Demasiados intentos. Espera 15 minutos.', requiere_pin: true }, 429);
   const dado = Buffer.from(c.req.header('x-portal-pin') ?? '');
   const esperado = Buffer.from(pin);
   if (dado.length === esperado.length && timingSafeEqual(dado, esperado)) { fallosPin.delete(k); return null; }
   // La ventana se mide desde el primer fallo (antes se medía con `hasta`, que vale 0 sin bloqueo: el contador volvía a 1 y nunca bloqueaba).
-  const vigente = f && f.desde > Date.now() - 15 * 60_000;
-  const n = (vigente ? f.n : 0) + 1;
-  fallosPin.set(k, { n, desde: vigente ? f.desde : Date.now(), hasta: n >= 8 ? Date.now() + 15 * 60_000 : 0 });
-  if (fallosPin.size > 10_000) fallosPin.clear();
+  registrarFallo(k, 8);
+  registrarFallo(kToken, MAX_POR_TOKEN);
+  // Limpieza por antigüedad (antes se vaciaba el mapa entero y con él los bloqueos activos).
+  if (fallosPin.size > 10_000) {
+    const ahora = Date.now();
+    for (const [key, v] of fallosPin) if (v.hasta < ahora && v.desde < ahora - VENTANA) fallosPin.delete(key);
+  }
   return c.json({ error: 'PIN requerido', requiere_pin: true }, 401);
 }
 

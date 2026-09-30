@@ -10,6 +10,7 @@ import { CeldaSelect, CeldaFecha, CeldaTexto, CeldaOwners } from './Celdas';
 import { COLOR_ESTADO, COLOR_APROBACION, COLOR_PRIORIDAD, COLOR_TIPO, COLOR_PLANIFICACION, colorGrupo } from './colores';
 import { PLANIFICACION_LABEL, CLASE_LABEL, type ClaseTarea } from '@backio/shared';
 import { ESTADO_LABEL, APROBACION_LABEL, PRIORIDAD_LABEL, TIPO_LABEL, haceCuanto, fechaCorta, diaLocal } from '@/lib/format';
+import { hrefExterno } from '@/lib/url';
 
 const ESTADOS = Object.keys(ESTADO_LABEL);
 const APROB = Object.keys(APROBACION_LABEL);
@@ -104,7 +105,7 @@ function Fila({ r, color, usuarios, onPatch, horas, nota, bloqueada, proyecto, o
           <HistorialReq r={r} onCambio={onCambio} usuarios={usuarios} />
           {!hecho && <button type="button" className={`text-xs shrink-0 px-1 rounded ${r.daily_fecha === hoyLocal() ? 'bg-amber-200 ring-1 ring-amber-400' : 'grayscale opacity-30 hover:opacity-80'}`} title={r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'} onClick={(e) => { e.stopPropagation(); void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() }); }}>☀</button>}
           {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
-          {r.basecamp_url && <a href={r.basecamp_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 pr-2 text-xs font-bold text-emerald-700 hover:text-emerald-900" title="Abrir el to-do en Basecamp">Bc↗</a>}
+          {r.basecamp_url && <a href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 pr-2 text-xs font-bold text-emerald-700 hover:text-emerald-900" title="Abrir el to-do en Basecamp">Bc↗</a>}
         </div>
       </div>
       <div className="border-l border-gray-100 flex items-center px-2 min-w-0 text-xs">{r.proyecto_id ? <Link href={`/proyectos/${r.proyecto_id}`} className="truncate text-gray-700 hover:text-brand" title={`${proyecto ?? 'Proyecto'}${r.bloque_nombre ? ` · ${r.bloque_nombre}` : ''}`}>{proyecto ?? '…'}</Link> : <span className="text-gray-300">—</span>}</div>
@@ -121,7 +122,7 @@ function Fila({ r, color, usuarios, onPatch, horas, nota, bloqueada, proyecto, o
         {avisoBasecamp && (
           <div className="absolute z-30 left-0 top-full mt-1 w-72 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-lg pointer-events-auto" onMouseLeave={() => setAvisoBasecamp(false)}>
             <b>Se completa desde Basecamp.</b> Marca el to-do como hecho allá y BackIO lo pasa a Completado en segundos.
-            {r.basecamp_url && <a className="block mt-2 btn-primary text-xs py-1 text-center" href={r.basecamp_url} target="_blank" rel="noreferrer">Abrir el to-do en Basecamp ↗</a>}
+            {r.basecamp_url && <a className="block mt-2 btn-primary text-xs py-1 text-center" href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer">Abrir el to-do en Basecamp ↗</a>}
             <button type="button" className="mt-2 link-action" onClick={() => setAvisoBasecamp(false)}>Cerrar</button>
           </div>
         )}
@@ -140,7 +141,7 @@ function Fila({ r, color, usuarios, onPatch, horas, nota, bloqueada, proyecto, o
       <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_sin_movimiento > 14 ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{r.dias_sin_movimiento}</div>
       <div className="border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums text-gray-600" title="Horas registradas en Basecamp (últimos 90 días)">{horas ? horas.toFixed(1) : ''}</div>
       <div className="border-l border-gray-100 min-w-0"><CeldaNota r={r} nota={nota} usuarios={usuarios} onCambio={onCambio} /></div>
-      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs">{r.basecamp_url ? <a href={r.basecamp_url} target="_blank" rel="noreferrer" className="text-brand underline truncate px-2">Basecamp</a> : <span className="text-gray-300">—</span>}</div>
+      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs">{r.basecamp_url ? <a href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer" className="text-brand underline truncate px-2">Basecamp</a> : <span className="text-gray-300">—</span>}</div>
       <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs text-gray-500" title={r.ultima_actualizacion}>{haceCuanto(r.ultima_actualizacion)}</div>
     </div>
   );

@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/Alert';
 import { CeldaSelect, CeldaOwners } from '@/components/backlog/Celdas';
 import { COLOR_PRIORIDAD, COLOR_TIPO, COLOR_APROBACION } from '@/components/backlog/colores';
 import { PRIORIDAD_LABEL, TIPO_LABEL, APROBACION_LABEL, fecha, haceCuanto } from '@/lib/format';
+import { hrefExterno } from '@/lib/url';
 
 type Entrada = Pick<RequerimientoMetricas, 'id' | 'titulo_interno' | 'cliente_id' | 'proyecto_id' | 'bloque_nombre' | 'owner_agencia' | 'fecha_entrega' | 'estado_operativo' | 'prioridad' | 'tipo_trabajo' | 'piezas' | 'estado_aprobacion' | 'basecamp_url'> & { entrada_at: string; lista: string | null; creador: string | null };
 const PRIOS = Object.keys(PRIORIDAD_LABEL); const TIPOS = Object.keys(TIPO_LABEL); const APROB = Object.keys(APROBACION_LABEL);
@@ -64,7 +65,7 @@ export default function EntradasBasecampPage() {
               <tr key={e.id} className={e.owner_agencia.length === 0 ? 'bg-red-50/40' : ''}>
                 <td className="td whitespace-nowrap text-gray-500" title={e.entrada_at}>{haceCuanto(e.entrada_at)}{e.creador && <div className="text-xs text-gray-400">por {e.creador}</div>}</td>
                 <td className="td"><div className="font-medium">{cliente(e.cliente_id)}</div><div className="text-xs text-gray-500">{e.lista ?? '—'}{e.bloque_nombre ? ` › ${e.bloque_nombre}` : ''}</div></td>
-                <td className="td">{e.titulo_interno}{e.basecamp_url && <a className="ml-2 text-xs font-bold text-emerald-700" href={e.basecamp_url} target="_blank" rel="noreferrer" title="Abrir en Basecamp">Bc↗</a>}{e.proyecto_id && <Link className="ml-2 text-xs text-gray-400 hover:text-brand" href={`/proyectos/${e.proyecto_id}`}>proyecto ↗</Link>}</td>
+                <td className="td">{e.titulo_interno}{e.basecamp_url && <a className="ml-2 text-xs font-bold text-emerald-700" href={hrefExterno(e.basecamp_url)} target="_blank" rel="noreferrer" title="Abrir en Basecamp">Bc↗</a>}{e.proyecto_id && <Link className="ml-2 text-xs text-gray-400 hover:text-brand" href={`/proyectos/${e.proyecto_id}`}>proyecto ↗</Link>}</td>
                 <td className="td"><div className="w-40"><CeldaOwners ids={e.owner_agencia} usuarios={usuarios} onChange={(ids) => patch(e, { owner_agencia: ids })} /></div></td>
                 <td className="td whitespace-nowrap">{fecha(e.fecha_entrega)}</td>
                 <td className="td p-0"><CeldaSelect valor={e.prioridad} opciones={PRIOS} colores={COLOR_PRIORIDAD} labels={PRIORIDAD_LABEL} onChange={(v) => patch(e, { prioridad: v as Entrada['prioridad'] })} /></td>

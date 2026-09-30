@@ -72,6 +72,11 @@ prometioWebhook.post('/', async (c) => {
   let parsedRaw: unknown;
   try { parsedRaw = JSON.parse(raw); } catch { return c.json({ error: 'bad json' }, 400); }
   const env1 = envelope.safeParse(parsedRaw);
+  // Anti-replay con el timestamp FIRMADO del cuerpo (PrometIO siempre lo envía): el header es opcional y no va en
+  // la firma, y el caché de duplicados vive solo 10 min en memoria, así que un envío capturado se podía repetir
+  // más tarde (auditoría run-1). Ventana de 5 min: los reintentos de PrometIO llegan dentro de ~35 s.
+  const enviado = env1.success && env1.data.timestamp ? Date.parse(env1.data.timestamp) : NaN;
+  if (!Number.isFinite(enviado) || Math.abs(Date.now() - enviado) > 5 * 60_000) return c.json({ error: 'timestamp ausente o fuera de ventana' }, 401);
   const tenantId = await tenantDefault();
   const ctx = { db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' as const };
   const invalido = async (evento: string, issues: unknown) => {
