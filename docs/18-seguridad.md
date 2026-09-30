@@ -81,3 +81,24 @@ producción.
 4. Definir `CRON_SECRET` en Railway (o dejar `/api/cron` cerrado, que es el estado actual en producción).
 5. Verificar en Supabase Auth que el registro público esté deshabilitado.
 6. Decidir la ventana para subir a Next 15.
+
+## Auditoría run-1 (28–30/09/2026, skill cloudflare/security-audit, perfil quick)
+
+Auditoría independiente solo sobre código fuente: 35 agentes, 21 candidatos, 18 hallazgos por validar y 3 descartados.
+El informe está fuera del repo, en `~/security-audit-skill/backIO/run-1/` (`REPORT.md`, `NEEDS-VALIDATION.md`, `findings.json`,
+`coverage-ledger.json`), y la próxima corrida parte de ahí. Los 18 hallazgos quedaron corregidos, con tests de regresión
+(`src/__tests__/seguridad_auditoria.test.ts`, `notificaciones_destino.test.ts`, `webhook_basecamp_verificado.test.ts`) y con las
+migraciones 24, 25 y 26 aplicadas y verificadas en producción el 30/09.
+
+| Frente | Qué se corrigió |
+|---|---|
+| OAuth / MCP | `/oauth/approve` rechaza tokens de agente; redirect_uri solo https o http en loopback; «Denegar» valida el retorno en el servidor (`/oauth/deny`); `get_client_health` cerrado para keys de perfil cliente |
+| Portal | Bloqueo del PIN que antes nunca se activaba; IP tomada del proxy; tope de 30 fallos por token |
+| Roles | KPIs y evolutivo exigen rol también con token OAuth; las API keys solo las crea una persona admin |
+| Base de datos | Funciones `auth_*` solo para usuarios activos (m25); reprocesos, reprogramaciones y bitácora solo sobre tareas propias (m25); trigger del colaborador en lista blanca y regla 3 (m25); notificaciones editables solo en `leida_at` (m24); alta de usuarios solo con correo confirmado (m26); RPC sin acceso anónimo y con chequeo de tenant (m26); `basecamp_url` solo https (m26) |
+| Integraciones | Webhook de Basecamp aplica el estado del to-do vivo, no el del payload; PrometIO exige el timestamp firmado; las notificaciones se envían siempre al correo actual del usuario |
+| Frontend | `next=` del login resuelto como URL del mismo origen; enlaces a Basecamp solo https |
+
+Quedaron fuera de cobertura (perfil quick) y conviene empezar por ahí una corrida `standard`: las rutas que crean
+tareas o plantillas y fijan `visible_cliente` al insertar (incluido el CSV masivo), y 8 routers de `/api/v1`
+(proyectos, plantillas, huérfanos, horas, usuarios, personas, dashboard, tipos-pieza).
