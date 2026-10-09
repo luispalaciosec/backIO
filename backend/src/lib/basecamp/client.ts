@@ -20,6 +20,22 @@ export interface BcTodoRef { id: number; app_url: string }
 const MAX_POR_VENTANA = 45;
 const VENTANA_MS = 10_000;
 
+/**
+ * El GET de un to-do devuelve la descripción ya renderizada: cada adjunto (imagen, archivo, mención) trae adentro su
+ * <figure><img>…</figure>. Si eso se devuelve tal cual en el PUT, Basecamp lo toma como contenido y el adjunto se
+ * desarma (pierde nombre y enlace, se duplica la vista previa) cada vez que BackIO cambia la fecha.
+ * La API espera el adjunto vacío: <bc-attachment sgid="…"></bc-attachment> (con caption si lo tenía).
+ * Solo se reescriben los adjuntos; el resto de la descripción pasa intacto y nunca se guarda en BackIO (regla 1).
+ */
+export function descripcionParaGuardar(html: string): string {
+  return html.replace(/<bc-attachment\b([^>]*)>[\s\S]*?<\/bc-attachment>/gi, (completo, attrs: string) => {
+    const sgid = /\ssgid="([^"]+)"/i.exec(attrs)?.[1];
+    if (!sgid) return completo;
+    const caption = /\scaption="([^"]*)"/i.exec(attrs)?.[1];
+    return `<bc-attachment sgid="${sgid}"${caption ? ` caption="${caption}"` : ''}></bc-attachment>`;
+  });
+}
+
 export class BasecampClient {
   private timestamps: number[] = [];
   constructor(
@@ -144,7 +160,7 @@ export class BasecampClient {
     const vivo = await this.request<{ content?: string; description?: string; due_on?: string | null; starts_on?: string | null; assignees?: { id: number }[]; completion_subscribers?: { id: number }[]; notify?: boolean }>('GET', `/buckets/${projectId}/todos/${todoId}.json`);
     const cuerpo = {
       content: input.content ?? vivo.content,
-      description: vivo.description ?? '',
+      description: descripcionParaGuardar(vivo.description ?? ''),
       due_on: input.due_on !== undefined ? input.due_on : vivo.due_on ?? null,
       starts_on: vivo.starts_on ?? null,
       assignee_ids: input.assignee_ids ?? (vivo.assignees ?? []).map((a) => a.id),
