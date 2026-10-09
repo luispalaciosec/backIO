@@ -25,6 +25,17 @@ describe('descripcionParaGuardar', () => {
     expect(descripcionParaGuardar(raro)).toBe(raro);
   });
 
+  it('quita las fotos de perfil sueltas que dejaron guardados anteriores', () => {
+    const suelta = '<figure dir="auto">\n<img alt="" title="Hector Mite" class="avatar" src="https://x/av.png" width="20" height="20">\n<figcaption>Hector</figcaption>\n</figure>';
+    const html = `<p>Hola <bc-attachment sgid="P1" content-type="application/vnd.basecamp.mention"><figure><img class="avatar" src="a.png"></figure></bc-attachment></p>${suelta}<p>Brief</p>`;
+    expect(descripcionParaGuardar(html)).toBe('<p>Hola <bc-attachment sgid="P1"></bc-attachment></p><p>Brief</p>');
+  });
+
+  it('no quita figuras normales (imágenes pegadas, sin avatar)', () => {
+    const fig = '<figure><img src="https://x/foto.png" class="imagen"><figcaption>Arte</figcaption></figure>';
+    expect(descripcionParaGuardar(fig)).toBe(fig);
+  });
+
   it('es idempotente: guardar dos veces da lo mismo', () => {
     const una = descripcionParaGuardar(`<p>${img('A')}</p>`);
     expect(descripcionParaGuardar(una)).toBe(una);

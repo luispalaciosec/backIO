@@ -28,12 +28,15 @@ const VENTANA_MS = 10_000;
  * Solo se reescriben los adjuntos; el resto de la descripción pasa intacto y nunca se guarda en BackIO (regla 1).
  */
 export function descripcionParaGuardar(html: string): string {
-  return html.replace(/<bc-attachment\b([^>]*)>[\s\S]*?<\/bc-attachment>/gi, (completo, attrs: string) => {
+  const limpio = html.replace(/<bc-attachment\b([^>]*)>[\s\S]*?<\/bc-attachment>/gi, (completo, attrs: string) => {
     const sgid = /\ssgid="([^"]+)"/i.exec(attrs)?.[1];
     if (!sgid) return completo;
     const caption = /\scaption="([^"]*)"/i.exec(attrs)?.[1];
     return `<bc-attachment sgid="${sgid}"${caption ? ` caption="${caption}"` : ''}></bc-attachment>`;
   });
+  // Restos de guardados anteriores: la foto de perfil de una mención quedó suelta fuera del adjunto. Con los adjuntos
+  // ya vacíos, una <figure> con un avatar solo puede venir de ese error (nadie pega su avatar en una nota).
+  return limpio.replace(/<figure\b[^>]*>(?:(?!<\/figure>)[\s\S])*?<img\b[^>]*class="[^"]*\bavatar\b[^"]*"[\s\S]*?<\/figure>/gi, '');
 }
 
 export class BasecampClient {
