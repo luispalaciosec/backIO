@@ -51,3 +51,10 @@ una acción de Luis) · **pendiente** (ola futura).
 | S11 · Keys de perfil cliente sin cliente | hecho | `lib/auth/middleware.ts`, `routes/v1/admin.ts`, `lib/mcp/server.ts`, `admin/api-keys/page.tsx` | El cliente es obligatorio al crear la key; `get_project_status` solo devuelve proyectos de ese cliente. Test. No había keys de ese perfil activas |
 | M3 · PIN del portal en claro | hecho | `lib/portal/pin.ts` (scrypt + sal), `routes/portal.ts`, `routes/v1/clientes.ts`, `admin/clientes/page.tsx` | Hash en `portal_pines` (sin políticas); el portal compara contra el hash; Admin solo indica si hay PIN y permite cambiarlo o quitarlo. Tests de hash y del portal |
 | M3 · Migrar los PIN existentes | hecho | `POST /api/v1/clientes/portal-pines/migrar`, `migrarPinesEnClaro` | Ejecutada el 10/10: los 17 clientes tenían la clave `portal_pin` en config pero vacía (el formulario guardaba `null`), así que no había ningún PIN real que migrar; se limpió la clave. Quedan 0 PIN en claro |
+
+## Acciones de Luis (10/10)
+
+| Acción | Estado | Verificación |
+|---|---|---|
+| Rotar `BASECAMP_WEBHOOK_SECRET` y actualizar los 15 webhooks | hecho | Mensaje de BackIO: 15 actualizados, 0 errores |
+| Reautorizar Basecamp (tokens nuevos) | hecho | Conectado 10/10 18:20; credenciales en `integracion_credenciales` (actualizada 23:20 UTC) y ningún token en `tenants.config` |
