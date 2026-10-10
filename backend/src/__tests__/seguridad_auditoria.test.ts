@@ -380,3 +380,15 @@ describe('Ola 1b (auditoría 10/10)', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('Ola 2 · dependencias', () => {
+  it('el servidor MCP responde initialize y lista tools con el SDK actualizado', async () => {
+    const h = { ...bearer('bko_lider_lectura'), 'content-type': 'application/json', accept: 'application/json, text/event-stream' };
+    const init = await app.request('/mcp', { method: 'POST', headers: h, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } } }) });
+    expect(init.status).toBe(200);
+    expect(await init.text()).toContain('backio');
+    const tools = await app.request('/mcp', { method: 'POST', headers: h, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) });
+    expect(tools.status).toBe(200);
+    expect(await tools.text()).toContain('confirm_plan');
+  });
+});
