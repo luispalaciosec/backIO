@@ -5,6 +5,7 @@ import type { Mesa } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { useIA } from '@/lib/useIA';
+import { hrefExterno } from '@/lib/url';
 
 interface Informe { id: string; mesa_id: string | null; markdown: string; publicado_at: string | null; created_at: string }
 
@@ -79,7 +80,7 @@ export default function InformesPage() {
               <div className="flex gap-2">
                 <button className="btn-ghost" onClick={() => navigator.clipboard.writeText(abierto.markdown)}>Copiar</button>
                 {!abierto.publicado_at && !pub && <button className="btn-success" disabled={!!busy} onClick={() => publicar(abierto)}>{busy === 'pub' ? 'Publicando…' : 'Publicar en Basecamp'}</button>}
-                {pub && <a className="btn-secondary" href={pub} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}
+                {pub && <a className="btn-secondary" href={hrefExterno(pub)} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}
               </div>
             </div>
             <pre className="whitespace-pre-wrap text-xs font-mono bg-gray-50 p-4 rounded">{abierto.markdown}</pre>

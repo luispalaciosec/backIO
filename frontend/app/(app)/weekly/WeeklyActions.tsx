@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { Acta, WeeklyIA } from '@backio/shared';
 import { api } from '@/lib/api';
 import { useIA } from '@/lib/useIA';
+import { hrefExterno } from '@/lib/url';
 
 export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { id: string; nombre: string }[] }) {
   const router = useRouter();
@@ -64,7 +65,7 @@ export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { 
               <div className="flex gap-2">
                 <button className="btn-ghost" onClick={() => navigator.clipboard.writeText(acta.markdown)}>Copiar</button>
                 {acta.mesa_id && !pub && <button className="btn-primary" disabled={!!busy} onClick={() => run('pub', async () => setPub(await api<{ url: string }>(`/semanas/actas/${acta.id}/publicar`, { method: 'POST' })))}>{busy === 'pub' ? '⏳ Publicando…' : 'Publicar en Basecamp'}</button>}
-                {pub && <a className="btn-secondary" href={pub.url} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}
+                {pub && <a className="btn-secondary" href={hrefExterno(pub.url)} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}
               </div>
             </div>
             {!acta.mesa_id && <p className="text-xs text-amber-700 mb-2">Documento de toda la agencia: para publicarlo en Basecamp genera el de una mesa.</p>}

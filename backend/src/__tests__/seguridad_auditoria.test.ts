@@ -80,7 +80,7 @@ vi.mock('../lib/oauth', async (orig) => {
 
 vi.mock('../lib/db/proyectos', () => ({
   getProyectoByPortalToken: async (_c: unknown, token: string) =>
-    /^[pqr]{43}$/.test(token)
+    /^[pqrs]{43}$/.test(token)
       ? {
           proyecto: { id: 'p1', tenant_id: TENANT, nombre: 'Campaña', fecha_entrega: '2099-12-15', cliente_id: 'c1' },
           cliente: { nombre: 'Cliente', logo_url: null, color_primario: '#000', config: { portal_pin: '123456' } },
@@ -90,6 +90,7 @@ vi.mock('../lib/db/proyectos', () => ({
 }));
 
 // Tablero con dos personas: si la respuesta trae a «u-otra», un colaborador vio a su compañera.
+vi.mock('../lib/portal/resumen', () => ({ generarResumen: async () => { throw new Error('ANTHROPIC_API_KEY no configurada'); } }));
 vi.mock('../lib/kpis', async (orig) => {
   const mod = await orig<typeof import('../lib/kpis')>();
   const persona = (usuario_id: string) => ({ usuario_id, nombre: USUARIOS[usuario_id]!.nombre, valor: 50, estado: 'no_cumple' });
@@ -268,5 +269,20 @@ describe('#18 webhook de PrometIO: timestamp firmado obligatorio', () => {
 
   it('un envío firmado viejo (repetido más tarde) se rechaza', async () => {
     expect((await enviar({ evento: 'empresa.actualizada', timestamp: new Date(Date.now() - 60 * 60_000).toISOString(), data: { n: 3 } })).status).toBe(401);
+  });
+});
+
+describe('Ola 0 (auditoría 10/10)', () => {
+  it('B1 · el preflight CORS de /api permite PUT (guardar plantillas, tipos de pieza y KPIs)', async () => {
+    const res = await app.request('/api/v1/plantillas', { method: 'OPTIONS', headers: { origin: 'http://localhost:3000', 'access-control-request-method': 'PUT', 'access-control-request-headers': 'authorization,content-type' } });
+    expect(res.headers.get('access-control-allow-methods') ?? '').toContain('PUT');
+  });
+
+  it('S13 · el resumen del portal no expone el error interno al visitante', async () => {
+    const res = await app.request(`/api/portal/${'s'.repeat(43)}/resumen`, { method: 'POST', headers: { 'x-portal-pin': '123456', 'x-forwarded-for': '192.0.2.50' } });
+    expect(res.status).toBe(503);
+    const cuerpo = await res.text();
+    expect(cuerpo).not.toContain('ANTHROPIC');
+    expect(cuerpo).toContain('no está disponible');
   });
 });

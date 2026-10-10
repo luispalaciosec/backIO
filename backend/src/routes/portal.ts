@@ -93,6 +93,8 @@ portal.post('/:token/resumen', async (c) => {
     const resumen = await generarResumen(r.proyecto.id, r.proyecto.tenant_id, safe, r.cliente.nombre);
     return c.json({ resumen });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : 'No se pudo generar el resumen' }, 503);
+    // El detalle (configuración, errores del proveedor de IA o de la base) va al log, nunca al visitante anónimo.
+    console.error('[portal] resumen', r.proyecto.id, err instanceof Error ? err.message : err);
+    return c.json({ error: 'El resumen no está disponible en este momento. Intenta más tarde.' }, 503);
   }
 });

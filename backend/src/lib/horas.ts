@@ -21,7 +21,8 @@ export async function sincronizarHoras(ctx: DbCtx, opts: { dias?: number; client
   // Paginado: PostgREST corta en 1000 filas; sin esto las horas de los to-dos restantes quedaban sin tarea.
   const porTodo = new Map<number, string>();
   for (let from = 0; ; from += 1000) {
-    const { data: reqs } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null).order('id').range(from, from + 999);
+    const { data: reqs, error } = await ctx.db.from('requerimientos').select('id, basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null).order('id').range(from, from + 999);
+    throwIf(error); // una página fallida cortaba el bucle en silencio y las horas quedaban sin tarea
     const filas = (reqs ?? []) as { id: string; basecamp_todo_id: number }[];
     for (const r of filas) porTodo.set(r.basecamp_todo_id, r.id);
     if (filas.length < 1000) break;

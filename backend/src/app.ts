@@ -22,7 +22,7 @@ export function createApp(): Hono {
   app.use('/.well-known/*', cors({ origin: '*' }));
   app.use('/oauth/*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'OPTIONS'] }));
   app.use('/mcp', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version'], allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], exposeHeaders: ['Mcp-Session-Id'] }));
-  app.use('/api/*', cors({ origin: frontendOrigins(), allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
+  app.use('/api/*', cors({ origin: frontendOrigins(), allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] }));
 
   app.get('/health', (c) => c.json({ ok: true, servicio: 'backio-backend', ts: new Date().toISOString() }));
   app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /api/portal/\n'));
@@ -45,7 +45,9 @@ export function createApp(): Hono {
     if (err instanceof DbError) {
       // Siempre al log (con detalle) para poder diagnosticar en Railway; al cliente solo el mensaje.
       if (err.status >= 500) console.error(`[${c.req.method} ${c.req.path}] ${err.message}`, err.detalle ?? '');
-      return c.json({ error: err.message, detalle: env().NODE_ENV === 'production' ? undefined : err.detalle }, err.status as 400);
+      // En producción un 5xx no devuelve el texto de Postgres (nombres de tablas, constraints…).
+      const prod = env().NODE_ENV === 'production';
+      return c.json({ error: prod && err.status >= 500 ? 'Error interno' : err.message, detalle: prod ? undefined : err.detalle }, err.status as 400);
     }
     console.error(`[${c.req.method} ${c.req.path}]`, err);
     return c.json({ error: env().NODE_ENV === 'production' ? 'Error interno' : err.message }, 500);

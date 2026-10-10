@@ -1,4 +1,5 @@
 import { serviceClient, type DbCtx } from './client';
+import { notificar } from '../notificaciones';
 
 export interface AuditEntry {
   accion: string;
@@ -19,7 +20,9 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
     ESCRITURAS.set(ctx.apiKeyId, arr);
     if (arr.length === 21) {
       console.warn(`[alerta] API key ${ctx.apiKeyId} superó 20 escrituras en 5 minutos`);
-      void ctx.db.from('notificaciones').insert({ tenant_id: ctx.tenantId, usuario_id: null, canal: 'pendiente', tipo: 'alerta_api_key', titulo: 'API key con escritura masiva', cuerpo: `La key ${ctx.apiKeyId} ejecutó más de 20 escrituras en 5 minutos.` });
+      // Antes era un insert sin await (el builder es perezoso: nunca salía) y con usuario_id null (no se despachaba).
+      void notificar(ctx, { tipo: 'alerta_api_key', titulo: 'API key con escritura masiva', cuerpo: `La key ${ctx.apiKeyId} ejecutó más de 20 escrituras en 5 minutos. Revisa Admin → API keys.`, ruta: '/admin/api-keys' }, { roles: ['admin', 'operaciones'] })
+        .catch((err) => console.error('[alerta] no se pudo notificar', err instanceof Error ? err.message : err));
     }
   }
   // La auditoría nunca debe romper la operación principal.

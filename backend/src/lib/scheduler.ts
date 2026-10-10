@@ -42,7 +42,9 @@ export function startScheduler(): void {
   const exclusivo = (nombre: string, fn: () => Promise<void>) => async () => {
     if (enCurso.has(nombre)) { console.warn(`[scheduler] ${nombre} sigue en curso; se omite esta corrida`); return; }
     enCurso.add(nombre);
-    try { await fn(); } finally { enCurso.delete(nombre); }
+    // Un fallo (p. ej. Supabase caído) se registra y no sale de aquí: un rechazo sin manejar terminaba el proceso
+    // y el reinicio borraba el estado en memoria (bloqueo del PIN, anti-duplicados, rate limit).
+    try { await fn(); } catch (err) { console.error(`[scheduler] ${nombre} falló`, err instanceof Error ? err.message : err); } finally { enCurso.delete(nombre); }
   };
   const reconciliar = exclusivo('reconcile', async () => {
     for (const t of await tenants()) {
@@ -73,7 +75,7 @@ export function startScheduler(): void {
   const horas = exclusivo('horas', async () => { for (const t of await tenants()) await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => console.error('[scheduler] horas', e.message)); });
   setInterval(() => void horas(), 6 * 3600_000);
 
-  setInterval(() => void procesarPendientes().catch(() => undefined), 60_000);
+  setInterval(() => void procesarPendientes().catch((err) => console.error('[scheduler] notificaciones', err instanceof Error ? err.message : err)), 60_000);
 
   let ultimaCorrida = '';
   let ultimoInforme = '';
@@ -81,7 +83,8 @@ export function startScheduler(): void {
   let ultimoKpi = '';
   let ultimaFotoDia = '';
   let ultimaFotoSemana = '';
-  setInterval(async () => {
+  setInterval(() => { porMinuto().catch((err) => console.error('[scheduler] tick falló', err instanceof Error ? err.message : err)); }, 60_000);
+  async function porMinuto(): Promise<void> {
     const t = ahoraLocal();
     // Diario 08:05: recurrencias de fees (genera el mes siguiente cuando llega el día configurado).
     if (t.hora === 8 && t.minuto === 5 && ultimaRecurrencia !== t.clave) {
@@ -156,5 +159,5 @@ export function startScheduler(): void {
         }
       }
     }
-  }, 60_000);
+  }
 }

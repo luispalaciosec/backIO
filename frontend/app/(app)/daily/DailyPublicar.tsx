@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useIA } from '@/lib/useIA';
+import { hrefExterno } from '@/lib/url';
 
 /** Paso 3 del daily: notas, borrador con IA y publicación. La mesa viene fija del paso 1. */
 export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; mesaNombre: string; tieneBoard: boolean }) {
@@ -51,7 +52,7 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
       {msg && (
         <div className={`rounded-md border px-3 py-2 text-sm flex items-center justify-between gap-3 ${msg.tipo === 'ok' ? 'border-green-200 bg-green-50 text-green-900' : msg.tipo === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-violet-200 bg-violet-50 text-violet-900'}`}>
           <span>{msg.texto}</span>
-          <span className="flex items-center gap-2 shrink-0">{msg.url && <a className="btn-primary text-xs py-1" href={msg.url} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}<button className="btn-ghost text-xs py-1" onClick={() => setMsg(null)}>×</button></span>
+          <span className="flex items-center gap-2 shrink-0">{msg.url && <a className="btn-primary text-xs py-1" href={hrefExterno(msg.url)} target="_blank" rel="noreferrer">Ver en Basecamp ↗</a>}<button className="btn-ghost text-xs py-1" onClick={() => setMsg(null)}>×</button></span>
         </div>
       )}
     </div>
