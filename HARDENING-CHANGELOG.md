@@ -57,4 +57,7 @@ una acción de Luis) · **pendiente** (ola futura).
 | Acción | Estado | Verificación |
 |---|---|---|
 | Rotar `BASECAMP_WEBHOOK_SECRET` y actualizar los 15 webhooks | hecho | Mensaje de BackIO: 15 actualizados, 0 errores |
+| Supabase: registro público apagado y «Confirm email» activo | hecho | `/auth/v1/settings`: `disable_signup: true`, `mailer_autoconfirm: false` |
+| Supabase: límites de Auth (sign-in, refresh, verificación) | hecho (Luis) | Configurados en el panel; no se exponen por API |
+| Sentry: proyectos `backio-frontend` y `backio-banckend` creados | hecho (Luis) | Faltan los DSN para la Ola 7 |
 | Reautorizar Basecamp (tokens nuevos) | hecho | Conectado 10/10 18:20; credenciales en `integracion_credenciales` (actualizada 23:20 UTC) y ningún token en `tenants.config` |
