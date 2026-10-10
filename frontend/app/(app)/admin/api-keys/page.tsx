@@ -10,14 +10,16 @@ export default function AdminApiKeysPage() {
   const [perfiles, setPerfiles] = useState<Record<string, string[]>>({});
   const [nueva, setNueva] = useState<{ nombre: string; key: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ nombre: '', perfil: 'gerencial' });
+  const [form, setForm] = useState({ nombre: '', perfil: 'gerencial', cliente_id: '' });
+  const [clientes, setClientes] = useState<{ id: string; nombre: string }[]>([]);
+  useEffect(() => { api<{ items: { id: string; nombre: string }[] }>('/clientes').then((r) => setClientes(r.items)).catch(() => setClientes([])); }, []);
 
   const cargar = () => api<{ items: ApiKey[]; perfiles: Record<string, string[]> }>('/admin/api-keys').then((r) => { setItems(r.items); setPerfiles(r.perfiles); }).catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => { void cargar(); }, []);
 
   async function crear(e: FormEvent) {
     e.preventDefault(); setError(null);
-    try { const r = await api<{ key: string; nombre: string }>('/admin/api-keys', { method: 'POST', json: form }); setNueva({ nombre: r.nombre, key: r.key }); setForm({ nombre: '', perfil: 'gerencial' }); await cargar(); }
+    try { const r = await api<{ key: string; nombre: string }>('/admin/api-keys', { method: 'POST', json: { nombre: form.nombre, perfil: form.perfil, ...(form.perfil === 'cliente' ? { cliente_id: form.cliente_id } : {}) } }); setNueva({ nombre: r.nombre, key: r.key }); setForm({ cliente_id: '', nombre: '', perfil: 'gerencial' }); await cargar(); }
     catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
   }
 
@@ -41,6 +43,14 @@ export default function AdminApiKeysPage() {
             {Object.keys(perfiles).map((p) => <option key={p} value={p}>{p} · {perfiles[p]?.join(', ')}</option>)}
           </select>
         </div>
+        {form.perfil === 'cliente' && (
+          <div className="min-w-48"><label className="label">Cliente</label>
+            <select className="input" required value={form.cliente_id} onChange={(e) => setForm({ ...form, cliente_id: e.target.value })}>
+              <option value="">Elige el cliente…</option>
+              {clientes.map((cl) => <option key={cl.id} value={cl.id}>{cl.nombre}</option>)}
+            </select>
+          </div>
+        )}
         <button className="btn-primary">Crear key</button>
       </form>
       <section className="card overflow-x-auto">

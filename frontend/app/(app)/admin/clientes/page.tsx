@@ -19,13 +19,15 @@ export default function AdminClientesPage() {
   async function guardar(c: Cliente, form: FormData) {
     setError(null); setOk(null);
     const bc = String(form.get('basecamp_project_id') ?? '').trim();
+    // El PIN se guarda con hash: no se puede mostrar. Vacío = sin cambios; «Quitar PIN» lo elimina.
     const pin = String(form.get('portal_pin') ?? '').trim();
+    const quitarPin = form.get('quitar_pin') === 'on';
     try {
       await api(`/clientes/${c.id}`, { method: 'PATCH', json: {
         basecamp_project_id: bc ? Number(bc) : null,
         color_primario: String(form.get('color_primario') || '#0073EA'),
         logo_url: String(form.get('logo_url') || '') || null,
-        config: { ...(c.config ?? {}), portal_pin: pin || null },
+        ...(quitarPin ? { portal_pin: null } : pin ? { portal_pin: pin } : {}),
       } });
       setOk(`${c.nombre} actualizado`);
       await cargar();
@@ -73,7 +75,11 @@ export default function AdminClientesPage() {
             <div><label className="label">Basecamp project id</label><input name="basecamp_project_id" className="input" inputMode="numeric" defaultValue={c.basecamp_project_id ?? ''} placeholder="Ej. 12345678" /></div>
             <div><label className="label">Logo URL</label><input name="logo_url" className="input" defaultValue={c.logo_url ?? ''} /></div>
             <div><label className="label">Color</label><input name="color_primario" type="color" className="input h-9 p-1" defaultValue={c.color_primario ?? '#0073EA'} /></div>
-            <div><label className="label">PIN portal</label><input name="portal_pin" className="input" maxLength={6} defaultValue={String((c.config as { portal_pin?: string })?.portal_pin ?? '')} placeholder="opcional" /></div>
+            <div>
+              <label className="label">PIN portal</label>
+              <input name="portal_pin" className="input" maxLength={6} inputMode="numeric" pattern="\d{4,6}" autoComplete="off" placeholder={(c as Cliente & { portal_pin_configurado?: boolean }).portal_pin_configurado ? 'Configurado · escribe otro para cambiarlo' : 'Sin PIN (4 a 6 dígitos)'} />
+              {(c as Cliente & { portal_pin_configurado?: boolean }).portal_pin_configurado && <label className="mt-1 flex items-center gap-1 text-xs text-gray-500"><input type="checkbox" name="quitar_pin" /> Quitar PIN</label>}
+            </div>
             <div className="flex gap-1">
               <button className="btn-primary">Guardar</button>
               {c.basecamp_project_id && (

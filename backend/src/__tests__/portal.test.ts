@@ -13,6 +13,7 @@ vi.mock('../lib/db/client', async (orig) => {
   const mod = await orig<typeof import('../lib/db/client')>();
   return { ...mod, serviceClient: () => ({}) as never };
 });
+vi.mock('../lib/portal/pin', async (orig) => ({ ...(await orig<object>()), leerHashPin: async () => null }));
 vi.mock('../lib/db/proyectos', () => ({
   getProyectoByPortalToken: async (_c: unknown, token: string) =>
     token === 'a'.repeat(43)

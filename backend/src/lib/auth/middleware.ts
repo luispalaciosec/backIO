@@ -28,6 +28,8 @@ export interface AuthInfo {
   scopes: Scope[];
   nombre: string;
   perfil?: string | null;
+  /** API key de perfil «cliente»: el único cliente cuyos datos puede leer (auditoría 10/10, S11). */
+  clienteId?: string | null;
 }
 
 declare module 'hono' {
@@ -44,11 +46,11 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
   const db = serviceClient();
   const { data } = await db
     .from('api_keys')
-    .select('id, tenant_id, nombre, scopes, perfil, revocada_at')
+    .select('id, tenant_id, nombre, scopes, perfil, cliente_id, revocada_at')
     .eq('key_hash', hashApiKey(key))
     .maybeSingle();
   if (!data || (data as { revocada_at: string | null }).revocada_at) return null;
-  const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[]; perfil: string | null };
+  const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[]; perfil: string | null; cliente_id: string | null };
   // El builder de PostgREST es perezoso: sin then/await la petición nunca salía y ultimo_uso_at quedaba muerto.
   void db.from('api_keys').update({ ultimo_uso_at: new Date().toISOString() }).eq('id', row.id).then(() => undefined, () => undefined);
   return {
@@ -58,6 +60,7 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
     scopes: row.scopes,
     nombre: row.nombre,
     perfil: row.perfil,
+    clienteId: row.cliente_id,
   };
 }
 

@@ -8,6 +8,7 @@ import { serviceClient, getProyectoByPortalToken } from '../lib/db';
 import { sanitizeForClient, assertClientSafe } from '../lib/visibility';
 import { portalExpirado } from '../lib/portal/token';
 import { generarResumen } from '../lib/portal/resumen';
+import { leerHashPin, pinCoincide } from '../lib/portal/pin';
 
 export const portal = new Hono();
 
@@ -39,16 +40,26 @@ function registrarFallo(k: string, max: number) {
   const n = (vigente ? f.n : 0) + 1;
   fallosPin.set(k, { n, desde: vigente ? f.desde : Date.now(), hasta: n >= max ? Date.now() + VENTANA : 0 });
 }
-function verificarPin(c: Context, token: string, pin: string | null): Response | null {
-  if (!pin) return null;
+/** Credencial del portal: el hash de `portal_pines` o, solo mientras no se migre, el PIN en claro de config. */
+interface PinCliente { hash: string | null; claro: string | null }
+function coincide(dado: string, pin: PinCliente): boolean {
+  if (pin.hash) return pinCoincide(dado, pin.hash);
+  const a = Buffer.from(dado), b = Buffer.from(pin.claro ?? '');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+async function pinDe(r: { proyecto: { cliente_id: string }; cliente: { config?: Record<string, unknown> | null } }): Promise<PinCliente> {
+  const hash = await leerHashPin(r.proyecto.cliente_id);
+  const claro = (r.cliente.config?.portal_pin as string | undefined) || null;
+  return { hash, claro: hash ? null : claro };
+}
+function verificarPin(c: Context, token: string, pin: PinCliente): Response | null {
+  if (!pin.hash && !pin.claro) return null;
   const k = `${token}:${ipCliente(c)}`;
   const kToken = `${token}:*`;
   const f = fallosPin.get(k);
   const ft = fallosPin.get(kToken);
   if ((f && f.hasta > Date.now()) || (ft && ft.hasta > Date.now())) return c.json({ error: 'Demasiados intentos. Espera 15 minutos.', requiere_pin: true }, 429);
-  const dado = Buffer.from(c.req.header('x-portal-pin') ?? '');
-  const esperado = Buffer.from(pin);
-  if (dado.length === esperado.length && timingSafeEqual(dado, esperado)) { fallosPin.delete(k); return null; }
+  if (coincide((c.req.header('x-portal-pin') ?? '').slice(0, 20), pin)) { fallosPin.delete(k); return null; }
   // La ventana se mide desde el primer fallo (antes se medía con `hasta`, que vale 0 sin bloqueo: el contador volvía a 1 y nunca bloqueaba).
   registrarFallo(k, 8);
   registrarFallo(kToken, MAX_POR_TOKEN);
@@ -71,7 +82,7 @@ async function cargar(token: string) {
 portal.get('/:token', async (c) => {
   const r = await cargar(c.req.param('token'));
   if (!r) return c.json({ error: 'Portal no disponible' }, 404);
-  const bloqueo = verificarPin(c, c.req.param('token'), (r.cliente.config?.portal_pin as string | undefined) ?? null);
+  const bloqueo = verificarPin(c, c.req.param('token'), await pinDe(r));
   if (bloqueo) return bloqueo;
 
   const safe = sanitizeForClient(r.proyecto, r.requerimientos);
@@ -86,7 +97,7 @@ portal.get('/:token', async (c) => {
 portal.post('/:token/resumen', async (c) => {
   const r = await cargar(c.req.param('token'));
   if (!r) return c.json({ error: 'Portal no disponible' }, 404);
-  const bloqueo = verificarPin(c, c.req.param('token'), (r.cliente.config?.portal_pin as string | undefined) ?? null);
+  const bloqueo = verificarPin(c, c.req.param('token'), await pinDe(r));
   if (bloqueo) return bloqueo;
   const safe = sanitizeForClient(r.proyecto, r.requerimientos);
   try {

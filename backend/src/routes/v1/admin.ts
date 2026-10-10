@@ -160,17 +160,24 @@ admin.post('/api-keys', zValidator('json', z.object({
   nombre: z.string().min(2),
   perfil: z.enum(['gerencial', 'ejecutiva', 'operaciones', 'prometio', 'cliente', 'custom']),
   scopes: z.array(z.enum(SCOPES)).optional(),
+  cliente_id: z.string().uuid().optional(),
 })), async (c) => {
   const ctx = ctxOf(c);
   // Solo una persona admin crea keys: una key creada por otra key quedaba sin dueño (creado_por null) y
   // sobrevivía a «Quitar acceso» de quien la originó (auditoría run-1).
   if (c.get('auth').tipo !== 'usuario' || !ctx.usuarioId) return c.json({ error: 'Las API keys solo las crea un administrador desde BackIO' }, 403);
   const body = c.req.valid('json');
+  // Una key de perfil cliente lee solo los proyectos de UN cliente (S11): el cliente es obligatorio y debe ser del tenant.
+  if (body.perfil === 'cliente') {
+    if (!body.cliente_id) return c.json({ error: 'Una key de perfil cliente necesita el cliente al que pertenece' }, 400);
+    const { data: cl } = await serviceClient().from('clientes').select('id').eq('id', body.cliente_id).eq('tenant_id', ctx.tenantId).maybeSingle();
+    if (!cl) return c.json({ error: 'Cliente no encontrado' }, 404);
+  }
   const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : PERFILES[body.perfil]!;
   const key = `bk_live_${randomBytes(24).toString('base64url')}`;
   const { data, error } = await serviceClient()
     .from('api_keys')
-    .insert({ tenant_id: ctx.tenantId, nombre: body.nombre, prefijo: key.slice(0, 12), key_hash: hashApiKey(key), scopes, perfil: body.perfil, creado_por: ctx.usuarioId })
+    .insert({ tenant_id: ctx.tenantId, nombre: body.nombre, prefijo: key.slice(0, 12), key_hash: hashApiKey(key), scopes, perfil: body.perfil, cliente_id: body.perfil === 'cliente' ? body.cliente_id : null, creado_por: ctx.usuarioId })
     .select('id, nombre, prefijo, scopes, perfil, created_at')
     .single();
   throwIf(error);

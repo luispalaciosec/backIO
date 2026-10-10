@@ -117,7 +117,11 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
   }, ({ proyecto_id }) => guard(['read:proyectos'], async () => {
     const det = await getProyectoDetalle(ctx, proyecto_id);
     if (!det) return fail('Proyecto no encontrado');
-    if (esScopeCliente(auth)) return ok(sanitizeForClient(det, det.requerimientos));
+    if (esScopeCliente(auth)) {
+      // La key de un cliente solo ve proyectos de ese cliente; una key sin cliente no ve ninguno (S11).
+      if (!auth.clienteId || det.cliente_id !== auth.clienteId) return fail('Proyecto no encontrado');
+      return ok(sanitizeForClient(det, det.requerimientos));
+    }
     const m = await mapas(ctx);
     const { requerimientos, ...p } = det;
     return ok({
@@ -354,7 +358,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     const scopeNecesario = visto.tool === 'plan_project_from_template' ? 'write:proyectos' : visto.tool === 'plan_requirement_update' ? 'write:requerimientos' : null;
     if (!scopeNecesario) return fail(`Tool de plan desconocida: ${visto.tool}`);
     if (!tiene(auth, scopeNecesario)) return fail(`Scope requerido: ${scopeNecesario}`);
-    if ((visto.api_key_id ?? null) !== (ctx.apiKeyId ?? null)) return fail('Este plan lo generó otra credencial');
+    if ((visto.api_key_id ?? null) !== (ctx.apiKeyId ?? null) || (visto.usuario_id ?? null) !== (ctx.usuarioId ?? null)) return fail('Este plan lo generó otra credencial');
     const plan = await tomarPlan(ctx, plan_id);
     if (plan.tool === 'plan_project_from_template') {
       if (!tiene(auth, 'write:proyectos')) return fail('Scope requerido: write:proyectos');

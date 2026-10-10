@@ -12,6 +12,7 @@ export interface AgentPlan<P = unknown, R = unknown> {
   id: string;
   tenant_id: string;
   api_key_id: string | null;
+  usuario_id: string | null;
   tool: string;
   parametros: P;
   plan: R;
@@ -22,7 +23,7 @@ export interface AgentPlan<P = unknown, R = unknown> {
 export async function guardarPlan<P, R>(ctx: DbCtx, tool: string, parametros: P, plan: R): Promise<{ plan_id: string; expira_en: string }> {
   const id = `plan_${randomBytes(6).toString('hex')}`;
   const expira = new Date(Date.now() + PLAN_TTL_MS).toISOString();
-  const { error } = await ctx.db.from('agent_plans').insert({ id, tenant_id: ctx.tenantId, api_key_id: ctx.apiKeyId ?? null, tool, parametros, plan, expira_at: expira });
+  const { error } = await ctx.db.from('agent_plans').insert({ id, tenant_id: ctx.tenantId, api_key_id: ctx.apiKeyId ?? null, usuario_id: ctx.usuarioId ?? null, tool, parametros, plan, expira_at: expira });
   throwIf(error);
   return { plan_id: id, expira_en: expira };
 }

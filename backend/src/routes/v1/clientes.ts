@@ -7,19 +7,26 @@ import { listClientes, getCliente, updateClienteConfig, listProyectos, listBackl
 import type { ResumenClientePrometio } from '@backio/shared';
 import { registrarWebhookCliente, diagnosticoWebhookCliente, actualizarWebhooksTenant } from '../../lib/basecamp/webhooks';
 import { importarBasecampCliente } from '../../lib/basecamp/importar';
+import { guardarPin, clientesConPin, migrarPinesEnClaro } from '../../lib/portal/pin';
 
 export const clientes = new Hono();
 
 /** `config` guarda el PIN del portal e ids de webhook: solo la ve admin (o una API key con scope admin). */
-function sinConfig<T extends { config?: unknown }>(c: Context, x: T): T {
+function esAdmin(c: Context): boolean {
   const a = c.get('auth');
-  const admin = a.tipo === 'usuario' ? a.rol === 'admin' : a.scopes.includes('admin');
-  return admin ? x : { ...x, config: {} };
+  return a.tipo === 'usuario' ? a.rol === 'admin' : a.scopes.includes('admin');
+}
+function sinConfig<T extends { config?: unknown }>(c: Context, x: T): T {
+  return esAdmin(c) ? x : { ...x, config: {} };
 }
 
 clientes.get('/', requireScope('read:proyectos'), async (c) => {
-  const items = (await listClientes(ctxOf(c), { incluirInactivos: c.req.query('todos') === '1' })).map((x) => sinConfig(c, x));
-  return c.json({ items, total: items.length });
+  const ctx = ctxOf(c);
+  const items = (await listClientes(ctx, { incluirInactivos: c.req.query('todos') === '1' })).map((x) => sinConfig(c, x));
+  // Admin ve si cada cliente tiene PIN (nunca el PIN: se guarda con hash).
+  if (!esAdmin(c)) return c.json({ items, total: items.length });
+  const conPin = await clientesConPin(ctx.tenantId);
+  return c.json({ items: items.map((x) => ({ ...x, portal_pin_configurado: conPin.has(x.id) })), total: items.length });
 });
 
 clientes.get('/:id', requireScope('read:proyectos'), async (c) => {
@@ -56,6 +63,8 @@ const patchSchema = z.object({
   config: z.record(z.unknown()).optional(),
   mesa_id: z.string().uuid().nullable().optional(),
   activo: z.boolean().optional(),
+  /** PIN del portal: 4 a 6 dígitos para fijarlo, null para quitarlo; ausente = sin cambios. Se guarda con hash. */
+  portal_pin: z.string().regex(/^\d{4,6}$/, 'El PIN debe tener de 4 a 6 dígitos').nullable().optional(),
 });
 
 /**
@@ -86,9 +95,22 @@ clientes.post('/', requireScope('admin'), zValidator('json', z.object({
 
 clientes.patch('/:id', requireScope('admin'), zValidator('json', patchSchema), async (c) => {
   const ctx = ctxOf(c);
-  const cl = await updateClienteConfig(ctx, c.req.param('id'), c.req.valid('json'));
-  await audit(ctx, { accion: 'actualizar_config', entidad: 'cliente', entidad_id: cl.id, detalle: c.req.valid('json') });
+  const { portal_pin, ...patch } = c.req.valid('json');
+  // El PIN nunca vuelve a config (en claro): va con hash a portal_pines (auditoría 10/10, M3).
+  if (patch.config && 'portal_pin' in patch.config) { const { portal_pin: _p, ...resto } = patch.config; patch.config = resto; }
+  if (!(await getCliente(ctx, c.req.param('id')))) return c.json({ error: 'No encontrado' }, 404);
+  const cl = Object.keys(patch).length ? await updateClienteConfig(ctx, c.req.param('id'), patch) : (await getCliente(ctx, c.req.param('id')))!;
+  if (portal_pin !== undefined) await guardarPin(ctx.tenantId, cl.id, portal_pin);
+  await audit(ctx, { accion: 'actualizar_config', entidad: 'cliente', entidad_id: cl.id, detalle: { ...patch, ...(portal_pin !== undefined ? { portal_pin: portal_pin ? 'cambiado' : 'quitado' } : {}) } });
   return c.json(cl);
+});
+
+/** Una sola vez: pasa los PIN que sigan en claro en clientes.config a hash en portal_pines. Idempotente. */
+clientes.post('/portal-pines/migrar', requireScope('admin'), async (c) => {
+  const ctx = ctxOf(c);
+  const migrados = await migrarPinesEnClaro(ctx.tenantId);
+  await audit(ctx, { accion: 'migrar_pines_portal', entidad: 'cliente', detalle: { migrados } });
+  return c.json({ migrados });
 });
 
 /** Rotación del secreto del webhook: reescribe la URL en todos los clientes activos. Solo admin. */

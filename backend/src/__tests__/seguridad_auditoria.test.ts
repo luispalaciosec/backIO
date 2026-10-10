@@ -80,7 +80,9 @@ vi.mock('../lib/oauth', async (orig) => {
 
 vi.mock('../lib/db/proyectos', () => ({
   getProyectoByPortalToken: async (_c: unknown, token: string) =>
-    /^[pqrs]{43}$/.test(token)
+    token === 't'.repeat(43)
+      ? { proyecto: { id: 'p2', tenant_id: TENANT, nombre: 'Campaña', fecha_entrega: '2099-12-15', cliente_id: 'c-hash' }, cliente: { nombre: 'Cliente', logo_url: null, color_primario: '#000', config: {} }, requerimientos: [] }
+    : /^[pqrs]{43}$/.test(token)
       ? {
           proyecto: { id: 'p1', tenant_id: TENANT, nombre: 'Campaña', fecha_entrega: '2099-12-15', cliente_id: 'c1' },
           cliente: { nombre: 'Cliente', logo_url: null, color_primario: '#000', config: { portal_pin: '123456' } },
@@ -93,6 +95,11 @@ vi.mock('../lib/db/proyectos', () => ({
 vi.mock('../lib/portal/resumen', () => ({ generarResumen: async () => { throw new Error('ANTHROPIC_API_KEY no configurada'); } }));
 vi.mock('../lib/personas', async (orig) => ({ ...(await orig<object>()), resumenPersonas: async () => ({ periodo: 'semana', personas: [{ usuario_id: 'u-colab', nombre: 'Colaboradora', email: 'colab@geeks.com.ec', puntaje: 70 }, { usuario_id: 'u-otra', nombre: 'Compañera', email: 'otra@geeks.com.ec', puntaje: 40 }] }) }));
 vi.mock('../lib/horas', async (orig) => ({ ...(await orig<object>()), resumenHoras: async () => ({ por_cliente: {}, por_usuario: { 'u-colab': 5, 'u-otra': 7 }, por_requerimiento: { r1: 3 }, por_proyecto: {}, total: 12 }) }));
+vi.mock('../lib/portal/pin', async (orig) => {
+  const mod = await orig<typeof import('../lib/portal/pin')>();
+  const hash = mod.hashPin('4321');
+  return { ...mod, leerHashPin: async (clienteId: string) => (clienteId === 'c-hash' ? hash : null) };
+});
 vi.mock('../lib/kpis', async (orig) => {
   const mod = await orig<typeof import('../lib/kpis')>();
   const persona = (usuario_id: string) => ({ usuario_id, nombre: USUARIOS[usuario_id]!.nombre, valor: 50, estado: 'no_cumple' });
@@ -347,5 +354,29 @@ describe('Ola 1a (auditoría 10/10)', () => {
   it('punto 14 · un cuerpo de más de 1 MB se rechaza con 413', async () => {
     const res = await app.request('/api/v1/requerimientos', { method: 'POST', headers: { ...bearer('jwt-lider'), 'content-type': 'application/json', 'content-length': String(2 * 1024 * 1024) }, body: 'x'.repeat(2 * 1024 * 1024) });
     expect(res.status).toBe(413);
+  });
+});
+
+describe('Ola 1b (auditoría 10/10)', () => {
+  it('M3 · el PIN se guarda con hash y sal: no es reversible y dos hashes del mismo PIN difieren', async () => {
+    const { hashPin, pinCoincide } = await import('../lib/portal/pin');
+    const a = hashPin('123456'), b = hashPin('123456');
+    expect(a).not.toContain('123456');
+    expect(a).not.toBe(b);
+    expect(pinCoincide('123456', a)).toBe(true);
+    expect(pinCoincide('123457', a)).toBe(false);
+    expect(pinCoincide('123456', 'basura')).toBe(false);
+  });
+
+  it('M3 · el portal valida el PIN contra el hash guardado', async () => {
+    const pedir = (pin?: string) => app.request(`/api/portal/${'t'.repeat(43)}`, { headers: { 'x-forwarded-for': '192.0.2.77', ...(pin ? { 'x-portal-pin': pin } : {}) } });
+    expect((await pedir()).status).toBe(401);
+    expect((await pedir('0000')).status).toBe(401);
+    expect((await pedir('4321')).status).toBe(200);
+  });
+
+  it('S11 · una key de perfil cliente exige el cliente al que pertenece', async () => {
+    const res = await app.request('/api/v1/admin/api-keys', { method: 'POST', headers: { ...bearer('jwt-admin'), 'content-type': 'application/json' }, body: JSON.stringify({ nombre: 'Portal cliente', perfil: 'cliente' }) });
+    expect(res.status).toBe(400);
   });
 });
