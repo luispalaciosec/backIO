@@ -25,7 +25,7 @@ una acción de Luis) · **pendiente** (ola futura).
 | Hallazgo | Estado | Archivos | Verificación |
 |---|---|---|---|
 | S1 · Secreto del webhook y token del portal en los logs | hecho | `backend/src/lib/log.ts`, `backend/src/app.ts` | Logger propio que redacta `/api/webhooks/basecamp/*`, `/api/portal/*` y toda query string. Test de `redactarRuta` |
-| S1 · Rotar `BASECAMP_WEBHOOK_SECRET` tras el deploy | pendiente-humano | Railway + Admin → Clientes → «Actualizar webhooks» | — |
+| S1 · Rotar `BASECAMP_WEBHOOK_SECRET` tras el deploy | hecho (Luis, 10/10) | Railway + Admin → Clientes → «Actualizar webhooks» | 15 webhooks actualizados, 0 registrados, 0 errores. Logs de Railway ya sin secretos en las rutas |
 | S3 · Un colaborador veía desempeño, horas y correo del equipo | hecho | `routes/v1/personas.ts`, `routes/v1/horas.ts`, `lib/auth/roles.ts`, `frontend/components/Sidebar.tsx` | Tests: colaborador ve solo su fila sin correo y solo sus horas por persona; gestión ve todo. «Personas» oculto en el menú del colaborador |
 | §3.6 · Permisos inline dispersos | hecho | `lib/auth/roles.ts` (`esColaborador`, `esColaboradorHumano`, `esGestion`), `shared/src/types.ts` (`puedeEscribir`), `requerimientos.ts`, `actividad.ts`, `me.server.ts`, `Sidebar.tsx` | Mismo significado que antes en cada sitio; typecheck y suite completa |
 | S4 · Fallback de credenciales de Basecamp a `tenants.config` | hecho | `lib/basecamp/credenciales.ts` | Solo `integracion_credenciales`; nunca se escriben tokens en `tenants` |
