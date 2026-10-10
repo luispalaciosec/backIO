@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-export function supabaseServer() {
-  const store = cookies();
+/** Next 15: cookies() es asíncrono. */
+export async function supabaseServer() {
+  const store = await cookies();
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
       getAll: () => store.getAll(),

@@ -4,7 +4,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { meServer } from '@/lib/me.server';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { data } = await supabaseServer().auth.getUser();
+  const { data } = await (await supabaseServer()).auth.getUser();
   if (!data.user) redirect('/login');
   const me = await meServer();
   return (

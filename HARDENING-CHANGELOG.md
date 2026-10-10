@@ -61,3 +61,13 @@ una acción de Luis) · **pendiente** (ola futura).
 | Supabase: límites de Auth (sign-in, refresh, verificación) | hecho (Luis) | Configurados en el panel; no se exponen por API |
 | Sentry: proyectos `backio-frontend` y `backio-banckend` creados | hecho (Luis) | Faltan los DSN para la Ola 7 |
 | Reautorizar Basecamp (tokens nuevos) | hecho | Conectado 10/10 18:20; credenciales en `integracion_credenciales` (actualizada 23:20 UTC) y ningún token en `tenants.config` |
+
+## Ola 2 · Dependencias (checklist punto 20)
+
+| Hallazgo | Estado | Archivos | Verificación |
+|---|---|---|---|
+| Backend: MCP SDK 1.30 (GHSA-6qxp-vccf-f47h), Hono 4.13.5, proxy-addr, fast-uri, ip-address | hecho | `backend/package.json`, `package.json` (`pnpm.overrides`) | MCP SDK 1.32.1, Hono 4.13.13; test nuevo de `initialize` + `tools/list` del MCP; deploy y `/health` 200 |
+| Frontend: Next 14.2.35 (2 críticas, 8 altas), postcss, source-map-js | hecho | `frontend/package.json`, `lib/supabase/server.ts`, `(app)/layout.tsx`, `lib/api.server.ts`, `proyectos/[id]`, `daily`, `p/[token]`, `next.config.mjs` | Next 15.5.27 + React 19; `cookies()`, `params` y `searchParams` asíncronos; `outputFileTracingRoot`; postcss y source-map-js por override. Build OK; login, recuperar y consentimiento revisados en el navegador sin errores |
+| `pnpm audit --prod` | hecho | — | De 34 vulnerabilidades (3 críticas, 12 altas) a **0** |
+| CI con auditoría y Dependabot | hecho | `.github/workflows/ci.yml`, `.github/dependabot.yml` | `pnpm audit --prod --audit-level=high` en cada push y PR; Dependabot semanal (npm) y mensual (actions) |
+| Probar en producción las pantallas con sesión (backlog, daily, KPIs, proyectos) | pendiente-humano | — | Rollback inmediato si algo falla: `vercel rollback https://backio-p0ys99oui-luis-palacios-projects-1f891ccb.vercel.app` |

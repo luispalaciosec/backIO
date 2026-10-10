@@ -5,7 +5,8 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 /** Portal cliente. Sin login. Consume /api/portal/:token, que devuelve ClientSafeProject y NADA MÁS. */
-export default function PortalPage({ params }: { params: { token: string } }) {
+export default async function PortalPage({ params: paramsP }: { params: Promise<{ token: string }> }) {
+  const params = await paramsP;
   return (
     <main className="min-h-screen bg-gray-50 py-6 px-4">
       <div className="max-w-xl mx-auto">

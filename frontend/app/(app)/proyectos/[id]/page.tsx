@@ -11,7 +11,8 @@ import { hrefExterno } from '@/lib/url';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProyectoPage({ params }: { params: { id: string } }) {
+export default async function ProyectoPage({ params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   let p: ProyectoDetalle;
   let vista: ClientSafeProject;
   try {

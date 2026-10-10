@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const seguridad = [
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -9,6 +12,8 @@ const seguridad = [
 ];
 
 const nextConfig = {
+  // Raíz del monorepo (pnpm): sin esto Next 15 adivina la raíz y puede tomar un lockfile ajeno al repo.
+  outputFileTracingRoot: path.join(path.dirname(fileURLToPath(import.meta.url)), '..'),
   transpilePackages: ['@backio/shared'],
   reactStrictMode: true,
   async headers() {

@@ -14,7 +14,8 @@ export const dynamic = 'force-dynamic';
  * → 3) tablero de la mesa → 4) apertura/cierre publicado en el board Daily de la mesa.
  * Una sola pantalla, sin scroll, proyectable. El daily no prioriza, desbloquea.
  */
-export default async function DailyPage({ searchParams }: { searchParams: { mesa?: string } }) {
+export default async function DailyPage({ searchParams: spP }: { searchParams: Promise<{ mesa?: string }> }) {
+  const searchParams = await spP;
   const [{ items: usuarios }, { items: mesas }, me] = await Promise.all([apiServer<{ items: Usuario[] }>('/usuarios'), apiServer<{ items: Mesa[] }>('/mesas'), meServer()]);
   const activas = mesas.filter((m) => m.activa);
   const todas = searchParams.mesa === 'todas';
