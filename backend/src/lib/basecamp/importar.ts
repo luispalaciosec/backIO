@@ -8,7 +8,7 @@
  * Idempotente: se enlaza por basecamp_todo_id / basecamp_todolist_id.
  */
 import type { DbCtx } from '../db/client';
-import { throwIf } from '../db/client';
+import { throwIf, serviceClient } from '../db/client';
 import { getCliente } from '../db/clientes';
 import { listUsuarios } from '../db/usuarios';
 import { insertProyecto, updateProyecto } from '../db/proyectos';
@@ -150,7 +150,8 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
     await audit(ctx, { accion: 'basecamp_eliminado', entidad: 'requerimiento', entidad_id: ex.id, detalle: { todo_id: ex.basecamp_todo_id, titulo: ex.titulo_interno } });
     r.eliminados_en_basecamp += 1;
   }
-  await ctx.db.from('clientes').update({ basecamp_importado_at: new Date().toISOString() }).eq('id', clienteId);
+  // Marca del sistema: con service role, porque con la migración 27 solo admin escribe en clientes con su sesión.
+  await serviceClient().from('clientes').update({ basecamp_importado_at: new Date().toISOString() }).eq('id', clienteId).eq('tenant_id', ctx.tenantId);
   await audit(ctx, { accion: 'basecamp_importar', entidad: 'cliente', entidad_id: clienteId, detalle: r });
   return r;
 }
