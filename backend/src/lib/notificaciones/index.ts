@@ -35,6 +35,24 @@ async function resolverDestinatarios(tenantId: string, d: Destino): Promise<{ id
   return [...out.entries()].map(([id, email]) => ({ id, email }));
 }
 
+/**
+ * Botón «Abrir en BackIO» de los correos (auditoría 10/10, S5). La ruta viaja al final del cuerpo tras una marca;
+ * cualquier aparición de la marca en el texto (p. ej. dentro del título de una tarea copiado a una señal) se
+ * neutraliza al encolar, se lee solo la última y además debe empezar por una sección conocida de BackIO.
+ */
+const MARCA_RUTA = '\n__ruta__:';
+const RUTAS_PERMITIDAS = ['/proyectos', '/backlog', '/weekly', '/daily', '/informes', '/kpis', '/dashboard', '/personas', '/dia-a-dia', '/huerfanos', '/evolutivo', '/admin/'];
+const sinMarca = (t: string) => t.replace(/__ruta__:/g, '__ruta:');
+export function rutaPermitida(ruta: string | undefined | null): string | undefined {
+  if (!ruta || !/^\/(?!\/)[A-Za-z0-9_\-./?=&%]*$/.test(ruta)) return undefined;
+  return RUTAS_PERMITIDAS.some((p) => ruta === p || ruta.startsWith(p.endsWith('/') ? p : `${p}/`) || ruta.startsWith(`${p}?`)) ? ruta : undefined;
+}
+export function separarRuta(cuerpo: string): { cuerpo: string; ruta: string | undefined } {
+  const i = cuerpo.lastIndexOf(MARCA_RUTA);
+  if (i < 0) return { cuerpo, ruta: undefined };
+  return { cuerpo: cuerpo.slice(0, i), ruta: rutaPermitida(cuerpo.slice(i + MARCA_RUTA.length)) };
+}
+
 export async function notificar(ctx: Pick<DbCtx, 'tenantId'>, n: Notificacion, destino: Destino): Promise<number> {
   const destinatarios = await resolverDestinatarios(ctx.tenantId, destino);
   if (destinatarios.length === 0) return 0;
@@ -43,7 +61,7 @@ export async function notificar(ctx: Pick<DbCtx, 'tenantId'>, n: Notificacion, d
     .from('notificaciones')
     .insert(destinatarios.map((u) => ({
       tenant_id: ctx.tenantId, usuario_id: u.id, email_destino: u.email, canal: 'email',
-      tipo: n.tipo, titulo: n.titulo, cuerpo: n.cuerpo + (n.ruta ? `\n__ruta__:${n.ruta}` : ''),
+      tipo: n.tipo, titulo: sinMarca(n.titulo), cuerpo: sinMarca(n.cuerpo) + (rutaPermitida(n.ruta) ? `${MARCA_RUTA}${n.ruta}` : ''),
       entidad_tipo: n.entidad_tipo ?? null, entidad_id: n.entidad_id ?? null,
     })))
     .select('id');
@@ -79,9 +97,7 @@ export async function procesarPendientes(tenantId?: string): Promise<{ enviadas:
     const destino = u && u.activo && u.tenant_id === f.tenant_id ? u.email : null;
     if (!destino) { await db.from('notificaciones').update({ intentos: MAX_INTENTOS, ultimo_error: 'sin destinatario válido' }).eq('id', f.id); continue; }
     if (f.email_destino && f.email_destino.trim().toLowerCase() !== destino.trim().toLowerCase()) console.warn('[notificaciones] email_destino no coincide con el usuario; se envía al correo del usuario', f.id);
-    const [cuerpo, rutaCruda] = f.cuerpo.split('\n__ruta__:');
-    // La ruta solo puede ser un path interno de BackIO: sin esto un título con "\n__ruta__:" desviaría el botón del correo.
-    const ruta = rutaCruda && /^\/(?!\/)[A-Za-z0-9_\-./?=&%]*$/.test(rutaCruda) ? rutaCruda : undefined;
+    const { cuerpo, ruta } = separarRuta(f.cuerpo);
     try {
       await sendEmail({ to: destino, subject: `[BackIO] ${f.titulo.replace(/[\r\n]+/g, ' ')}`, html: plantillaHtml(f.titulo, cuerpo ?? '', ruta ? `${base}${ruta}` : undefined), text: cuerpo });
       await db.from('notificaciones').update({ enviada_at: new Date().toISOString(), intentos: f.intentos + 1, ultimo_error: null }).eq('id', f.id);

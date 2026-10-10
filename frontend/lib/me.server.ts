@@ -9,7 +9,5 @@ export async function meServer(): Promise<Me> {
   catch { return { nombre: '', rol: null, usuario_id: null }; }
 }
 
-/** Roles que pueden generar/publicar (weekly, daily, proyectos). Espejo de ROLES_INTERNOS_GESTION del backend. */
-export function puedeEscribir(rol: Rol | null): boolean {
-  return rol !== null && rol !== 'colaborador';
-}
+/** Roles que pueden generar/publicar (weekly, daily, proyectos): la definición vive en @backio/shared. */
+export { puedeEscribir } from '@backio/shared';

@@ -21,8 +21,19 @@ const oauthError = (c: { json: (b: unknown, s: 400 | 401) => Response }, err: un
 };
 
 oauth.post('/register', async (c) => {
-  try { return c.json(await registrarCliente(await c.req.json()), 201); }
+  try { return c.json(await registrarCliente(await c.req.json().catch(() => null)), 201); }
   catch (err) { return oauthError(c, err); }
+});
+
+/**
+ * Datos registrados de un cliente para la pantalla de consentimiento: el nombre y los hosts salen de aquí, no de la
+ * URL (antes un enlace podía decir «Claude Desktop» para un cliente cualquiera; auditoría 10/10, S6 / M13).
+ */
+oauth.get('/client/:id', async (c) => {
+  const cliente = await getCliente(c.req.param('id').slice(0, 100));
+  if (!cliente) return c.json({ error: 'invalid_client' }, 404);
+  const hosts = [...new Set(cliente.redirect_uris.map((u) => { try { return new URL(u).host; } catch { return ''; } }).filter(Boolean))];
+  return c.json({ client_id: cliente.id, nombre: cliente.nombre, hosts, scopes: validarScopes(c.req.query('scope')) });
 });
 
 /** Paso 1: el cliente MCP llega aquí; validamos y mandamos al consentimiento del frontend (requiere login). */
@@ -68,9 +79,16 @@ oauth.post('/deny', requireAuth, zValidator('json', z.object({ client_id: z.stri
   return c.json({ redirect: u.toString() });
 });
 
+/** Campos de /oauth/token con tamaño acotado (antes se aceptaba cualquier cuerpo). */
+const campo = (max: number) => z.string().max(max).optional();
+const tokenSchema = z.object({ grant_type: z.string().max(40), code: campo(256), client_id: campo(100), client_secret: campo(256), redirect_uri: campo(500), code_verifier: campo(256), refresh_token: campo(256) });
+
 oauth.post('/token', async (c) => {
   const ct = c.req.header('content-type') ?? '';
-  const body = (ct.includes('json') ? await c.req.json() : Object.fromEntries((await c.req.formData()).entries())) as Record<string, string | undefined>;
+  const crudo = await (ct.includes('json') ? c.req.json() : c.req.formData().then((f) => Object.fromEntries(f.entries()))).catch(() => null);
+  const parsed = tokenSchema.safeParse(crudo);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const body = parsed.data;
   try {
     if (body.grant_type === 'authorization_code') {
       return c.json(await canjearCodigo({ code: body.code ?? '', client_id: body.client_id ?? '', client_secret: body.client_secret, redirect_uri: body.redirect_uri, code_verifier: body.code_verifier }));
@@ -83,7 +101,9 @@ oauth.post('/token', async (c) => {
 });
 
 oauth.post('/revoke', async (c) => {
-  const body = Object.fromEntries((await c.req.formData()).entries()) as Record<string, string>;
-  if (body.token) await revocar(body.token);
+  // RFC 7009: siempre 200, aunque el token no exista o el cuerpo no sirva.
+  const crudo = await c.req.formData().then((f) => Object.fromEntries(f.entries())).catch(() => null);
+  const parsed = z.object({ token: z.string().min(1).max(256) }).safeParse(crudo);
+  if (parsed.success) await revocar(parsed.data.token);
   return c.body(null, 200);
 });

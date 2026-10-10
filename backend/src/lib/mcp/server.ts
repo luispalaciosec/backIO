@@ -29,7 +29,7 @@ import { previewProyecto, crearProyectoDesdePlantilla } from '../builder/service
 import { updateRequerimiento, getRequerimiento } from '../db/requerimientos';
 import { pushDueDate } from '../basecamp/write';
 import { publicarActaEnBasecamp } from './publish';
-import { guardarPlan, tomarPlan, guardarResultado } from './plans';
+import { guardarPlan, tomarPlan, guardarResultado, verPlan } from './plans';
 import { buildDashboard } from '../dashboard';
 import { resumenHoras } from '../horas';
 import { completarUltimaReprogramacion } from '../db/historial';
@@ -347,6 +347,14 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     description: 'Ejecuta un plan generado por plan_project_from_template o plan_requirement_update. El plan_id expira en 15 minutos y es de un solo uso.',
     inputSchema: { plan_id: z.string().regex(/^plan_[0-9a-f]{12}$/) },
   }, ({ plan_id }) => guard([], async () => {
+    // Permisos ANTES de consumir: antes cualquier credencial del tenant que conociera el plan_id lo gastaba aunque
+    // no pudiera ejecutarlo, y un plan de una API key podía confirmarlo otra (auditoría 10/10, S9).
+    const visto = await verPlan(ctx, plan_id);
+    if (!visto) return fail('plan_id no existe o no pertenece a este tenant');
+    const scopeNecesario = visto.tool === 'plan_project_from_template' ? 'write:proyectos' : visto.tool === 'plan_requirement_update' ? 'write:requerimientos' : null;
+    if (!scopeNecesario) return fail(`Tool de plan desconocida: ${visto.tool}`);
+    if (!tiene(auth, scopeNecesario)) return fail(`Scope requerido: ${scopeNecesario}`);
+    if ((visto.api_key_id ?? null) !== (ctx.apiKeyId ?? null)) return fail('Este plan lo generó otra credencial');
     const plan = await tomarPlan(ctx, plan_id);
     if (plan.tool === 'plan_project_from_template') {
       if (!tiene(auth, 'write:proyectos')) return fail('Scope requerido: write:proyectos');

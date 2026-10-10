@@ -4,6 +4,7 @@
  * guardados hasheados. El usuario autoriza con su sesión de BackIO en /oauth/consent (frontend).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { z } from 'zod';
 import { serviceClient, throwIf, DbError } from '../db/client';
 
 export const SCOPES_SOPORTADOS = ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos', 'write:proyectos', 'write:actas'] as const;
@@ -49,18 +50,30 @@ export function redirectUriSegura(u: string): boolean {
 
 export interface OAuthClient { id: string; secret_hash: string | null; nombre: string; redirect_uris: string[] }
 
-export async function registrarCliente(body: { client_name?: string; redirect_uris?: unknown; token_endpoint_auth_method?: string }): Promise<{ client_id: string; client_secret?: string; client_name: string; redirect_uris: string[]; token_endpoint_auth_method: string; grant_types: string[]; response_types: string[] }> {
-  const uris = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter((u): u is string => typeof u === 'string') : [];
-  if (uris.length === 0) throw new DbError('redirect_uris requerido', 400);
+/**
+ * Registro dinámico (RFC 7591) con esquema y límites: antes se guardaba el cuerpo crudo como `metadata`, sin
+ * tamaño máximo, y el nombre podía traer saltos de línea (auditoría 10/10, S6 y punto 14 del checklist).
+ */
+const registroSchema = z.object({
+  client_name: z.string().trim().max(100).regex(/^[^\r\n]*$/).optional(),
+  redirect_uris: z.array(z.string().max(500)).min(1).max(10),
+  token_endpoint_auth_method: z.enum(['none', 'client_secret_post', 'client_secret_basic']).optional(),
+});
+
+export async function registrarCliente(cuerpo: unknown): Promise<{ client_id: string; client_secret?: string; client_name: string; redirect_uris: string[]; token_endpoint_auth_method: string; grant_types: string[]; response_types: string[] }> {
+  const parsed = registroSchema.safeParse(cuerpo);
+  if (!parsed.success) throw new DbError(`invalid_client_metadata: ${parsed.error.issues.map((i) => i.path.join('.') || i.message).join(', ')}`, 400);
+  const body = parsed.data;
+  const uris = body.redirect_uris;
   for (const u of uris) {
     if (!redirectUriSegura(u)) throw new DbError(`invalid_redirect_uri: debe ser https (o http en localhost): ${u}`, 400);
   }
   const publico = (body.token_endpoint_auth_method ?? 'none') === 'none';
   const id = `mcp_${randomBytes(12).toString('hex')}`;
   const secret = publico ? undefined : b64url(randomBytes(32));
-  const { error } = await serviceClient().from('oauth_clients').insert({ id, secret_hash: secret ? sha256(secret) : null, nombre: body.client_name ?? 'Cliente MCP', redirect_uris: uris, metadata: body });
+  const { error } = await serviceClient().from('oauth_clients').insert({ id, secret_hash: secret ? sha256(secret) : null, nombre: body.client_name || 'Cliente MCP', redirect_uris: uris, metadata: body });
   throwIf(error);
-  return { client_id: id, client_secret: secret, client_name: body.client_name ?? 'Cliente MCP', redirect_uris: uris, token_endpoint_auth_method: publico ? 'none' : 'client_secret_post', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] };
+  return { client_id: id, client_secret: secret, client_name: body.client_name || 'Cliente MCP', redirect_uris: uris, token_endpoint_auth_method: publico ? 'none' : 'client_secret_post', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] };
 }
 
 export async function getCliente(clientId: string): Promise<OAuthClient | null> {
@@ -128,8 +141,16 @@ export async function refrescar(p: { refresh_token: string; client_id: string; c
   const { data, error } = await db.from('oauth_tokens').select('*').eq('token_hash', sha256(p.refresh_token)).eq('tipo', 'refresh').eq('client_id', p.client_id).maybeSingle();
   throwIf(error);
   const t = data as { tenant_id: string; usuario_id: string; scope: string; expira_at: string; revocado_at: string | null } | null;
-  if (!t || t.revocado_at || new Date(t.expira_at).getTime() < Date.now()) throw new DbError('invalid_grant', 400);
-  await db.from('oauth_tokens').update({ revocado_at: new Date().toISOString() }).eq('token_hash', sha256(p.refresh_token)); // rotación
+  if (!t || new Date(t.expira_at).getTime() < Date.now()) throw new DbError('invalid_grant', 400);
+  // Rotación atómica: solo una petición puede usar este refresh. Si ya estaba usado (o dos compiten), es una
+  // reutilización: se revocan todos los tokens vivos de ese cliente para ese usuario (auditoría 10/10, S8).
+  const ahora = new Date().toISOString();
+  const { data: rotado, error: e2 } = t.revocado_at ? { data: [], error: null } : await db.from('oauth_tokens').update({ revocado_at: ahora }).eq('token_hash', sha256(p.refresh_token)).is('revocado_at', null).select('token_hash');
+  throwIf(e2);
+  if (!rotado?.length) {
+    await db.from('oauth_tokens').update({ revocado_at: ahora }).eq('client_id', p.client_id).eq('usuario_id', t.usuario_id).is('revocado_at', null);
+    throw new DbError('invalid_grant', 400);
+  }
   return emitirTokens({ client_id: p.client_id, tenant_id: t.tenant_id, usuario_id: t.usuario_id, scope: t.scope });
 }
 

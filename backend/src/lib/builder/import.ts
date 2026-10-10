@@ -54,6 +54,7 @@ export function validarFilas(
     if (!f.cliente_slug) motivos.push('cliente_slug vacío');
     else if (!ctx.clientesSlug.has(f.cliente_slug)) motivos.push(`cliente "${f.cliente_slug}" no existe`);
     if (!f.titulo_interno) motivos.push('titulo_interno vacío');
+    else if (/[\r\n]/.test(f.titulo_interno)) motivos.push('titulo_interno con saltos de línea');
     const vis = (f.visible ?? '').toLowerCase();
     if (!BOOL_TRUE.has(vis) && !BOOL_FALSE.has(vis)) motivos.push(`visible inválido: "${f.visible}"`);
     if (BOOL_TRUE.has(vis) && !f.etiqueta_cliente) motivos.push('visible=true requiere etiqueta_cliente');

@@ -3,6 +3,8 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
+import { esColaborador, esColaboradorHumano } from '../../lib/auth/roles';
+import { unaLinea } from '../../lib/validacion';
 import {
   listBacklog, getRequerimiento, insertRequerimientos, updateRequerimiento, softDeleteRequerimiento,
   audit, listClientes, listUsuarios, getClienteBySlug, insertProyecto, listProyectos, getUsuarioByEmail, DbError,
@@ -71,7 +73,7 @@ requerimientos.get('/:id', requireScope('read:backlog'), async (c) => {
 const crearSchema = z.object({
   cliente_id: z.string().uuid(),
   proyecto_id: z.string().uuid().nullable().optional(),
-  titulo_interno: z.string().min(2),
+  titulo_interno: unaLinea(2, 300),
   etiqueta_cliente: z.string().nullable().optional(),
   visible_cliente: z.boolean().default(false),
   bloque_nombre: z.string().nullable().optional(),
@@ -117,7 +119,7 @@ requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json'
 });
 
 const patchSchema = z.object({
-  titulo_interno: z.string().min(2).optional(),
+  titulo_interno: unaLinea(2, 300).optional(),
   etiqueta_cliente: z.string().nullable().optional(),
   visible_cliente: z.literal(false).optional(), // solo restringir; abrir lo bloquea el trigger igualmente
   estado_operativo: z.enum(ESTADOS).optional(),
@@ -144,7 +146,7 @@ export const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entrega
 
 const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.rol === 'colaborador' && a.perfil !== 'oauth') return next(); // se valida en el handler
+  if (esColaboradorHumano(a)) return next(); // se valida en el handler
   return requireScope('write:requerimientos')(c, next);
 };
 
@@ -156,7 +158,7 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
   const patch = c.req.valid('json');
 
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.rol === 'colaborador') {
+  if (esColaborador(a)) {
     if (!ctx.usuarioId || !previo.owner_agencia.includes(ctx.usuarioId)) return c.json({ error: 'Solo puedes actualizar las tareas asignadas a ti' }, 403);
     const noPermitidos = Object.keys(patch).filter((k) => !(CAMPOS_COLABORADOR as readonly string[]).includes(k));
     if (noPermitidos.length) return c.json({ error: `Como colaborador solo puedes cambiar estado, fecha de entrega y entregables (no: ${noPermitidos.join(', ')})` }, 403);
@@ -211,7 +213,7 @@ requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), 
  */
 async function soloSiEsSuya(c: Context, requerimientoId: string | null): Promise<Response | null> {
   const a = c.get('auth');
-  if (!(a.tipo === 'usuario' && a.rol === 'colaborador' && a.perfil !== 'oauth')) return null;
+  if (!esColaboradorHumano(a)) return null;
   const ctx = ctxOf(c);
   const r = requerimientoId ? await getRequerimiento(ctx, requerimientoId) : null;
   if (!r || !ctx.usuarioId || !r.owner_agencia.includes(ctx.usuarioId)) return c.json({ error: 'Solo puedes actualizar las tareas asignadas a ti.' }, 403);
@@ -236,7 +238,7 @@ requerimientos.post('/:id/bitacora', escrituraOPropia, zValidator('json', z.obje
   if (bloqueo) return bloqueo;
   const a = c.get('auth');
   // Lo que ve el cliente lo decide gestión: un colaborador anota, pero no publica al cliente.
-  const visible = b.visible_cliente && r.visible_cliente && !(a.tipo === 'usuario' && a.rol === 'colaborador');
+  const visible = b.visible_cliente && r.visible_cliente && !esColaborador(a);
   const nota = await insertBitacora(ctx, { requerimiento_id: id, nota: b.nota, visible_cliente: visible, estado_operativo: r.estado_operativo, estado_aprobacion: r.estado_aprobacion });
   await audit(ctx, { accion: 'bitacora', entidad: 'requerimiento', entidad_id: id, detalle: { nota: b.nota.slice(0, 200), visible_cliente: b.visible_cliente } });
   return c.json(nota, 201);
@@ -244,7 +246,7 @@ requerimientos.post('/:id/bitacora', escrituraOPropia, zValidator('json', z.obje
 requerimientos.delete('/:id/bitacora/:bid', escrituraOPropia, async (c) => {
   const ctx = ctxOf(c);
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.rol === 'colaborador') {
+  if (esColaborador(a)) {
     // Un colaborador solo borra sus propias notas.
     const { data: nota } = await ctx.db.from('bitacora').select('usuario_id, requerimiento_id').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('bid')).maybeSingle();
     const n = nota as { usuario_id: string | null; requerimiento_id: string } | null;
@@ -274,7 +276,7 @@ requerimientos.post('/:id/reprocesos', escrituraOPropia, zValidator('json', z.ob
   const previo = await getRequerimiento(ctx, c.req.param('id'));
   if (!previo) return c.json({ error: 'No encontrado' }, 404);
   const a = c.get('auth');
-  if (a.tipo === 'usuario' && a.rol === 'colaborador' && !(ctx.usuarioId && previo.owner_agencia.includes(ctx.usuarioId))) return c.json({ error: 'Solo puedes registrar reprocesos en tus tareas' }, 403);
+  if (esColaborador(a) && !(ctx.usuarioId && previo.owner_agencia.includes(ctx.usuarioId))) return c.json({ error: 'Solo puedes registrar reprocesos en tus tareas' }, 403);
   const rp = await registrarReproceso(ctx, previo.id, { origen: b.origen as OrigenReproceso, motivo: b.motivo as MotivoReproceso, paso_retorno: b.paso_retorno ?? null, observacion: b.observacion ?? null, reabrir_basecamp: b.reabrir_basecamp, area_responsable: b.area_responsable ?? null, atribuible: b.atribuible ?? null });
   return c.json(rp, 201);
 });

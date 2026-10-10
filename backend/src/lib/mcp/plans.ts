@@ -27,6 +27,13 @@ export async function guardarPlan<P, R>(ctx: DbCtx, tool: string, parametros: P,
   return { plan_id: id, expira_en: expira };
 }
 
+/** Lee un plan sin consumirlo (para verificar permisos antes de gastarlo). */
+export async function verPlan(ctx: DbCtx, planId: string): Promise<AgentPlan | null> {
+  const { data, error } = await ctx.db.from('agent_plans').select('*').eq('id', planId).eq('tenant_id', ctx.tenantId).maybeSingle();
+  throwIf(error);
+  return (data as AgentPlan) ?? null;
+}
+
 export async function tomarPlan<P = unknown, R = unknown>(ctx: DbCtx, planId: string): Promise<AgentPlan<P, R>> {
   const { data, error } = await ctx.db.from('agent_plans').select('*').eq('id', planId).eq('tenant_id', ctx.tenantId).maybeSingle();
   throwIf(error);

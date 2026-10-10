@@ -5,6 +5,9 @@ import { getCliente, updateClienteConfig } from '../db/clientes';
 import { audit } from '../db/audit';
 import { BasecampClient } from './client';
 
+/** La URL registrada lleva el secreto: nunca se devuelve completa por la API (auditoría 10/10, S10). */
+export const enmascararPayloadUrl = (u: string): string => u.replace(/(\/api\/webhooks\/basecamp\/)[^/]+$/, '$1***');
+
 export function webhookUrl(): string {
   const base = process.env.BACKEND_PUBLIC_URL ?? env().BASECAMP_REDIRECT_URI?.replace(/\/api\/basecamp\/oauth\/callback$/, '');
   if (!base) throw new Error('BACKEND_PUBLIC_URL no configurada');
@@ -18,13 +21,13 @@ export async function registrarWebhookCliente(ctx: DbCtx, clienteId: string): Pr
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const url = webhookUrl();
   const existente = (cliente.config as { basecamp_webhook_id?: number }).basecamp_webhook_id;
-  if (existente) return { webhook_id: existente, payload_url: url };
+  if (existente) return { webhook_id: existente, payload_url: enmascararPayloadUrl(url) };
   const wh = await bc.registerWebhook(cliente.basecamp_project_id, url);
   // Solo el id: la URL lleva el secreto del webhook y clientes.config era legible por todos los usuarios.
   const { basecamp_webhook_url: _u, ...restoConfig } = cliente.config as Record<string, unknown>;
   await updateClienteConfig(ctx, clienteId, { config: { ...restoConfig, basecamp_webhook_id: wh.id } });
   await audit(ctx, { accion: 'basecamp_registrar_webhook', entidad: 'cliente', entidad_id: clienteId, detalle: { webhook_id: wh.id, project: cliente.basecamp_project_id } });
-  return { webhook_id: wh.id, payload_url: url };
+  return { webhook_id: wh.id, payload_url: enmascararPayloadUrl(url) };
 }
 
 /**
@@ -62,5 +65,5 @@ export async function diagnosticoWebhookCliente(ctx: DbCtx, clienteId: string) {
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const d = await bc.getWebhookDeliveries(cliente.basecamp_project_id, id);
   // Se enmascara el token de la URL.
-  return { webhook_id: id, activo: d.activo, payload_url: d.payload_url.replace(/(\/api\/webhooks\/basecamp\/)[^/]+$/, '$1***'), url_coincide: d.payload_url === webhookUrl(), entregas: d.entregas };
+  return { webhook_id: id, activo: d.activo, payload_url: enmascararPayloadUrl(d.payload_url), url_coincide: d.payload_url === webhookUrl(), entregas: d.entregas };
 }

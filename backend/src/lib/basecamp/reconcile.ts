@@ -9,13 +9,17 @@ import { getCliente } from '../db/clientes';
 import { pushDueDate } from './write';
 import { BasecampClient } from './client';
 import { applyBasecampUpdate, extractSafeTodo } from './sync';
+import { audit } from '../db/audit';
+
+/** Tope de fechas reenviadas a Basecamp por corrida: un desfase masivo no se propaga entero de una vez (M14). */
+const MAX_FECHAS_POR_CORRIDA = 25;
 
 export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; aplicados: number }> {
   const activos = (await listBacklog(ctx, { solo_activos: true })).filter((r) => r.basecamp_todo_id);
   if (activos.length === 0) return { revisados: 0, aplicados: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const proyectosPorCliente = new Map<string, number | null>();
-  let aplicados = 0;
+  let aplicados = 0, fechas = 0;
   for (const r of activos) {
     if (!proyectosPorCliente.has(r.cliente_id)) {
       proyectosPorCliente.set(r.cliente_id, (await getCliente(ctx, r.cliente_id))?.basecamp_project_id ?? null);
@@ -27,7 +31,13 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
       const safe = extractSafeTodo(raw);
       if (safe && (await applyBasecampUpdate(ctx, { ...safe, completed: safe.completed ?? false })).aplicado) aplicados += 1;
       // Regla 3: BackIO manda sobre la fecha. Si Basecamp quedó desfasado, se reenvía.
-      if (safe && r.fecha_entrega && safe.due_on !== r.fecha_entrega) { await pushDueDate(ctx, r, bc).catch((e) => console.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e)); }
+      if (safe && r.fecha_entrega && safe.due_on !== r.fecha_entrega && fechas < MAX_FECHAS_POR_CORRIDA) {
+        fechas += 1;
+        try {
+          await pushDueDate(ctx, r, bc);
+          await audit(ctx, { accion: 'basecamp_fecha_reenviada', entidad: 'requerimiento', entidad_id: r.id, detalle: { todo_id: r.basecamp_todo_id, basecamp: safe.due_on, backio: r.fecha_entrega } });
+        } catch (e) { console.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e); }
+      }
     } catch (err) {
       console.error('[reconcile] fallo en to-do', r.basecamp_todo_id, err);
     }

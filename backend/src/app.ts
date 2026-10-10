@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
+import { logPeticiones } from './lib/log';
+import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import { env, frontendOrigins } from './config/env';
 import { DbError } from './lib/db';
@@ -18,7 +19,11 @@ import { openapi } from './routes/openapi';
 export function createApp(): Hono {
   const app = new Hono();
   app.use('*', secureHeaders());
-  if (env().NODE_ENV !== 'test') app.use('*', logger());
+  if (env().NODE_ENV !== 'test') app.use('*', logPeticiones);
+  // Tamaño máximo del cuerpo (punto 14): 1 MB en general, 2 MB para la importación CSV.
+  const limiteGeneral = bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json({ error: 'El cuerpo de la petición es demasiado grande' }, 413) });
+  const limiteBulk = bodyLimit({ maxSize: 2 * 1024 * 1024, onError: (c) => c.json({ error: 'El CSV es demasiado grande (máximo 2 MB)' }, 413) });
+  app.use('*', (c, next) => (/\/requerimientos\/bulk(\/preview)?$/.test(c.req.path) ? limiteBulk : limiteGeneral)(c, next));
   app.use('/.well-known/*', cors({ origin: '*' }));
   app.use('/oauth/*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'OPTIONS'] }));
   app.use('/mcp', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version'], allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], exposeHeaders: ['Mcp-Session-Id'] }));

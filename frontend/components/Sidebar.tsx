@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { Rol } from '@backio/shared';
+import { puedeEscribir, type Rol } from '@backio/shared';
 import { SignOutButton } from '@/components/SignOutButton';
 
 type Hoja = { href: string; label: string; icon: string };
@@ -55,7 +55,7 @@ const KEY = 'backio:sidebar:colapsado'; // preferencia de UI, no dato de negocio
 
 export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
   const esAdmin = rol === 'admin';
-  const escribe = rol !== null && rol !== 'colaborador';
+  const escribe = puedeEscribir(rol);
   const [colapsado, setColapsado] = useState(false);
   const pathname = usePathname();
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
@@ -102,7 +102,7 @@ export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         <Item href="/dashboard" label="Dashboard" icon="◧" />
         {/* KPIs: gestión ve el tablero; un colaborador ve «Mis KPIs» (solo lo suyo, lo acota el backend). */}
-        {GRUPOS.map((g) => <GrupoNav key={g.id} g={escribe ? g : { ...g, items: g.items.filter((i) => i.href !== '/evolutivo').map((i) => (i.href === '/kpis' ? { ...i, label: 'Mis KPIs' } : i)) }} />)}
+        {GRUPOS.map((g) => <GrupoNav key={g.id} g={escribe ? g : { ...g, items: g.items.filter((i) => i.href !== '/evolutivo' && i.href !== '/personas').map((i) => (i.href === '/kpis' ? { ...i, label: 'Mis KPIs' } : i)) }} />)}
         {esAdmin && <div className={`pt-3 mt-3 border-t border-gray-100 text-[10px] uppercase tracking-wide text-gray-400 ${colapsado ? 'text-center' : 'px-3'}`}>{colapsado ? '•' : 'Admin'}</div>}
         {esAdmin && ADMIN_GRUPOS.map((g) => <GrupoNav key={g.id} g={g} />)}
         {escribe && <Link href="/proyectos/nuevo" title="Nuevo proyecto" className={`btn-primary w-full mt-4 ${colapsado ? 'px-0' : ''}`}>{colapsado ? '+' : '+ Nuevo proyecto'}</Link>}

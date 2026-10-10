@@ -91,6 +91,8 @@ vi.mock('../lib/db/proyectos', () => ({
 
 // Tablero con dos personas: si la respuesta trae a «u-otra», un colaborador vio a su compañera.
 vi.mock('../lib/portal/resumen', () => ({ generarResumen: async () => { throw new Error('ANTHROPIC_API_KEY no configurada'); } }));
+vi.mock('../lib/personas', async (orig) => ({ ...(await orig<object>()), resumenPersonas: async () => ({ periodo: 'semana', personas: [{ usuario_id: 'u-colab', nombre: 'Colaboradora', email: 'colab@geeks.com.ec', puntaje: 70 }, { usuario_id: 'u-otra', nombre: 'Compañera', email: 'otra@geeks.com.ec', puntaje: 40 }] }) }));
+vi.mock('../lib/horas', async (orig) => ({ ...(await orig<object>()), resumenHoras: async () => ({ por_cliente: {}, por_usuario: { 'u-colab': 5, 'u-otra': 7 }, por_requerimiento: { r1: 3 }, por_proyecto: {}, total: 12 }) }));
 vi.mock('../lib/kpis', async (orig) => {
   const mod = await orig<typeof import('../lib/kpis')>();
   const persona = (usuario_id: string) => ({ usuario_id, nombre: USUARIOS[usuario_id]!.nombre, valor: 50, estado: 'no_cumple' });
@@ -284,5 +286,66 @@ describe('Ola 0 (auditoría 10/10)', () => {
     const cuerpo = await res.text();
     expect(cuerpo).not.toContain('ANTHROPIC');
     expect(cuerpo).toContain('no está disponible');
+  });
+});
+
+describe('Ola 1a (auditoría 10/10)', () => {
+  it('S1 · el log de peticiones no guarda el secreto del webhook ni el token del portal', async () => {
+    const { redactarRuta } = await import('../lib/log');
+    expect(redactarRuta('/api/webhooks/basecamp/s3cr3t-largo')).toBe('/api/webhooks/basecamp/[redactado]');
+    expect(redactarRuta('/api/portal/abc123token/resumen')).toBe('/api/portal/[redactado]/resumen');
+    expect(redactarRuta('/api/basecamp/oauth/callback?code=xyz&state=abc')).toBe('/api/basecamp/oauth/callback');
+    expect(redactarRuta('/api/v1/backlog')).toBe('/api/v1/backlog');
+  });
+
+  it('S3 · un colaborador solo ve su fila de Personas y sin correo; gestión ve a todos', async () => {
+    const colab = (await (await app.request('/api/v1/personas', { headers: bearer('bko_colab_lectura') })).json()) as { personas: Record<string, unknown>[] };
+    expect(colab.personas.map((p) => p.usuario_id)).toEqual(['u-colab']);
+    expect(colab.personas[0]).not.toHaveProperty('email');
+    const lider = (await (await app.request('/api/v1/personas', { headers: bearer('bko_lider_lectura') })).json()) as { personas: unknown[] };
+    expect(lider.personas).toHaveLength(2);
+  });
+
+  it('S3 · en el resumen de horas un colaborador solo ve sus horas por persona', async () => {
+    const r = (await (await app.request('/api/v1/horas/resumen', { headers: bearer('bko_colab_lectura') })).json()) as { por_usuario: Record<string, number>; por_requerimiento: Record<string, number> };
+    expect(r.por_usuario).toEqual({ 'u-colab': 5 });
+    expect(r.por_requerimiento).toEqual({ r1: 3 });
+  });
+
+  it('S5 · la ruta del botón del correo: solo la última marca y solo secciones de BackIO', async () => {
+    const { separarRuta, rutaPermitida } = await import('../lib/notificaciones');
+    expect(separarRuta('Señales\n• Tarea X\n__ruta__:/oauth/consent?client_id=evil\n__ruta__:/weekly')).toEqual({ cuerpo: 'Señales\n• Tarea X\n__ruta__:/oauth/consent?client_id=evil', ruta: '/weekly' });
+    expect(rutaPermitida('/oauth/consent?client_id=x')).toBeUndefined();
+    expect(rutaPermitida('//evil.example')).toBeUndefined();
+    expect(rutaPermitida('/proyectos/123')).toBe('/proyectos/123');
+    expect(rutaPermitida('/admin/api-keys')).toBe('/admin/api-keys');
+  });
+
+  it('S5 · un título con saltos de línea se rechaza', async () => {
+    const res = await app.request('/api/v1/requerimientos', { method: 'POST', headers: { ...bearer('jwt-lider'), 'content-type': 'application/json' },
+      body: JSON.stringify({ cliente_id: '00000000-0000-4000-8000-0000000000aa', titulo_interno: 'Tarea\n__ruta__:/oauth/consent' }) });
+    expect(res.status).toBe(400);
+  });
+
+  it('S6 · la pantalla de consentimiento obtiene nombre y hosts del registro, no de la URL', async () => {
+    const r = (await (await app.request('/oauth/client/cli-1?scope=read:backlog%20admin')).json()) as { nombre: string; hosts: string[]; scopes: string[] };
+    expect(r).toEqual({ client_id: 'cli-1', nombre: 'Agente de prueba', hosts: ['localhost:9999'], scopes: ['read:backlog'] });
+    expect((await app.request('/oauth/client/no-existe')).status).toBe(404);
+  });
+
+  it('S6 · el registro dinámico valida el esquema (nombre de una línea, límites)', async () => {
+    const registrar = (b: object) => app.request('/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+    expect((await registrar({ client_name: 'Claude\nDesktop', redirect_uris: ['https://claude.ai/cb'] })).status).toBe(400);
+    expect((await registrar({ client_name: 'X', redirect_uris: Array(11).fill('https://claude.ai/cb') })).status).toBe(400);
+    expect((await registrar({ client_name: 'Claude', redirect_uris: ['https://claude.ai/cb'] })).status).toBe(201);
+  });
+
+  it('punto 13 · GET /plantillas?cliente= exige un uuid', async () => {
+    expect((await app.request('/api/v1/plantillas?cliente=x),id.neq.null', { headers: bearer('jwt-lider') })).status).toBe(400);
+  });
+
+  it('punto 14 · un cuerpo de más de 1 MB se rechaza con 413', async () => {
+    const res = await app.request('/api/v1/requerimientos', { method: 'POST', headers: { ...bearer('jwt-lider'), 'content-type': 'application/json', 'content-length': String(2 * 1024 * 1024) }, body: 'x'.repeat(2 * 1024 * 1024) });
+    expect(res.status).toBe(413);
   });
 });

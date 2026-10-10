@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listPlantillas, getPlantillaArbol, guardarPlantilla, getProyectoDetalle, audit } from '../../lib/db';
+import { unaLinea } from '../../lib/validacion';
 
 export const plantillas = new Hono();
 
 plantillas.get('/', requireScope('read:proyectos'), async (c) => {
   const cliente = c.req.query('cliente');
+  // Se interpola en un filtro .or() de PostgREST: solo un uuid (auditoría 10/10, punto 13).
+  if (cliente && !z.string().uuid().safeParse(cliente).success) return c.json({ error: 'cliente debe ser un id válido' }, 400);
   const items = await listPlantillas(ctxOf(c), { clienteId: cliente || undefined, incluirInactivas: c.req.query('todas') === '1' });
   return c.json({ items, total: items.length });
 });
@@ -17,8 +20,8 @@ plantillas.get('/:id', requireScope('read:proyectos'), async (c) => {
   return p ? c.json(p) : c.json({ error: 'No encontrado' }, 404);
 });
 
-const tarea = z.object({ titulo_interno: z.string().min(1), etiqueta_cliente: z.string().nullable().optional().default(null), visible_cliente_default: z.boolean().default(false), peso_relativo: z.number().min(0).default(1), dias_offset: z.number().int().default(0), rol_sugerido: z.string().nullable().optional().default(null) });
-const bloque = z.object({ nombre: z.string().min(1), peso: z.number().min(0).max(100), opcional: z.boolean().default(false), tareas: z.array(tarea).default([]) });
+const tarea = z.object({ titulo_interno: unaLinea(1, 300), etiqueta_cliente: z.string().nullable().optional().default(null), visible_cliente_default: z.boolean().default(false), peso_relativo: z.number().min(0).default(1), dias_offset: z.number().int().default(0), rol_sugerido: z.string().nullable().optional().default(null) });
+const bloque = z.object({ nombre: unaLinea(1, 160), peso: z.number().min(0).max(100), opcional: z.boolean().default(false), tareas: z.array(tarea).default([]) });
 const schema = z.object({
   id: z.string().uuid().optional(),
   nombre: z.string().min(2), descripcion: z.string().nullable().optional(),

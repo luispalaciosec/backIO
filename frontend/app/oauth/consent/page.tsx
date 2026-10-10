@@ -28,8 +28,8 @@ function Consent() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sesion, setSesion] = useState<boolean | null>(null);
-  const cliente = params.get('client_name') ?? 'Cliente MCP';
-  const scopes = (params.get('scope') ?? '').split(' ').filter(Boolean);
+  // Nombre, hosts y permisos salen del registro en el servidor, nunca de la URL (auditoría 10/10, S6).
+  const [registrado, setRegistrado] = useState<{ nombre: string; hosts: string[]; scopes: string[] } | null>(null);
   const redirect = params.get('redirect_uri') ?? '';
 
   useEffect(() => {
@@ -40,6 +40,15 @@ function Consent() {
       } else setSesion(true);
     });
   }, [params, router]);
+
+  useEffect(() => {
+    if (!sesion) return;
+    const id = params.get('client_id') ?? '';
+    const q = new URLSearchParams({ scope: params.get('scope') ?? '' });
+    apiRaw<{ nombre: string; hosts: string[]; scopes: string[] }>(`/oauth/client/${encodeURIComponent(id)}?${q}`)
+      .then(setRegistrado)
+      .catch(() => setError('Este cliente no está registrado en BackIO. No autorices nada desde este enlace.'));
+  }, [sesion, params]);
 
   async function aprobar() {
     setBusy(true); setError(null);
@@ -67,6 +76,9 @@ function Consent() {
 
   if (sesion === null) return <div className="text-gray-500 text-center py-20">Verificando sesión…</div>;
   let host = redirect; try { host = new URL(redirect).host; } catch { /* ignore */ }
+  const cliente = registrado?.nombre ?? 'Cliente MCP';
+  const scopes = registrado?.scopes ?? [];
+  const hostRegistrado = !!registrado && registrado.hosts.includes(host);
   return (
     <div className="card w-full max-w-md p-8 space-y-5">
       <div className="flex items-center gap-3">
@@ -82,7 +94,7 @@ function Consent() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button className="btn-secondary flex-1" onClick={denegar} disabled={busy}>Denegar</button>
-        <button className="btn-primary flex-1" onClick={aprobar} disabled={busy}>{busy ? 'Autorizando…' : 'Autorizar'}</button>
+        <button className="btn-primary flex-1" onClick={aprobar} disabled={busy || !hostRegistrado}>{busy ? 'Autorizando…' : 'Autorizar'}</button>
       </div>
     </div>
   );

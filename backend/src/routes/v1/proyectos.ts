@@ -9,6 +9,7 @@ import { sanitizeForClient } from '../../lib/visibility';
 import { createProjectStructure } from '../../lib/basecamp/write';
 import { previewProyecto, crearProyectoDesdePlantilla } from '../../lib/builder/service';
 import type { EstadoOperativo } from '@backio/shared';
+import { unaLinea } from '../../lib/validacion';
 
 export const proyectos = new Hono();
 
@@ -24,7 +25,7 @@ const bloqueSchema = z.object({
 const crearSchema = z.object({
   cliente_id: z.string().uuid(),
   plantilla_id: z.string().uuid(),
-  nombre: z.string().min(3).max(120),
+  nombre: unaLinea(3, 120),
   brief: z.object({
     objetivo_negocio: z.string().min(1),
     publico_objetivo: z.string().min(1),
@@ -115,7 +116,7 @@ proyectos.post('/:id/basecamp/reintentar', requireScope('write:proyectos'), asyn
 });
 
 const patchSchema = z.object({
-  nombre: z.string().min(3).optional(),
+  nombre: unaLinea(3, 120).optional(),
   estado: z.enum(['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'reprogramado', 'bloqueado', 'completado', 'cancelado']).optional(),
   fecha_entrega: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   owner_ejecutiva: z.string().uuid().nullable().optional(),

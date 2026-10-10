@@ -32,6 +32,11 @@ export const ROLES_INTERNOS_GESTION: readonly Rol[] = [
   'lider',
 ];
 
+/** Puede generar/publicar y editar fuera de lo propio (weekly, daily, proyectos). Única definición para backend y frontend. */
+export function puedeEscribir(rol: Rol | null | undefined): boolean {
+  return !!rol && ROLES_INTERNOS_GESTION.includes(rol);
+}
+
 export type TipoPlantilla = 'campana' | 'lanzamiento' | 'fee_mensual' | 'pieza_suelta' | 'trade';
 
 export type TipoTrabajo = 'fee' | 'proyecto';

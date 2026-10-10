@@ -12,11 +12,12 @@ export default function EstablecerClavePage() {
 
   useEffect(() => {
     const sb = supabaseBrowser();
-    // Tres formas de llegar: ?token_hash= (nuestro correo, se canjea con verifyOtp), ?code= (PKCE)
-    // o #access_token= (enlaces antiguos de Supabase con flujo implícito).
+    // Dos formas de llegar: ?token_hash= (nuestro correo, se canjea con verifyOtp) o ?code= (PKCE, atado a este
+    // navegador). Ya no se acepta #access_token=: con él cualquiera podía meter su sesión en el navegador de otra
+    // persona del equipo (login CSRF; auditoría 10/10, S12).
     const qs = new URLSearchParams(window.location.search);
     const tokenHash = qs.get('token_hash');
-    const tipo = (qs.get('type') ?? 'invite') as 'invite' | 'recovery' | 'magiclink' | 'email';
+    const tipo: 'invite' | 'recovery' = qs.get('type') === 'recovery' ? 'recovery' : 'invite';
     const code = qs.get('code');
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const listo = async () => {
@@ -26,9 +27,6 @@ export default function EstablecerClavePage() {
           if (error) { setError(error.message); return setEstado('invalido'); }
         } else if (code) {
           const { error } = await sb.auth.exchangeCodeForSession(code);
-          if (error) { setError(error.message); return setEstado('invalido'); }
-        } else if (hash.get('access_token') && hash.get('refresh_token')) {
-          const { error } = await sb.auth.setSession({ access_token: hash.get('access_token')!, refresh_token: hash.get('refresh_token')! });
           if (error) { setError(error.message); return setEstado('invalido'); }
         } else if (hash.get('error_description')) {
           setError(hash.get('error_description'));
@@ -46,8 +44,11 @@ export default function EstablecerClavePage() {
     e.preventDefault(); setError(null);
     if (clave.length < 8) return setError('Mínimo 8 caracteres.');
     if (clave !== clave2) return setError('Las contraseñas no coinciden.');
-    const { error } = await supabaseBrowser().auth.updateUser({ password: clave });
+    const sb = supabaseBrowser();
+    const { error } = await sb.auth.updateUser({ password: clave });
     if (error) return setError(error.message);
+    // Con la clave nueva se cierran las demás sesiones abiertas de la cuenta.
+    await sb.auth.signOut({ scope: 'others' }).catch(() => undefined);
     setEstado('ok');
     setTimeout(() => { router.replace('/dashboard'); router.refresh(); }, 800);
   }

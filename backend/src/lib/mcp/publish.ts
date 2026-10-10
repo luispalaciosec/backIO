@@ -6,7 +6,7 @@
  */
 import type { Acta, Mesa } from '@backio/shared';
 import type { DbCtx } from '../db/client';
-import { throwIf } from '../db/client';
+import { throwIf, DbError } from '../db/client';
 import { BasecampClient } from '../basecamp/client';
 import { getMesa } from '../db/mesas';
 import { getSemana } from '../db/semanas';
@@ -22,7 +22,24 @@ export function tituloWeekly(acta: Acta, semana: { numero_iso: number; fecha_ini
     : `${fmtFecha(semana.fecha_fin)} || Acta de Cierre - Semana ${semana.numero_iso}`;
 }
 
+/**
+ * Publica un acta una sola vez. El acta se «reserva» con un update condicional antes de llamar a Basecamp: dos
+ * llamadas simultáneas (REST o MCP) ya no publican dos mensajes (auditoría 10/10, S7). Si Basecamp falla, se libera.
+ */
 export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
+  const reservado = new Date().toISOString();
+  const { data: claim, error: e0 } = await ctx.db.from('actas').update({ publicado_at: reservado, publicado_por: ctx.usuarioId }).eq('id', acta.id).is('publicado_at', null).select('id');
+  throwIf(e0);
+  if (!claim?.length) throw new DbError('El acta ya fue publicada', 409);
+  try {
+    return await publicarReservada(ctx, acta);
+  } catch (err) {
+    await ctx.db.from('actas').update({ publicado_at: null, publicado_por: null }).eq('id', acta.id).eq('publicado_at', reservado);
+    throw err;
+  }
+}
+
+async function publicarReservada(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const html = markdownBasico(acta.markdown);
   let doc: { id: number; app_url: string };
@@ -46,7 +63,7 @@ export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ 
     doc = await bc.createDocument(projectId, vault.id, { title: titulo, content: html });
   }
 
-  const { error: e2 } = await ctx.db.from('actas').update({ publicado_at: new Date().toISOString(), publicado_por: ctx.usuarioId, basecamp_doc_id: doc.id }).eq('id', acta.id);
+  const { error: e2 } = await ctx.db.from('actas').update({ basecamp_doc_id: doc.id }).eq('id', acta.id);
   throwIf(e2);
   if (acta.tipo !== 'informe_mensual') {
     const col = acta.tipo === 'plan_operativo' ? 'plan_publicado_at' : 'acta_publicada_at';
