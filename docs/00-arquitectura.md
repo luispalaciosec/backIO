@@ -8,7 +8,7 @@ Geeks opera hoy con tres sistemas desconectados:
 
 | Sistema | Función real | Problema |
 |---|---|---|
-| Monday.com | Vista de cuenta para cliente | ~$15,000/año, muere por falta de disciplina |
+| Monday.com | Vista de cuenta para cliente | costo anual en licencias; muere por falta de disciplina |
 | Basecamp | Ejecución de producción | Sin visibilidad agregada, sin backlog priorizado |
 | Docs manuales | Plan Operativo y Acta de Cierre | Doble digitación semanal de la misma data |
 

@@ -16,6 +16,10 @@ const nextConfig = {
   outputFileTracingRoot: path.join(path.dirname(fileURLToPath(import.meta.url)), '..'),
   transpilePackages: ['@backio/shared'],
   reactStrictMode: true,
+  // La documentación (public/docs, la copia copiar-docs.mjs) entra por /docs.
+  async rewrites() {
+    return [{ source: '/docs', destination: '/docs/index.html' }];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: seguridad },

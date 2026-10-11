@@ -17,3 +17,6 @@ backend/supabase/.temp
 # Sitio de documentación (VitePress)
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Copia del sitio de documentación (la genera el build del frontend)
+frontend/public/docs

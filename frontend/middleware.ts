@@ -46,7 +46,31 @@ function politicaCsp(nonce: string): string {
   ].join('; ');
 }
 
+/**
+ * Documentación pública (backio.vercel.app/docs): archivos estáticos de VitePress, sin sesión. CSP propia y más
+ * estricta que la de la app: sin scripts en línea (copiar-docs.mjs los pasa a archivos) ni conexiones a otros
+ * dominios, porque comparte origen con la sesión de BackIO.
+ */
+const CSP_DOCS = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 export async function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname === '/docs' || req.nextUrl.pathname.startsWith('/docs/')) {
+    const r = NextResponse.next();
+    r.headers.set('Content-Security-Policy', CSP_DOCS);
+    return r;
+  }
   const nonce = btoa(crypto.randomUUID());
   const csp = politicaCsp(nonce);
   // Next lee el nonce de la cabecera CSP de la petición y lo pone en sus propios scripts.

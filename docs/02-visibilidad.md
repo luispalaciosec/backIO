@@ -13,7 +13,7 @@
 Un director de arte escribe en una revisión: *"esto está horrible, hay que rehacerlo"*.
 Si ese texto llega al portal del cliente, el daño es inmediato e irreversible.
 
-En Geeks, dos clientes representan ~67% de la facturación. El costo de un solo incidente
+En Geeks, pocos clientes concentran buena parte de la facturación. El costo de un solo incidente
 excede varios años del ahorro que justifica todo este proyecto.
 
 ---

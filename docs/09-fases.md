@@ -46,7 +46,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [ ] Alerta de concentración de carga en paso 4
 
 ### Fase 2
-- [x] OAuth Basecamp funcionando con refresh automático (conectado 03/09/2026, cuenta 4186385)
+- [x] OAuth Basecamp funcionando con refresh automático (conectado 03/09/2026)
 - [x] Creación probada primero en proyecto sandbox de Basecamp (proyecto 48775530, 4 to-dos, 03/09/2026)
 - [x] Webhook recibiendo y aplicando `completed` (verificado 03/09/2026: `todo_completed` → completado en <1 s)
 - [x] Polling de reconciliación cada 30 min (scheduler interno; verificado a mano)

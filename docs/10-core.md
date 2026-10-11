@@ -35,7 +35,7 @@ cinco convenciones informales que nadie documenta.
 | Componente | Qué resuelve | Costo de no tenerlo |
 |---|---|---|
 | **Identidad (SSO)** | Un login para los tres sistemas | Tres tablas de usuarios. Alguien renuncia y hay que darlo de baja en tres lados; uno se olvida |
-| **Tabla maestra de clientes** | El `cliente_id` ya decidido | Reconciliación manual entre "Banco Amazonas" y "BASA" |
+| **Tabla maestra de clientes** | El `cliente_id` ya decidido | Reconciliación manual entre "Cliente Ejemplo" y "CE" (el mismo cliente con dos nombres) |
 | **Roles y permisos** | Que "ejecutiva" signifique lo mismo en los tres | Marcia es admin en uno y operaciones en otro; nadie sabe qué puede ver |
 | **Catálogo de servicios** | PrometIO cotiza, BackIO ejecuta, DatIO reporta el mismo servicio | Tres listas que divergen. Rentabilidad por servicio imposible de calcular |
 | **Design system** | Componentes y tokens compartidos | Un chip de estado escrito tres veces, con tres verdes distintos |
@@ -58,7 +58,7 @@ servicio "Campaña 360"
   → cruce:    margen real por línea de servicio
 ```
 
-Para una agencia en recuperación con ~67% del revenue concentrado en dos cuentas, saber qué
+Para una agencia con buena parte de los ingresos concentrada en pocas cuentas, saber qué
 servicio deja plata y cuál se vende bien pero cuesta más de lo que factura es la base de la
 decisión de qué vender.
 

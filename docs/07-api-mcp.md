@@ -140,14 +140,14 @@ Detalles de los parámetros:
 
 **El patrón preview + confirm no es opcional.** Un LLM que interpreta mal "crea las tareas
 de la campaña de Navidad" puede generar 40 to-dos en el proyecto de producción real de
-Banco Amazonas.
+Cliente Ejemplo.
 
 ```typescript
 // Ejemplo de respuesta de plan_project_from_template
 {
   plan_id: "plan_a1b2c3",
   expira_en: "2026-09-02T21:30:00Z",   // 15 minutos
-  resumen: "Crear proyecto 'Campaña Navidad' para Banco Amazonas",
+  resumen: "Crear proyecto 'Campaña Navidad' para Cliente Ejemplo",
   cambios: {
     proyectos_a_crear: 1,
     requerimientos_a_crear: 14,
@@ -203,13 +203,13 @@ respuestas se describen en ese archivo. No se mantiene a mano.
 ## Casos de uso reales
 
 ```
-Luis (en Claude): "¿cómo va Banco Amazonas esta semana?"
-  → get_client_health + list_backlog(cliente: BASA, semana: actual)
+Luis (en Claude): "¿cómo va Cliente Ejemplo esta semana?"
+  → get_client_health + list_backlog(cliente: "Cliente Ejemplo", semana: actual)
 
 Marcia (en Claude): "prepara la agenda del weekly"
   → get_weekly_signals + get_capacity → agenda ordenada
 
-Ejecutiva: "arma la campaña de Black Friday para Banco Amazonas,
+Ejecutiva: "arma la campaña de Black Friday para Cliente Ejemplo,
             entrega el 20 de noviembre"
   → plan_project_from_template → preview → confirm_plan
 

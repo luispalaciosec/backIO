@@ -9,8 +9,8 @@ gestión de cuenta. Son sistemas hermanos que hoy comparten entidades sin saberl
 
 **Decisión cerrada: `cliente_id` es el mismo UUID en ambos sistemas.**
 
-Sin esto, en seis meses habría reconciliación manual permanente entre "Banco Amazonas" en
-PrometIO y "Banco Amazonas" en BackIO. Es una hora de trabajo hoy o un dolor indefinido
+Sin esto, en seis meses habría reconciliación manual permanente entre "Cliente Ejemplo" en
+PrometIO y "Cliente Ejemplo" en BackIO. Es una hora de trabajo hoy o un dolor indefinido
 después.
 
 ---

@@ -85,7 +85,8 @@ pnpm --filter @backio/backend db:types    # regenera los tipos de la base (src/l
 pnpm --filter @backio/backend docs:api    # regenera la referencia de la API (docs/referencia-api.md)
 ```
 
-Este sitio de documentación se levanta con `pnpm --filter @backio/docs dev`.
+Este sitio de documentación se levanta con `pnpm --filter @backio/docs dev` y se publica en `backio.vercel.app/docs`: el
+build del frontend lo compila y lo copia a `frontend/public/docs` (`frontend/scripts/copiar-docs.mjs`).
 
 ## Base de datos
 

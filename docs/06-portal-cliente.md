@@ -5,7 +5,7 @@
 ## Objetivo
 
 Reemplazar la vista que hoy el cliente tiene en Monday.com, con dos mejoras:
-1. El cliente **no paga asiento** (aquí está el ahorro real de ~$15,000/año)
+1. El cliente **no paga asiento** (aquí está el ahorro real frente a las licencias de Monday)
 2. Es imposible que vea contenido interno (ver [02 · Visibilidad](./02-visibilidad.md))
 
 ## Referencia visual
@@ -111,7 +111,7 @@ Botón que genera 3 párrafos en lenguaje natural.
 ```json
 {
   "proyecto": "Campaña Navidad 2026",
-  "cliente": "Banco Amazonas",
+  "cliente": "Cliente Ejemplo",
   "avance_ponderado": 62,
   "completados": ["Investigación de mercado", "Propuesta creativa"],
   "en_curso": ["Ajustes solicitados"],

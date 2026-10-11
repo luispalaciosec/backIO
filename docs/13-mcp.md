@@ -79,7 +79,7 @@ update tenants set config = config || '{"basecamp_docs_project_id": 12345678}' w
 
 ## Ejemplos de uso
 
-- "¿Cómo va Banco Amazonas esta semana?" → `get_client_health` + `list_backlog(cliente, semana: actual)`
+- "¿Cómo va Cliente Ejemplo esta semana?" → `get_client_health` + `list_backlog(cliente, semana: actual)`
 - "Prepara la agenda del weekly" → `get_weekly_signals` + `get_capacity`
-- "Arma la campaña de Black Friday para Banco Amazonas, entrega 20 de noviembre" → `list_clients_and_templates` → `plan_project_from_template` → revisar → `confirm_plan`
+- "Arma la campaña de Black Friday para Cliente Ejemplo, entrega 20 de noviembre" → `list_clients_and_templates` → `plan_project_from_template` → revisar → `confirm_plan`
 - "Genera el acta de cierre" → `generate_closing_minutes` → revisar → `publish_document`

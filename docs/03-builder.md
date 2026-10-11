@@ -179,7 +179,7 @@ tipo Trade (185 tareas, 4,069 piezas en 7 meses).
 
 ```csv
 cliente_slug,proyecto,titulo_interno,etiqueta_cliente,visible,bloque,peso,tipo,prioridad,fecha_pedido,fecha_entrega,owner_email,piezas
-cerveceria,Trade Q4,POP PROMO CADENAS,Material POP,true,Producción,3,fee,alta,2026-08-20,2026-08-31,elias@geeks.ec,29
+cerveceria,Trade Q4,POP PROMO CADENAS,Material POP,true,Producción,3,fee,alta,2026-08-20,2026-08-31,persona@geeks.ec,29
 ```
 
 Reglas del importador:

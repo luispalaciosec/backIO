@@ -8,11 +8,13 @@ export default withMermaid(
     lang: 'es-EC',
     title: 'BackIO',
     description: 'Documentación de BackIO · Geeks Ecuador',
-    cleanUrls: true,
+    // Se publica dentro del frontend en backio.vercel.app/docs (archivos estáticos de Next): rutas con .html.
+    base: '/docs/',
+    cleanUrls: false,
     lastUpdated: true,
     // README.md es el índice para quien navega el repo en GitHub; el sitio tiene su propia portada.
     srcExclude: ['README.md', 'manual/**'],
-    head: [['link', { rel: 'icon', href: '/backio-icon.svg' }], ['meta', { name: 'robots', content: 'noindex, nofollow' }]],
+    head: [['link', { rel: 'icon', href: '/docs/backio-icon.svg' }], ['meta', { name: 'robots', content: 'noindex, nofollow' }]],
     themeConfig: {
       logo: '/backio-icon.svg',
       nav: [

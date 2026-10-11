@@ -85,6 +85,10 @@ vigía que avisa si alguna no corre. No hace falta configurar nada más en Railw
 El proyecto de Vercel ya existe y tiene **Root Directory** `frontend`. Install y build están en
 `frontend/vercel.json` (instala desde la raíz del monorepo). El deploy normal es el automático descrito arriba.
 
+La documentación viaja con el frontend: su `pnpm build` compila `docs/` con VitePress, la copia a
+`frontend/public/docs` y queda en `https://backio.vercel.app/docs`, pública y sin pedir sesión, con una política de
+seguridad de contenido propia (`frontend/middleware.ts`).
+
 Deploy manual, si hace falta (por ejemplo, sin `VERCEL_TOKEN`): desde la **raíz** del repo,
 
 ```bash

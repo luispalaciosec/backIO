@@ -75,7 +75,8 @@ Cómo está armado por dentro, ciclo de una petición, crons, integraciones y de
 
 ## Documentación
 
-La carpeta `docs/` es un sitio VitePress. Para leerlo en local:
+La carpeta `docs/` es un sitio VitePress publicado en **https://backio.vercel.app/docs** (se compila junto con el
+frontend). Para leerlo en local mientras se edita:
 
 ```bash
 pnpm --filter @backio/docs dev

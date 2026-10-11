@@ -20,13 +20,13 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 
 | # | Input | Implicación en BackIO |
 |---|---|---|
-| I1 | Proyecto Basecamp = marca (ej. "Banco Amazonas - Fee de Agencia") | `clientes.basecamp_project_id` (ya existe) |
+| I1 | Proyecto Basecamp = marca (ej. "Cliente Ejemplo - Fee de Agencia") | `clientes.basecamp_project_id` (ya existe) |
 | I2 | Grupo de tareas = todolist (fee mensual "Cronograma de contenido - Septiembre 2026" o campaña puntual) | Proyecto de BackIO = todolist (ya existe) |
 | I3 | Grupos dentro de la lista (Regreso a Clases, AON) | Bloques de plantilla → grupos de Basecamp (**nuevo**) |
 | I4 | Fee recurrente mes a mes | Plantillas recurrentes con patrón de nombre y generación mensual (**nuevo**) |
 | I5 | Muchas plantillas, distintas por cliente | Editor de plantillas + "guardar proyecto como plantilla" + plantillas por cliente (**nuevo**) |
 | I6 | Mesas Orión y Omega con boards "Daily (apertura/cierre)" y "Weekly (Status Semanal)" | Publicar actas y daily como mensajes en esos boards, no como Docs (**cambio**) |
-| I7 | Timesheet por to-do (1.219 h en BASA) | Sync de horas por requerimiento, sin descripción (**nuevo**) |
+| I7 | Timesheet por to-do (horas registradas en cada to-do) | Sync de horas por requerimiento, sin descripción (**nuevo**) |
 | I8 | To-dos existentes creados fuera de BackIO | Importación única + detector de huérfanos (**nuevo**, decisión pendiente) |
 | I9 | Daily y weekly se digitan a mano | IA redacta apertura/cierre, status semanal y agenda (**nuevo**) |
 | I10 | Informe ejecutivo mensual en el Schedule de la mesa | IA lo redacta desde el dashboard (**nuevo**) |
@@ -48,7 +48,7 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 - "Guardar este proyecto como plantilla".
 - Plantillas generales y por cliente; en el paso 1 aparecen primero las del cliente.
 - Plantillas recurrentes: patrón `{nombre} - {mes} {año}`, fechas desde inicio de mes, botón "Generar mes" y cron el día 25 que deja el borrador para confirmar.
-- **DoD**: el fee de Banco Amazonas de octubre se genera desde plantilla y se confirma en el paso 5 en menos de 5 minutos.
+- **DoD**: el fee de Cliente Ejemplo de octubre se genera desde plantilla y se confirma en el paso 5 en menos de 5 minutos.
 
 ### Sprint 3 · Lo que ya existe y las horas — **hecho 04/09/2026**
 - Importación única de todolists vivas por cliente (id, título, fecha, asignados, completado) → proyectos y requerimientos enlazados. *Requiere decisión D1.*

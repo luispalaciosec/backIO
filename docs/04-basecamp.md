@@ -43,7 +43,7 @@ menos de un minuto para que expire el token.
 **User-Agent obligatorio** (Basecamp lo exige y bloquea sin él). Se configura con `BASECAMP_USER_AGENT`; el
 valor por defecto es:
 ```
-User-Agent: BackIO Geeks (luis@geeks.ec)
+User-Agent: BackIO Geeks (correo@dominio)
 ```
 
 Rate limit de Basecamp: 50 req / 10 seg. El cliente HTTP (`backend/src/lib/basecamp/client.ts`) se frena solo a

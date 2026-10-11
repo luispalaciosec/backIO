@@ -83,7 +83,7 @@ mezcle datos entre organizaciones.
 | Las tareas programadas se registran en `cron_runs` y un **vigía** avisa si una no corre | Un despliegue a la hora de un job lo perdía sin que nadie se enterara | 10–11/10/2026 |
 | Las operaciones de varios pasos (import CSV, Builder, quitar acceso) van en **una transacción** de Postgres | Un fallo a medias dejaba proyectos huérfanos o credenciales vivas | 11/10/2026 (migración 29) |
 | Errores a **Sentry sin datos personales** ni del cliente | Ver los errores sin exponer información | 11/10/2026 |
-| La documentación es **escrita a mano** y se publica como sitio aparte; sin wikis generados por IA | La documentación es la fuente de verdad: tiene que ser exacta | 11/10/2026 · Luis |
+| La documentación es **escrita a mano**, sin wikis generados por IA, y se publica en `backio.vercel.app/docs` (pública, fuera de buscadores), después de cerrar los pendientes de seguridad | La documentación es la fuente de verdad: tiene que ser exacta. Publicarla junto a la app evita montar otra plataforma | 11/10/2026 · Luis |
 
 El detalle de las decisiones de seguridad está en [Seguridad](./18-seguridad.md) y en
 [Endurecimiento tras la auditoría](./endurecimiento.md).
