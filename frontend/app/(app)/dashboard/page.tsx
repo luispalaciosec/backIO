@@ -7,6 +7,8 @@ import { Alert } from '@/components/ui/Alert';
 import { Barras, Kpi, Semaforo } from '@/components/dashboard/Charts';
 import { fechaCorta, ESTADO_LABEL } from '@/lib/format';
 import { COLOR_ESTADO } from '@/components/backlog/colores';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 interface Dashboard {
   generado_at: string;
@@ -22,10 +24,11 @@ interface Dashboard {
 export default function DashboardPage() {
   const [d, setD] = useState<Dashboard | null>(null);
   const [mesas, setMesas] = useState<Mesa[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   const [mesa, setMesa] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(() => {}); }, []);
+  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(avisar('las mesas')); }, [avisar]);
   useEffect(() => {
     setD(null);
     api<Dashboard>(`/dashboard${mesa ? `?mesa=${mesa}` : ''}`).then(setD).catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
@@ -36,6 +39,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4 flex-wrap">
+      <AvisoCarga fallos={fallos} />
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-gray-500">{d ? `Actualizado ${new Date(d.generado_at).toLocaleTimeString('es-EC')}` : 'Cargando…'} · calculado sobre el backlog, no declarado</p>

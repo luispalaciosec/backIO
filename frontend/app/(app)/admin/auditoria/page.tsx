@@ -4,6 +4,8 @@ import type { Usuario } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { ZONA } from '@backio/shared';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 interface Evento { id: number; usuario_id: string | null; api_key_id: string | null; origen: string; accion: string; entidad: string; entidad_id: string | null; detalle: Record<string, unknown> | null; created_at: string }
 interface Resultado { items: Evento[]; total: number; con_error: number }
@@ -11,6 +13,7 @@ const ORIGENES = ['ui', 'api', 'mcp', 'webhook:basecamp', 'webhook:prometio', 'c
 
 export default function AuditoriaPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   const [f, setF] = useState({ usuario: '', accion: '', entidad: '', origen: '', desde: '', hasta: '' });
   const [r, setR] = useState<Resultado | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +25,7 @@ export default function AuditoriaPage() {
     try { setR(await api<Resultado>(`/admin/audit?${qs}`)); } catch (e) { setError(e instanceof ApiError ? e.message : 'Error'); }
     setBusy(false);
   }, [f]);
-  useEffect(() => { api<{ items: Usuario[] }>('/admin/usuarios').then((x) => setUsuarios(x.items)).catch(() => {}); void cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { api<{ items: Usuario[] }>('/admin/usuarios').then((x) => setUsuarios(x.items)).catch(avisar('las personas')); void cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const nombre = (id: string | null) => usuarios.find((u) => u.id === id);
   const esError = (e: Evento) => /rechaz|fall|error|invalid/i.test(e.accion) || !!(e.detalle && 'error' in e.detalle);
   const fecha = (iso: string) => new Date(iso).toLocaleString('es-EC', { timeZone: ZONA, day: 'numeric', month: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' });
@@ -43,6 +46,7 @@ export default function AuditoriaPage() {
         <button type="button" className="btn-ghost" onClick={() => setF({ usuario: '', accion: '', entidad: '', origen: '', desde: '', hasta: '' })}>Limpiar</button>
       </form>
       {error && <Alert tipo="error">{error}</Alert>}
+      <AvisoCarga fallos={fallos} />
       {r && (
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="card p-4"><div className="text-xs uppercase tracking-wide text-gray-500">Total filtrado</div><div className="text-3xl font-bold">{r.total}</div></div>

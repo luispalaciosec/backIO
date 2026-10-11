@@ -13,6 +13,8 @@ import { celebrar } from '@/lib/confetti';
 import { ESTADO_LABEL } from '@/lib/format';
 import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '@/lib/orden';
 import { CAMPOS_COLABORADOR, hoyLocal } from '@backio/shared';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 type Vista = 'tabla' | 'kanban';
 
@@ -26,6 +28,7 @@ function BacklogInner() {
   const [proyectosCliente, setProyectosCliente] = useState<Record<string, { id: string; nombre: string; basecamp: boolean; completado: boolean }[]>>({});
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   // Filtros, orden y vista viven en la URL (sobreviven al refresh y se comparten) con respaldo en localStorage (preferencia de UI).
   const router = useRouter();
   const sp = useSearchParams();
@@ -81,8 +84,8 @@ function BacklogInner() {
   }, [filtro]);
 
   useEffect(() => {
-    api<{ items: Cliente[] }>('/clientes').then((r) => setClientes(r.items)).catch(() => {});
-    api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {});
+    api<{ items: Cliente[] }>('/clientes').then((r) => setClientes(r.items)).catch(avisar('los clientes'));
+    api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(avisar('las personas'));
     api<{ items: { id: string; nombre: string; mesa_id: string | null; cliente_id: string; estado: string; basecamp_todolist_id: number | null }[] }>('/proyectos').then((r) => {
       setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id])));
       // También los proyectos completados: una campaña cerrada puede recibir una tarea nueva (se reabre sola).
@@ -90,11 +93,11 @@ function BacklogInner() {
       const orden = (x: { estado: string; nombre: string }) => `${x.estado === 'completado' ? 1 : 0}${x.nombre.toLowerCase()}`;
       for (const p of r.items.filter((x) => x.estado !== 'cancelado').sort((a, b) => orden(a).localeCompare(orden(b), 'es'))) (pc[p.cliente_id] ??= []).push({ id: p.id, nombre: p.nombre, basecamp: !!p.basecamp_todolist_id, completado: p.estado === 'completado' });
       setProyectosCliente(pc);
-    }).catch(() => {});
-    api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(() => {});
-    api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(() => {});
-    api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {});
-  }, []);
+    }).catch(avisar('los proyectos'));
+    api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(avisar('las mesas'));
+    api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(avisar('las horas'));
+    api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(avisar('las últimas notas'));
+  }, [avisar]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   // Celebración por lo completado desde la última visita (la mayoría se completa en Basecamp, sin pulsar nada aquí).
@@ -113,7 +116,7 @@ function BacklogInner() {
       void celebrar({ x: 0.5, y: 0.35 });
       if (nuevos.length >= 5) setTimeout(() => void celebrar({ x: 0.2, y: 0.4 }), 500);
       if (nuevos.length >= 10) setTimeout(() => void celebrar({ x: 0.8, y: 0.4 }), 900);
-    }).catch(() => undefined);
+    }).catch(() => undefined); // decorativo: sin celebración no se pierde nada
   }, []);
 
   const me = useMe();
@@ -277,6 +280,7 @@ function BacklogInner() {
       </div>
 
       {error && <Alert tipo="error">{error}</Alert>}
+      <AvisoCarga fallos={fallos} />
       {aviso && <Alert tipo="ok">{aviso}</Alert>}
       {celebracion && (
         <div className="rounded-md border border-green-200 bg-green-50 text-green-900 px-4 py-3 text-sm flex items-start justify-between gap-3">
@@ -296,7 +300,7 @@ function BacklogInner() {
 
       {!loading && vista === 'tabla' && (
         <div className="overflow-auto pb-4 tablero" style={{ maxHeight: 'calc(100vh - 8.5rem)' }}>
-          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} notas={notas} puedeEditar={puedeEditar} proyectos={proyectos} proyectosCliente={proyectosCliente} onCambio={() => { void cargar(true); api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(() => {}); }} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
+          <BacklogTable items={itemsOrdenados} clientes={clientesVisibles.length ? clientesVisibles : clientes} usuarios={usuarios} onPatch={patch} onCrear={colaborador ? undefined : crear} horas={horas} notas={notas} puedeEditar={puedeEditar} proyectos={proyectos} proyectosCliente={proyectosCliente} onCambio={() => { void cargar(true); api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(avisar('las últimas notas')); }} onSincronizar={puedeSincronizar ? sincronizar : undefined} />
         </div>
       )}
       {!loading && vista === 'kanban' && (

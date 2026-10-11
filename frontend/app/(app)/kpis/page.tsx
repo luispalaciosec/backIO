@@ -6,6 +6,8 @@ import { api, BACKEND } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
 import { VistaEquipo, FichaPersona, DetalleKpi, useTableroKpis, mesActual, moverMes, nombreMes, type Seleccion } from '@/components/kpis/Kpis';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 export default function KpisPage() { return <Suspense><Kpis /></Suspense>; }
 
@@ -18,8 +20,9 @@ function Kpis() {
   const soloMios = me?.rol === 'colaborador';
   const { tablero, error, recargar } = useTableroKpis(mes, soloMios);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   const [sel, setSel] = useState<Seleccion | null>(null);
-  useEffect(() => { api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(() => {}); }, []);
+  useEffect(() => { api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(avisar('las personas')); }, [avisar]);
   const ir = (p: Record<string, string | null>) => {
     const q = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(p)) { if (v) q.set(k, v); else q.delete(k); }
@@ -38,6 +41,7 @@ function Kpis() {
         </div>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
+      <AvisoCarga fallos={fallos} />
       {!tablero && !error && <p className="text-sm text-gray-400">Calculando tus KPIs…</p>}
       {tablero && me.usuario_id && <section className="card p-4"><FichaPersona tablero={tablero} usuarioId={me.usuario_id} onAbrir={setSel} /></section>}
       {sel && <DetalleKpi sel={sel} mes={mes} puedeRegistrar={false} usuarios={[]} onClose={() => setSel(null)} onGuardado={recargar} />}

@@ -3,15 +3,18 @@ import { useEffect, useState } from 'react';
 import type { Cliente, Mesa } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 export default function AdminClientesPage() {
   const [items, setItems] = useState<Cliente[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [mesasAlta, setMesasAlta] = useState<Mesa[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   const [nuevo, setNuevo] = useState({ nombre: '', basecamp_project_id: '', mesa_id: '', grupo: '' });
   const [creando, setCreando] = useState(false);
-  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesasAlta(r.items.filter((m) => m.activa))).catch(() => {}); }, []);
+  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesasAlta(r.items.filter((m) => m.activa))).catch(avisar('las mesas')); }, [avisar]);
   const [diag, setDiag] = useState<Record<string, unknown> | null>(null);
   const cargar = () => api<{ items: Cliente[] }>('/clientes?todos=1').then((r) => setItems(r.items)).catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => { void cargar(); }, []);
@@ -49,6 +52,7 @@ export default function AdminClientesPage() {
         }}>↻ Actualizar webhooks (rotar secreto)</button>
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
+      <AvisoCarga fallos={fallos} />
       {ok && <Alert tipo="ok">{ok}</Alert>}
       <form className="card p-4 grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_1fr_auto] items-end border-brand/30 bg-brand/5" onSubmit={async (e) => {
         e.preventDefault(); setCreando(true); setError(null); setOk(null);

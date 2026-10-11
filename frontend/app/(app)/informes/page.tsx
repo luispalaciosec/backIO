@@ -6,6 +6,8 @@ import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { useIA } from '@/lib/useIA';
 import { hrefExterno } from '@/lib/url';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 interface Informe { id: string; mesa_id: string | null; markdown: string; publicado_at: string | null; created_at: string }
 
@@ -14,6 +16,7 @@ function mesAnterior(): string { const d = new Date(); d.setUTCDate(1); d.setUTC
 export default function InformesPage() {
   const ia = useIA();
   const [mesas, setMesas] = useState<Mesa[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   const [items, setItems] = useState<Informe[]>([]);
   const [mesa, setMesa] = useState('');
   const [mes, setMes] = useState(mesAnterior());
@@ -21,8 +24,8 @@ export default function InformesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pub, setPub] = useState<string | null>(null);
-  const cargar = () => api<{ items: Informe[] }>('/ia/informes').then((r) => setItems(r.items)).catch(() => {});
-  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => { setMesas(r.items.filter((m) => m.activa)); setMesa((v) => v || r.items.find((m) => m.activa)?.id || ''); }).catch(() => {}); void cargar(); }, []);
+  const cargar = () => api<{ items: Informe[] }>('/ia/informes').then((r) => setItems(r.items)).catch(avisar('los informes'));
+  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => { setMesas(r.items.filter((m) => m.activa)); setMesa((v) => v || r.items.find((m) => m.activa)?.id || ''); }).catch(avisar('las mesas')); void cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- carga inicial única
   const nombreMesa = (id: string | null) => mesas.find((m) => m.id === id)?.nombre ?? '—';
   const titulo = (i: Informe) => i.markdown.split('\n')[0]?.replace(/^#\s*/, '') ?? i.id;
 
@@ -55,6 +58,7 @@ export default function InformesPage() {
         ) : <span className="text-xs text-gray-400">La capa de IA no está configurada en el backend.</span>}
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
+      <AvisoCarga fallos={fallos} />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm min-w-[700px]">
           <thead><tr><th className="th">Informe</th><th className="th">Mesa</th><th className="th">Generado</th><th className="th">Publicado</th><th className="th"></th></tr></thead>

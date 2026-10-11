@@ -4,12 +4,15 @@ import { useRouter } from 'next/navigation';
 import type { Proyecto, Mesa } from '@backio/shared';
 import { useEffect } from 'react';
 import { api } from '@/lib/api';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 export function PortalControls({ proyecto }: { proyecto: Proyecto }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [mesas, setMesas] = useState<Mesa[]>([]);
-  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items)).catch(() => {}); }, []);
+  const { fallos, avisar } = useAvisosCarga();
+  useEffect(() => { api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items)).catch(avisar('las mesas')); }, [avisar]);
   const url = typeof window !== 'undefined' && proyecto.portal_token ? `${window.location.origin}/p/${proyecto.portal_token}` : null;
 
   async function toggle() {
@@ -55,6 +58,7 @@ export function PortalControls({ proyecto }: { proyecto: Proyecto }) {
 
   return (
     <div className="card p-3 text-sm space-y-2 min-w-64">
+      <AvisoCarga fallos={fallos} />
       <div className="flex items-center justify-between gap-3">
         <span>Mesa</span>
         <select className="input w-40" value={proyecto.mesa_id ?? ''} disabled={busy} onChange={async (e) => { setBusy(true); await api(`/proyectos/${proyecto.id}`, { method: 'PATCH', json: { mesa_id: e.target.value || null } }); setBusy(false); router.refresh(); }}>

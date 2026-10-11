@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { TipoPieza } from '@backio/shared';
 import { api } from '@/lib/api';
 import type { WizardState } from '../wizard';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 export function Step3Alcance({ state: s, set }: { state: WizardState; set: (p: Partial<WizardState>) => void }) {
   const plantilla = s.plantilla!;
@@ -13,11 +15,13 @@ export function Step3Alcance({ state: s, set }: { state: WizardState; set: (p: P
   const upd = (id: string, patch: Partial<WizardState['bloques'][string]>) =>
     set({ bloques: { ...s.bloques, [id]: { ...(s.bloques[id] ?? { bloque_id: id, activo: true, owner_id: null, piezas_por_canal: {} }), ...patch } } });
   const [tipos, setTipos] = useState<TipoPieza[]>([]);
-  useEffect(() => { api<{ items: TipoPieza[] }>('/tipos-pieza').then((r) => setTipos(r.items)).catch(() => {}); }, []);
+  const { fallos, avisar } = useAvisosCarga();
+  useEffect(() => { api<{ items: TipoPieza[] }>('/tipos-pieza').then((r) => setTipos(r.items)).catch(avisar('los tipos de pieza')); }, [avisar]);
   const totalPiezas = (cfg?: WizardState['bloques'][string]) => Object.values(cfg?.piezas_por_tipo ?? {}).reduce((a, b) => a + (b || 0), 0);
 
   return (
     <div className="space-y-3">
+      <AvisoCarga fallos={fallos} />
       {s.piezas_sugeridas && Object.keys(s.piezas_sugeridas).length > 0 && <p className="text-sm rounded-md bg-violet-50 border border-violet-200 text-violet-900 px-3 py-2">Del brief del cliente: {tipos.filter((t) => (s.piezas_sugeridas?.[t.id] ?? 0) > 0).map((t) => `${s.piezas_sugeridas?.[t.id]} ${t.nombre.toLowerCase()}`).join(', ')}. Repártelas en los bloques.</p>}
       <p className="text-sm text-gray-500">Desmarca bloques opcionales; su peso se redistribuye proporcionalmente. En cada bloque indica cuántas piezas de cada tipo: cada tipo se expande en un to-do por paso de su flujo (un reel: ideas → guiones → aprobación → storyboards → grabación → edición → aprobación → posteo). El peso se reparte por esfuerzo × cantidad.</p>
       {plantilla.bloques.map((b) => {

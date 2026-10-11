@@ -12,6 +12,8 @@ import { Step4EquipoFechas } from './_steps/Step4EquipoFechas';
 import { Step5Revision } from './_steps/Step5Revision';
 import { Borradores, type Borrador } from './_components/Borradores';
 import type { TipoPieza } from '@backio/shared';
+import { useAvisosCarga } from '@/lib/useAvisosCarga';
+import { AvisoCarga } from '@/components/ui/AvisoCarga';
 
 const PASOS = ['Tipo de trabajo', 'Brief', 'Alcance', 'Equipo y fechas', 'Revisión'];
 
@@ -22,6 +24,7 @@ export default function NuevoProyectoPage() {
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
   const [borradores, setBorradores] = useState<Borrador[]>([]);
+  const { fallos, avisar } = useAvisosCarga();
   const [pendiente, setPendiente] = useState<WizardState | null>(null);
 
   useEffect(() => {
@@ -35,13 +38,13 @@ export default function NuevoProyectoPage() {
     ])
       .then(([p, c, u]) => setCat({ plantillas: p.items, clientes: c.items, usuarios: u.items }))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar el catálogo'));
-    api<{ items: Borrador[] }>('/proyectos/borradores').then((r) => setBorradores(r.items)).catch(() => {});
-  }, []);
+    api<{ items: Borrador[] }>('/proyectos/borradores').then((r) => setBorradores(r.items)).catch(avisar('los borradores de PrometIO'));
+  }, [avisar]);
   useEffect(() => { guardarBorrador(s); }, [s]);
   // Plantillas propias del cliente: al elegir cliente se recarga la lista (generales + suyas).
   useEffect(() => {
-    api<{ items: Plantilla[] }>(`/plantillas${s.cliente_id ? `?cliente=${s.cliente_id}` : ''}`).then((r) => setCat((c) => ({ ...c, plantillas: r.items }))).catch(() => {});
-  }, [s.cliente_id]);
+    api<{ items: Plantilla[] }>(`/plantillas${s.cliente_id ? `?cliente=${s.cliente_id}` : ''}`).then((r) => setCat((c) => ({ ...c, plantillas: r.items }))).catch(avisar('las plantillas del cliente'));
+  }, [s.cliente_id, avisar]);
 
   const set = (patch: Partial<WizardState>) => setS((prev) => ({ ...prev, ...patch }));
 
@@ -113,6 +116,7 @@ export default function NuevoProyectoPage() {
       </header>
 
       {error && <Alert tipo="error">{error}</Alert>}
+      <AvisoCarga fallos={fallos} />
       {pendiente && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm flex items-center justify-between gap-3">
           <span className="text-blue-900">Dejaste un proyecto a medio crear{pendiente.nombre ? `: "${pendiente.nombre}"` : ''} (paso {pendiente.paso}).</span>
