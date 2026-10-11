@@ -100,14 +100,15 @@ Roles (`usuarios.rol`): `admin`, `gerencia`, `operaciones`, `ejecutiva`, `lider`
   `mesas.ts` (`alcanceMesa`: clientes + proyectos de una mesa), `semanas.ts`, `historial.ts`
   (reprogramaciones/reprocesos), `bitacora.ts`, `audit.ts`, `plantillas.ts`, `tipos_pieza.ts`, `admin.ts`
   (invitaciones, API keys), `basecamp_import.ts`, `kpis.ts`, `tenants.ts`, `cron_runs.ts` (registro de jobs),
-  `lote.ts` (llama a la RPC `crear_lote`) y `paginar.ts`.
+  `lote.ts` (llama a la RPC `crear_lote`) y `paginar.ts`. Desde el 11/10/2026 cada módulo de dominio de `lib/`
+  tiene su par en `lib/db` (`evolutivo.ts`, `informes.ts`, `oauth.ts`, `notificaciones.ts`, `portal.ts`,
+  `huerfanos.ts`, `credenciales.ts`, `mantenimiento.ts`…).
 - `database.types.ts` son los tipos generados del esquema. No se edita a mano: se regenera con
   `pnpm --filter @backio/backend db:types` después de cada migración.
 - **PostgREST corta en 1000 filas.** Toda lectura que pueda superar eso pagina con `.range()`
-  en bucle (`paginar.ts`; huérfanos, horas, informe por canal, bitácora, scripts). Ya nos mordió tres veces.
+  en bucle (`paginar.ts`; huérfanos, horas, informe por canal, bitácora, mantenimiento). Ya nos mordió tres veces.
 - `audit()` escribe **siempre con service role** (la tabla no tiene política de insert para usuarios).
-- Lint: una consulta a Supabase fuera de `lib/db` es error en `routes/` y aviso en el resto de `lib/`
-  (`eslint.config.mjs`).
+- Lint: una consulta a Supabase fuera de `lib/db` es error en `routes/` y en todo `lib/` (`eslint.config.mjs`).
 
 ### 2.4 Base de datos (Supabase)
 
@@ -333,7 +334,8 @@ Resuelto en la auditoría del 10/10: CI en cada push (typecheck, lint, tests, bu
 Supabase (`pnpm --filter @backio/backend db:types`), jobs en una sola tabla con registro. Después (11/10): vigía de jobs
 (`lib/vigia.ts`: correo a admin y Sentry si una tarea programada no corre; estado en Admin → Servicios) y deploy
 automático del frontend (`.github/workflows/deploy-frontend.yml`, con el secreto `VERCEL_TOKEN`). Reparaciones de datos
-en Admin → Mantenimiento en lugar de scripts locales.
+en Admin → Mantenimiento en lugar de scripts locales, y todas las consultas de `lib/` movidas a `lib/db` (la regla de lint
+pasó a error).
 
 ---
 
