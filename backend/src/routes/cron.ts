@@ -1,13 +1,10 @@
-/** Jobs programados. Protegidos con CRON_SECRET (Vercel Cron / GitHub Actions). */
+/**
+ * Disparadores externos de los jobs (Vercel Cron, GitHub Actions) cuando no corre el scheduler interno. Protegidos
+ * con CRON_SECRET. Corren el mismo job de lib/jobs.ts que el scheduler, en una ventana «manual» propia.
+ */
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { serviceClient, throwIf } from '../lib/db';
-import { reconcileTenant } from '../lib/basecamp/reconcile';
-import { recalcularSenales } from '../lib/rituals/service';
-import { procesarPendientes } from '../lib/notificaciones';
-import { procesarRecurrencias } from '../lib/recurrencias';
-import { importarBasecampCliente } from '../lib/basecamp/importar';
-import { sincronizarHoras } from '../lib/horas';
+import { ejecutarJob, jobPorNombre, momentoLocal } from '../lib/jobs';
 
 export const cron = new Hono();
 
@@ -21,69 +18,20 @@ cron.use('*', async (c, next) => {
   await next();
 });
 
-async function tenants(): Promise<string[]> {
-  const { data, error } = await serviceClient().from('tenants').select('id').eq('activo', true);
-  throwIf(error);
-  return (data ?? []).map((t) => (t as { id: string }).id);
+// Rutas históricas → nombre del job.
+const RUTAS: Record<string, string> = {
+  '/basecamp/reconciliar': 'reconcile',
+  '/basecamp/estructura': 'estructura',
+  '/notificaciones': 'notificaciones',
+  '/senales': 'senales',
+  '/recurrencias': 'recurrencias',
+  '/horas': 'horas',
+};
+
+for (const [ruta, nombre] of Object.entries(RUTAS)) {
+  cron.post(ruta, async (c) => {
+    const job = jobPorNombre(nombre)!;
+    const r = await ejecutarJob(job, momentoLocal(), { manual: true });
+    return c.json(r?.resultado ?? { omitido: 'no aplica ahora' });
+  });
 }
-
-/** Cada 30 min: reconciliación Basecamp. */
-cron.post('/basecamp/reconciliar', async (c) => {
-  const out: Record<string, unknown> = {};
-  for (const t of await tenants()) {
-    try {
-      out[t] = await reconcileTenant({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' });
-    } catch (err) {
-      out[t] = { error: err instanceof Error ? err.message : String(err) };
-    }
-  }
-  return c.json(out);
-});
-
-/** Cada minuto: reintento de notificaciones pendientes. */
-cron.post('/notificaciones', async (c) => c.json(await procesarPendientes()));
-
-/** Domingo 18:00: señales del weekly. */
-cron.post('/senales', async (c) => {
-  const out: Record<string, number> = {};
-  for (const t of await tenants()) {
-    out[t] = (await recalcularSenales({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' })).length;
-  }
-  return c.json(out);
-});
-
-/** Cada hora: estructura de Basecamp (renombres, movimientos, responsables, eliminados). */
-cron.post('/basecamp/estructura', async (c) => {
-  const out: Record<string, unknown> = {};
-  for (const t of await tenants()) {
-    const ctx = { db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' as const };
-    const { data } = await serviceClient()
-      .from('clientes')
-      .select('id, nombre')
-      .eq('tenant_id', t)
-      .eq('activo', true)
-      .not('basecamp_project_id', 'is', null)
-      .not('basecamp_importado_at', 'is', null);
-    for (const cl of (data ?? []) as { id: string; nombre: string }[])
-      out[cl.nombre] = await importarBasecampCliente(ctx, cl.id, { soloActualizar: true }).catch((e: Error) => ({ error: e.message }));
-  }
-  return c.json(out);
-});
-/** Diario: recurrencias de fees. */
-cron.post('/recurrencias', async (c) => {
-  const out: Record<string, unknown> = {};
-  for (const t of await tenants())
-    out[t] = await procesarRecurrencias({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({
-      error: e.message,
-    }));
-  return c.json(out);
-});
-/** Cada 6 h: horas. */
-cron.post('/horas', async (c) => {
-  const out: Record<string, unknown> = {};
-  for (const t of await tenants())
-    out[t] = await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({
-      error: e.message,
-    }));
-  return c.json(out);
-});

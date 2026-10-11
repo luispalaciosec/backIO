@@ -156,23 +156,30 @@ API key hace más de 20 escrituras en 5 min (`audit.ts`).
 
 ---
 
-## 4. Lo que corre solo (`src/lib/scheduler.ts`, activo con `ENABLE_INTERNAL_CRON=1`)
+## 4. Lo que corre solo (`src/lib/jobs.ts`, activo con `ENABLE_INTERNAL_CRON=1`)
 
-| Cada | Qué | Función |
-|---|---|---|
-| 30 min | Reconciliación con Basecamp (`completed`, `due_on`) | `reconcileTenant` |
-| 30 min (+10) | Estructura de Basecamp: listas, grupos, to-dos, responsables, eliminados | `importarBasecampCliente` |
-| 6 h | Horas del timesheet (una llamada, toda la cuenta) | `sincronizarHoras` |
-| 1 min | Cola de notificaciones por correo | `procesarPendientes` |
-| Diario 08:05 | Recurrencias de fees (D2) | `procesarRecurrencias` |
-| Día 1, 08:00 | Informe ejecutivo mensual por mesa (solo redacta) | `informe.ts` |
-| Domingo 18:00 | Señales del weekly + agenda por correo | `recalcularSenales` |
-| L-V 19:30 | Foto del daily por mesa (evolutivo) | `fotoDaily` |
-| Domingo 17:55 | Foto de la semana por mesa (evolutivo) | `fotoWeekly` |
-| Día 1, 08:10 | Congela los KPIs del mes anterior | `congelarPeriodo` |
+Los jobs están en una sola tabla, `JOBS` de `lib/jobs.ts`. La recorren el scheduler interno (`lib/scheduler.ts`, un
+tick por minuto) y los disparadores externos de `/api/cron`. Un job de hora fija corre si la hora ya llegó y no han
+pasado más de 2 h (así se recupera un tick perdido por un despliegue). Un job de intervalo corre una vez por tramo.
+Cada ejecución reclama su ventana en `cron_runs (job, ventana)`, una fila única: dos procesos no repiten el mismo job.
+Al terminar se guarda `ok` y un resumen en `detalle` (solo conteos, nunca texto de Basecamp).
 
-Todos usan `serviceClient()` con `origen: 'cron'` y escriben en `audit_log`. Si un cron falla solo
-se ve en los logs de Railway: **no hay alerta todavía** (ver §8).
+| Cada | Job | Qué | Función |
+|---|---|---|---|
+| 1 min | `notificaciones` | Cola de correos (sin registro en `cron_runs`) | `procesarPendientes` |
+| 30 min | `reconcile` | Reconciliación con Basecamp (`completed`, `due_on`) | `reconcileTenant` |
+| 15 min | `estructura` | Estructura de Basecamp: listas, grupos, to-dos, responsables, eliminados | `importarBasecampCliente` |
+| 6 h | `horas` | Horas del timesheet | `sincronizarHoras` |
+| Diario 03:30 | `limpieza` | Contadores de `limites` y `cron_runs` de más de 60 días | `limites_limpiar`, `limpiarCronRuns` |
+| Diario 08:05 | `recurrencias` | Recurrencias de fees (D2) | `procesarRecurrencias` |
+| Día 1, 08:00 | `informe_mensual` | Informe ejecutivo mensual por mesa (solo redacta; requiere IA) | `generarInformeMensual` |
+| Día 1, 08:10 | `kpis_congelar` | Congela los KPIs del mes (y trimestre) anterior | `congelarPeriodo` |
+| L-V 19:30 | `foto_daily` | Foto del daily por mesa (evolutivo) | `fotoDaily` |
+| Domingo 17:55 | `foto_semana` | Foto de la semana por mesa (evolutivo) | `fotoWeekly` |
+| Domingo 18:00 | `senales` | Señales del weekly + agenda por correo | `recalcularSenales` |
+
+Todos usan `serviceClient()` con `origen: 'cron'`. Para saber si un job corrió y cómo terminó:
+`select * from cron_runs order by inicio_at desc`. Todavía no hay alerta automática si falla (ver §8; Sentry, Ola 7).
 
 ---
 
