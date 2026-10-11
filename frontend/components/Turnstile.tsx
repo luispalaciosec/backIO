@@ -35,7 +35,8 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
     cargarScript().then(() => {
       if (!vivo || !ref.current || !window.turnstile) return;
       id = window.turnstile.render(ref.current, {
-        sitekey: SITE_KEY_TURNSTILE, language: 'es', theme: 'light', size: 'flexible',
+        sitekey: SITE_KEY_TURNSTILE, language: 'es', theme: 'light', // Turnstile mide al menos 300 px: en pantallas angostas (celular) va en formato compacto.
+        size: ref.current.clientWidth < 300 ? 'compact' : 'flexible',
         callback: (t: string) => onToken(t),
         'expired-callback': () => onToken(null),
         'error-callback': () => onToken(null),
