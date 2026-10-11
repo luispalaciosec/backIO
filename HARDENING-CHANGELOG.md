@@ -149,3 +149,11 @@ una acción de Luis) · **pendiente** (ola futura).
 | Webhook de PrometIO sin tests de eventos | hecho | `__tests__/webhook_prometio.test.ts` (7) | Firma inválida y timestamp viejo: 401 con rastro sin el cuerpo; empresa creada/actualizada con el mismo id (logo solo si viene); cotización aprobada crea solo un borrador (nunca un proyecto) con la plantilla sugerida y avisa a ejecutivas y operaciones; cliente nuevo antes del borrador; payload inválido 400 auditado; evento desconocido ignorado; cuerpo repetido procesado una vez |
 | MCP: reglas de `actualizarRequerimiento` en preview y confirmación | hecho | `__tests__/mcp_requerimientos.test.ts` (4) | Por el protocolo MCP en memoria: sin motivo no hay plan; el preview pasa por `validarActualizacion` y no ofrece planes inaplicables; confirmar llama a la función común con `exigirMotivo` y el `plan_id` para auditoría; si la regla cambió, el agente recibe el motivo |
 | Frontend sin tests | hecho | `frontend/vitest.config.mts`, `lib/__tests__/api.test.ts` (9), `lib/__tests__/url.test.ts` (5); `pnpm test` los corre en CI | Núcleo de fetch: 204, 2xx no JSON falla, error con estado y detalle, JSON con cabecera, token de sesión en `api`, PIN sin token en `apiPortal`; `mensajeDeError` (incluido el formato viejo de zod); `hrefExterno` solo https; `rutaInterna` rechaza otro origen y el truco del tabulador; `limpiarUrl` quita el token del portal y las query antes de Sentry |
+| Rutas REST de actualizar tarea y «quitar acceso» | hecho | `__tests__/rutas_actualizar_y_acceso.test.ts` (10) | PATCH: colaborador/UI exige reglas y motivo, API no exige motivo, `ReglaError` vuelve con su estado, título con salto de línea rechazado antes de la función. Quitar acceso: no a uno mismo, solo admin, transacción antes que Supabase Auth, fallo de Auth informado, fallo de la transacción no toca Auth, usuario ajeno 404 |
+
+## Cierre (11/10/2026)
+
+Las 9 olas del plan están hechas y desplegadas. Tests: backend 198, frontend 14, shared 14 (antes de la auditoría: 117 en
+backend y ninguno en el frontend). CI en cada push: `pnpm audit --prod --audit-level=high`, typecheck, lint, tests y build.
+Pendientes que no son código: ver «Deuda técnica» en `docs/17-arquitectura-tecnica.md` §8 (staging, aviso si un job no
+corre, tests de integración contra el sandbox de Basecamp, 115 consultas fuera de `lib/db` en `lib`).
