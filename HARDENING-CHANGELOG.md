@@ -153,7 +153,7 @@ una acción de Luis) · **pendiente** (ola futura).
 
 ## Cierre (11/10/2026)
 
-Las 9 olas del plan están hechas y desplegadas. Tests: backend 198, frontend 14, shared 14 (antes de la auditoría: 117 en
-backend y ninguno en el frontend). CI en cada push: `pnpm audit --prod --audit-level=high`, typecheck, lint, tests y build.
+Las 9 olas del plan están hechas y desplegadas. Tests: backend 198, frontend 14, shared 14 (al empezar la Ola 4: 121 en
+backend, 9 en shared y ninguno en el frontend). CI en cada push: `pnpm audit --prod --audit-level=high`, typecheck, lint, tests y build.
 Pendientes que no son código: ver «Deuda técnica» en `docs/17-arquitectura-tecnica.md` §8 (staging, aviso si un job no
 corre, tests de integración contra el sandbox de Basecamp, 115 consultas fuera de `lib/db` en `lib`).
