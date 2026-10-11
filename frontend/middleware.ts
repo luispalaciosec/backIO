@@ -12,6 +12,13 @@ function politicaCsp(nonce: string): string {
   const prod = process.env.NODE_ENV === 'production';
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL ?? '';
   const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  // Sentry recibe los errores en su host de ingesta (solo si hay DSN).
+  let sentry = '';
+  try {
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) sentry = ` https://${new URL(process.env.NEXT_PUBLIC_SENTRY_DSN).host}`;
+  } catch {
+    // DSN mal escrito: sin Sentry, la CSP no lo admite.
+  }
   const turnstile = 'https://challenges.cloudflare.com';
   return [
     "default-src 'self'",
@@ -19,7 +26,7 @@ function politicaCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https: data: blob:",
     "font-src 'self' data:",
-    `connect-src 'self' ${backend} ${supabase} ${supabase.replace(/^https:/, 'wss:')}${prod ? '' : ' ws: http://localhost:*'}`,
+    `connect-src 'self' ${backend} ${supabase} ${supabase.replace(/^https:/, 'wss:')}${sentry}${prod ? '' : ' ws: http://localhost:*'}`,
     `frame-src ${turnstile}`,
     "worker-src 'self' blob:",
     "object-src 'none'",

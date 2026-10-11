@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@backio/shared": "workspace:*",
+    "@sentry/nextjs": "^11.6.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "canvas-confetti": "1.9.3",
