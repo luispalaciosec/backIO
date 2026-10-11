@@ -18,7 +18,7 @@ export function EstadoChip({ estado }: { estado: EstadoOperativo }) {
 
 /** Chip de la vista cliente: solo 4 estados, nunca rojo. */
 export function EstadoClienteChip({ estado, esperando }: { estado: 'pendiente' | 'en_proceso' | 'completado'; esperando?: boolean }) {
-  if (esperando) return <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-white bg-estado-espera">Esperando tu aprobación</span>;
+  if (esperando) return <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-white bg-estado-espera">Pendiente de tu revisión</span>;
   const map = {
     completado: ['Completado', 'bg-estado-completado text-white'],
     en_proceso: ['En proceso', 'bg-estado-proceso text-white'],

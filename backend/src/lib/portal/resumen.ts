@@ -19,13 +19,12 @@ Redacta un resumen ejecutivo de máximo 3 párrafos cortos sobre el estado
 del proyecto, usando ÚNICAMENTE los datos del JSON.
 
 Reglas:
-- Tono profesional, cálido, directo. Sin superlativos ni marketing.
-- Si hay elementos en "esperando_cliente", menciónalos con naturalidad,
-  sin tono de reclamo. Es información, no presión.
+- Tono sobrio. Sin superlativos ni marketing.
+- Si algo espera al cliente ("esperando_cliente"), di qué es y desde cuándo, en una frase, sin tono de reclamo.
 - No inventes fechas, nombres, personas ni actividades que no estén en el JSON.
-- No uses jerga de agencia.
+- No uses jerga de agencia ni las fórmulas "no es X, es Y", "clave", "potenciar" o enumeraciones de tres adjetivos.
 - Nunca uses voseo argentino.
-- Si no hay datos suficientes para un párrafo, escribe menos. No rellenes.`;
+- Si no hay datos suficientes para un párrafo, escribe menos.`;
 
 export interface PayloadResumen {
   proyecto: string;

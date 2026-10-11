@@ -5,8 +5,6 @@ requerimientos y vista de cuenta del cliente, apoyándose en Basecamp como siste
 
 En producción desde el 04/09/2026 · `backio.vercel.app` · 15 clientes sincronizados con Basecamp.
 
----
-
 ## Qué hace
 
 | Para | Qué resuelve |
@@ -19,8 +17,6 @@ En producción desde el 04/09/2026 · `backio.vercel.app` · 15 clientes sincron
 
 Basecamp sigue siendo donde el equipo trabaja. BackIO lee de ahí solo lo estructural (títulos,
 fechas, responsables, completado, horas) y escribe de vuelta fechas, to-dos nuevos y mensajes.
-
----
 
 ## Las cinco reglas que nunca se rompen
 
@@ -37,8 +33,6 @@ fechas, responsables, completado, horas) y escribe de vuelta fechas, to-dos nuev
 Detalle y defensas en `docs/02-visibilidad.md`. Zonas que no se cambian sin revisión humana:
 `lib/visibility/`, `lib/basecamp/write.ts`, tools MCP de escritura y políticas RLS (`CLAUDE.md`).
 
----
-
 ## Stack
 
 | Capa | Tecnología |
@@ -50,8 +44,6 @@ Detalle y defensas en `docs/02-visibilidad.md`. Zonas que no se cambian sin revi
 | CRM | PrometIO (webhook, `cliente_id` compartido) |
 | IA | Claude (Anthropic API): redacta dailies, weeklies, briefs e informes; una persona publica |
 | Agentes | MCP Server + API REST con OpenAPI |
-
----
 
 ## Correr en local
 
@@ -66,8 +58,6 @@ pnpm test && pnpm typecheck
 Variables, usuarios de prueba y verificación de RLS: `docs/11-setup.md`. Despliegue:
 `docs/12-despliegue.md`.
 
----
-
 ## Estructura
 
 ```
@@ -81,8 +71,6 @@ docs/       specs, arquitectura técnica, manual de uso (HTML + PDF)
 Cómo está armado por dentro, ciclo de una petición, crons, integraciones y deuda técnica:
 **`docs/17-arquitectura-tecnica.md`**.
 
----
-
 ## Documentación
 
 | Doc | Contenido |
@@ -90,7 +78,7 @@ Cómo está armado por dentro, ciclo de una petición, crons, integraciones y de
 | `CLAUDE.md` | Reglas, convenciones, zonas de revisión humana |
 | `docs/00-arquitectura.md` | Modelo mental y alcance de la suite (PrometIO, DatIO, BackIO) |
 | `docs/01-modelo-datos.md` | Esquema, RLS, índices |
-| `docs/02-visibilidad.md` | Frontera cliente/interno. **El documento más importante** |
+| `docs/02-visibilidad.md` | Frontera cliente/interno. Léelo antes de tocar el portal o la sincronización |
 | `docs/03-builder.md` | Creación de proyectos (Builder, importación, desde Basecamp) |
 | `docs/04-basecamp.md` | Integración: qué entra, qué sale, incidentes y lecciones |
 | `docs/05-rituales.md` | Daily, Weekly, motor de señales, formato de mensajes |
@@ -105,8 +93,6 @@ Cómo está armado por dentro, ciclo de una petición, crons, integraciones y de
 | `docs/18-seguridad.md` | Revisión de seguridad: hallazgos, correcciones y pendientes |
 | `docs/19-kpis.md` | KPIs por persona y por equipo |
 | `docs/manual/` | Manual de uso para el equipo (HTML y PDF con pantallas) |
-
----
 
 ## Estado y deuda técnica
 
@@ -124,8 +110,6 @@ del frontend. Lista completa y priorizada en `docs/17-arquitectura-tecnica.md` �
 | Daily | Es de una mesa; ninguna tarea entra sin responsable |
 | Canal de notificación | Correo |
 | Todo SQL | Archivo numerado en `backend/supabase/migrations/`, lo aplica Luis |
-
----
 
 ## Riesgo #1
 

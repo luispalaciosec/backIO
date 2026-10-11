@@ -54,7 +54,7 @@ export function validarActualizacion(
   }
   // Regla 3: Basecamp manda sobre completed. No se completa desde BackIO si el to-do existe en Basecamp.
   if (patch.estado_operativo === 'completado' && previo.basecamp_todo_id)
-    throw new ReglaError('Este requerimiento se completa desde Basecamp (fuente de verdad de completed).', 422);
+    throw new ReglaError('Esta tarea se marca como completada en Basecamp.', 422);
   // Regla del daily (22/09): ninguna tarea entra al daily sin al menos un responsable.
   if (patch.daily_fecha) {
     const owners = patch.owner_agencia ?? previo.owner_agencia ?? [];

@@ -37,7 +37,7 @@ function Integraciones() {
     <div className="max-w-2xl space-y-6">
       <header>
         <h1 className="text-2xl font-bold">Integraciones</h1>
-        <p className="text-sm text-gray-500">Solo administradores. Las credenciales se guardan en la configuración del tenant.</p>
+        <p className="text-sm text-gray-500">Solo administradores. Las credenciales se guardan en una tabla aparte que solo lee el servidor; ningún usuario puede consultarlas.</p>
       </header>
       {params.get('basecamp') === 'ok' && <Alert tipo="ok">Basecamp conectado correctamente.</Alert>}
       {error && <Alert tipo="error">{error}</Alert>}

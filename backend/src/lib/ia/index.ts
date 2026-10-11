@@ -17,7 +17,7 @@ export const MODELO_IA = 'claude-sonnet-5';
 export const ESTILO_GEEKS = `Escribes para Geeks Ecuador, agencia creativa en Quito. Español de Ecuador, neutro y directo.
 Reglas fijas:
 - Usa ÚNICAMENTE los datos del JSON. No inventes nombres, fechas, cifras ni tareas.
-- Nada de superlativos ni marketing. Frases cortas. Sin voseo argentino.
+- Nada de superlativos ni marketing. Varía el largo de las frases y prioriza el dato sobre el adjetivo. Sin voseo argentino.
 - Si un dato no está, no lo menciones. No rellenes.
 - No uses emojis salvo que se indique.`;
 
@@ -103,7 +103,7 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
         : (res.stop_reason as string) === 'refusal'
           ? 'el modelo rechazó la solicitud'
           : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
-    throw new DbError(`La IA no devolvió texto: ${motivo}. Vuelve a intentar; si persiste, avisa a Luis.`, 502);
+    throw new DbError(`La IA no devolvió texto: ${motivo}. Vuelve a intentar; si persiste, avisa al administrador de BackIO.`, 502);
   }
   const { error } = await serviceClient()
     .from('ia_generaciones')
@@ -130,14 +130,14 @@ export function traducirErrorIA(err: unknown): DbError {
   const status = e.status ?? 0;
   console.error('[ia] error de la API', { status, msg });
   if (status === 401 || /invalid x-api-key|authentication/i.test(msg))
-    return new DbError('La clave de IA no es válida o fue revocada (ANTHROPIC_API_KEY). Avisa a Luis.', 502);
+    return new DbError('La clave de IA no es válida o fue revocada (ANTHROPIC_API_KEY). Avisa al administrador de BackIO.', 502);
   if (status === 402 || /credit balance|billing|insufficient/i.test(msg))
     return new DbError('La cuenta de IA no tiene saldo. Hay que recargar créditos en Anthropic.', 502);
   if (status === 429) return new DbError('La IA está al límite de uso por ahora. Espera un minuto y vuelve a intentar.', 503);
   if (status === 529 || /overloaded/i.test(msg))
     return new DbError('El servicio de IA está saturado en este momento. Vuelve a intentar en unos minutos.', 503);
   if (status === 404 || (/model/i.test(msg) && /not found|does not exist/i.test(msg)))
-    return new DbError(`El modelo de IA (${MODELO_IA}) no está disponible para esta clave. Avisa a Luis.`, 502);
+    return new DbError(`El modelo de IA (${MODELO_IA}) no está disponible para esta clave. Avisa al administrador de BackIO.`, 502);
   if (/timeout|timed out|ECONNRESET|fetch failed/i.test(msg))
     return new DbError('La IA tardó demasiado en responder. Vuelve a intentar.', 504);
   return new DbError(`Error de la IA: ${msg || 'desconocido'}`, 502);

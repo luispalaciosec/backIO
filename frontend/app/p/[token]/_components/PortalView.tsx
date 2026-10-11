@@ -11,14 +11,19 @@ export function PortalView({ token }: { token: string }) {
   const [data, setData] = useState<Payload | null>(null);
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'pin' | 'no_disponible'>('cargando');
   const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const cargar = useCallback(async (p?: string) => {
     try {
       setData(await apiPortal<Payload>(`/${token}`, {}, p));
       setEstado('ok');
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setEstado('pin');
-      else setEstado('no_disponible');
+      // PIN pedido, incorrecto o bloqueado por intentos: el visitante sabe qué pasó (antes un PIN errado no decía nada
+      // y el bloqueo se presentaba como «enlace no disponible»).
+      if (e instanceof ApiError && (e.status === 401 || e.status === 429)) {
+        setEstado('pin');
+        setPinError(e.status === 429 ? 'Demasiados intentos. Espera 15 minutos.' : p ? 'PIN incorrecto.' : null);
+      } else setEstado('no_disponible');
     }
   }, [token]);
   useEffect(() => { void cargar(); }, [cargar]);
@@ -30,7 +35,8 @@ export function PortalView({ token }: { token: string }) {
     return (
       <form className="card p-8 space-y-3 max-w-xs mx-auto" onSubmit={(e) => { e.preventDefault(); void cargar(pin); }}>
         <div className="font-semibold">Ingresa el PIN del proyecto</div>
-        <input className="input text-center tracking-[0.5em]" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} />
+        <input className="input text-center tracking-[0.5em]" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} aria-describedby="pin-error" />
+        {pinError && <p id="pin-error" role="alert" className="text-sm text-red-700">{pinError}</p>}
         <button className="btn-primary w-full">Entrar</button>
       </form>
     );

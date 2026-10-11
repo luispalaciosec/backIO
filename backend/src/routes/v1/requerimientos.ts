@@ -421,7 +421,7 @@ requerimientos.post('/bulk', requireScope('write:requerimientos'), async (c) => 
     usuariosEmail: new Set(usuarios.map((u) => u.email.toLowerCase())),
   });
   if (preview.rechazadas.length > 0) {
-    return c.json({ error: 'Hay filas inválidas. Import es todo o nada.', preview }, 422);
+    return c.json({ error: 'Hay filas con errores; no se cargó ninguna. Corrígelas y vuelve a intentar.', preview }, 422);
   }
 
   // Proyectos nuevos y tareas van en un solo lote transaccional (B7): o entra todo o nada.

@@ -42,12 +42,12 @@ function proximoPaso(def: KpiDefinicion, v: KpiValor, g: Guia): { texto: string;
   if (def.operador === '>=') {
     const necesarias = Math.ceil(v.meta * b - 1e-9);
     const faltan = Math.max(0, necesarias - a);
-    if (faltan === 0) return { texto: `¡Meta cumplida! Llevas ${a} ${a === 1 ? g.suma : g.sumaPl} y necesitabas ${necesarias}. 🎉`, logro: true };
+    if (faltan === 0) return { texto: `Cumpliste la meta: llevas ${a} ${a === 1 ? g.suma : g.sumaPl} y necesitabas ${necesarias}.`, logro: true };
     return { texto: `Te ${faltan === 1 ? 'falta' : 'faltan'} ${faltan} ${faltan === 1 ? g.suma : g.sumaPl} más para llegar al ${pct(v.meta)}.`, logro: false };
   }
   const permitidas = Math.floor(v.meta * b + 1e-9);
   const margen = permitidas - a;
-  if (margen >= 0) return { texto: v.meta === 0 ? (a === 0 ? '¡Cero! Justo lo que pide la meta. 🎉' : '') : `Vas bien: te ${margen === 1 ? 'queda' : 'quedan'} ${margen} de margen antes de pasar el ${pct(v.meta)}. 🎉`, logro: true };
+  if (margen >= 0) return { texto: v.meta === 0 ? (a === 0 ? 'Cero este mes, justo lo que pide la meta.' : '') : `Vas bien: te ${margen === 1 ? 'queda' : 'quedan'} ${margen} de margen antes de pasar el ${pct(v.meta)}.`, logro: true };
   return { texto: `Te pasaste por ${-margen}: la meta permite hasta ${permitidas} ${permitidas === 1 ? g.resta : g.restaPl} de ${b}.`, logro: false };
 }
 

@@ -38,7 +38,7 @@ export function VistaCliente({
       </div>
       {data.bloqueado_por_cliente.length > 0 && (
         <div className="mx-5 mb-4 rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm">
-          <div className="font-semibold text-amber-900">⚠ Esperando tu aprobación</div>
+          <div className="font-semibold text-amber-900">Pendiente de tu revisión</div>
           {data.bloqueado_por_cliente.map((b, i) => (
             <div key={i} className="text-amber-900">{b.titulo} · {b.dias} {b.dias === 1 ? 'día' : 'días'}</div>
           ))}

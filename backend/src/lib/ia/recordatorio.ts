@@ -14,9 +14,11 @@ recordando con amabilidad que un pendiente depende de ellos. Formato:
 Asunto: ...
 (línea en blanco)
 cuerpo
-- Tono cálido y profesional, sin reclamo ni presión. Es información útil para que el proyecto avance.
-- Menciona qué esperamos de ellos, desde cuándo (si hay días) y qué se desbloquea al recibirlo.
-- Cierra ofreciendo ayuda. Firma con el nombre de la ejecutiva. Sin emojis.`;
+- Tono amable y concreto, sin reclamo.
+- Menciona el pendiente, los días de espera y la fecha comprometida solo si están en el JSON. No supongas qué se
+  desbloquea ni qué pasa después.
+- Cierra con una pregunta concreta (por ejemplo, "¿Nos lo puedes enviar antes del jueves?"), sin fórmulas de cortesía
+  como "quedo atenta a cualquier inquietud". Firma con el nombre de la ejecutiva. Sin emojis.`;
 
 export async function redactarRecordatorio(
   ctx: DbCtx,

@@ -89,7 +89,7 @@ export default async function WeeklyPage() {
           <CausasPendientes titulos={titulos} escribe={escribe} />
           <section className="card p-4 space-y-3">
             <div className="font-semibold">Acuerdos de la sesión</div>
-            <p className="text-xs text-gray-500">Tres campos. La fecha es real: no existe “próxima weekly”.</p>
+            <p className="text-xs text-gray-500">Cada acuerdo lleva responsable y una fecha concreta del calendario.</p>
             {escribe ? <AcuerdoForm semanaId={semana.id} usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre }))} /> : <p className="text-xs text-gray-400">Los acuerdos los registra quien dirige el weekly.</p>}
             <ul className="divide-y divide-gray-100 text-sm">
               {acuerdos.map((a) => (
