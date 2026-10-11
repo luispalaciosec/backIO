@@ -27,7 +27,7 @@ jobs:
       - name: Falta el token de Vercel
         if: env.VERCEL_TOKEN == ''
         run: echo "::warning::Sin el secreto VERCEL_TOKEN no se despliega el frontend. Ver el encabezado de este archivo."
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: env.VERCEL_TOKEN != ''
         with:
           # El commit que pasó el CI, no lo último de main.
