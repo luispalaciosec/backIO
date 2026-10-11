@@ -7,7 +7,14 @@
  */
 import type { Recurrencia, CrearProyectoInput, BloqueAlcanceInput, BriefProyecto } from '@backio/shared';
 import type { DbCtx } from './db/client';
-import { throwIf, DbError } from './db/client';
+import { DbError } from './db/client';
+import {
+  getProyectoDePeriodo,
+  listRecurrencias,
+  marcarPeriodoGenerado,
+  updateRecurrenciaFila,
+  upsertRecurrenciaFila,
+} from './db/recurrencias';
 import { getProyectoDetalle, updateProyecto } from './db/proyectos';
 import { getPlantillaArbol } from './db/plantillas';
 import { audit } from './db/audit';
@@ -37,20 +44,7 @@ export function nombreDelPeriodo(patron: string, periodo: string): string {
     .replace(/\{MES\}/g, Mes.toUpperCase());
 }
 
-export async function listRecurrencias(ctx: DbCtx): Promise<Recurrencia[]> {
-  const { data, error } = await ctx.db
-    .from('recurrencias')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .order('created_at', { ascending: false });
-  throwIf(error);
-  return (data ?? []) as Recurrencia[];
-}
-export async function getRecurrencia(ctx: DbCtx, id: string): Promise<Recurrencia | null> {
-  const { data, error } = await ctx.db.from('recurrencias').select('*').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
-  throwIf(error);
-  return (data as Recurrencia) ?? null;
-}
+export { listRecurrencias, getRecurrencia } from './db/recurrencias';
 
 export async function upsertRecurrencia(
   ctx: DbCtx,
@@ -67,53 +61,38 @@ export async function upsertRecurrencia(
     ultimo_proyecto_id?: string | null;
   },
 ): Promise<Recurrencia> {
-  const { data, error } = await ctx.db
-    .from('recurrencias')
-    .upsert(
-      {
-        tenant_id: ctx.tenantId,
-        cliente_id: r.cliente_id,
-        plantilla_id: r.plantilla_id,
-        nombre_patron: r.nombre_patron,
-        brief: r.brief,
-        bloques: r.bloques,
-        owner_ejecutiva: r.owner_ejecutiva,
-        dia_generacion: r.dia_generacion ?? 25,
-        activa: true,
-        proyecto_origen_id: r.proyecto_origen_id ?? null,
-        ultimo_mes_generado: r.ultimo_mes_generado ?? null,
-        ultimo_proyecto_id: r.ultimo_proyecto_id ?? null,
-        created_by: ctx.usuarioId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tenant_id,cliente_id,plantilla_id' },
-    )
-    .select()
-    .single();
-  throwIf(error);
+  const data = await upsertRecurrenciaFila(ctx, {
+    tenant_id: ctx.tenantId,
+    cliente_id: r.cliente_id,
+    plantilla_id: r.plantilla_id,
+    nombre_patron: r.nombre_patron,
+    brief: r.brief,
+    bloques: r.bloques,
+    owner_ejecutiva: r.owner_ejecutiva,
+    dia_generacion: r.dia_generacion ?? 25,
+    activa: true,
+    proyecto_origen_id: r.proyecto_origen_id ?? null,
+    ultimo_mes_generado: r.ultimo_mes_generado ?? null,
+    ultimo_proyecto_id: r.ultimo_proyecto_id ?? null,
+    created_by: ctx.usuarioId,
+    updated_at: new Date().toISOString(),
+  });
   await audit(ctx, {
     accion: 'recurrencia_guardar',
     entidad: 'recurrencia',
-    entidad_id: (data as Recurrencia).id,
+    entidad_id: data.id,
     detalle: { cliente_id: r.cliente_id, plantilla_id: r.plantilla_id },
   });
-  return data as Recurrencia;
+  return data;
 }
 export async function updateRecurrencia(
   ctx: DbCtx,
   id: string,
   patch: Partial<Pick<Recurrencia, 'activa' | 'dia_generacion' | 'nombre_patron' | 'owner_ejecutiva' | 'bloques' | 'brief'>>,
 ): Promise<Recurrencia> {
-  const { data, error } = await ctx.db
-    .from('recurrencias')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', id)
-    .select()
-    .single();
-  throwIf(error);
+  const data = await updateRecurrenciaFila(ctx, id, patch);
   await audit(ctx, { accion: 'recurrencia_actualizar', entidad: 'recurrencia', entidad_id: id, detalle: patch });
-  return data as Recurrencia;
+  return data;
 }
 
 /** Crea una recurrencia a partir de un proyecto existente, reconstruyendo el alcance desde sus requerimientos. */
@@ -162,15 +141,8 @@ export async function generarPeriodo(
   rec: Recurrencia,
   periodo: string,
 ): Promise<{ proyecto_id: string; creado: boolean; nombre: string; basecamp?: unknown }> {
-  const { data: existente } = await ctx.db
-    .from('proyectos')
-    .select('id, nombre')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('recurrencia_id', rec.id)
-    .eq('periodo', periodo)
-    .is('deleted_at', null)
-    .maybeSingle();
-  if (existente) return { proyecto_id: (existente as { id: string }).id, creado: false, nombre: (existente as { nombre: string }).nombre };
+  const existente = await getProyectoDePeriodo(ctx, rec.id, periodo);
+  if (existente) return { proyecto_id: existente.id, creado: false, nombre: existente.nombre };
   const { inicio, fin } = rangoPeriodo(periodo);
   const nombre = nombreDelPeriodo(rec.nombre_patron, periodo);
   const brief = rec.brief as CrearProyectoInput['brief'];
@@ -193,11 +165,7 @@ export async function generarPeriodo(
   };
   const r: ResultadoCreacion = await crearProyectoDesdePlantilla(ctx, input);
   await updateProyecto(ctx, r.proyecto.id, { recurrencia_id: rec.id, periodo });
-  const { error } = await ctx.db
-    .from('recurrencias')
-    .update({ ultimo_mes_generado: periodo, ultimo_proyecto_id: r.proyecto.id, updated_at: new Date().toISOString() })
-    .eq('id', rec.id);
-  throwIf(error);
+  await marcarPeriodoGenerado(ctx, rec.id, periodo, r.proyecto.id);
   await audit(ctx, {
     accion: 'recurrencia_generar',
     entidad: 'proyecto',

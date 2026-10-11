@@ -2,6 +2,7 @@
 import { env } from '../../config/env';
 import type { DbCtx } from '../db/client';
 import { getCliente, updateClienteConfig } from '../db/clientes';
+import { listClientesConWebhook } from '../db/webhooks';
 import { audit } from '../db/audit';
 import { BasecampClient } from './client';
 
@@ -44,15 +45,9 @@ export async function actualizarWebhooksTenant(
 ): Promise<{ actualizados: string[]; registrados: string[]; errores: { cliente: string; error: string }[] }> {
   const url = webhookUrl();
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const { data } = await ctx.db
-    .from('clientes')
-    .select('id, nombre, basecamp_project_id, config')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('activo', true)
-    .is('deleted_at', null)
-    .not('basecamp_project_id', 'is', null);
+  const clientes = await listClientesConWebhook(ctx);
   const out = { actualizados: [] as string[], registrados: [] as string[], errores: [] as { cliente: string; error: string }[] };
-  for (const c of (data ?? []) as { id: string; nombre: string; basecamp_project_id: number; config: Record<string, unknown> }[]) {
+  for (const c of clientes) {
     try {
       const id = c.config?.basecamp_webhook_id as number | undefined;
       if (id) {

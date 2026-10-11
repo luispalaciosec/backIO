@@ -3,7 +3,7 @@
  * Solo estado y milisegundos; sin detalle interno de errores hacia el cliente.
  */
 import { env, frontendOrigins } from '../config/env';
-import { serviceClient } from './db/client';
+import { pingTenant } from './db/salud';
 import { getStatus } from './basecamp/oauth';
 import { BasecampClient } from './basecamp/client';
 import { JOBS } from './jobs';
@@ -84,8 +84,7 @@ export async function verificarSalud(
       return url;
     }),
     medir('supabase_db', 'Supabase DB', async () => {
-      const { error } = await serviceClient().from('tenants').select('id').eq('id', tenantId).limit(1);
-      if (error) throw new Error(error.message);
+      await pingTenant(tenantId);
     }),
     medir('supabase_auth', 'Supabase Auth', async (signal) => {
       await esperar(await fetch(`${e.SUPABASE_URL}/auth/v1/health`, { signal, headers: { apikey: e.SUPABASE_ANON_KEY } }));

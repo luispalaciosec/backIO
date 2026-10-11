@@ -18,7 +18,8 @@ import type { DbCtx } from './db/client';
 import { getRequerimiento, updateRequerimiento } from './db/requerimientos';
 import { insertReproceso, reprocesoAbierto, updateReproceso } from './db/historial';
 import { audit } from './db/audit';
-import { throwIf } from './db/client';
+import { setVecesReproceso, getReproceso } from './db/cumplimiento';
+import { listHorasRequerimientoDesde } from './db/horas';
 import { reabrirTodo } from './basecamp/write';
 import { log } from './logger';
 
@@ -144,12 +145,7 @@ export async function registrarReproceso(
     atribuible,
     area_responsable,
   });
-  const { error } = await ctx.db
-    .from('requerimientos')
-    .update({ veces_reproceso: req.veces_reproceso + 1 })
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', requerimientoId);
-  throwIf(error);
+  await setVecesReproceso(ctx, requerimientoId, req.veces_reproceso + 1);
   const patch: Parameters<typeof updateRequerimiento>[2] = { ultima_actualizacion: new Date().toISOString() };
   if (
     req.estado_operativo === 'completado' ||
@@ -177,18 +173,10 @@ export async function registrarReproceso(
 
 /** Cierra el reproceso abierto: fecha de cierre y horas del timesheet consumidas desde que se abrió. */
 export async function cerrarReproceso(ctx: DbCtx, requerimientoId: string, reprocesoId?: string): Promise<Reproceso | null> {
-  const abierto = reprocesoId
-    ? ((await ctx.db.from('reprocesos').select('*').eq('tenant_id', ctx.tenantId).eq('id', reprocesoId).maybeSingle())
-        .data as Reproceso | null)
-    : await reprocesoAbierto(ctx, requerimientoId);
+  const abierto = reprocesoId ? await getReproceso(ctx, reprocesoId) : await reprocesoAbierto(ctx, requerimientoId);
   if (!abierto || abierto.cerrado_at) return abierto ?? null;
-  const { data: horas } = await ctx.db
-    .from('horas')
-    .select('horas')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('requerimiento_id', requerimientoId)
-    .gte('fecha', abierto.abierto_at.slice(0, 10));
-  const total = ((horas ?? []) as { horas: number }[]).reduce((s, h) => s + Number(h.horas), 0);
+  const horas = await listHorasRequerimientoDesde(ctx, requerimientoId, abierto.abierto_at.slice(0, 10));
+  const total = horas.reduce((s, h) => s + Number(h.horas), 0);
   const cerrado_at = new Date().toISOString();
   await updateReproceso(ctx, abierto.id, { cerrado_at, horas_reproceso: Math.round(total * 100) / 100 });
   await audit(ctx, {

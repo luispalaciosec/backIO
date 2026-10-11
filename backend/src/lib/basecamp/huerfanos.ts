@@ -4,7 +4,6 @@
  * requerimientos. Solo título (excepción D1), creador, fecha y estado.
  */
 import type { DbCtx } from '../db/client';
-import { throwIf } from '../db/client';
 import { listClientes } from '../db/clientes';
 import { getProyecto } from '../db/proyectos';
 import { insertRequerimientos } from '../db/requerimientos';
@@ -13,25 +12,26 @@ import { audit } from '../db/audit';
 import { notificar } from '../notificaciones';
 import { BasecampClient } from './client';
 import { recorrerTodos } from './recorrer';
-import { paginar } from '../db/paginar';
+import {
+  type Huerfano,
+  contarHuerfanosPendientes,
+  descartarRequerimiento,
+  enlazarRequerimientoTodo,
+  getHuerfano,
+  getRequerimientoPorTodo,
+  insertHuerfanos,
+  listHuerfanosPendientesTodo,
+  listProyectosListasCliente,
+  listTodoIdsEnlazados,
+  listTodoIdsHuerfanos,
+  marcarHuerfanoAdoptado,
+  marcarHuerfanoIgnorado,
+  marcarHuerfanosAdoptados,
+  restaurarRequerimiento,
+} from '../db/huerfanos';
 import { log } from '../logger';
 
-export interface Huerfano {
-  id: string;
-  cliente_id: string;
-  basecamp_project_id: number;
-  basecamp_todolist_id: number | null;
-  basecamp_todo_id: number;
-  titulo: string;
-  creador_nombre: string | null;
-  creador_basecamp_id: number | null;
-  due_on: string | null;
-  completed: boolean;
-  app_url: string | null;
-  detectado_at: string;
-  resuelto_at: string | null;
-  resolucion: string | null;
-}
+export { listHuerfanos, type Huerfano } from '../db/huerfanos';
 
 export async function detectarHuerfanos(
   ctx: DbCtx,
@@ -41,34 +41,13 @@ export async function detectarHuerfanos(
   if (clientes.length === 0) return { clientes: 0, nuevos: 0, pendientes: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   // Paginado: PostgREST corta en 1000 filas y, con más tareas enlazadas, los to-dos ya conocidos salían como huérfanos.
-  const conocidos = new Set(
-    (
-      await paginar<{ basecamp_todo_id: number }>((desde, hasta) =>
-        ctx.db
-          .from('requerimientos')
-          .select('basecamp_todo_id')
-          .eq('tenant_id', ctx.tenantId)
-          .not('basecamp_todo_id', 'is', null)
-          .order('id')
-          .range(desde, hasta),
-      )
-    ).map((r) => r.basecamp_todo_id),
-  );
+  const conocidos = new Set(await listTodoIdsEnlazados(ctx));
   // Huérfanos pendientes cuyo to-do ya está enlazado (falsos positivos): se cierran solos.
   {
-    const { data: pend } = await ctx.db
-      .from('basecamp_huerfanos')
-      .select('id, basecamp_todo_id')
-      .eq('tenant_id', ctx.tenantId)
-      .is('resuelto_at', null);
-    const falsos = ((pend ?? []) as { id: string; basecamp_todo_id: number }[])
-      .filter((h) => conocidos.has(h.basecamp_todo_id))
-      .map((h) => h.id);
-    if (falsos.length)
-      await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' }).in('id', falsos);
+    const falsos = (await listHuerfanosPendientesTodo(ctx)).filter((h) => conocidos.has(h.basecamp_todo_id)).map((h) => h.id);
+    if (falsos.length) await marcarHuerfanosAdoptados(ctx, falsos);
   }
-  const { data: previos } = await ctx.db.from('basecamp_huerfanos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId);
-  const yaRegistrados = new Set(((previos ?? []) as { basecamp_todo_id: number }[]).map((h) => h.basecamp_todo_id));
+  const yaRegistrados = new Set(await listTodoIdsHuerfanos(ctx));
 
   let nuevos = 0;
   for (const c of clientes) {
@@ -77,7 +56,8 @@ export async function detectarHuerfanos(
       for (const { lista, todos } of (await recorrerTodos(bc, pid, false)).listas) {
         const huerfanos = todos.filter((t) => !conocidos.has(t.id) && !yaRegistrados.has(t.id));
         if (!huerfanos.length) continue;
-        const { error } = await ctx.db.from('basecamp_huerfanos').insert(
+        await insertHuerfanos(
+          ctx,
           huerfanos.map((t) => ({
             tenant_id: ctx.tenantId,
             cliente_id: c.id,
@@ -92,7 +72,6 @@ export async function detectarHuerfanos(
             app_url: t.app_url,
           })),
         );
-        throwIf(error);
         huerfanos.forEach((t) => yaRegistrados.add(t.id));
         nuevos += huerfanos.length;
       }
@@ -100,11 +79,7 @@ export async function detectarHuerfanos(
       log.error('[huerfanos] cliente', c.nombre, err instanceof Error ? err.message : err);
     }
   }
-  const { count } = await ctx.db
-    .from('basecamp_huerfanos')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', ctx.tenantId)
-    .is('resuelto_at', null);
+  const count = await contarHuerfanosPendientes(ctx);
   if (nuevos > 0 && opts.notificar !== false) {
     await notificar(
       ctx,
@@ -126,33 +101,14 @@ export async function detectarHuerfanos(
   return { clientes: clientes.length, nuevos, pendientes: count ?? 0 };
 }
 
-export async function listHuerfanos(ctx: DbCtx, soloPendientes = true): Promise<Huerfano[]> {
-  let q = ctx.db.from('basecamp_huerfanos').select('*').eq('tenant_id', ctx.tenantId).order('detectado_at', { ascending: false });
-  if (soloPendientes) q = q.is('resuelto_at', null);
-  const { data, error } = await q.limit(500);
-  throwIf(error);
-  return (data ?? []) as Huerfano[];
-}
-
 /** Adopta un huérfano: lo convierte en requerimiento del proyecto de su lista (o del indicado). */
 export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: string | null): Promise<{ requerimiento_id: string }> {
-  const { data, error } = await ctx.db.from('basecamp_huerfanos').select('*').eq('tenant_id', ctx.tenantId).eq('id', id).single();
-  throwIf(error);
-  const h = data as Huerfano;
+  const h: Huerfano = await getHuerfano(ctx, id);
   // Si el to-do ya tiene requerimiento (vivo o eliminado), no se crea otro: se reutiliza.
-  const { data: exist } = await ctx.db
-    .from('requerimientos')
-    .select('id, deleted_at')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('basecamp_todo_id', h.basecamp_todo_id)
-    .maybeSingle();
-  if (exist) {
-    const ex = exist as { id: string; deleted_at: string | null };
-    if (ex.deleted_at) await ctx.db.from('requerimientos').update({ deleted_at: null }).eq('id', ex.id);
-    await ctx.db
-      .from('basecamp_huerfanos')
-      .update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: ex.id })
-      .eq('id', id);
+  const ex = await getRequerimientoPorTodo(ctx, h.basecamp_todo_id);
+  if (ex) {
+    if (ex.deleted_at) await restaurarRequerimiento(ctx, ex.id);
+    await marcarHuerfanoAdoptado(ctx, id, ex.id);
     await audit(ctx, {
       accion: 'adoptar_huerfano',
       entidad: 'requerimiento',
@@ -163,17 +119,9 @@ export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: strin
   }
   let pid = proyectoId ?? null;
   if (!pid && h.basecamp_todolist_id) {
-    const { data: pg } = await ctx.db
-      .from('proyectos')
-      .select('id, basecamp_todolist_id, basecamp_grupos')
-      .eq('tenant_id', ctx.tenantId)
-      .eq('cliente_id', h.cliente_id)
-      .is('deleted_at', null);
+    const pg = await listProyectosListasCliente(ctx, h.cliente_id);
     const lista = h.basecamp_todolist_id;
-    pid =
-      ((pg ?? []) as { id: string; basecamp_todolist_id: number | null; basecamp_grupos: Record<string, number> }[]).find(
-        (x) => x.basecamp_todolist_id === lista || Object.values(x.basecamp_grupos ?? {}).includes(lista),
-      )?.id ?? null;
+    pid = pg.find((x) => x.basecamp_todolist_id === lista || Object.values(x.basecamp_grupos ?? {}).includes(lista))?.id ?? null;
   }
   const proyecto = pid ? await getProyecto(ctx, pid) : null;
   const usuarios = await listUsuarios(ctx);
@@ -199,19 +147,16 @@ export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: strin
   ]);
   if (!req) throw new Error('No se pudo crear el requerimiento');
   // Enlace al to-do: si falla, mejor abortar que dejar un requerimiento suelto que la importación duplicará.
-  const { error: eEnlace } = await ctx.db
-    .from('requerimientos')
-    .update({ basecamp_todo_id: h.basecamp_todo_id, basecamp_todolist_id: h.basecamp_todolist_id, basecamp_url: h.app_url })
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', req.id);
+  const eEnlace = await enlazarRequerimientoTodo(ctx, req.id, {
+    basecamp_todo_id: h.basecamp_todo_id,
+    basecamp_todolist_id: h.basecamp_todolist_id,
+    basecamp_url: h.app_url,
+  });
   if (eEnlace) {
-    await ctx.db.from('requerimientos').update({ deleted_at: new Date().toISOString() }).eq('id', req.id);
+    await descartarRequerimiento(ctx, req.id);
     throw new Error(`No se pudo enlazar el to-do ${h.basecamp_todo_id}: ${eEnlace.message}`);
   }
-  await ctx.db
-    .from('basecamp_huerfanos')
-    .update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: req.id })
-    .eq('id', id);
+  await marcarHuerfanoAdoptado(ctx, id, req.id);
   await audit(ctx, {
     accion: 'adoptar_huerfano',
     entidad: 'requerimiento',
@@ -222,11 +167,6 @@ export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: strin
 }
 
 export async function ignorarHuerfano(ctx: DbCtx, id: string): Promise<void> {
-  const { error } = await ctx.db
-    .from('basecamp_huerfanos')
-    .update({ resuelto_at: new Date().toISOString(), resolucion: 'ignorado' })
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', id);
-  throwIf(error);
+  await marcarHuerfanoIgnorado(ctx, id);
   await audit(ctx, { accion: 'ignorar_huerfano', entidad: 'huerfano', entidad_id: id });
 }

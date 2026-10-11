@@ -3,7 +3,8 @@
  * La descripción de cada entrada nunca entra (se descarta en BasecampClient.timesheetSafe).
  */
 import type { DbCtx } from './db/client';
-import { throwIf, type FilaInsert } from './db/client';
+import type { FilaInsert } from './db/client';
+import { listHorasDesde, listRequerimientosConTodo, upsertHoras } from './db/horas';
 import { listClientes } from './db/clientes';
 import { listUsuarios } from './db/usuarios';
 import { audit } from './db/audit';
@@ -24,20 +25,8 @@ export async function sincronizarHoras(
   const usuarios = await listUsuarios(ctx);
   const porPersona = new Map(usuarios.filter((u) => u.basecamp_user_id).map((u) => [u.basecamp_user_id as number, u.id]));
   // Paginado: PostgREST corta en 1000 filas; sin esto las horas de los to-dos restantes quedaban sin tarea.
-  const porTodo = new Map<number, string>();
-  for (let from = 0; ; from += 1000) {
-    const { data: reqs, error } = await ctx.db
-      .from('requerimientos')
-      .select('id, basecamp_todo_id')
-      .eq('tenant_id', ctx.tenantId)
-      .not('basecamp_todo_id', 'is', null)
-      .order('id')
-      .range(from, from + 999);
-    throwIf(error); // una página fallida cortaba el bucle en silencio y las horas quedaban sin tarea
-    const filas = (reqs ?? []) as { id: string; basecamp_todo_id: number }[];
-    for (const r of filas) porTodo.set(r.basecamp_todo_id, r.id);
-    if (filas.length < 1000) break;
-  }
+  // Una página fallida lanza: antes cortaba el bucle en silencio y las horas quedaban sin tarea.
+  const porTodo = new Map((await listRequerimientosConTodo(ctx)).map((r) => [r.basecamp_todo_id, r.id]));
 
   // Una sola llamada: el reporte ignora bucket_id (devuelve la cuenta entera), así que se atribuye cada
   // entrada al cliente por el proyecto que trae la propia entrada. Antes se llamaba por cliente y todas
@@ -74,12 +63,7 @@ export async function sincronizarHoras(
       });
     }
     for (let i = 0; i < filas.length; i += 500) {
-      const { data, error } = await ctx.db
-        .from('horas')
-        .upsert(filas.slice(i, i + 500), { onConflict: 'tenant_id,basecamp_entry_id' })
-        .select('id');
-      throwIf(error);
-      guardadas += (data ?? []).length;
+      guardadas += await upsertHoras(ctx, filas.slice(i, i + 500));
     }
   } catch (err) {
     log.error('[horas]', err instanceof Error ? err.message : err);
@@ -103,21 +87,7 @@ export interface ResumenHoras {
 }
 
 export async function resumenHoras(ctx: DbCtx, desdeIso: string, filtro: { clienteIds?: string[] } = {}): Promise<ResumenHoras> {
-  let q = ctx.db
-    .from('horas')
-    .select('cliente_id, usuario_id, requerimiento_id, horas, requerimientos(proyecto_id)')
-    .eq('tenant_id', ctx.tenantId)
-    .gte('fecha', desdeIso.slice(0, 10));
-  if (filtro.clienteIds?.length) q = q.in('cliente_id', filtro.clienteIds);
-  const { data, error } = await q;
-  throwIf(error);
-  const rows = (data ?? []) as unknown as {
-    cliente_id: string;
-    usuario_id: string | null;
-    requerimiento_id: string | null;
-    horas: number;
-    requerimientos: { proyecto_id: string | null } | null;
-  }[];
+  const rows = await listHorasDesde(ctx, desdeIso.slice(0, 10), filtro.clienteIds);
   const pc: Record<string, number> = {},
     pu: Record<string, number> = {},
     pr: Record<string, number> = {},
