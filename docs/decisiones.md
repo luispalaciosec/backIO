@@ -71,6 +71,7 @@ mezcle datos entre organizaciones.
 | — | Máximo **50 to-dos** por operación en Basecamp; sobre eso, confirmación explícita adicional | Acota el daño de una creación masiva por error ([Basecamp](./04-basecamp.md)) | 03/09/2026 · Luis |
 | — | Cambiar la fecha de entrega desde la pantalla **exige motivo** (API y agentes pueden omitirlo y queda «sin causa» como señal) | Sin motivo no se puede saber a quién atribuir el atraso | 04/09/2026 |
 | — | En el portal, una tarea cancelada se muestra como «En proceso» | — | 04/09/2026 · Luis |
+| — | En el portal, las tareas canceladas **no cuentan en el avance** del proyecto (siguen en la lista como «En proceso») | — | 11/10/2026 · Luis |
 | — | **Ninguna tarea entra al daily sin responsable** | En el daily nadie sabría a quién preguntar | 22/09/2026 |
 | — | **Basecamp es un origen aceptado**: lo que el equipo crea allí entra solo a BackIO | Tras una semana de uso real, producción seguía creando to-dos en Basecamp y las ejecutivas gastaban su tiempo adoptando huérfanos ([Basecamp](./04-basecamp.md#basecamp-como-origen-aceptado-23-09-2026)) | 23/09/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |

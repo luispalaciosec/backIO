@@ -107,6 +107,21 @@ describe('frontera de visibilidad · sanitizeForClient', () => {
     expect(out).toMatchObject({ avance: 0, hitos: [], bloqueado_por_cliente: [] });
   });
 
+  it('las canceladas no cuentan en el avance, pero siguen en la lista como «En proceso»', () => {
+    const out = sanitizeForClient(proyecto, [
+      req({ id: 'a', visible_cliente: true, etiqueta_cliente: 'A', estado_operativo: 'completado', peso: 1 }),
+      req({ id: 'b', visible_cliente: true, etiqueta_cliente: 'B', estado_operativo: 'en_ejecucion', peso: 1 }),
+      req({ id: 'c', visible_cliente: true, etiqueta_cliente: 'C', estado_operativo: 'cancelado', peso: 2 }),
+    ]);
+    expect(out.avance).toBe(50); // antes 25: la cancelada pesaba en el total
+    expect(out.hitos.find((h) => h.id === 'c')?.estado).toBe('en_proceso');
+  });
+
+  it('si todas las visibles están canceladas, el avance es 0', () => {
+    const out = sanitizeForClient(proyecto, [req({ visible_cliente: true, etiqueta_cliente: 'X', estado_operativo: 'cancelado' })]);
+    expect(out.avance).toBe(0);
+  });
+
   it('mapEstadoCliente cubre todos los estados', () => {
     expect(mapEstadoCliente('completado')).toBe('completado');
     expect(mapEstadoCliente('backlog')).toBe('pendiente');

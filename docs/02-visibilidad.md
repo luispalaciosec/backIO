@@ -181,9 +181,9 @@ El módulo exporta además:
 («Por iniciar»). Todos los demás se colapsan a `en_proceso`: `en_ejecucion`, `en_revision`, `reprogramado`,
 `bloqueado` y también `cancelado`. El cliente no ve la palabra "atrasado" ni "bloqueado por nosotros".
 
-Que `cancelado` se muestre como «En proceso» fue una decisión explícita (04/09/2026, Luis). Hoy las tareas
-visibles canceladas no se filtran antes de llegar a `sanitizeForClient`: aparecen como hitos en proceso y su
-peso cuenta en el total sobre el que se calcula el avance del portal.
+Que `cancelado` se muestre como «En proceso» fue una decisión explícita (04/09/2026, Luis). Las tareas
+visibles canceladas siguen apareciendo como hitos en proceso, pero desde el 11/10/2026 (decisión de Luis) no
+cuentan en el avance: `sanitizeForClient` lo calcula solo sobre las visibles no canceladas.
 
 **Agentes con perfil cliente.** Una API key de perfil «cliente» queda atada a un cliente
 (`api_keys.cliente_id`, migración `20261010000027_seguridad_auditoria_1010.sql`). La tool MCP

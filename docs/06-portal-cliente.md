@@ -29,8 +29,8 @@ Nunca rojo. El cliente no ve "atrasado" ni "bloqueado por nosotros".
 Cómo se traduce cada estado interno (`mapEstadoCliente`, ver [02 · Visibilidad](./02-visibilidad.md)):
 `completado` se muestra como Completado; `backlog` y `priorizado`, como Por iniciar; todos los demás, como En
 proceso. Eso incluye `cancelado`, que se muestra como «En proceso» por decisión explícita (04/09/2026, Luis). Las
-tareas visibles canceladas no se filtran: aparecen como hitos en proceso y su peso cuenta en el avance del
-portal.
+tareas visibles canceladas aparecen como hitos en proceso, pero no cuentan en el avance del portal (decisión del
+11/10/2026, Luis).
 
 ---
 

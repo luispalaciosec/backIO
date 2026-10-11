@@ -78,8 +78,11 @@ export function sanitizeForClient(p: SanitizableProject, reqs: SanitizableRequir
     (r) => r.visible_cliente === true && typeof r.etiqueta_cliente === 'string' && r.etiqueta_cliente.length > 0,
   );
 
-  const pesoTotal = visibles.reduce((s, r) => s + Number(r.peso), 0);
-  const pesoHecho = visibles.filter((r) => r.estado_operativo === 'completado').reduce((s, r) => s + Number(r.peso), 0);
+  // El avance no cuenta las canceladas (decisión de Luis, 11/10/2026). En la lista siguen apareciendo como
+  // «En proceso» (decisión del 04/09/2026).
+  const cuentan = visibles.filter((r) => r.estado_operativo !== 'cancelado');
+  const pesoTotal = cuentan.reduce((s, r) => s + Number(r.peso), 0);
+  const pesoHecho = cuentan.filter((r) => r.estado_operativo === 'completado').reduce((s, r) => s + Number(r.peso), 0);
 
   const esperando = visibles.filter((r) => r.estado_aprobacion === 'pendiente_cliente');
 
