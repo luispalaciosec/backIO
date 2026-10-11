@@ -3,12 +3,14 @@
  * Todo lo que sale de aquí pasa por sanitizeForClient() + assertClientSafe().
  */
 import { Hono, type Context } from 'hono';
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { serviceClient, getProyectoByPortalToken } from '../lib/db';
 import { sanitizeForClient, assertClientSafe } from '../lib/visibility';
 import { portalExpirado } from '../lib/portal/token';
 import { generarResumen } from '../lib/portal/resumen';
 import { leerHashPin, pinCoincide } from '../lib/portal/pin';
+import { ipCliente } from '../lib/ip';
+import { estadoLimite, sumarIntento, limpiarLimite, limitar } from '../lib/limite';
 
 export const portal = new Hono();
 
@@ -19,27 +21,15 @@ portal.use('*', async (c, next) => {
 });
 
 /**
- * PIN del portal: comparación en tiempo constante y bloqueo tras 8 fallos por token+IP durante 15 min
- * (antes se podía forzar por bruta: 6 dígitos sin límite). Devuelve null si pasa, o la respuesta de error.
+ * PIN del portal: comparación con el hash y bloqueo tras 8 fallos por token+IP o 30 por token (cualquier IP) en
+ * 15 min. Los contadores viven en Postgres (`limites`, migración 28): sobreviven reinicios y despliegues.
  */
-const fallosPin = new Map<string, { n: number; desde: number; hasta: number }>();
-const VENTANA = 15 * 60_000;
-/** Tope global por token (todas las IPs): rotar la IP no permite seguir probando PIN. */
+const VENTANA_SEG = 15 * 60;
+const MAX_POR_IP = 8;
 const MAX_POR_TOKEN = 30;
-/**
- * IP del cliente: la ÚLTIMA entrada de X-Forwarded-For, que agrega el proxy de Railway. La primera la puede
- * escribir el propio cliente y con eso obtenía un contador nuevo en cada intento (auditoría run-1).
- */
-function ipCliente(c: Context): string {
-  const xff = c.req.header('x-forwarded-for')?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
-  return xff[xff.length - 1] ?? c.req.header('x-real-ip') ?? 'ip';
-}
-function registrarFallo(k: string, max: number) {
-  const f = fallosPin.get(k);
-  const vigente = f && f.desde > Date.now() - VENTANA;
-  const n = (vigente ? f.n : 0) + 1;
-  fallosPin.set(k, { n, desde: vigente ? f.desde : Date.now(), hasta: n >= max ? Date.now() + VENTANA : 0 });
-}
+/** El token del portal es una credencial: en la tabla de límites solo va su huella. */
+const huella = (token: string) => createHash('sha256').update(token).digest('hex').slice(0, 24);
+
 /** Credencial del portal: el hash de `portal_pines` o, solo mientras no se migre, el PIN en claro de config. */
 interface PinCliente { hash: string | null; claro: string | null }
 function coincide(dado: string, pin: PinCliente): boolean {
@@ -52,22 +42,15 @@ async function pinDe(r: { proyecto: { cliente_id: string }; cliente: { config?: 
   const claro = (r.cliente.config?.portal_pin as string | undefined) || null;
   return { hash, claro: hash ? null : claro };
 }
-function verificarPin(c: Context, token: string, pin: PinCliente): Response | null {
+async function verificarPin(c: Context, token: string, pin: PinCliente): Promise<Response | null> {
   if (!pin.hash && !pin.claro) return null;
-  const k = `${token}:${ipCliente(c)}`;
-  const kToken = `${token}:*`;
-  const f = fallosPin.get(k);
-  const ft = fallosPin.get(kToken);
-  if ((f && f.hasta > Date.now()) || (ft && ft.hasta > Date.now())) return c.json({ error: 'Demasiados intentos. Espera 15 minutos.', requiere_pin: true }, 429);
-  if (coincide((c.req.header('x-portal-pin') ?? '').slice(0, 20), pin)) { fallosPin.delete(k); return null; }
-  // La ventana se mide desde el primer fallo (antes se medía con `hasta`, que vale 0 sin bloqueo: el contador volvía a 1 y nunca bloqueaba).
-  registrarFallo(k, 8);
-  registrarFallo(kToken, MAX_POR_TOKEN);
-  // Limpieza por antigüedad (antes se vaciaba el mapa entero y con él los bloqueos activos).
-  if (fallosPin.size > 10_000) {
-    const ahora = Date.now();
-    for (const [key, v] of fallosPin) if (v.hasta < ahora && v.desde < ahora - VENTANA) fallosPin.delete(key);
-  }
+  const kIp = `pin:${huella(token)}:${ipCliente(c)}`;
+  const kToken = `pin:${huella(token)}:*`;
+  // Bloqueado si ya acumuló el máximo de fallos (por IP o por token) en la ventana.
+  const [eIp, eToken] = await Promise.all([estadoLimite(kIp, MAX_POR_IP - 1, VENTANA_SEG), estadoLimite(kToken, MAX_POR_TOKEN - 1, VENTANA_SEG)]);
+  if (eIp.excedido || eToken.excedido) return c.json({ error: 'Demasiados intentos. Espera 15 minutos.', requiere_pin: true }, 429);
+  if (coincide((c.req.header('x-portal-pin') ?? '').slice(0, 20), pin)) { await limpiarLimite(kIp); return null; }
+  await Promise.all([sumarIntento(kIp, MAX_POR_IP, VENTANA_SEG), sumarIntento(kToken, MAX_POR_TOKEN, VENTANA_SEG)]);
   return c.json({ error: 'PIN requerido', requiere_pin: true }, 401);
 }
 
@@ -82,7 +65,7 @@ async function cargar(token: string) {
 portal.get('/:token', async (c) => {
   const r = await cargar(c.req.param('token'));
   if (!r) return c.json({ error: 'Portal no disponible' }, 404);
-  const bloqueo = verificarPin(c, c.req.param('token'), await pinDe(r));
+  const bloqueo = await verificarPin(c, c.req.param('token'), await pinDe(r));
   if (bloqueo) return bloqueo;
 
   const safe = sanitizeForClient(r.proyecto, r.requerimientos);
@@ -94,10 +77,11 @@ portal.get('/:token', async (c) => {
   return c.json(out);
 });
 
-portal.post('/:token/resumen', async (c) => {
+// El resumen llama a la IA (costo): 10 por hora por enlace, además de la caché de 6 h (auditoría 10/10, punto 11).
+portal.post('/:token/resumen', limitar('portal_resumen', 10, 3600, (c) => huella(c.req.param('token') ?? '')), async (c) => {
   const r = await cargar(c.req.param('token'));
   if (!r) return c.json({ error: 'Portal no disponible' }, 404);
-  const bloqueo = verificarPin(c, c.req.param('token'), await pinDe(r));
+  const bloqueo = await verificarPin(c, c.req.param('token'), await pinDe(r));
   if (bloqueo) return bloqueo;
   const safe = sanitizeForClient(r.proyecto, r.requerimientos);
   try {

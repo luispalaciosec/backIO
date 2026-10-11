@@ -392,3 +392,33 @@ describe('Ola 2 · dependencias', () => {
     expect(await tools.text()).toContain('confirm_plan');
   });
 });
+
+describe('Ola 3 (auditoría 10/10)', () => {
+  it('punto 11 · el registro dinámico OAuth se limita a 10 por hora por IP', async () => {
+    const registrar = () => app.request('/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.99' }, body: JSON.stringify({ client_name: 'X', redirect_uris: ['https://claude.ai/cb'] }) });
+    for (let i = 0; i < 10; i++) expect((await registrar()).status).toBe(201);
+    const bloqueado = await registrar();
+    expect(bloqueado.status).toBe(429);
+    expect(Number(bloqueado.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('punto 11 · recuperar contraseña: 10 por IP cada 15 minutos', async () => {
+    const pedir = () => app.request('/api/v1/auth/recuperar', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.120' }, body: JSON.stringify({ email: 'nadie@example.com' }) });
+    for (let i = 0; i < 10; i++) expect((await pedir()).status).toBe(200);
+    expect((await pedir()).status).toBe(429);
+  });
+
+  it('punto 12 · Turnstile: sin clave no se exige; con clave, sin token se rechaza', async () => {
+    const { verificarTurnstile } = await import('../lib/turnstile');
+    expect(await verificarTurnstile(undefined)).toBe(true);
+    process.env.TURNSTILE_SECRET_KEY = 'prueba';
+    try { expect(await verificarTurnstile(undefined)).toBe(false); }
+    finally { delete process.env.TURNSTILE_SECRET_KEY; }
+  });
+
+  it('punto 18 · la API responde con CSP que no permite cargar nada ni ser embebida', async () => {
+    const res = await app.request('/health');
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
+    expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+  });
+});

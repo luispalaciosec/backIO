@@ -1,14 +1,17 @@
 'use client';
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
+import { Turnstile, SITE_KEY_TURNSTILE } from '@/components/Turnstile';
 import Link from 'next/link';
 import { BACKEND } from '@/lib/api';
 
 export default function RecuperarPage() {
   const [email, setEmail] = useState('');
   const [estado, setEstado] = useState<'form' | 'enviando' | 'listo'>('form');
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const recibirToken = useCallback((t: string | null) => setCaptcha(t), []);
   async function enviar(e: FormEvent) {
     e.preventDefault(); setEstado('enviando');
-    try { await fetch(`${BACKEND}/api/v1/auth/recuperar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); } catch { /* siempre mostramos lo mismo */ }
+    try { await fetch(`${BACKEND}/api/v1/auth/recuperar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, ...(captcha ? { captcha } : {}) }) }); } catch { /* siempre mostramos lo mismo */ }
     setEstado('listo');
   }
   return (
@@ -32,7 +35,8 @@ export default function RecuperarPage() {
               <p className="text-sm text-gray-600">Escribe tu correo y te mandamos un enlace para definir una nueva.</p>
             </div>
             <input className="input" type="email" autoComplete="email" placeholder="tu@geeks.com.ec" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-            <button className="btn-primary w-full" disabled={estado === 'enviando'}>{estado === 'enviando' ? 'Enviando…' : 'Enviarme el enlace'}</button>
+            <Turnstile onToken={recibirToken} />
+            <button className="btn-primary w-full" disabled={estado === 'enviando' || (!!SITE_KEY_TURNSTILE && !captcha)}>{estado === 'enviando' ? 'Enviando…' : 'Enviarme el enlace'}</button>
             <Link href="/login" className="block text-center text-sm link-action">Volver a entrar</Link>
           </form>
         )}

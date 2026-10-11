@@ -6,6 +6,8 @@ import { DbError } from '../lib/db/client';
 import { requireAuth, ctxOf } from '../lib/auth/middleware';
 import { audit } from '../lib/db/audit';
 import { metadataAuthServer, metadataProtectedResource, registrarCliente, getCliente, validarScopes, emitirCodigo, canjearCodigo, refrescar, revocar, redirectUriSegura } from '../lib/oauth';
+import { ipCliente } from '../lib/ip';
+import { limitar } from '../lib/limite';
 
 export const wellKnown = new Hono();
 wellKnown.get('/oauth-authorization-server', (c) => c.json(metadataAuthServer()));
@@ -20,7 +22,8 @@ const oauthError = (c: { json: (b: unknown, s: 400 | 401) => Response }, err: un
   return c.json({ error: code, error_description: desc }, err instanceof DbError && err.status === 401 ? 401 : 400);
 };
 
-oauth.post('/register', async (c) => {
+// Registro dinámico abierto (lo usan los clientes MCP): 10 por hora por IP (auditoría 10/10, S6 y punto 11).
+oauth.post('/register', limitar('oauth_register', 10, 3600, ipCliente), async (c) => {
   try { return c.json(await registrarCliente(await c.req.json().catch(() => null)), 201); }
   catch (err) { return oauthError(c, err); }
 });
@@ -83,7 +86,7 @@ oauth.post('/deny', requireAuth, zValidator('json', z.object({ client_id: z.stri
 const campo = (max: number) => z.string().max(max).optional();
 const tokenSchema = z.object({ grant_type: z.string().max(40), code: campo(256), client_id: campo(100), client_secret: campo(256), redirect_uri: campo(500), code_verifier: campo(256), refresh_token: campo(256) });
 
-oauth.post('/token', async (c) => {
+oauth.post('/token', limitar('oauth_token', 60, 300, ipCliente), async (c) => {
   const ct = c.req.header('content-type') ?? '';
   const crudo = await (ct.includes('json') ? c.req.json() : c.req.formData().then((f) => Object.fromEntries(f.entries()))).catch(() => null);
   const parsed = tokenSchema.safeParse(crudo);
@@ -100,7 +103,7 @@ oauth.post('/token', async (c) => {
   } catch (err) { return oauthError(c, err); }
 });
 
-oauth.post('/revoke', async (c) => {
+oauth.post('/revoke', limitar('oauth_revoke', 60, 300, ipCliente), async (c) => {
   // RFC 7009: siempre 200, aunque el token no exista o el cuerpo no sirva.
   const crudo = await c.req.formData().then((f) => Object.fromEntries(f.entries())).catch(() => null);
   const parsed = z.object({ token: z.string().min(1).max(256) }).safeParse(crudo);

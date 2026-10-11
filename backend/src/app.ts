@@ -18,7 +18,8 @@ import { openapi } from './routes/openapi';
 
 export function createApp(): Hono {
   const app = new Hono();
-  app.use('*', secureHeaders());
+  // La API solo devuelve JSON y redirecciones: una CSP que no permite cargar nada ni ser embebida (punto 18).
+  app.use('*', secureHeaders({ contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } }));
   if (env().NODE_ENV !== 'test') app.use('*', logPeticiones);
   // Tamaño máximo del cuerpo (punto 14): 1 MB en general, 2 MB para la importación CSV.
   const limiteGeneral = bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json({ error: 'El cuerpo de la petición es demasiado grande' }, 413) });

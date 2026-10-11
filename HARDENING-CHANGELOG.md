@@ -70,4 +70,18 @@ una acción de Luis) · **pendiente** (ola futura).
 | Frontend: Next 14.2.35 (2 críticas, 8 altas), postcss, source-map-js | hecho | `frontend/package.json`, `lib/supabase/server.ts`, `(app)/layout.tsx`, `lib/api.server.ts`, `proyectos/[id]`, `daily`, `p/[token]`, `next.config.mjs` | Next 15.5.27 + React 19; `cookies()`, `params` y `searchParams` asíncronos; `outputFileTracingRoot`; postcss y source-map-js por override. Build OK; login, recuperar y consentimiento revisados en el navegador sin errores |
 | `pnpm audit --prod` | hecho | — | De 34 vulnerabilidades (3 críticas, 12 altas) a **0** |
 | CI con auditoría y Dependabot | hecho | `.github/workflows/ci.yml`, `.github/dependabot.yml` | `pnpm audit --prod --audit-level=high` en cada push y PR; Dependabot semanal (npm) y mensual (actions) |
-| Probar en producción las pantallas con sesión (backlog, daily, KPIs, proyectos) | pendiente-humano | — | Rollback inmediato si algo falla: `vercel rollback https://backio-p0ys99oui-luis-palacios-projects-1f891ccb.vercel.app` |
+| Probar en producción las pantallas con sesión (backlog, daily, KPIs, proyectos) | hecho (Luis, 10/10 19:00) | — | Rollback inmediato si algo falla: `vercel rollback https://backio-p0ys99oui-luis-palacios-projects-1f891ccb.vercel.app` |
+
+## Ola 3 · Headers, bots y límite de peticiones (checklist 9, 11, 12, 18, 19)
+
+| Hallazgo | Estado | Archivos | Verificación |
+|---|---|---|---|
+| M2 / punto 18 · CSP completa en el frontend | hecho | `frontend/middleware.ts`, `app/layout.tsx`, `next.config.mjs` | Nonce por respuesta + `'strict-dynamic'`; `connect-src` solo backend y Supabase; `object-src 'none'`, `base-uri`, `form-action`, `frame-ancestors 'none'`. Build de producción local: 14/14 scripts con nonce, `eval` bloqueado, sin violaciones en consola |
+| Punto 18 · CSP en el backend | hecho | `backend/src/app.ts` | `default-src 'none'; frame-ancestors 'none'`. Test |
+| Punto 9 · Robo de sesión por XSS | parcial | — | Mitigado por la CSP (la sesión de Supabase sigue siendo legible desde JS por diseño) |
+| Punto 11 · Límite de peticiones persistente | hecho (código) | `backend/src/lib/limite.ts`, `lib/ip.ts`, `routes/oauth.ts`, `routes/auth_publico.ts`, `routes/portal.ts`, `routes/mcp.ts`, `lib/scheduler.ts` | `/oauth/register` 10/h, `/oauth/token` y `/revoke` 60/5 min por IP; recuperar 10/15 min por IP y 1/min por correo; resumen del portal 10/h por enlace; PIN y MCP pasan a la misma tabla. Sin la migración 28 usa memoria (como antes). Tests |
+| Migración 28 (`limites`, `limite_sumar`, `limite_estado`, `cron_runs`) | pendiente-humano | `backend/supabase/migrations/20261010000028_limites_y_cron_runs.sql` | Revisar y aplicar |
+| Punto 12 · Captcha (Turnstile) | hecho (código) | `frontend/components/Turnstile.tsx`, login, recuperar; `backend/src/lib/turnstile.ts` | Activo solo con claves; sin claves los formularios funcionan igual. Test. En `/oauth/register` no aplica (lo llaman clientes MCP automáticos): queda el límite por IP |
+| Punto 12 · Claves de Turnstile y captcha en Supabase | pendiente-humano | Vercel `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, Railway `TURNSTILE_SECRET_KEY`, Supabase → Attack Protection | — |
+| Punto 19 · URLs públicas https en producción | hecho | `backend/src/config/env.ts` | Aviso en el log si alguna no es https o si `FRONTEND_URL` incluye orígenes locales |
+| `FRONTEND_URL` de Railway incluye `http://localhost:3000` | pendiente-humano | Railway → Variables | Quitarlo deja el CORS de producción solo para `https://backio.vercel.app` |

@@ -40,5 +40,18 @@ export function env(): Env {
     throw new Error(`Variables de entorno inválidas o faltantes: ${faltan}`);
   }
   cached = parsed.data;
+  revisarHttps(cached);
   return cached;
+}
+
+/**
+ * En producción las URLs públicas deben ser https (punto 19 del checklist): con ellas se arman los enlaces de los
+ * correos, el issuer de OAuth y la URL de los webhooks. Se avisa en el log en vez de impedir el arranque.
+ */
+function revisarHttps(e: Env): void {
+  if (e.NODE_ENV !== 'production') return;
+  const publicas = [e.FRONTEND_URL.split(',')[0]?.trim() ?? '', process.env.BACKEND_PUBLIC_URL ?? ''].filter(Boolean);
+  for (const u of publicas) if (!u.startsWith('https://')) console.error(`[env] URL pública sin https en producción: ${u}`);
+  const locales = e.FRONTEND_URL.split(',').map((s) => s.trim()).filter((s) => /^http:\/\/(localhost|127\.0\.0\.1)/.test(s));
+  if (locales.length) console.warn(`[env] FRONTEND_URL incluye orígenes locales en producción (CORS): ${locales.join(', ')}`);
 }

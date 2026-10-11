@@ -9,15 +9,17 @@ import { zValidator } from '@hono/zod-validator';
 import { serviceClient } from '../lib/db';
 import { frontendOrigins } from '../config/env';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../lib/notificaciones/email';
+import { ipCliente } from '../lib/ip';
+import { limitar, sumarIntento } from '../lib/limite';
+import { verificarTurnstile } from '../lib/turnstile';
 
 export const authPublico = new Hono();
-const ultimo = new Map<string, number>();
-
-authPublico.post('/recuperar', zValidator('json', z.object({ email: z.string().email() })), async (c) => {
-  const email = c.req.valid('json').email.trim().toLowerCase();
-  const ahora = Date.now();
-  if ((ultimo.get(email) ?? 0) > ahora - 60_000) return c.json({ ok: true });
-  ultimo.set(email, ahora);
+// 10 por IP cada 15 min y 1 por correo por minuto, persistentes (auditoría 10/10, punto 11); captcha si está activo.
+authPublico.post('/recuperar', limitar('recuperar_ip', 10, 900, ipCliente), zValidator('json', z.object({ email: z.string().email().max(254), captcha: z.string().max(2048).optional() })), async (c) => {
+  const { email: crudo, captcha } = c.req.valid('json');
+  const email = crudo.trim().toLowerCase();
+  if (!(await verificarTurnstile(captcha, ipCliente(c)))) return c.json({ error: 'Completa la verificación antes de enviar.' }, 400);
+  if ((await sumarIntento(`recuperar_email:${email}`, 1, 60)).excedido) return c.json({ ok: true });
   try {
     const sb = serviceClient();
     const { data: u } = await sb.from('usuarios').select('id, nombre, activo').eq('email', email).maybeSingle();

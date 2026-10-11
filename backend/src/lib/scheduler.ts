@@ -87,6 +87,8 @@ export function startScheduler(): void {
   async function porMinuto(): Promise<void> {
     const t = ahoraLocal();
     // Diario 08:05: recurrencias de fees (genera el mes siguiente cuando llega el día configurado).
+    // Diario 03:30: limpia contadores viejos de la tabla de límites (migración 28). Sin la tabla, no hace nada.
+    if (t.hora === 3 && t.minuto === 30) await serviceClient().rpc('limites_limpiar').then(() => undefined, () => undefined);
     if (t.hora === 8 && t.minuto === 5 && ultimaRecurrencia !== t.clave) {
       ultimaRecurrencia = t.clave;
       for (const id of await tenants()) {
