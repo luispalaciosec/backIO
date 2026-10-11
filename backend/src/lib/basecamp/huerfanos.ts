@@ -12,6 +12,8 @@ import { listUsuarios } from '../db/usuarios';
 import { audit } from '../db/audit';
 import { notificar } from '../notificaciones';
 import { BasecampClient } from './client';
+import { recorrerTodos } from './recorrer';
+import { paginar } from '../db/paginar';
 
 export interface Huerfano {
   id: string;
@@ -38,20 +40,19 @@ export async function detectarHuerfanos(
   if (clientes.length === 0) return { clientes: 0, nuevos: 0, pendientes: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   // Paginado: PostgREST corta en 1000 filas y, con más tareas enlazadas, los to-dos ya conocidos salían como huérfanos.
-  const conocidos = new Set<number>();
-  for (let from = 0; ; from += 1000) {
-    const { data: enlazados, error: eEnl } = await ctx.db
-      .from('requerimientos')
-      .select('basecamp_todo_id')
-      .eq('tenant_id', ctx.tenantId)
-      .not('basecamp_todo_id', 'is', null)
-      .order('id')
-      .range(from, from + 999);
-    throwIf(eEnl);
-    const filas = (enlazados ?? []) as { basecamp_todo_id: number }[];
-    for (const r of filas) conocidos.add(r.basecamp_todo_id);
-    if (filas.length < 1000) break;
-  }
+  const conocidos = new Set(
+    (
+      await paginar<{ basecamp_todo_id: number }>((desde, hasta) =>
+        ctx.db
+          .from('requerimientos')
+          .select('basecamp_todo_id')
+          .eq('tenant_id', ctx.tenantId)
+          .not('basecamp_todo_id', 'is', null)
+          .order('id')
+          .range(desde, hasta),
+      )
+    ).map((r) => r.basecamp_todo_id),
+  );
   // Huérfanos pendientes cuyo to-do ya está enlazado (falsos positivos): se cierran solos.
   {
     const { data: pend } = await ctx.db
@@ -72,33 +73,27 @@ export async function detectarHuerfanos(
   for (const c of clientes) {
     const pid = c.basecamp_project_id as number;
     try {
-      const todoset = await bc.getTodosetId(pid);
-      const listas = await bc.listTodolists(pid, todoset);
-      for (const lista of listas) {
-        const fuentes = [{ id: lista.id }, ...(await bc.listGroups(pid, lista.id))];
-        for (const f of fuentes) {
-          const todos = await bc.listTodosSafe(pid, f.id, false);
-          const huerfanos = todos.filter((t) => !conocidos.has(t.id) && !yaRegistrados.has(t.id));
-          if (!huerfanos.length) continue;
-          const { error } = await ctx.db.from('basecamp_huerfanos').insert(
-            huerfanos.map((t) => ({
-              tenant_id: ctx.tenantId,
-              cliente_id: c.id,
-              basecamp_project_id: pid,
-              basecamp_todolist_id: f.id,
-              basecamp_todo_id: t.id,
-              titulo: t.titulo || `To-do ${t.id}`,
-              creador_basecamp_id: t.creator_id,
-              creador_nombre: t.creator_nombre,
-              due_on: t.due_on,
-              completed: t.completed,
-              app_url: t.app_url,
-            })),
-          );
-          throwIf(error);
-          huerfanos.forEach((t) => yaRegistrados.add(t.id));
-          nuevos += huerfanos.length;
-        }
+      for (const { lista, todos } of (await recorrerTodos(bc, pid, false)).listas) {
+        const huerfanos = todos.filter((t) => !conocidos.has(t.id) && !yaRegistrados.has(t.id));
+        if (!huerfanos.length) continue;
+        const { error } = await ctx.db.from('basecamp_huerfanos').insert(
+          huerfanos.map((t) => ({
+            tenant_id: ctx.tenantId,
+            cliente_id: c.id,
+            basecamp_project_id: pid,
+            basecamp_todolist_id: t.grupoId ?? lista.id,
+            basecamp_todo_id: t.id,
+            titulo: t.titulo || `To-do ${t.id}`,
+            creador_basecamp_id: t.creator_id,
+            creador_nombre: t.creator_nombre,
+            due_on: t.due_on,
+            completed: t.completed,
+            app_url: t.app_url,
+          })),
+        );
+        throwIf(error);
+        huerfanos.forEach((t) => yaRegistrados.add(t.id));
+        nuevos += huerfanos.length;
       }
     } catch (err) {
       console.error('[huerfanos] cliente', c.nombre, err instanceof Error ? err.message : err);
