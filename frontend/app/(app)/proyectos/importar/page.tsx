@@ -33,7 +33,7 @@ export default function ImportarPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       <h1 className="text-2xl font-bold">Carga masiva (CSV)</h1>
-      <p className="text-sm text-gray-500">Preview obligatorio. Import transaccional: o entran todas las filas o ninguna. <code>visible=true</code> exige <code>etiqueta_cliente</code>.</p>
+      <p className="text-sm text-gray-500">Primero revisas cómo queda cada fila. Al importar entran todas las filas o ninguna: si una falla, no se crea nada. Las filas con <code>visible=true</code> necesitan <code>etiqueta_cliente</code>.</p>
       <textarea className="input font-mono text-xs" rows={10} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={EJEMPLO} />
       <input type="file" accept=".csv,text/csv" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} />
       <div className="flex gap-2">

@@ -2894,6 +2894,10 @@ export type Database = {
       };
     };
     Functions: {
+      _insertar_fila: {
+        Args: { p_fila: Json | null; p_tabla: string | null };
+        Returns: Json;
+      };
       auth_es_admin: {
         Args: Record<PropertyKey, never>;
         Returns: Json;
@@ -2910,16 +2914,20 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Json;
       };
+      crear_lote: {
+        Args: { p_proyectos: Json | null; p_requerimientos: Json | null };
+        Returns: Json;
+      };
       ensure_semana: {
-        Args: { p_fecha: string; p_tenant: string };
+        Args: { p_fecha: string | null; p_tenant: string | null };
         Returns: Json;
       };
       limite_estado: {
-        Args: { p_clave: string; p_max: number; p_ventana_seg: number };
+        Args: { p_clave: string | null; p_max: number | null; p_ventana_seg: number | null };
         Returns: Json;
       };
       limite_sumar: {
-        Args: { p_clave: string; p_max: number; p_ventana_seg: number };
+        Args: { p_clave: string | null; p_max: number | null; p_ventana_seg: number | null };
         Returns: Json;
       };
       limites_limpiar: {
@@ -2927,7 +2935,11 @@ export type Database = {
         Returns: Json;
       };
       proyectos_recalcular_estado: {
-        Args: { p_proyecto: string };
+        Args: { p_proyecto: string | null };
+        Returns: Json;
+      };
+      quitar_acceso: {
+        Args: { p_actor: string | null; p_reasignar_a: string | null; p_tenant: string | null; p_usuario: string | null };
         Returns: Json;
       };
     };

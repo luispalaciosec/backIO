@@ -8,8 +8,7 @@ import type { DbCtx } from '../db/client';
 import { DbError } from '../db/client';
 import { getPlantillaArbol } from '../db/plantillas';
 import { getCliente } from '../db/clientes';
-import { insertProyecto, updateProyecto } from '../db/proyectos';
-import { insertRequerimientos } from '../db/requerimientos';
+import { updateProyecto } from '../db/proyectos';
 import { listUsuarios } from '../db/usuarios';
 import { listTiposPieza } from '../db/tipos_pieza';
 import { audit } from '../db/audit';
@@ -17,6 +16,7 @@ import { notificar } from '../notificaciones';
 import { createProjectStructure } from '../basecamp/write';
 import { generarPortalToken } from '../portal/token';
 import { planificarProyecto, restarDias, type PlanProyecto, type AlertaCapacidad } from './plan';
+import { crearLote } from '../db/lote';
 
 export interface PreviewProyecto {
   plan: PlanProyecto;
@@ -91,24 +91,28 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;
   const fecha_inicio = input.fecha_inicio ?? (primeraFecha < input.fecha_entrega ? primeraFecha : restarDias(input.fecha_entrega, 1));
 
-  const proyecto = await insertProyecto(ctx, {
-    cliente_id: input.cliente_id,
-    plantilla_id: input.plantilla_id,
-    prometio_cotizacion_id: input.prometio_cotizacion_id ?? null,
-    nombre: input.nombre,
-    brief: { actual: { ...input.brief, version: 1, creado_at: new Date().toISOString() }, historial: [] },
-    fecha_inicio,
-    fecha_entrega: input.fecha_entrega,
-    owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId,
-    portal_token: generarPortalToken(),
-    ...(input.periodo ? { periodo: input.periodo } : {}),
-  });
-
-  const requerimientos = await insertRequerimientos(
+  // Proyecto y tareas en una transacción (B7): antes un fallo en las tareas dejaba el proyecto creado sin ellas.
+  const lote = await crearLote(
     ctx,
+    [
+      {
+        clave: 'proyecto',
+        cliente_id: input.cliente_id,
+        plantilla_id: input.plantilla_id,
+        prometio_cotizacion_id: input.prometio_cotizacion_id ?? null,
+        nombre: input.nombre,
+        brief: { actual: { ...input.brief, version: 1, creado_at: new Date().toISOString() }, historial: [] },
+        fecha_inicio,
+        fecha_entrega: input.fecha_entrega,
+        owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId,
+        portal_token: generarPortalToken(),
+        ...(input.periodo ? { periodo: input.periodo } : {}),
+      },
+    ],
     plan.tareas.map((t) => ({
       cliente_id: input.cliente_id,
-      proyecto_id: proyecto.id,
+      proyecto_id: null,
+      proyecto_clave: 'proyecto',
       bloque_nombre: t.bloque_nombre,
       plantilla_tarea_id: t.plantilla_tarea_id || null,
       tipo_pieza_id: t.tipo_pieza_id ?? null,
@@ -124,6 +128,8 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
       piezas: t.piezas,
     })),
   );
+  const proyecto = lote.proyectos.proyecto!;
+  const requerimientos = lote.requerimientos;
 
   await audit(ctx, {
     accion: 'crear_proyecto',

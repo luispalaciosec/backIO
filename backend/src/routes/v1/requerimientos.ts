@@ -14,7 +14,6 @@ import {
   listClientes,
   listUsuarios,
   getClienteBySlug,
-  insertProyecto,
   listProyectos,
   getUsuarioByEmail,
   DbError,
@@ -29,6 +28,7 @@ import { listReprogramaciones, listReprocesos, setMotivoReprogramacion, listSinM
 import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
 import { actualizarRequerimiento, ReglaError } from '../../lib/requerimientos/actualizar';
+import { crearLote, type ProyectoDelLote, type RequerimientoDelLote } from '../../lib/db/lote';
 import { ensureSemana } from '../../lib/db/semanas';
 
 export const requerimientos = new Hono();
@@ -444,35 +444,38 @@ requerimientos.post('/bulk', requireScope('write:requerimientos'), async (c) => 
     return c.json({ error: 'Hay filas inválidas. Import es todo o nada.', preview }, 422);
   }
 
+  // Proyectos nuevos y tareas van en un solo lote transaccional (B7): o entra todo o nada.
   const proyectosExistentes = await listProyectos(ctx);
-  const proyectoPorClave = new Map<string, string>();
-  const rows = [];
+  const nuevos = new Map<string, ProyectoDelLote>();
+  const rows: RequerimientoDelLote[] = [];
+  const hoy = hoyLocal();
   for (const f of preview.validas) {
     const cliente = (await getClienteBySlug(ctx, f.cliente_slug))!;
     let proyectoId: string | null = null;
+    let proyectoClave: string | undefined;
     if (f.proyecto) {
       const clave = `${cliente.id}:${f.proyecto}`;
-      proyectoId =
-        proyectoPorClave.get(clave) ?? proyectosExistentes.find((p) => p.cliente_id === cliente.id && p.nombre === f.proyecto)?.id ?? null;
+      proyectoId = proyectosExistentes.find((p) => p.cliente_id === cliente.id && p.nombre === f.proyecto)?.id ?? null;
       if (!proyectoId) {
-        const hoy = hoyLocal();
-        const p = await insertProyecto(ctx, {
-          cliente_id: cliente.id,
-          plantilla_id: null,
-          nombre: f.proyecto,
-          brief: {},
-          fecha_inicio: hoy,
-          fecha_entrega: f.fecha_entrega || hoy,
-          portal_token: generarPortalToken(),
-        });
-        proyectoId = p.id;
+        proyectoClave = clave;
+        if (!nuevos.has(clave))
+          nuevos.set(clave, {
+            clave,
+            cliente_id: cliente.id,
+            plantilla_id: null,
+            nombre: f.proyecto,
+            brief: {},
+            fecha_inicio: hoy,
+            fecha_entrega: f.fecha_entrega || hoy,
+            portal_token: generarPortalToken(),
+          });
       }
-      proyectoPorClave.set(clave, proyectoId);
     }
     const owner = f.owner_email ? await getUsuarioByEmail(ctx, f.owner_email) : null;
     rows.push({
       cliente_id: cliente.id,
       proyecto_id: proyectoId,
+      ...(proyectoClave ? { proyecto_clave: proyectoClave } : {}),
       titulo_interno: f.titulo_interno,
       etiqueta_cliente: f.etiqueta_cliente || null,
       visible_cliente: esVisible(f.visible),
@@ -486,7 +489,11 @@ requerimientos.post('/bulk', requireScope('write:requerimientos'), async (c) => 
       piezas: f.piezas ? Number(f.piezas) : 0,
     });
   }
-  const creados = await insertRequerimientos(ctx, rows);
-  await audit(ctx, { accion: 'bulk_import', entidad: 'requerimiento', detalle: { filas: creados.length } });
+  const { requerimientos: creados, proyectos: proyectosCreados } = await crearLote(ctx, [...nuevos.values()], rows);
+  await audit(ctx, {
+    accion: 'bulk_import',
+    entidad: 'requerimiento',
+    detalle: { filas: creados.length, proyectos_creados: Object.keys(proyectosCreados).length },
+  });
   return c.json({ creados: creados.length, items: creados }, 201);
 });

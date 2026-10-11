@@ -86,7 +86,8 @@ const funciones = Object.entries(spec.paths)
     const body = (ops.post?.parameters ?? []).find((x) => x.in === 'body')?.schema;
     const req = new Set(body?.required ?? []);
     const args = Object.entries(body?.properties ?? {})
-      .map(([k, v]) => `${prop(k)}${req.has(k) ? '' : '?'}: ${tipo(v)}`)
+      // En SQL todo argumento admite null; la función decide qué hacer con él.
+      .map(([k, v]) => `${prop(k)}${req.has(k) ? '' : '?'}: ${tipo(v)} | null`)
       .join('; ');
     return `      ${p.slice(5)}: {\n        Args: ${args ? `{ ${args} }` : 'Record<PropertyKey, never>'};\n        Returns: Json;\n      };`;
   });

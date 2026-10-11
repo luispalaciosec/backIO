@@ -9,6 +9,7 @@ import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 import { finDiaLocal, inicioDiaLocal } from '@backio/shared';
+import { quitarAcceso } from '../../lib/db/lote';
 
 export const admin = new Hono();
 admin.use('*', requireScope('admin'));
@@ -360,53 +361,20 @@ admin.post(
       .eq('id', id)
       .maybeSingle();
     if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
-    // 1) BackIO: inactivo (el middleware rechaza a inactivos aunque tengan sesión).
-    const { error: e1 } = await db.from('usuarios').update({ activo: false }).eq('id', id);
-    throwIf(e1);
-    // 2) Supabase Auth: bloquear login y cerrar sesiones.
+    // 1) En una transacción (B8): credenciales primero, luego usuario, tareas y recurrencias. Si falla, nada cambió
+    //    y el error llega a la pantalla (antes los pasos sueltos tragaban errores y respondían ok).
+    const r = await quitarAcceso(ctx, id, b.reasignar_a ?? null);
+    // 2) Supabase Auth (API externa, después del commit): bloquear login y cerrar sesiones. Si falla, la persona ya
+    //    está inactiva en BackIO (el middleware la rechaza) y la respuesta lo dice.
     let auth = 'ok';
     try {
-      const r = await db.auth.admin.updateUserById(id, { ban_duration: '876600h' });
-      if (r.error) auth = r.error.message;
-      await db.auth.admin.signOut(id, 'global').catch(() => undefined);
+      const ban = await db.auth.admin.updateUserById(id, { ban_duration: '876600h' });
+      if (ban.error) auth = ban.error.message;
+      const salida = await db.auth.admin.signOut(id, 'global');
+      if (salida.error && auth === 'ok') auth = `sesiones: ${salida.error.message}`;
     } catch (err) {
       auth = err instanceof Error ? err.message : 'error';
     }
-    // 3) Credenciales de agente creadas por la persona.
-    const ahora = new Date().toISOString();
-    await db.from('api_keys').update({ revocada_at: ahora }).eq('tenant_id', ctx.tenantId).eq('creado_por', id).is('revocada_at', null);
-    await db
-      .from('oauth_tokens')
-      .delete()
-      .eq('usuario_id', id)
-      .then(
-        () => undefined,
-        () => undefined,
-      );
-    // 4) Tareas abiertas: reasignar o desasignar.
-    const { data: tareas } = await db
-      .from('requerimientos')
-      .select('id, owner_agencia')
-      .eq('tenant_id', ctx.tenantId)
-      .is('deleted_at', null)
-      .not('estado_operativo', 'in', '("completado","cancelado")')
-      .contains('owner_agencia', [id]);
-    let reasignadas = 0;
-    for (const t of (tareas ?? []) as { id: string; owner_agencia: string[] }[]) {
-      const nuevos = t.owner_agencia.filter((x) => x !== id);
-      if (b.reasignar_a && !nuevos.includes(b.reasignar_a)) nuevos.push(b.reasignar_a);
-      const { error } = await db.from('requerimientos').update({ owner_agencia: nuevos, updated_by: ctx.usuarioId }).eq('id', t.id);
-      if (!error) reasignadas += 1;
-    }
-    await db
-      .from('recurrencias')
-      .update({ owner_ejecutiva: b.reasignar_a ?? null })
-      .eq('tenant_id', ctx.tenantId)
-      .eq('owner_ejecutiva', id)
-      .then(
-        () => undefined,
-        () => undefined,
-      );
     await audit(ctx, {
       accion: 'quitar_acceso',
       entidad: 'usuario',
@@ -414,12 +382,12 @@ admin.post(
       detalle: {
         email: (u as { email: string }).email,
         reasignar_a: b.reasignar_a ?? null,
-        tareas_reasignadas: reasignadas,
+        ...r,
         auth,
         motivo: b.motivo ?? null,
       },
     });
-    return c.json({ ok: true, tareas_reasignadas: reasignadas, auth_bloqueado: auth === 'ok' });
+    return c.json({ ok: true, ...r, auth_bloqueado: auth === 'ok', auth_error: auth === 'ok' ? null : auth });
   },
 );
 
