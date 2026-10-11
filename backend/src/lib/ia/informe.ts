@@ -80,7 +80,6 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
   const payload = { mesa: mesa.nombre, mes: etiqueta, desde, hasta, totales, por_cliente: porCliente, por_persona: porPersona, senales_por_tipo: senalesPorTipo, arrastre_top: activos.filter((r) => r.veces_reprogramado >= 2).slice(0, 10).map((r) => ({ tarea: r.titulo_interno, cliente: nombreC(r.cliente_id), veces: r.veces_reprogramado, owner: r.owner_agencia[0] ? nombreU(r.owner_agencia[0]) : null })) };
   const g = await generarTexto(ctx, { tipo: 'informe_mensual', entidad: { tipo: 'mesa', id: mesa.id }, payload, system: SYSTEM_INFORME, maxTokens: 3500, cacheMs: 6 * 3600_000 });
 
-  const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '—');
   const md = [
     `# Informe mensual · ${mesa.nombre} · ${etiqueta}`, '',
     `**Entregas:** ${totales.entregados} requerimientos (${totales.piezas} piezas) · **A tiempo sobre fecha original:** ${totales.pct_a_tiempo_original ?? '—'}% · **sobre fecha vigente:** ${totales.pct_a_tiempo_vigente ?? '—'}% · **Reprogramaciones:** ${totales.reprogramaciones}${totales.causa_reprogramacion_dominante ? ` (causa principal: ${totales.causa_reprogramacion_dominante})` : ''} · **Reprocesos:** ${totales.reprocesos} (${totales.horas_reproceso} h) · **Horas:** ${totales.horas} · **Abiertos al cierre:** ${totales.activos_al_cierre} (${totales.atrasados_al_cierre} atrasados) · **Señales críticas:** ${totales.senales_criticas}`, '',

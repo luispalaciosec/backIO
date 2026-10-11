@@ -6,11 +6,6 @@
  */
 import type { FilaImportCSV, PreviewImport } from '@backio/shared';
 
-export const COLUMNAS_CSV: (keyof FilaImportCSV)[] = [
-  'cliente_slug', 'proyecto', 'titulo_interno', 'etiqueta_cliente', 'visible', 'bloque',
-  'peso', 'tipo', 'prioridad', 'fecha_pedido', 'fecha_entrega', 'owner_email', 'piezas',
-];
-
 export function parseCSV(texto: string): FilaImportCSV[] {
   const lineas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lineas.length === 0) return [];

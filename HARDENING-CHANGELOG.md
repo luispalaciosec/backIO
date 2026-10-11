@@ -85,3 +85,14 @@ una acción de Luis) · **pendiente** (ola futura).
 | Punto 12 · Claves de Turnstile y captcha en Supabase | hecho (Luis, 10/10) | Vercel `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, Railway `TURNSTILE_SECRET_KEY`, Supabase → Attack Protection | Frontend redesplegado con la clave; el widget aparece en el login sin violaciones de CSP (formato compacto en pantallas < 300 px). Luis inició sesión con el captcha sin problemas |
 | Punto 19 · URLs públicas https en producción | hecho | `backend/src/config/env.ts` | Aviso en el log si alguna no es https o si `FRONTEND_URL` incluye orígenes locales |
 | `FRONTEND_URL` de Railway incluía `http://localhost:3000` | hecho (Luis, 10/10) | Railway → Variables | Solo `https://backio.vercel.app`; un preflight desde `http://localhost:3000` ya no recibe permiso CORS |
+
+## Ola 4 · Calidad I: basura, formato y utilidades compartidas
+
+| Hallazgo | Estado | Archivos | Verificación |
+|---|---|---|---|
+| A.1 · 13 scripts gastados (incluido `verificar_put.ts`, `PUT` crudo a Basecamp) | hecho | `backend/scripts/*`, `backend/scripts/README.md` | Borrados; el README ya no dice que `verificar_put.ts` no escribía y documenta `duplicados_sin_enlace.ts` |
+| A.1 · Exports y locales muertos | hecho | `db/usuarios.ts`, `builder/import.ts`, `cumplimiento.ts`, `ia/index.ts`, `ia/informe.ts`, `basecamp/client.ts`, `basecamp/oauth.ts`, `mcp/server.ts`, `shared/src/types.ts`, `shared/src/api.ts`, `BacklogTable.tsx`, `admin/recurrencias`, `Step3Alcance.tsx` | `tsc --noUnusedLocals --noUnusedParameters` limpio en los tres paquetes |
+| A.1 · Reexports de `lib/visibility/index.ts` | pendiente | — | Zona de revisión humana (`CLAUDE.md`): no se toca sin visto bueno |
+| A.2 · `/cron/huerfanos` (detector retirado el 23/09) | hecho | `backend/src/routes/cron.ts` | Borrado |
+| A.3 · `dotenv` no declarado | hecho | `backend/package.json` | devDependency |
+| B14 · README con migraciones «01–20» y alerta de API keys dada por buena | hecho | `README.md`, `docs/18-seguridad.md` | Corregidos |

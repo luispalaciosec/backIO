@@ -14,7 +14,7 @@ import type { DbCtx } from '../db/client';
 import { DbError } from '../db/client';
 import { listBacklog } from '../db/requerimientos';
 import { getProyectoDetalle, listProyectos } from '../db/proyectos';
-import { listClientes, getCliente } from '../db/clientes';
+import { listClientes } from '../db/clientes';
 import { listPlantillas, getPlantillaArbol } from '../db/plantillas';
 import { listUsuarios } from '../db/usuarios';
 import { resolverMesa, alcanceMesa, listMesas } from '../db/mesas';

@@ -69,7 +69,8 @@ producción.
 - Credenciales: API keys y tokens OAuth hasheados y mostrados una vez; PKCE obligatorio; códigos de un solo
   uso; `timingSafeEqual` en webhooks; webhooks fail-closed en producción.
 - MCP: preview + confirm con `plan_id` de un solo uso, límite de escrituras por credencial, alerta por
-  escritura masiva.
+  escritura masiva (hasta el 10/10/2026 la alerta no se enviaba: insert perezoso sin destinatario; ver B11 en
+  `HARDENING-CHANGELOG.md`).
 - Historial git sin credenciales desde el primer commit; `.env` ignorado; sin `dangerouslySetInnerHTML`;
   el token de sesión nunca toca URL ni `localStorage`.
 

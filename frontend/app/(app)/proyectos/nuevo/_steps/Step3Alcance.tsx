@@ -8,7 +8,7 @@ export function Step3Alcance({ state: s, set }: { state: WizardState; set: (p: P
   const canales = s.brief.canales;
   const activos = plantilla.bloques.filter((b) => s.bloques[b.id]?.activo ?? true);
   const sumaActiva = activos.reduce((acc, b) => acc + b.peso, 0);
-  const pesoRedistribuido = (id: string, peso: number) => (sumaActiva ? Math.round((peso / sumaActiva) * 1000) / 10 : 0);
+  const pesoRedistribuido = (peso: number) => (sumaActiva ? Math.round((peso / sumaActiva) * 1000) / 10 : 0);
 
   const upd = (id: string, patch: Partial<WizardState['bloques'][string]>) =>
     set({ bloques: { ...s.bloques, [id]: { ...(s.bloques[id] ?? { bloque_id: id, activo: true, owner_id: null, piezas_por_canal: {} }), ...patch } } });
@@ -31,7 +31,7 @@ export function Step3Alcance({ state: s, set }: { state: WizardState; set: (p: P
                 <span className="font-semibold">{b.nombre}</span>
                 {b.opcional && <span className="text-xs text-gray-500">opcional</span>}
               </label>
-              <span className="text-sm tabular-nums">{activo ? pesoRedistribuido(b.id, b.peso) : 0}% del proyecto <span className="text-gray-400">(base {b.peso}%)</span></span>
+              <span className="text-sm tabular-nums">{activo ? pesoRedistribuido(b.peso) : 0}% del proyecto <span className="text-gray-400">(base {b.peso}%)</span></span>
             </div>
             {activo && (
               <>

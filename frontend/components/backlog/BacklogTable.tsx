@@ -17,7 +17,6 @@ const APROB = Object.keys(APROBACION_LABEL);
 const PLANIF = Object.keys(PLANIFICACION_LABEL);
 const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const PRIOS = Object.keys(PRIORIDAD_LABEL);
-const TIPOS = Object.keys(TIPO_LABEL);
 
 export interface BacklogTableProps {
   items: RequerimientoMetricas[];

@@ -6,7 +6,6 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env';
-import { serviceClient, throwIf } from '../db/client';
 import type { BasecampTokens } from './client';
 
 const LAUNCHPAD = 'https://launchpad.37signals.com';

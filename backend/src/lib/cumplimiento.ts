@@ -32,9 +32,6 @@ export function desvioDias(r: Pick<Requerimiento, 'completado_at' | 'fecha_entre
 export function atribuibleEquipo(motivo: MotivoReprogramacion | null): boolean {
   return MOTIVOS_REPROGRAMACION.find((m) => m.valor === motivo)?.atribuible === 'equipo';
 }
-export function responsableReproceso(motivo: MotivoReproceso | null): string {
-  return MOTIVOS_REPROCESO.find((m) => m.valor === motivo)?.responsable ?? 'sin causa';
-}
 export function labelMotivoReprogramacion(m: MotivoReprogramacion | null): string {
   return m ? MOTIVOS_REPROGRAMACION.find((x) => x.valor === m)?.label ?? m : 'Sin causa';
 }

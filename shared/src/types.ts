@@ -43,14 +43,6 @@ export type TipoTrabajo = 'fee' | 'proyecto';
 
 export type SyncEstado = 'pendiente' | 'ok' | 'incompleto';
 
-export interface Tenant {
-  id: string;
-  nombre: string;
-  slug: string;
-  config: Record<string, unknown>;
-  activo: boolean;
-}
-
 export interface Mesa {
   id: string;
   tenant_id: string;

@@ -12,17 +12,6 @@ export async function listUsuarios(ctx: DbCtx): Promise<Usuario[]> {
   return (data ?? []) as Usuario[];
 }
 
-export async function getUsuario(ctx: DbCtx, id: string): Promise<Usuario | null> {
-  const { data, error } = await ctx.db
-    .from('usuarios')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', id)
-    .maybeSingle();
-  throwIf(error);
-  return (data as Usuario) ?? null;
-}
-
 export async function getUsuarioByEmail(ctx: DbCtx, email: string): Promise<Usuario | null> {
   const { data, error } = await ctx.db
     .from('usuarios')

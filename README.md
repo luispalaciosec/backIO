@@ -73,7 +73,7 @@ Variables, usuarios de prueba y verificación de RLS: `docs/11-setup.md`. Despli
 ```
 shared/     tipos compartidos y sanitizeForClient (única salida al cliente)
 backend/    src/app.ts (routers) · src/routes/v1 · src/lib (dominio, db, basecamp, ia, mcp)
-            supabase/migrations (SQL versionado, 01–20) · scripts (operación)
+            supabase/migrations (SQL versionado, 01–28) · scripts (operación)
 frontend/   app/(app) área interna · app/p portal · components · lib
 docs/       specs, arquitectura técnica, manual de uso (HTML + PDF)
 ```

@@ -3,11 +3,6 @@
  */
 import type { EstadoOperativo, Prioridad, Requerimiento, Proyecto, BriefProyecto } from './types';
 
-export interface ApiError {
-  error: string;
-  detalle?: unknown;
-}
-
 export interface Paginado<T> {
   items: T[];
   total: number;

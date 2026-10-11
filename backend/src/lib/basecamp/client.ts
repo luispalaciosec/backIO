@@ -6,7 +6,6 @@
  * Las respuestas se tipan SOLO con los campos que BackIO necesita. Nunca se guardan enteras.
  */
 import { env } from '../../config/env';
-import { serviceClient } from '../db/client';
 
 export interface BasecampTokens {
   access_token: string;

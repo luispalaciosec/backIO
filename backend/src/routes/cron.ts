@@ -5,7 +5,6 @@ import { serviceClient, throwIf } from '../lib/db';
 import { reconcileTenant } from '../lib/basecamp/reconcile';
 import { recalcularSenales } from '../lib/rituals/service';
 import { procesarPendientes } from '../lib/notificaciones';
-import { detectarHuerfanos } from '../lib/basecamp/huerfanos';
 import { procesarRecurrencias } from '../lib/recurrencias';
 import { importarBasecampCliente } from '../lib/basecamp/importar';
 import { sincronizarHoras } from '../lib/horas';
@@ -53,12 +52,6 @@ cron.post('/senales', async (c) => {
   return c.json(out);
 });
 
-/** Cada 30 min: huérfanos. */
-cron.post('/huerfanos', async (c) => {
-  const out: Record<string, unknown> = {};
-  for (const t of await tenants()) out[t] = await detectarHuerfanos({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({ error: e.message }));
-  return c.json(out);
-});
 /** Cada hora: estructura de Basecamp (renombres, movimientos, responsables, eliminados). */
 cron.post('/basecamp/estructura', async (c) => {
   const out: Record<string, unknown> = {};

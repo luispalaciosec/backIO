@@ -25,10 +25,6 @@ export function iaDisponible(): boolean {
   return Boolean(env().ANTHROPIC_API_KEY);
 }
 
-export function firma(persona: string): string {
-  return `Redactado por BackIO, publicado por ${persona}`;
-}
-
 export function hashPayload(payload: unknown): string {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }

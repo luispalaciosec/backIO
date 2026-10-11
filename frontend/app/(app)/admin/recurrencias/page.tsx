@@ -21,7 +21,6 @@ export default function RecurrenciasPage() {
   useEffect(() => { void cargar(); }, []);
   const nc = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '—';
   const np = (id: string) => plantillas.find((p) => p.id === id)?.nombre ?? '—';
-  const nu = (id: string | null) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
 
   async function patch(id: string, body: Partial<Recurrencia>) {
     setError(null);
