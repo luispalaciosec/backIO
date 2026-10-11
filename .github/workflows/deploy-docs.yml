@@ -1,7 +1,8 @@
 # Publica el sitio de documentación (docs/, VitePress) en Cloudflare Pages cuando el CI de main termina en verde.
 # El sitio es privado: el acceso lo controla Cloudflare Access (Zero Trust) delante del dominio de Pages.
 # Requiere en el repo (Settings → Secrets and variables → Actions): los secretos CLOUDFLARE_API_TOKEN (permiso
-# «Cloudflare Pages: Edit») y CLOUDFLARE_ACCOUNT_ID. Sin ellos, el job avisa y no falla.
+# «Cloudflare Pages: Edit») y CLOUDFLARE_ACCOUNT_ID. Sin ellos, el job avisa y no falla. El proyecto de Pages
+# (backio-docs) lo crea este mismo job la primera vez. Configurar Cloudflare Access ANTES de cargar los secretos.
 name: Deploy docs
 
 on:
@@ -40,4 +41,6 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter @backio/docs build
+          # Crea el proyecto la primera vez (si ya existe, el comando falla y se sigue).
+          npx --yes wrangler@4.141.0 pages project create backio-docs --production-branch=main || true
           npx --yes wrangler@4.141.0 pages deploy docs/.vitepress/dist --project-name=backio-docs --branch=main
