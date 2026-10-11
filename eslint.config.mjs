@@ -18,14 +18,24 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
-  {
-    // Las consultas a Supabase viven en lib/db (CLAUDE.md). Aviso hasta la Ola 6, que las mueve.
-    files: ['backend/src/routes/**/*.ts', 'backend/src/lib/**/*.ts'],
-    ignores: ['backend/src/lib/db/**'],
+  // Las consultas a Supabase viven en lib/db (CLAUDE.md). En las rutas es error desde la Ola 6; en el resto de lib
+  // queda como aviso hasta moverlas.
+  ...[
+    { files: ['backend/src/routes/**/*.ts'], nivel: 'error' },
+    { files: ['backend/src/lib/**/*.ts'], ignores: ['backend/src/lib/db/**'], nivel: 'warn' },
+  ].map(({ nivel, ...donde }) => ({
+    ...donde,
     rules: {
-      'no-restricted-syntax': ['warn', { selector: "CallExpression[callee.property.name='from'][callee.object.name!=/^(Array|Buffer|Object)$/][arguments.0.type='Literal']", message: 'Consulta a Supabase fuera de lib/db.' }],
+      'no-restricted-syntax': [
+        nivel,
+        {
+          selector:
+            "CallExpression[callee.property.name='from'][callee.object.name!=/^(Array|Buffer|Object)$/][arguments.0.type='Literal']",
+          message: 'Consulta a Supabase fuera de lib/db.',
+        },
+      ],
     },
-  },
+  })),
   {
     files: ['**/__tests__/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },

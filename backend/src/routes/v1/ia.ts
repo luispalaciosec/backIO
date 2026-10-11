@@ -12,6 +12,7 @@ import { redactarRecordatorio } from '../../lib/ia/recordatorio';
 import { generarInformeMensual } from '../../lib/ia/informe';
 import { informeCanal, gruposInforme } from '../../lib/informe_canal';
 import { hoyLocal } from '@backio/shared';
+import { listInformesMensuales } from '../../lib/db/semanas';
 
 /** Capa de IA: redacta, nunca publica. Todo lo que sale de aquí lo revisa y publica una persona. */
 export const ia = new Hono();
@@ -107,14 +108,7 @@ ia.post(
 
 ia.get('/informes', requireScope('read:senales'), async (c) => {
   const ctx = ctxOf(c);
-  const { data } = await ctx.db
-    .from('actas')
-    .select('id, tipo, mesa_id, semana_id, markdown, publicado_at, created_at')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('tipo', 'informe_mensual')
-    .order('created_at', { ascending: false })
-    .limit(24);
-  return c.json({ items: data ?? [] });
+  return c.json({ items: await listInformesMensuales(ctx) });
 });
 
 // ---------------- Informe por canal (sin IA: puro cálculo)

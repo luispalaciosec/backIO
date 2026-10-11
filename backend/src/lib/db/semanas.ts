@@ -122,3 +122,27 @@ export async function getActa(ctx: DbCtx, id: string): Promise<Acta | null> {
   throwIf(error);
   return (data as Acta) ?? null;
 }
+
+/** ¿La semana ya tiene un Plan Operativo generado? */
+export async function semanaTienePlan(ctx: DbCtx, semanaId: string): Promise<boolean> {
+  const { count, error } = await ctx.db
+    .from('actas')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('semana_id', semanaId)
+    .eq('tipo', 'plan_operativo');
+  throwIf(error);
+  return (count ?? 0) > 0;
+}
+
+export async function listInformesMensuales(ctx: DbCtx) {
+  const { data, error } = await ctx.db
+    .from('actas')
+    .select('id, tipo, mesa_id, semana_id, markdown, publicado_at, created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('tipo', 'informe_mensual')
+    .order('created_at', { ascending: false })
+    .limit(24);
+  throwIf(error);
+  return data ?? [];
+}

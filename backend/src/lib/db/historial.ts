@@ -189,3 +189,10 @@ export async function listCumplimientoDesde(
     })),
   };
 }
+
+/** Requerimiento al que pertenece una reprogramación o un reproceso (para validar permisos y rutas anidadas). */
+export async function requerimientoDeHistorial(ctx: DbCtx, tabla: 'reprogramaciones' | 'reprocesos', id: string): Promise<string | null> {
+  const { data, error } = await ctx.db.from(tabla).select('requerimiento_id').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
+  throwIf(error);
+  return data?.requerimiento_id ?? null;
+}

@@ -132,3 +132,29 @@ export async function requerimientosConFechaCambiadaDesde(ctx: DbCtx, desdeIso: 
   throwIf(error);
   return [...new Set((data ?? []).map((r) => (r as { entidad_id: string }).entidad_id))];
 }
+
+/** Marca (o desmarca) la primera respuesta al cliente. Devuelve el error de la base sin lanzar, para el mensaje de la ruta. */
+export async function setPrimeraRespuesta(ctx: DbCtx, id: string, valor: string | null): Promise<{ message: string } | null> {
+  const { error } = await ctx.db.from('requerimientos').update({ primera_respuesta_at: valor }).eq('tenant_id', ctx.tenantId).eq('id', id);
+  return error;
+}
+
+/** Filas de la vista de métricas para un conjunto de ids (bandeja de entradas desde Basecamp). */
+export async function metricasPorIds(ctx: DbCtx, ids: string[]) {
+  if (!ids.length) return [];
+  const { data, error } = await ctx.db
+    .from('v_requerimientos_metricas')
+    .select(
+      'id, titulo_interno, cliente_id, proyecto_id, bloque_nombre, owner_agencia, fecha_entrega, estado_operativo, prioridad, tipo_trabajo, piezas, estado_aprobacion, basecamp_url, planificacion',
+    )
+    .eq('tenant_id', ctx.tenantId)
+    .in('id', ids);
+  throwIf(error);
+  return data ?? [];
+}
+
+export async function tenantDeRequerimiento(ctx: DbCtx, id: string): Promise<string | null> {
+  const { data, error } = await ctx.db.from('requerimientos').select('tenant_id').eq('id', id).maybeSingle();
+  throwIf(error);
+  return data?.tenant_id ?? null;
+}

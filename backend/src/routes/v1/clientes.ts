@@ -8,6 +8,7 @@ import type { ResumenClientePrometio } from '@backio/shared';
 import { registrarWebhookCliente, diagnosticoWebhookCliente, actualizarWebhooksTenant } from '../../lib/basecamp/webhooks';
 import { importarBasecampCliente } from '../../lib/basecamp/importar';
 import { guardarPin, clientesConPin, migrarPinesEnClaro } from '../../lib/portal/pin';
+import { clienteDuplicado, insertCliente } from '../../lib/db/clientes';
 
 export const clientes = new Hono();
 
@@ -107,37 +108,23 @@ clientes.post(
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 60) || `cliente-${Date.now()}`;
-    const { data: dup } = await ctx.db
-      .from('clientes')
-      .select('id, nombre')
-      .eq('tenant_id', ctx.tenantId)
-      .or(`slug.eq.${slug}${b.basecamp_project_id ? `,basecamp_project_id.eq.${b.basecamp_project_id}` : ''}`)
-      .maybeSingle();
-    if (dup)
-      return c.json(
-        { error: `Ya existe un cliente con ese nombre o ese proyecto de Basecamp: ${(dup as { nombre: string }).nombre}` },
-        409,
-      );
-    const { data, error } = await ctx.db
-      .from('clientes')
-      .insert({
-        id: randomUUID(),
-        tenant_id: ctx.tenantId,
-        nombre: b.nombre,
-        slug,
-        basecamp_project_id: b.basecamp_project_id ?? null,
-        mesa_id: b.mesa_id ?? null,
-        color_primario: b.color_primario ?? '#0073EA',
-        activo: true,
-        config: { origen: 'manual', ...(b.grupo ? { grupo: b.grupo } : {}) },
-      })
-      .select()
-      .single();
-    if (error) return c.json({ error: error.message }, 500);
+    const dup = await clienteDuplicado(ctx, slug, b.basecamp_project_id ?? null);
+    if (dup) return c.json({ error: `Ya existe un cliente con ese nombre o ese proyecto de Basecamp: ${dup.nombre}` }, 409);
+    const { data, error } = await insertCliente(ctx, {
+      id: randomUUID(),
+      nombre: b.nombre,
+      slug,
+      basecamp_project_id: b.basecamp_project_id ?? null,
+      mesa_id: b.mesa_id ?? null,
+      color_primario: b.color_primario ?? '#0073EA',
+      activo: true,
+      config: { origen: 'manual', ...(b.grupo ? { grupo: b.grupo } : {}) },
+    });
+    if (error || !data) return c.json({ error: error?.message ?? 'No se pudo crear' }, 500);
     await audit(ctx, {
       accion: 'crear_cliente',
       entidad: 'cliente',
-      entidad_id: (data as { id: string }).id,
+      entidad_id: data.id,
       detalle: { nombre: b.nombre, basecamp_project_id: b.basecamp_project_id ?? null, origen: 'manual' },
     });
     return c.json(data, 201);

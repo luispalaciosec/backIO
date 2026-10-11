@@ -12,6 +12,8 @@ import { emailHabilitado, plantillaHtml, sendEmail } from '../lib/notificaciones
 import { ipCliente } from '../lib/ip';
 import { limitar, sumarIntento } from '../lib/limite';
 import { verificarTurnstile } from '../lib/turnstile';
+import { usuarioPorEmailSinSesion } from '../lib/db/usuarios';
+import { audit } from '../lib/db/audit';
 
 export const authPublico = new Hono();
 // 10 por IP cada 15 min y 1 por correo por minuto, persistentes (auditoría 10/10, punto 11); captcha si está activo.
@@ -26,8 +28,7 @@ authPublico.post(
     if ((await sumarIntento(`recuperar_email:${email}`, 1, 60)).excedido) return c.json({ ok: true });
     try {
       const sb = serviceClient();
-      const { data: u } = await sb.from('usuarios').select('id, nombre, activo, tenant_id').eq('email', email).maybeSingle();
-      const usuario = u as { id: string; nombre: string; activo: boolean; tenant_id: string } | null;
+      const usuario = await usuarioPorEmailSinSesion(email);
       if (!usuario?.activo) return c.json({ ok: true }); // no revelar
       const base = `${frontendOrigins()[0] ?? 'http://localhost:3000'}/auth/establecer-clave`;
       const { data, error } = await sb.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: base } });
@@ -47,21 +48,10 @@ authPublico.post(
         html: plantillaHtml('Restablece tu contraseña', cuerpo, link),
         text: `${cuerpo}\n${link}`,
       });
-      await sb
-        .from('audit_log')
-        .insert({
-          tenant_id: usuario.tenant_id,
-          usuario_id: usuario.id,
-          origen: 'ui',
-          accion: 'recuperar_contrasena',
-          entidad: 'usuario',
-          entidad_id: usuario.id,
-          detalle: {},
-        })
-        .then(
-          () => undefined,
-          () => undefined,
-        );
+      await audit(
+        { db: sb, tenantId: usuario.tenant_id, usuarioId: usuario.id, origen: 'ui' },
+        { accion: 'recuperar_contrasena', entidad: 'usuario', entidad_id: usuario.id, detalle: {} },
+      );
     } catch (err) {
       console.error('[recuperar]', err instanceof Error ? err.message : err);
     }

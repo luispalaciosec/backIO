@@ -1,4 +1,4 @@
-import { serviceClient, type DbCtx } from './client';
+import { serviceClient, throwIf, type DbCtx } from './client';
 import { notificar } from '../notificaciones';
 
 export interface AuditEntry {
@@ -53,4 +53,40 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
   } catch (err) {
     console.error('[audit] fallo al registrar', err);
   }
+}
+
+/**
+ * Entradas desde Basecamp (accion basecamp_entrada) de los últimos días que nadie marcó como revisadas.
+ * audit_log no tiene política de lectura para usuarios: se lee con service role, acotado al tenant.
+ */
+export async function entradasBasecampSinRevisar(
+  ctx: DbCtx,
+  desdeIso: string,
+): Promise<{ entidad_id: string; created_at: string; detalle: Record<string, unknown> }[]> {
+  const svc = serviceClient();
+  const { data: ent, error } = await svc
+    .from('audit_log')
+    .select('entidad_id, created_at, detalle')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('accion', 'basecamp_entrada')
+    .gte('created_at', desdeIso)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  throwIf(error);
+  const entradas = (ent ?? []).filter((e): e is typeof e & { entidad_id: string } => !!e.entidad_id);
+  if (!entradas.length) return [];
+  const { data: rev, error: e2 } = await svc
+    .from('audit_log')
+    .select('entidad_id')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('accion', 'revisar_entrada')
+    .in(
+      'entidad_id',
+      entradas.map((e) => e.entidad_id),
+    );
+  throwIf(e2);
+  const revisadas = new Set((rev ?? []).map((r) => r.entidad_id));
+  return entradas
+    .filter((e) => !revisadas.has(e.entidad_id))
+    .map((e) => ({ entidad_id: e.entidad_id, created_at: e.created_at, detalle: (e.detalle ?? {}) as Record<string, unknown> }));
 }

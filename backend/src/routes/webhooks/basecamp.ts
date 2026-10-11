@@ -12,6 +12,8 @@ import type { Requerimiento } from '@backio/shared';
 import { audit } from '../../lib/db/audit';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { importarBasecampCliente } from '../../lib/basecamp/importar';
+import { clientePorProyectoBasecamp, proyectoBasecampDeCliente } from '../../lib/db/clientes';
+import { tenantDeRequerimiento } from '../../lib/db/requerimientos';
 
 export const basecampWebhook = new Hono();
 
@@ -21,15 +23,7 @@ export const basecampWebhook = new Hono();
  */
 const importacionesPendientes = new Map<string, NodeJS.Timeout>();
 async function programarImportacion(bucketId: number): Promise<void> {
-  const db = serviceClient();
-  const { data } = await db
-    .from('clientes')
-    .select('id, tenant_id, nombre')
-    .eq('basecamp_project_id', bucketId)
-    .eq('activo', true)
-    .is('deleted_at', null)
-    .maybeSingle();
-  const cl = data as { id: string; tenant_id: string; nombre: string } | null;
+  const cl = await clientePorProyectoBasecamp(bucketId);
   if (!cl) return;
   const previo = importacionesPendientes.get(cl.id);
   if (previo) clearTimeout(previo);
@@ -63,13 +57,7 @@ async function programarImportacion(bucketId: number): Promise<void> {
  * Devuelve null si el evento no corresponde al proyecto del cliente o el to-do no se pudo leer.
  */
 async function estadoVivo(req: Requerimiento, safe: BasecampSyncPayload): Promise<BasecampSyncPayload | null> {
-  const { data } = await serviceClient()
-    .from('clientes')
-    .select('basecamp_project_id')
-    .eq('id', req.cliente_id)
-    .eq('tenant_id', req.tenant_id)
-    .maybeSingle();
-  const proyecto = (data as { basecamp_project_id: number | null } | null)?.basecamp_project_id ?? null;
+  const proyecto = await proyectoBasecampDeCliente(req.tenant_id, req.cliente_id);
   if (!proyecto || (safe.bucket_id !== null && safe.bucket_id !== proyecto)) return null;
   const bc = await BasecampClient.forTenant(req.tenant_id);
   let raw: unknown;
@@ -134,8 +122,7 @@ async function handle(raw: string) {
 
   const resultado = await applyBasecampUpdate(ctx, safe);
   if (resultado.requerimiento_id) {
-    const { data } = await ctx.db.from('requerimientos').select('tenant_id').eq('id', resultado.requerimiento_id).single();
-    const tenantId = (data as { tenant_id: string } | null)?.tenant_id;
+    const tenantId = await tenantDeRequerimiento(ctx, resultado.requerimiento_id);
     if (tenantId)
       await audit(
         { ...ctx, tenantId },

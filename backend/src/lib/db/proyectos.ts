@@ -160,3 +160,46 @@ export async function updateProyecto(
   if (!data) throw new DbError('Proyecto no encontrado', 404);
   return data as Proyecto;
 }
+
+/** Borradores creados por PrometIO (cotización aprobada) pendientes de convertir en proyecto. */
+export async function listBorradoresPendientes(ctx: DbCtx) {
+  const { data, error } = await ctx.db
+    .from('proyecto_borradores')
+    .select('id, cliente_id, prometio_cotizacion_id, plantilla_sugerida_id, payload, estado, proyecto_id, created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('estado', 'pendiente')
+    .order('created_at', { ascending: false });
+  throwIf(error);
+  return data ?? [];
+}
+
+export async function descartarBorrador(ctx: DbCtx, id: string): Promise<void> {
+  const { error } = await ctx.db.from('proyecto_borradores').update({ estado: 'descartado' }).eq('tenant_id', ctx.tenantId).eq('id', id);
+  throwIf(error);
+}
+
+/** Plantilla sugerida para un servicio de PrometIO (tabla mapeo_servicios). */
+export async function plantillaParaServicio(ctx: DbCtx, servicio: string): Promise<string | null> {
+  const { data, error } = await ctx.db
+    .from('mapeo_servicios')
+    .select('plantilla_id')
+    .eq('tenant_id', ctx.tenantId)
+    .ilike('servicio_prometio', servicio)
+    .maybeSingle();
+  throwIf(error);
+  return data?.plantilla_id ?? null;
+}
+
+/** Borrador de proyecto desde una cotización aprobada en PrometIO (idempotente por cotización). */
+export async function guardarBorradorPrometio(
+  ctx: DbCtx,
+  b: { cliente_id: string; prometio_cotizacion_id: string; plantilla_sugerida_id: string | null; payload: unknown },
+): Promise<{ id: string }> {
+  const { data, error } = await ctx.db
+    .from('proyecto_borradores')
+    .upsert({ ...b, tenant_id: ctx.tenantId }, { onConflict: 'tenant_id,prometio_cotizacion_id' })
+    .select('id')
+    .single();
+  throwIf(error);
+  return data!;
+}

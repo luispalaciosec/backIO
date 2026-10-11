@@ -10,8 +10,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env';
-import { serviceClient, upsertClienteDesdePrometio, audit, throwIf, getCliente } from '../../lib/db';
+import { serviceClient, upsertClienteDesdePrometio, audit, getCliente } from '../../lib/db';
 import { notificar } from '../../lib/notificaciones';
+import { tenantPorDefecto } from '../../lib/db/tenants';
+import { ponerLogoSiFalta } from '../../lib/db/clientes';
+import { guardarBorradorPrometio, plantillaParaServicio } from '../../lib/db/proyectos';
 
 export const prometioWebhook = new Hono();
 
@@ -48,11 +51,7 @@ function verify(raw: string, sig: string | undefined): boolean {
   return hex.length === esperado.length && timingSafeEqual(Buffer.from(hex), Buffer.from(esperado));
 }
 
-async function tenantDefault(): Promise<string> {
-  const { data, error } = await serviceClient().from('tenants').select('id').eq('activo', true).order('created_at').limit(1).single();
-  throwIf(error);
-  return (data as { id: string }).id;
-}
+const tenantDefault = tenantPorDefecto;
 
 const vistos = new Map<string, number>();
 
@@ -114,7 +113,7 @@ prometioWebhook.post('/', async (c) => {
     const e = empresa.safeParse(data);
     if (!e.success) return invalido(evento, e.error.issues);
     const cl = await upsertClienteDesdePrometio(ctx, { id: e.data.id, nombre: e.data.nombre, activo: e.data.activo });
-    if (e.data.logo_url) await ctx.db.from('clientes').update({ logo_url: e.data.logo_url }).eq('id', cl.id).is('logo_url', null);
+    if (e.data.logo_url) await ponerLogoSiFalta(ctx, cl.id, e.data.logo_url);
     await audit(ctx, { accion: evento, entidad: 'cliente', entidad_id: cl.id });
     return c.json({ ok: true, cliente_id: cl.id });
   }
@@ -128,30 +127,12 @@ prometioWebhook.post('/', async (c) => {
       (await getCliente(ctx, cot.empresa.id)) ??
       (await upsertClienteDesdePrometio(ctx, { id: cot.empresa.id, nombre: cot.empresa.nombre, activo: cot.empresa.activo }));
     const principal = cot.lineas[0]?.servicio;
-    const { data: mapeo } = principal
-      ? await ctx.db
-          .from('mapeo_servicios')
-          .select('plantilla_id')
-          .eq('tenant_id', tenantId)
-          .ilike('servicio_prometio', principal)
-          .maybeSingle()
-      : { data: null };
-    const { data: fila, error } = await ctx.db
-      .from('proyecto_borradores')
-      .upsert(
-        {
-          tenant_id: tenantId,
-          cliente_id: cliente.id,
-          prometio_cotizacion_id: cot.cotizacion_id,
-          plantilla_sugerida_id: (mapeo as { plantilla_id: string } | null)?.plantilla_id ?? null,
-          payload: cot,
-        },
-        { onConflict: 'tenant_id,prometio_cotizacion_id' },
-      )
-      .select()
-      .single();
-    throwIf(error);
-    const borrador = fila as { id: string };
+    const borrador = await guardarBorradorPrometio(ctx, {
+      cliente_id: cliente.id,
+      prometio_cotizacion_id: cot.cotizacion_id,
+      plantilla_sugerida_id: principal ? await plantillaParaServicio(ctx, principal) : null,
+      payload: cot,
+    });
     await audit(ctx, {
       accion: 'cotizacion_ganada',
       entidad: 'proyecto_borrador',

@@ -65,3 +65,14 @@ export async function ultimaBitacoraPorRequerimiento(
   }
   return out;
 }
+
+export async function getNotaBitacora(ctx: DbCtx, id: string): Promise<{ usuario_id: string | null; requerimiento_id: string } | null> {
+  const { data, error } = await ctx.db
+    .from('bitacora')
+    .select('usuario_id, requerimiento_id')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', id)
+    .maybeSingle();
+  throwIf(error);
+  return data;
+}

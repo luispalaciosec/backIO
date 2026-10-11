@@ -1,5 +1,5 @@
 import type { Cliente } from '@backio/shared';
-import { type DbCtx, throwIf } from './client';
+import { type DbCtx, type FilaInsert, serviceClient, throwIf } from './client';
 
 export async function listClientes(ctx: DbCtx, opts: { incluirInactivos?: boolean } = {}): Promise<Cliente[]> {
   let q = ctx.db.from('clientes').select('*').eq('tenant_id', ctx.tenantId).is('deleted_at', null).order('nombre');
@@ -71,4 +71,58 @@ export function slugify(s: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
+}
+
+/** Cliente del tenant con el mismo slug o el mismo proyecto de Basecamp (para no duplicar al darlo de alta). */
+export async function clienteDuplicado(ctx: DbCtx, slug: string, basecampProjectId: number | null): Promise<{ nombre: string } | null> {
+  let q = ctx.db.from('clientes').select('id, nombre').eq('tenant_id', ctx.tenantId);
+  q = basecampProjectId ? q.or(`slug.eq.${slug},basecamp_project_id.eq.${basecampProjectId}`) : q.eq('slug', slug);
+  const { data, error } = await q.limit(1).maybeSingle();
+  throwIf(error);
+  return data;
+}
+
+export async function insertCliente(ctx: DbCtx, fila: Omit<FilaInsert<'clientes'>, 'tenant_id'>) {
+  const { data, error } = await ctx.db
+    .from('clientes')
+    .insert({ ...fila, tenant_id: ctx.tenantId })
+    .select()
+    .single();
+  return { data, error };
+}
+
+/** Cliente activo dueño de un proyecto de Basecamp, en cualquier tenant (webhook de Basecamp, sin sesión). */
+export async function clientePorProyectoBasecamp(bucketId: number): Promise<{ id: string; tenant_id: string; nombre: string } | null> {
+  const { data, error } = await serviceClient()
+    .from('clientes')
+    .select('id, tenant_id, nombre')
+    .eq('basecamp_project_id', bucketId)
+    .eq('activo', true)
+    .is('deleted_at', null)
+    .maybeSingle();
+  throwIf(error);
+  return data;
+}
+
+/** Proyecto de Basecamp guardado en BackIO para un cliente (fuente de verdad frente al payload del webhook). */
+export async function proyectoBasecampDeCliente(tenantId: string, clienteId: string): Promise<number | null> {
+  const { data, error } = await serviceClient()
+    .from('clientes')
+    .select('basecamp_project_id')
+    .eq('id', clienteId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  throwIf(error);
+  return data?.basecamp_project_id ?? null;
+}
+
+/** Logo que llega de PrometIO: solo se usa si el cliente aún no tiene uno. */
+export async function ponerLogoSiFalta(ctx: DbCtx, clienteId: string, logoUrl: string): Promise<void> {
+  const { error } = await ctx.db
+    .from('clientes')
+    .update({ logo_url: logoUrl })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', clienteId)
+    .is('logo_url', null);
+  throwIf(error);
 }

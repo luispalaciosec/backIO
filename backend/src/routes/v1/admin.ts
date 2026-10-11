@@ -3,13 +3,27 @@ import { z } from 'zod';
 import { zValidator } from '../../lib/validacion';
 import { randomBytes } from 'node:crypto';
 import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
-import { listUsuarios, audit, throwIf, serviceClient } from '../../lib/db';
+import { listUsuarios, audit, serviceClient } from '../../lib/db';
 import { frontendOrigins } from '../../config/env';
 import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
-import { finDiaLocal, inicioDiaLocal } from '@backio/shared';
 import { quitarAcceso } from '../../lib/db/lote';
+import {
+  actualizarUsuario,
+  borrarInvitacion,
+  buscarAuditoria,
+  clienteEsDelTenant,
+  crearApiKey,
+  getInvitacion,
+  guardarInvitacion,
+  listApiKeys,
+  listInvitaciones,
+  reactivarUsuario,
+  revocarApiKey,
+  usuarioDelTenant,
+  vincularUsuarioBasecamp,
+} from '../../lib/db/admin';
 
 export const admin = new Hono();
 admin.use('*', requireScope('admin'));
@@ -34,12 +48,7 @@ admin.post('/usuarios/basecamp/vincular', async (c) => {
       continue;
     }
     if (u.basecamp_user_id === p.id && (u.avatar_url || !p.avatar_url)) continue;
-    const { error } = await serviceClient()
-      .from('usuarios')
-      .update({ basecamp_user_id: p.id, ...(p.avatar_url ? { avatar_url: p.avatar_url } : {}) })
-      .eq('tenant_id', ctx.tenantId)
-      .eq('id', u.id);
-    throwIf(error);
+    await vincularUsuarioBasecamp(ctx, u.id, p.id, p.avatar_url ?? null);
     vinculados.push({ usuario: u.nombre, basecamp_user_id: p.id });
   }
   await audit(ctx, {
@@ -77,8 +86,7 @@ admin.patch(
     if (id === ctx.usuarioId && ((patch.rol && patch.rol !== 'admin') || patch.activo === false)) {
       return c.json({ error: 'No puedes quitarte el rol admin ni desactivarte a ti mismo' }, 422);
     }
-    const { data, error } = await ctx.db.from('usuarios').update(patch).eq('tenant_id', ctx.tenantId).eq('id', id).select().single();
-    throwIf(error);
+    const data = await actualizarUsuario(ctx, id, patch);
     await audit(ctx, { accion: 'actualizar_usuario', entidad: 'usuario', entidad_id: id, detalle: patch });
     return c.json(data);
   },
@@ -87,13 +95,7 @@ admin.patch(
 // ---------------- invitaciones
 admin.get('/invitaciones', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await ctx.db
-    .from('invitaciones')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .order('created_at', { ascending: false });
-  throwIf(error);
-  return c.json({ items: data ?? [] });
+  return c.json({ items: await listInvitaciones(ctx) });
 });
 
 admin.post(
@@ -110,23 +112,15 @@ admin.post(
   async (c) => {
     const ctx = ctxOf(c);
     const body = c.req.valid('json');
-    const { data, error } = await ctx.db
-      .from('invitaciones')
-      .upsert(
-        { ...body, email: body.email.toLowerCase(), tenant_id: ctx.tenantId, created_by: ctx.usuarioId },
-        { onConflict: 'tenant_id,email' },
-      )
-      .select()
-      .single();
-    throwIf(error);
+    const data = await guardarInvitacion(ctx, body);
     await audit(ctx, {
       accion: 'crear_invitacion',
       entidad: 'invitacion',
-      entidad_id: (data as { id: string }).id,
+      entidad_id: data.id,
       detalle: { email: body.email, rol: body.rol },
     });
     const envio = await enviarInvitacion(body.email.toLowerCase(), body.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
-    return c.json({ ...(data as object), envio }, 201);
+    return c.json({ ...data, envio }, 201);
   },
 );
 
@@ -175,15 +169,8 @@ async function mandar(
 
 admin.post('/invitaciones/:id/reenviar', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await ctx.db
-    .from('invitaciones')
-    .select('email, nombre')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', c.req.param('id'))
-    .maybeSingle();
-  throwIf(error);
-  if (!data) return c.json({ error: 'Invitación no encontrada' }, 404);
-  const inv = data as { email: string; nombre: string };
+  const inv = await getInvitacion(ctx, c.req.param('id'));
+  if (!inv) return c.json({ error: 'Invitación no encontrada' }, 404);
   const envio = await enviarInvitacion(inv.email, inv.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
   const { url: _url, ...sinEnlace } = envio as { url?: string; enviado: boolean; error?: string };
   await audit(ctx, { accion: 'reenviar_invitacion', entidad: 'invitacion', entidad_id: c.req.param('id'), detalle: sinEnlace });
@@ -192,8 +179,7 @@ admin.post('/invitaciones/:id/reenviar', async (c) => {
 
 admin.delete('/invitaciones/:id', async (c) => {
   const ctx = ctxOf(c);
-  const { error } = await ctx.db.from('invitaciones').delete().eq('tenant_id', ctx.tenantId).eq('id', c.req.param('id'));
-  throwIf(error);
+  await borrarInvitacion(ctx, c.req.param('id'));
   return c.body(null, 204);
 });
 
@@ -226,13 +212,7 @@ const PERFILES: Record<string, readonly (typeof SCOPES)[number][]> = {
 
 admin.get('/api-keys', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await serviceClient()
-    .from('api_keys')
-    .select('id, nombre, prefijo, scopes, perfil, ultimo_uso_at, revocada_at, created_at')
-    .eq('tenant_id', ctx.tenantId)
-    .order('created_at', { ascending: false });
-  throwIf(error);
-  return c.json({ items: data ?? [], perfiles: PERFILES });
+  return c.json({ items: await listApiKeys(ctx), perfiles: PERFILES });
 });
 
 /** La key completa se devuelve UNA sola vez. Solo se guarda el hash. */
@@ -257,49 +237,32 @@ admin.post(
     // Una key de perfil cliente lee solo los proyectos de UN cliente (S11): el cliente es obligatorio y debe ser del tenant.
     if (body.perfil === 'cliente') {
       if (!body.cliente_id) return c.json({ error: 'Una key de perfil cliente necesita el cliente al que pertenece' }, 400);
-      const { data: cl } = await serviceClient()
-        .from('clientes')
-        .select('id')
-        .eq('id', body.cliente_id)
-        .eq('tenant_id', ctx.tenantId)
-        .maybeSingle();
-      if (!cl) return c.json({ error: 'Cliente no encontrado' }, 404);
+      if (!(await clienteEsDelTenant(ctx, body.cliente_id))) return c.json({ error: 'Cliente no encontrado' }, 404);
     }
     const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : [...PERFILES[body.perfil]!];
     const key = `bk_live_${randomBytes(24).toString('base64url')}`;
-    const { data, error } = await serviceClient()
-      .from('api_keys')
-      .insert({
-        tenant_id: ctx.tenantId,
-        nombre: body.nombre,
-        prefijo: key.slice(0, 12),
-        key_hash: hashApiKey(key),
-        scopes,
-        perfil: body.perfil,
-        cliente_id: body.perfil === 'cliente' ? body.cliente_id : null,
-        creado_por: ctx.usuarioId,
-      })
-      .select('id, nombre, prefijo, scopes, perfil, created_at')
-      .single();
-    throwIf(error);
+    const data = await crearApiKey(ctx, {
+      nombre: body.nombre,
+      prefijo: key.slice(0, 12),
+      key_hash: hashApiKey(key),
+      scopes,
+      perfil: body.perfil,
+      cliente_id: body.perfil === 'cliente' ? body.cliente_id : null,
+      creado_por: ctx.usuarioId,
+    });
     await audit(ctx, {
       accion: 'crear_api_key',
       entidad: 'api_key',
-      entidad_id: (data as { id: string }).id,
+      entidad_id: data.id,
       detalle: { nombre: body.nombre, scopes },
     });
-    return c.json({ ...(data as object), key }, 201);
+    return c.json({ ...data, key }, 201);
   },
 );
 
 admin.post('/api-keys/:id/revocar', async (c) => {
   const ctx = ctxOf(c);
-  const { error } = await serviceClient()
-    .from('api_keys')
-    .update({ revocada_at: new Date().toISOString() })
-    .eq('tenant_id', ctx.tenantId)
-    .eq('id', c.req.param('id'));
-  throwIf(error);
+  await revocarApiKey(ctx, c.req.param('id'));
   await audit(ctx, { accion: 'revocar_api_key', entidad: 'api_key', entidad_id: c.req.param('id') });
   return c.body(null, 204);
 });
@@ -309,32 +272,7 @@ admin.get('/audit', async (c) => {
   const ctx = ctxOf(c);
   const q = c.req.query();
   const limit = Math.min(Number(q.limit ?? 200) || 200, 1000);
-  // Filtros como una cadena PostgREST (evita genéricos profundos del builder).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const aplicar = (qb: any): any => {
-    let x = qb.eq('tenant_id', ctx.tenantId);
-    if (q.usuario) x = x.eq('usuario_id', q.usuario);
-    if (q.origen) x = x.eq('origen', q.origen);
-    if (q.accion) x = x.ilike('accion', `%${q.accion}%`);
-    if (q.entidad) x = x.ilike('entidad', `%${q.entidad}%`);
-    if (q.desde) x = x.gte('created_at', inicioDiaLocal(q.desde));
-    if (q.hasta) x = x.lte('created_at', finDiaLocal(q.hasta));
-    return x;
-  };
-  const db = serviceClient();
-  const [lista, total, errores] = await Promise.all([
-    aplicar(db.from('audit_log').select('*')).order('created_at', { ascending: false }).limit(limit),
-    aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })),
-    aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })).or(
-      'accion.ilike.%rechaz%,accion.ilike.%fall%,accion.ilike.%error%,accion.ilike.%invalid%,detalle->>error.not.is.null',
-    ),
-  ]);
-  throwIf(lista.error as never);
-  return c.json({
-    items: (lista.data as unknown[]) ?? [],
-    total: (total.count as number | null) ?? 0,
-    con_error: (errores.count as number | null) ?? 0,
-  });
+  return c.json(await buscarAuditoria(ctx, q, limit));
 });
 
 // ---------------- salud del sistema
@@ -354,12 +292,7 @@ admin.post(
     const b = c.req.valid('json');
     if (id === ctx.usuarioId) return c.json({ error: 'No puedes quitarte el acceso a ti mismo' }, 422);
     const db = serviceClient();
-    const { data: u } = await db
-      .from('usuarios')
-      .select('id, nombre, email, activo')
-      .eq('tenant_id', ctx.tenantId)
-      .eq('id', id)
-      .maybeSingle();
+    const u = await usuarioDelTenant(ctx, id);
     if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
     // 1) En una transacción (B8): credenciales primero, luego usuario, tareas y recurrencias. Si falla, nada cambió
     //    y el error llega a la pantalla (antes los pasos sueltos tragaban errores y respondían ok).
@@ -380,7 +313,7 @@ admin.post(
       entidad: 'usuario',
       entidad_id: id,
       detalle: {
-        email: (u as { email: string }).email,
+        email: u.email,
         reasignar_a: b.reasignar_a ?? null,
         ...r,
         auth,
@@ -396,16 +329,15 @@ admin.post('/usuarios/:id/restaurar-acceso', async (c) => {
   const ctx = ctxOf(c);
   const id = c.req.param('id');
   const db = serviceClient();
-  const { data: u } = await db.from('usuarios').select('id, nombre, email').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
+  const u = await usuarioDelTenant(ctx, id);
   if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
-  const { error } = await db.from('usuarios').update({ activo: true }).eq('id', id);
-  throwIf(error);
+  await reactivarUsuario(ctx, id);
   try {
     await db.auth.admin.updateUserById(id, { ban_duration: 'none' });
   } catch {
     /* si no existe en auth, la invitación lo crea */
   }
-  const envio = await enviarInvitacion((u as { email: string }).email, (u as { nombre: string }).nombre).catch((e: Error) => ({
+  const envio = await enviarInvitacion(u.email, u.nombre).catch((e: Error) => ({
     enviado: false,
     error: e.message,
   }));
@@ -414,7 +346,7 @@ admin.post('/usuarios/:id/restaurar-acceso', async (c) => {
     accion: 'restaurar_acceso',
     entidad: 'usuario',
     entidad_id: id,
-    detalle: { email: (u as { email: string }).email, envio: sinEnlace },
+    detalle: { email: u.email, envio: sinEnlace },
   });
   return c.json({ ok: true, envio });
 });
