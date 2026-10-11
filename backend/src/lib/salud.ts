@@ -6,6 +6,9 @@ import { env, frontendOrigins } from '../config/env';
 import { serviceClient } from './db/client';
 import { getStatus } from './basecamp/oauth';
 import { BasecampClient } from './basecamp/client';
+import { JOBS } from './jobs';
+import { log } from './logger';
+import { ultimasCorridas } from './db/cron_runs';
 
 export type EstadoServicio = 'ok' | 'degradado' | 'caido' | 'no_configurado';
 export interface Servicio {
@@ -44,7 +47,33 @@ const esperar = async (res: Response, ok: (s: number) => boolean = (s) => s < 50
   if (!ok(res.status)) throw new Error(`HTTP ${res.status}`);
 };
 
-export async function verificarSalud(tenantId: string): Promise<{ verificado_at: string; todo_ok: boolean; servicios: Servicio[] }> {
+export interface EstadoJob {
+  nombre: string;
+  descripcion: string;
+  ultima_at: string | null;
+  /** al_dia · con_errores (la última corrida terminó con error) · sin_correr (nunca o demasiado atrasado) · sin_registro */
+  estado: 'al_dia' | 'con_errores' | 'sin_correr' | 'sin_registro';
+}
+
+/** Última corrida de cada job programado (cron_runs). El vigía avisa por correo; esto es para mirarlo en pantalla. */
+export async function estadoJobs(ahoraMs = Date.now()): Promise<EstadoJob[]> {
+  const ultimas = await ultimasCorridas();
+  return JOBS.filter((j) => j.registrar !== false).map((j) => {
+    const u = ultimas.get(j.nombre);
+    if (!u) return { nombre: j.nombre, descripcion: j.descripcion, ultima_at: null, estado: 'sin_registro' as const };
+    const atrasado = j.intervaloMin !== undefined && ahoraMs - Date.parse(u.inicio_at) > Math.max(3 * j.intervaloMin, 90) * 60_000;
+    return {
+      nombre: j.nombre,
+      descripcion: j.descripcion,
+      ultima_at: u.inicio_at,
+      estado: atrasado ? ('sin_correr' as const) : u.ok === false ? ('con_errores' as const) : ('al_dia' as const),
+    };
+  });
+}
+
+export async function verificarSalud(
+  tenantId: string,
+): Promise<{ verificado_at: string; todo_ok: boolean; servicios: Servicio[]; jobs: EstadoJob[] }> {
   const e = env();
   const servicios = await Promise.all([
     medir('railway', 'Railway (API BackIO)', async () => `Node ${process.version} · ${Math.round(process.uptime() / 60)} min activo`),
@@ -92,9 +121,14 @@ export async function verificarSalud(tenantId: string): Promise<{ verificado_at:
       return e.PROMETIO_WEBHOOK_SECRET ? 'webhook configurado' : 'sin secreto de webhook';
     }),
   ]);
+  const jobs = await estadoJobs().catch((err) => {
+    log.error('[salud] estado de jobs', err);
+    return [];
+  });
   return {
     verificado_at: new Date().toISOString(),
     todo_ok: servicios.every((s) => s.estado === 'ok' || s.estado === 'no_configurado'),
     servicios,
+    jobs,
   };
 }

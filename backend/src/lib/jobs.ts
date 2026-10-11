@@ -22,6 +22,7 @@ import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
 import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
+import { vigilar } from './vigia';
 import { log } from './logger';
 
 /** Instante en hora de Guayaquil. dia: 0 domingo … 6 sábado. clave: YYYY-MM-DD. */
@@ -33,18 +34,19 @@ export interface Momento {
   ms: number;
 }
 
+const formatoMomento = new Intl.DateTimeFormat('en-US', {
+  timeZone: ZONA,
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 export function momentoLocal(d: Date = new Date()): Momento {
-  const f = new Intl.DateTimeFormat('en-US', {
-    timeZone: ZONA,
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const p = Object.fromEntries(f.formatToParts(d).map((x) => [x.type, x.value]));
+  const p = Object.fromEntries(formatoMomento.formatToParts(d).map((x) => [x.type, x.value]));
   const dias: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return {
     dia: dias[p.weekday ?? 'Mon'] ?? 1,
@@ -118,6 +120,8 @@ export interface Job {
   nombre: string;
   descripcion: string;
   ventana: Ventana;
+  /** Solo en los jobs de intervalo: cada cuántos minutos corre (lo usa el vigía para saber si se atrasó). */
+  intervaloMin?: number;
   /** false: corre en cada tick sin registro en cron_runs (p. ej. reintento de notificaciones, idempotente). */
   registrar?: boolean;
   /** Si devuelve false, el job no aplica ahora (p. ej. sin clave de IA) y no consume la ventana. */
@@ -137,6 +141,7 @@ export const JOBS: Job[] = [
     nombre: 'reconcile',
     descripcion: 'Reconciliación con Basecamp, cada 30 min',
     ventana: cada(30),
+    intervaloMin: 30,
     ejecutar: () => porTenant((ctx) => reconcileTenant(ctx)),
   },
   {
@@ -145,6 +150,7 @@ export const JOBS: Job[] = [
     nombre: 'estructura',
     descripcion: 'Estructura de Basecamp, cada 15 min',
     ventana: cada(15),
+    intervaloMin: 15,
     ejecutar: () =>
       porTenant(async (ctx) => {
         const out: Record<string, unknown> = {};
@@ -157,6 +163,7 @@ export const JOBS: Job[] = [
     nombre: 'horas',
     descripcion: 'Horas de Basecamp, cada 6 h',
     ventana: cada(360),
+    intervaloMin: 360,
     ejecutar: () => porTenant((ctx) => sincronizarHoras(ctx)),
   },
   {
@@ -247,6 +254,14 @@ export const JOBS: Job[] = [
         );
         return s.length;
       }),
+  },
+  {
+    // Avisa (Sentry + correo a admin, una vez por problema) si un job de hora fija no corrió en su ventana o si uno
+    // de intervalo lleva demasiado sin correr. Ver lib/vigia.ts.
+    nombre: 'vigia',
+    descripcion: 'Revisa que los demás jobs hayan corrido, cada hora',
+    ventana: cada(60),
+    ejecutar: (m) => vigilar(JOBS, m.ms),
   },
 ];
 

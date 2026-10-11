@@ -49,3 +49,43 @@ export async function clientesConBasecamp(tenantId: string): Promise<{ id: strin
   throwIf(error);
   return (data ?? []) as { id: string; nombre: string }[];
 }
+
+/** De las ventanas pedidas, cuáles tienen registro en cron_runs (es decir, el job arrancó). */
+export async function ventanasRegistradas(pares: { job: string; ventana: string }[]): Promise<Set<string>> {
+  if (!pares.length) return new Set();
+  const { data, error } = await serviceClient()
+    .from('cron_runs')
+    .select('job, ventana')
+    .in('job', [...new Set(pares.map((p) => p.job))])
+    .in('ventana', [...new Set(pares.map((p) => p.ventana))]);
+  throwIf(error);
+  return new Set((data ?? []).map((r) => `${r.job}|${r.ventana}`));
+}
+
+export interface UltimaCorrida {
+  job: string;
+  inicio_at: string;
+  fin_at: string | null;
+  ok: boolean | null;
+}
+
+/** Última corrida registrada de cada job (los registros del vigía, «vigia:<job>», quedan fuera). */
+export async function ultimasCorridas(): Promise<Map<string, UltimaCorrida>> {
+  const { data, error } = await serviceClient()
+    .from('cron_runs')
+    .select('job, inicio_at, fin_at, ok')
+    .not('job', 'like', 'vigia:%')
+    .order('inicio_at', { ascending: false })
+    .limit(1000);
+  throwIf(error);
+  const out = new Map<string, UltimaCorrida>();
+  for (const r of data ?? []) if (!out.has(r.job)) out.set(r.job, r);
+  return out;
+}
+
+/** Inicio del registro: la corrida más antigua en cron_runs (antes de eso no hay con qué comparar). */
+export async function inicioDelRegistro(): Promise<number | null> {
+  const { data, error } = await serviceClient().from('cron_runs').select('inicio_at').order('inicio_at').limit(1).maybeSingle();
+  throwIf(error);
+  return data ? Date.parse(data.inicio_at) : null;
+}

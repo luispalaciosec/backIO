@@ -2,10 +2,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { ZONA } from '@backio/shared';
 
 type Estado = 'ok' | 'degradado' | 'caido' | 'no_configurado';
 interface Servicio { id: string; nombre: string; estado: Estado; latencia_ms: number | null; detalle: string | null }
-interface Salud { verificado_at: string; todo_ok: boolean; servicios: Servicio[] }
+interface Job { nombre: string; descripcion: string; ultima_at: string | null; estado: 'al_dia' | 'con_errores' | 'sin_correr' | 'sin_registro' }
+interface Salud { verificado_at: string; todo_ok: boolean; servicios: Servicio[]; jobs?: Job[] }
+const ESTADO_JOB: Record<Job['estado'], { label: string; punto: string }> = {
+  al_dia: { label: 'Al día', punto: 'bg-green-500' }, con_errores: { label: 'Última corrida con errores', punto: 'bg-amber-500' }, sin_correr: { label: 'Atrasado', punto: 'bg-red-500' }, sin_registro: { label: 'Aún no corre', punto: 'bg-gray-400' },
+};
 
 const ICONO: Record<string, string> = { railway: '🚂', vercel: '▲', supabase_db: '🗄️', supabase_auth: '🔐', basecamp: '🏕️', resend: '✉️', anthropic: '✨', prometio: '💼' };
 const ESTADO: Record<Estado, { label: string; punto: string }> = {
@@ -50,6 +55,24 @@ export default function ServiciosPage() {
         ))}
         {!d && !error && <p className="text-sm text-gray-400">Verificando servicios…</p>}
       </div>
+      {d?.jobs && d.jobs.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Tareas programadas</h2>
+          <p className="text-sm text-gray-500">Lo que BackIO corre solo. Si una no corre a su hora, llega un correo a las personas admin.</p>
+          <div className="card divide-y">
+            {d.jobs.map((j) => (
+              <div key={j.nombre} className="px-4 py-2 flex items-center justify-between gap-4 text-sm">
+                <span className="min-w-0">{j.descripcion}</span>
+                <span className="shrink-0 text-gray-600 flex items-center gap-2">
+                  <span className={`inline-block h-2 w-2 rounded-full ${ESTADO_JOB[j.estado].punto}`} />
+                  {ESTADO_JOB[j.estado].label}
+                  {j.ultima_at && <span className="text-xs text-gray-400">· {new Date(j.ultima_at).toLocaleString('es-EC', { timeZone: ZONA, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -157,3 +157,9 @@ Las 9 olas del plan están hechas y desplegadas. Tests: backend 198, frontend 14
 backend, 9 en shared y ninguno en el frontend). CI en cada push: `pnpm audit --prod --audit-level=high`, typecheck, lint, tests y build.
 Pendientes que no son código: ver «Deuda técnica» en `docs/17-arquitectura-tecnica.md` §8 (staging, aviso si un job no
 corre, tests de integración contra el sandbox de Basecamp, 115 consultas fuera de `lib/db` en `lib`).
+
+## Después del cierre (11/10/2026)
+
+| Tema | Estado | Archivos | Verificación |
+|---|---|---|---|
+| Aviso si un job no corre (deuda §8.2) | hecho | `backend/src/lib/vigia.ts` (job `vigia`, cada hora), `lib/db/cron_runs.ts`, `lib/salud.ts` (`estadoJobs`), Admin → Servicios («Tareas programadas») | Un job de hora fija cuya ventana cerró sin registro, o uno de intervalo sin corridas en tres intervalos, genera un error en Sentry y un correo a admin, una sola vez por problema. Ignora ventanas anteriores al inicio del registro (evita falsas alarmas al desplegar). Revisión en seco contra producción: 0 problemas. `vigia.test.ts` (5) |
