@@ -5,7 +5,7 @@
  */
 import type { DbCtx } from './db/client';
 import { serviceClient, throwIf } from './db/client';
-import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO } from '@backio/shared';
+import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, finDiaLocal, inicioDiaLocal } from '@backio/shared';
 
 export interface EventoActividad {
   id: string; fecha: string; usuario_id: string; nombre: string; avatar_url: string | null; rol: string;
@@ -74,7 +74,7 @@ function describir(accion: string, d: Record<string, unknown>): string {
 
 export async function actividadDelDia(ctx: DbCtx, fecha: string, usuarioId?: string | null): Promise<{ fecha: string; eventos: EventoActividad[]; por_persona: { usuario_id: string; nombre: string; avatar_url: string | null; acciones: number; primera: string; ultima: string }[] }> {
   const db = serviceClient();
-  const desde = `${fecha}T00:00:00-05:00`; const hasta = `${fecha}T23:59:59-05:00`;
+  const desde = inicioDiaLocal(fecha); const hasta = finDiaLocal(fecha);
   let q = db.from('audit_log').select('id, usuario_id, origen, accion, entidad, entidad_id, detalle, created_at').eq('tenant_id', ctx.tenantId).not('usuario_id', 'is', null).gte('created_at', desde).lte('created_at', hasta).order('created_at', { ascending: false }).limit(1000);
   if (usuarioId) q = q.eq('usuario_id', usuarioId);
   const { data: au, error } = await q; throwIf(error);

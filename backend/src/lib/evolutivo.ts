@@ -4,12 +4,12 @@
  * la evolución del mes. Lo anterior al despliegue se reconstruye desde la auditoría (origen «reconstruido»).
  */
 import type { Mesa } from '@backio/shared';
-import { MOTIVOS_REPROGRAMACION } from '@backio/shared';
+import { MOTIVOS_REPROGRAMACION, diaLocal, hoyLocal, inicioDiaLocal, porcentaje, sumarDias } from '@backio/shared';
 import { type DbCtx, serviceClient, throwIf } from './db/client';
 import { alcanceMesa, listMesas } from './db/mesas';
 import { listUsuarios } from './db/usuarios';
 import { ensureSemana } from './db/semanas';
-import { fechaLocal, sumarDias } from './rituals/daily';
+import { paginar } from './db/paginar';
 
 // ---------------------------------------------------------------- tipos
 export interface TareaEvo {
@@ -37,9 +37,8 @@ export interface MetricasSemana {
 }
 
 // ---------------------------------------------------------------- utilidades de fecha (Guayaquil)
-export const inicioDia = (dia: string) => new Date(`${dia}T00:00:00-05:00`).toISOString();
+export const inicioDia = inicioDiaLocal;
 export const finDia = (dia: string) => inicioDia(sumarDias(dia, 1));
-const diaGye = (iso: string) => new Date(new Date(iso).getTime() - 5 * 3600_000).toISOString().slice(0, 10);
 const enRango = (iso: string | null | undefined, desde: string, hasta: string) => !!iso && iso >= desde && iso < hasta;
 export const esHabil = (dia: string) => { const d = new Date(`${dia}T12:00:00Z`).getUTCDay(); return d !== 0 && d !== 6; };
 export function diasHabiles(desde: string, hasta: string): string[] {
@@ -47,7 +46,6 @@ export function diasHabiles(desde: string, hasta: string): string[] {
   for (let d = desde; d <= hasta; d = sumarDias(d, 1)) if (esHabil(d)) out.push(d);
   return out;
 }
-const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : null);
 
 // ---------------------------------------------------------------- cálculo puro
 /**
@@ -91,7 +89,7 @@ export function metricasDia(p: {
   for (const t of fuera) for (const o of t.owner_agencia) pp(o).fuera += 1;
   return {
     metricas: {
-      planificadas: planificadas.length, cerradas_planificadas: cerradasPlan.length, cumplimiento_pct: pct(cerradasPlan.length, planificadas.length),
+      planificadas: planificadas.length, cerradas_planificadas: cerradasPlan.length, cumplimiento_pct: porcentaje(cerradasPlan.length, planificadas.length),
       cerradas_fuera: fuera.length, cerradas_total: cerradasHoy.length,
       nuevas_hoy: nuevas.length, nuevas_no_planificadas: nuevas.filter((t) => t.planificacion === 'no_planificado').length, nuevas_urgentes: nuevas.filter((t) => t.planificacion === 'urgente').length,
       reprocesos_hoy: p.reprocesos.filter((r) => ids.has(r.requerimiento_id) && enRango(r.abierto_at, desde, hasta)).length,
@@ -112,7 +110,7 @@ export function metricasSemana(p: {
   const ids = new Set(p.tareas.map((t) => t.id));
   // Completadas sin fecha de cierre (histórico importado) no se pueden medir: quedan fuera.
   const comprometidas = p.tareas.filter((t) => t.estado_operativo !== 'cancelado' && !(t.estado_operativo === 'completado' && !t.completado_at) && t.fecha_entrega_original && t.fecha_entrega_original >= p.inicio && t.fecha_entrega_original <= p.fin);
-  const hechaAntes = (t: TareaEvo, fecha: string | null) => !!t.completado_at && !!fecha && diaGye(t.completado_at) <= fecha;
+  const hechaAntes = (t: TareaEvo, fecha: string | null) => !!t.completado_at && !!fecha && diaLocal(t.completado_at) <= fecha;
   const aOrig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega_original)).length;
   const aVig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega)).length;
   const porId = new Map(p.tareas.map((t) => [t.id, t]));
@@ -122,16 +120,16 @@ export function metricasSemana(p: {
   const atrib = (m: string | null) => MOTIVOS_REPROGRAMACION.find((x) => x.valor === m)?.atribuible;
   return {
     comprometidas: comprometidas.length, a_tiempo_original: aOrig, a_tiempo_vigente: aVig,
-    pct_a_tiempo_original: pct(aOrig, comprometidas.length), pct_a_tiempo_vigente: pct(aVig, comprometidas.length),
+    pct_a_tiempo_original: porcentaje(aOrig, comprometidas.length), pct_a_tiempo_vigente: porcentaje(aVig, comprometidas.length),
     arrastre: comprometidas.filter((t) => !(t.completado_at && t.completado_at < hasta)).length,
     cerradas: p.tareas.filter((t) => enRango(t.completado_at, desde, hasta)).length,
-    plan_tareas: plan ? plan.length : null, plan_cumplidas: planOk, pct_plan: plan && plan.length ? pct(planOk ?? 0, plan.length) : null,
+    plan_tareas: plan ? plan.length : null, plan_cumplidas: planOk, pct_plan: plan && plan.length ? porcentaje(planOk ?? 0, plan.length) : null,
     reprocesos: p.reprocesos.filter((r) => ids.has(r.requerimiento_id) && enRango(r.abierto_at, desde, hasta)).length,
     reprogramaciones: reprogs.length, reprogramaciones_equipo: reprogs.filter((r) => atrib(r.motivo) === 'equipo').length, reprogramaciones_cliente: reprogs.filter((r) => atrib(r.motivo) === 'cliente').length,
     senales_criticas: p.senales.filter((s) => s.severidad === 'critica').length, senales_altas: p.senales.filter((s) => s.severidad === 'alta').length,
     senales_medias: p.senales.filter((s) => s.severidad === 'media').length, senales_atendidas: p.senales.filter((s) => s.atendida).length,
     acuerdos: p.acuerdos.length, acuerdos_cumplidos: p.acuerdos.filter((a) => a.estado === 'cumplido').length,
-    acuerdos_a_tiempo: p.acuerdos.filter((a) => a.estado === 'cumplido' && a.cerrado_at && diaGye(a.cerrado_at) <= a.fecha_compromiso).length,
+    acuerdos_a_tiempo: p.acuerdos.filter((a) => a.estado === 'cumplido' && a.cerrado_at && diaLocal(a.cerrado_at) <= a.fecha_compromiso).length,
     dailies_apertura: p.dailies.apertura, dailies_cierre: p.dailies.cierre, dias_habiles: diasHabiles(p.inicio, p.fin).length,
   };
 }
@@ -143,12 +141,6 @@ interface DatosMesa {
   eventos: EventoSeleccion[]; bloqueos: { requerimiento_id: string; at: string }[];
   publicaciones: { tipo: 'apertura' | 'cierre'; at: string; message_id: number | null }[];
   nombres: Map<string, string>;
-}
-
-async function paginar<T>(q: (a: number, b: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) { const { data, error } = await q(from, from + 999); throwIf(error as never); const f = (data ?? []) as T[]; out.push(...f); if (f.length < 1000) break; }
-  return out;
 }
 
 export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Promise<DatosMesa> {
@@ -200,7 +192,7 @@ async function guardarDia(ctx: DbCtx, mesaId: string, dia: string, f: ReturnType
 }
 
 /** Foto del día (cierre publicado o cron de las 19:30). */
-export async function fotoDaily(ctx: DbCtx, mesa: Mesa, dia = fechaLocal(), origen: 'cierre' | 'cron' = 'cron'): Promise<MetricasDia> {
+export async function fotoDaily(ctx: DbCtx, mesa: Mesa, dia = hoyLocal(), origen: 'cierre' | 'cron' = 'cron'): Promise<MetricasDia> {
   const d = await cargarMesa(ctx, mesa, inicioDia(sumarDias(dia, -1)));
   const f = fotoDeDia(d, dia, false);
   await guardarDia(ctx, mesa.id, dia, f, origen);
@@ -228,7 +220,7 @@ export async function calcularSemana(ctx: DbCtx, d: DatosMesa, inicio: string, f
   const senales = ((sen ?? []) as { severidad: string; atendida: boolean; entidad_tipo: string; entidad_id: string }[]).filter((s) => (s.entidad_tipo === 'requerimiento' && ids.has(s.entidad_id)) || (s.entidad_tipo === 'cliente' && clientes.has(s.entidad_id)));
   const planIds = acta ? (((acta as { contenido: { prioridades?: { id: string }[] } }).contenido?.prioridades ?? []).map((x) => x.id)) : null;
   const pubs = d.publicaciones.filter((x) => enRango(x.at, inicioDia(inicio), finDia(fin)));
-  const diasCon = (tipo: 'apertura' | 'cierre') => new Set(pubs.filter((x) => x.tipo === tipo).map((x) => diaGye(x.at))).size;
+  const diasCon = (tipo: 'apertura' | 'cierre') => new Set(pubs.filter((x) => x.tipo === tipo).map((x) => diaLocal(x.at))).size;
   return {
     semana_id: semana.id,
     metricas: metricasSemana({ inicio, fin, tareas: d.tareas, reprocesos: d.reprocesos, reprogramaciones: d.reprogramaciones, senales, acuerdos: (acu ?? []) as { estado: string; fecha_compromiso: string; cerrado_at: string | null }[], planIds, dailies: { apertura: diasCon('apertura'), cierre: diasCon('cierre') } }),
@@ -246,7 +238,7 @@ async function guardarSemana(ctx: DbCtx, mesaId: string, inicio: string, fin: st
 }
 
 /** Foto de la semana que cierra (domingo) para cada mesa activa. */
-export async function fotoWeekly(ctx: DbCtx, dia = fechaLocal()): Promise<number> {
+export async function fotoWeekly(ctx: DbCtx, dia = hoyLocal()): Promise<number> {
   const { inicio, fin } = semanaDe(dia);
   let n = 0;
   for (const mesa of (await listMesas(ctx)).filter((m) => m.activa)) {
@@ -259,7 +251,7 @@ export async function fotoWeekly(ctx: DbCtx, dia = fechaLocal()): Promise<number
 
 /** Rehace días hábiles y semanas desde `desde` hasta ayer. Idempotente; no pisa fotos tomadas en vivo. */
 export async function reconstruirDesde(ctx: DbCtx, desde: string): Promise<{ dias: number; semanas: number }> {
-  const ayer = sumarDias(fechaLocal(), -1);
+  const ayer = sumarDias(hoyLocal(), -1);
   let dias = 0, semanas = 0;
   for (const mesa of (await listMesas(ctx)).filter((m) => m.activa)) {
     const d = await cargarMesa(ctx, mesa, inicioDia(sumarDias(desde, -7)));
@@ -284,7 +276,7 @@ export function resumir(dias: { metricas: MetricasDia; publicado: boolean }[]): 
   const s = (k: keyof MetricasDia) => dias.reduce((acc, d) => acc + (Number(d.metricas[k]) || 0), 0);
   const plan = s('planificadas'), ok = s('cerradas_planificadas');
   return {
-    dias: dias.length, dias_con_cierre: dias.filter((d) => d.publicado).length, planificadas: plan, cerradas_planificadas: ok, cumplimiento_pct: pct(ok, plan),
+    dias: dias.length, dias_con_cierre: dias.filter((d) => d.publicado).length, planificadas: plan, cerradas_planificadas: ok, cumplimiento_pct: porcentaje(ok, plan),
     cerradas_fuera: s('cerradas_fuera'), cerradas_total: s('cerradas_total'), fuera_de_plan: s('nuevas_no_planificadas') + s('nuevas_urgentes'),
     reprocesos: s('reprocesos_hoy'), reprogramaciones: s('reprogramaciones_24h'),
     vencidas_promedio: dias.length ? Math.round((s('vencidas_abiertas') / dias.length) * 10) / 10 : null,
@@ -305,7 +297,7 @@ export async function evolutivoMes(ctx: DbCtx, mesa: Mesa, mes: string): Promise
   const dias = todos.filter((x) => x.fecha >= ini);
   const semanas = (ws ?? []) as EvolutivoMes['semanas'];
   // Hoy y la semana en curso: en vivo (aún no hay foto).
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   if (hoy >= ini && hoy <= finMes) {
     const d = await cargarMesa(ctx, mesa, inicioDia(sumarDias(semanaDe(hoy).inicio, -7)));
     if (esHabil(hoy) && !dias.some((x) => x.fecha === hoy)) { const f = fotoDeDia(d, hoy, false); dias.push({ fecha: hoy, metricas: f.metricas, por_persona: f.por_persona, origen: 'en_vivo', publicado: f.publicado, apertura_publicada: f.apertura_publicada, en_vivo: true }); }

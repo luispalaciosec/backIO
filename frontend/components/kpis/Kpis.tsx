@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { KpiTablero, KpiValor, KpiDefinicion, KpiDetalleTarea, Usuario, Atribuible } from '@backio/shared';
-import { AREA_LABEL, ATRIBUIBLE_LABEL, CALCULO_KPI_LABEL } from '@backio/shared';
+import { AREA_LABEL, ATRIBUIBLE_LABEL, CALCULO_KPI_LABEL, formatoFraccion } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { fecha, diaLocal, iniciales } from '@/lib/format';
 import { ComoSeCalcula } from './ComoSeCalcula';
@@ -12,7 +12,7 @@ import { hrefExterno } from '@/lib/url';
 
 type Kpi = KpiTablero['areas'][number]['kpis'][number];
 
-export const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v * 1000) / 10}%`);
+export const pct = formatoFraccion;
 const COLOR: Record<KpiValor['estado'], string> = { cumple: 'bg-emerald-600 text-white', no_cumple: 'bg-red-600 text-white', sin_dato: 'bg-gray-100 text-gray-400' };
 const COLOR_SUAVE: Record<KpiValor['estado'], string> = { cumple: 'bg-emerald-50 text-emerald-800 border-emerald-200', no_cumple: 'bg-red-50 text-red-800 border-red-200', sin_dato: 'bg-gray-50 text-gray-400 border-gray-200' };
 const ETIQUETA: Record<KpiValor['estado'], string> = { cumple: 'Cumple', no_cumple: 'No cumple', sin_dato: 'Sin dato' };

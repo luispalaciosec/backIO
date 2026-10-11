@@ -5,6 +5,7 @@
  */
 import type { DbCtx } from './db/client';
 import { throwIf } from './db/client';
+import { diaLocal, lunesDe } from '@backio/shared';
 
 export interface CanalSerie { cliente_id: string; nombre: string; color: string }
 export interface InformeCanal {
@@ -23,7 +24,6 @@ const PALETA = ['#9BD24E', '#FF7F41', '#7E3FBF', '#1F77B4', '#F0B429', '#2CA58D'
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-function lunesDe(iso: string): string { const d = new Date(`${iso}T12:00:00Z`); const dow = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - dow); return d.toISOString().slice(0, 10); }
 function mesesEntre(desde: string, hasta: string): string[] { const out: string[] = []; let [y, m] = desde.slice(0, 7).split('-').map(Number); const fin = hasta.slice(0, 7); for (let i = 0; i < 36; i++) { const k = `${y}-${String(m).padStart(2, '0')}`; out.push(k); if (k >= fin) break; m! += 1; if (m! > 12) { m = 1; y! += 1; } } return out; }
 function semanasEntre(desde: string, hasta: string): string[] { const out: string[] = []; let d = lunesDe(desde); const fin = lunesDe(hasta); for (let i = 0; i < 120 && d <= fin; i++) { out.push(d); const n = new Date(`${d}T12:00:00Z`); n.setUTCDate(n.getUTCDate() + 7); d = n.toISOString().slice(0, 10); } return out; }
 
@@ -38,7 +38,7 @@ export async function informeCanal(ctx: DbCtx, o: { clienteIds: string[]; desde:
     const { data, error } = await ctx.db.from('requerimientos').select('cliente_id, piezas, estado_operativo, estado_aprobacion, prioridad, fecha_pedido, created_at, completado_at').eq('tenant_id', ctx.tenantId).in('cliente_id', o.clienteIds).is('deleted_at', null).neq('estado_operativo', 'cancelado').order('id').range(from, from + 999);
     throwIf(error); const r = (data ?? []) as R[]; filas.push(...r); if (r.length < 1000) break;
   }
-  const fechaGen = (r: R) => (r.fecha_pedido ?? r.created_at.slice(0, 10));
+  const fechaGen = (r: R) => (r.fecha_pedido ?? diaLocal(r.created_at));
   const enRango = filas.filter((r) => { const f = fechaGen(r); return f >= o.desde && f <= o.hasta; });
   const piezasDe = (rs: R[]) => rs.reduce((s, r) => s + (Number(r.piezas) || 0), 0);
   const por_mes = mesesEntre(o.desde, o.hasta).map((mes) => {
@@ -48,8 +48,8 @@ export async function informeCanal(ctx: DbCtx, o: { clienteIds: string[]; desde:
     const [y, m] = mes.split('-').map(Number);
     return { mes, etiqueta: `${MESES_L[m! - 1]} ${y}`, piezas: piezasDe(rs), tareas: rs.length, por_canal };
   });
-  const entregadas = filas.filter((r) => r.completado_at && r.completado_at.slice(0, 10) >= o.desde && r.completado_at.slice(0, 10) <= o.hasta);
-  const por_semana = semanasEntre(o.desde, o.hasta).map((sem) => { const rs = entregadas.filter((r) => lunesDe((r.completado_at as string).slice(0, 10)) === sem); const [, m, d] = sem.split('-').map(Number); return { semana: sem, etiqueta: `${d} ${MESES[m! - 1]}`, piezas: piezasDe(rs), tareas: rs.length }; });
+  const entregadas = filas.filter((r) => r.completado_at && diaLocal(r.completado_at) >= o.desde && diaLocal(r.completado_at) <= o.hasta);
+  const por_semana = semanasEntre(o.desde, o.hasta).map((sem) => { const rs = entregadas.filter((r) => lunesDe(diaLocal(r.completado_at as string)) === sem); const [, m, d] = sem.split('-').map(Number); return { semana: sem, etiqueta: `${d} ${MESES[m! - 1]}`, piezas: piezasDe(rs), tareas: rs.length }; });
   const completadas = enRango.filter((r) => r.estado_operativo === 'completado').length;
   const aprobadas = enRango.filter((r) => r.estado_aprobacion === 'aprobado').length;
   const pendCli = enRango.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length;

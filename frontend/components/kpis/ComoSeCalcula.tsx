@@ -4,6 +4,7 @@
  * Usa sus propios números: fichas que se llenan, la cuenta en palabras, cuánto le falta y cómo sumar.
  */
 import type { CalculoKpi, KpiDefinicion, KpiValor } from '@backio/shared';
+import { formatoFraccion } from '@backio/shared';
 
 interface Guia { emoji: string; ficha: string; regla: string; suma: string; sumaPl: string; resta: string; restaPl: string; tip: string }
 const GUIA: Record<CalculoKpi, Guia> = {
@@ -18,7 +19,7 @@ const GUIA: Record<CalculoKpi, Guia> = {
   manual: { emoji: '✍️', ficha: 'punto', regla: 'Este indicador no sale de las tareas: lo registra gestión cada periodo con su fuente (encuesta o dato financiero).', suma: 'obtenido', sumaPl: 'obtenidos', resta: 'posible', restaPl: 'posibles', tip: 'Pregunta a tu líder cómo va este indicador y qué lo mueve.' },
 };
 
-const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+const pct = formatoFraccion;
 
 function Fichas({ a, b, menosEsMejor }: { a: number; b: number; menosEsMejor: boolean }) {
   const escala = b > 60 ? Math.ceil(b / 60) : 1;

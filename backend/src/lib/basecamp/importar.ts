@@ -16,6 +16,7 @@ import { insertRequerimientos } from '../db/requerimientos';
 import { audit } from '../db/audit';
 import { generarPortalToken } from '../portal/token';
 import { BasecampClient } from './client';
+import { hoyLocal, sumarDias } from '@backio/shared';
 
 /** Prefijos en el título del to-do que fijan clase y proactividad al importarlo. null si no hay ninguno. */
 export function marcasDeTitulo(titulo: string | null | undefined): { clase?: 'propuesta' | 'incidencia'; proactiva?: true } | null {
@@ -99,8 +100,8 @@ export async function importarBasecampCliente(ctx: DbCtx, clienteId: string, opt
     let proyecto = proyectoPorLista.get(lista.id);
     if (!proyecto) {
       const fechas = todosPlanos.map((t) => t.due_on).filter((d): d is string => !!d).sort();
-      const hoy = new Date().toISOString().slice(0, 10);
-      const entrega = fechas[fechas.length - 1] ?? new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+      const hoy = hoyLocal();
+      const entrega = fechas[fechas.length - 1] ?? sumarDias(hoyLocal(), 30);
       const inicio = fechas[0] && fechas[0] < entrega ? fechas[0] : hoy < entrega ? hoy : entrega;
       const p = await insertProyecto(ctx, { cliente_id: clienteId, plantilla_id: null, nombre: lista.name, brief: { origen: 'importacion_basecamp' }, fecha_inicio: inicio, fecha_entrega: entrega, portal_token: generarPortalToken() });
       const grupoMap = Object.fromEntries(grupos.map((g) => [g.name, g.id]));

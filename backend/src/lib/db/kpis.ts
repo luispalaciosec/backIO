@@ -4,6 +4,7 @@
  */
 import type { KpiDefinicion, KpiMedicion, Reproceso, Reprogramacion } from '@backio/shared';
 import { type DbCtx, serviceClient, throwIf } from './client';
+import { paginar } from './paginar';
 
 export async function listDefiniciones(ctx: DbCtx, soloActivas = false): Promise<KpiDefinicion[]> {
   let q = serviceClient().from('kpi_definiciones').select('*').eq('tenant_id', ctx.tenantId).order('area').order('orden');
@@ -55,17 +56,6 @@ export interface ReqKpi {
 }
 const CAMPOS = 'id, titulo_interno, cliente_id, proyecto_id, owner_agencia, prioridad, estado_operativo, estado_aprobacion, fecha_entrega, fecha_entrega_original, completado_at, created_at, clase, proactiva, primera_respuesta_at, basecamp_url';
 
-async function paginar<T>(consulta: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await consulta(from, from + 999);
-    throwIf(error as never);
-    const filas = (data ?? []) as T[];
-    out.push(...filas);
-    if (filas.length < 1000) break;
-  }
-  return out;
-}
 
 export interface DatosKpi {
   completadas: ReqKpi[];

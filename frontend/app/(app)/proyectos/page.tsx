@@ -7,6 +7,7 @@ import { AvanceBar } from '@/components/ui/AvanceBar';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { Alert } from '@/components/ui/Alert';
 import { fecha, ESTADO_LABEL } from '@/lib/format';
+import { hoyLocal } from '@backio/shared';
 
 type Fila = Proyecto & { avance: number; cliente_nombre: string };
 type Orden = 'entrega' | 'inicio' | 'avance' | 'nombre' | 'cliente' | 'actualizado' | 'estado';
@@ -70,9 +71,9 @@ export default function ProyectosPage() {
   const resumen = useMemo(() => ({
     activos: items.filter((p) => p.estado !== 'completado' && p.estado !== 'cancelado').length,
     completados: items.filter((p) => p.estado === 'completado').length,
-    atrasados: items.filter((p) => p.estado !== 'completado' && p.estado !== 'cancelado' && p.fecha_entrega < new Date().toISOString().slice(0, 10)).length,
+    atrasados: items.filter((p) => p.estado !== 'completado' && p.estado !== 'cancelado' && p.fecha_entrega < hoyLocal()).length,
   }), [items]);
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocal();
 
   return (
     <div className="space-y-4">

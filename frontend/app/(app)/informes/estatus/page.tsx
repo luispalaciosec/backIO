@@ -6,11 +6,11 @@ import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { fecha, fechaCorta, diaLocal, APROBACION_LABEL } from '@/lib/format';
+import { hoyLocal, lunesDe, sumarDias } from '@backio/shared';
 
 type Fila = RequerimientoMetricas & { ultima_nota: Bitacora | null };
 
-const lunes = (d: Date) => { const x = new Date(d); const dow = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dow); return x.toISOString().slice(0, 10); };
-const sumar = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const sumar = sumarDias;
 
 /** Estatus por cliente para la reunión: tarea, responsable, estado y última observación. Reemplaza la hoja "Control de tareas". */
 export default function EstatusPage() { return <Suspense><Estatus /></Suspense>; }
@@ -18,8 +18,8 @@ export default function EstatusPage() { return <Suspense><Estatus /></Suspense>;
 function Estatus() {
   const sp = useSearchParams(); const router = useRouter();
   const cliente = sp.get('cliente') ?? '';
-  const desde = sp.get('desde') ?? lunes(new Date());
-  const hasta = sp.get('hasta') ?? sumar(lunes(new Date()), 4);
+  const desde = sp.get('desde') ?? lunesDe(hoyLocal());
+  const hasta = sp.get('hasta') ?? sumar(lunesDe(hoyLocal()), 4);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [items, setItems] = useState<Fila[]>([]);

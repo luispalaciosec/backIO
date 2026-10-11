@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { iniciales } from '@/lib/format';
+import { ZONA, hoyLocal, sumarDias } from '@backio/shared';
 
 interface Evento { id: string; fecha: string; usuario_id: string; nombre: string; avatar_url: string | null; rol: string; accion: string; texto: string; entidad: string; titulo: string | null; cliente: string | null; ruta: string | null; origen: string }
 interface Persona { usuario_id: string; nombre: string; avatar_url: string | null; acciones: number; primera: string; ultima: string }
 interface Resp { fecha: string; eventos: Evento[]; por_persona: Persona[] }
 
-const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-EC', { timeZone: 'America/Guayaquil', hour: '2-digit', minute: '2-digit' });
-const mover = (f: string, n: number) => { const d = new Date(`${f}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-EC', { timeZone: ZONA, hour: '2-digit', minute: '2-digit' });
+const mover = sumarDias;
 const ICONO: Record<string, string> = { crear: '＋', eliminar: '🗑', reprogramar: '↺', actualizar: '✎', reproceso: '⟲', reproceso_cerrado: '✓', crear_proyecto: '▦', publicar_acta: '📣', publicar_daily_apertura: '🟢', publicar_daily_cierre: '🔴', basecamp_importar: '⇄', adoptar_huerfano: '⚠', generar_plan_operativo: '📋', generar_acta_cierre: '✅' };
 
 function Avatar({ nombre, url, size = 36 }: { nombre: string; url: string | null; size?: number }) {
@@ -31,7 +31,7 @@ export default function DiaADiaPage() {
   const titulo = new Date(`${fecha}T12:00:00Z`).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   // Agrupar por hora para la línea de tiempo.
   const porHora = new Map<string, Evento[]>();
-  for (const e of d?.eventos ?? []) { const h = `${new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Guayaquil', hour: '2-digit', hour12: false }).format(new Date(e.fecha)).slice(0, 2)}:00`; porHora.set(h, [...(porHora.get(h) ?? []), e]); }
+  for (const e of d?.eventos ?? []) { const h = `${new Intl.DateTimeFormat('en-GB', { timeZone: ZONA, hour: '2-digit', hour12: false }).format(new Date(e.fecha)).slice(0, 2)}:00`; porHora.set(h, [...(porHora.get(h) ?? []), e]); }
 
   return (
     <div className="space-y-4 max-w-5xl">

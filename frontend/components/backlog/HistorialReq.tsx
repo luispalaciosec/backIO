@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { RequerimientoMetricas, HistorialRequerimiento, MotivoReproceso, MotivoReprogramacion } from '@backio/shared';
-import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, PASOS_RETORNO } from '@backio/shared';
+import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, PASOS_RETORNO, ZONA } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
 import { AREAS, AREA_LABEL, ATRIBUIBLE_LABEL, type Area, type Atribuible } from '@backio/shared';
@@ -68,7 +68,7 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
             <div className="text-xs text-gray-500 mt-1">Comprometida {fecha(r.fecha_entrega_original)}{r.fecha_entrega !== r.fecha_entrega_original ? <> · vigente <b>{fecha(r.fecha_entrega)}</b></> : null} · {r.veces_reprogramado} reprogramaciones · {r.veces_reproceso ?? 0} reprocesos</div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button type="button" className={`text-xs rounded border px-2 py-0.5 ${respondido ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-300 hover:bg-gray-50'}`} disabled={busy} title={respondido ? `Primera respuesta al cliente: ${new Date(respondido).toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}. Clic para deshacer.` : 'Marca la primera respuesta efectiva al cliente (SLA de Cuentas, KPI-CUE-03)'} onClick={async () => {
+            <button type="button" className={`text-xs rounded border px-2 py-0.5 ${respondido ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-300 hover:bg-gray-50'}`} disabled={busy} title={respondido ? `Primera respuesta al cliente: ${new Date(respondido).toLocaleString('es-EC', { timeZone: ZONA })}. Clic para deshacer.` : 'Marca la primera respuesta efectiva al cliente (SLA de Cuentas, KPI-CUE-03)'} onClick={async () => {
               setErr(null);
               try { const x = await api<{ primera_respuesta_at: string | null }>(`/requerimientos/${r.id}/respondido`, { method: 'POST', json: { deshacer: !!respondido } }); setRespondido(x.primera_respuesta_at); onCambio(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
             }}>{respondido ? '✓ Respondido' : 'Respondido'}</button>

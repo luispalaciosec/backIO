@@ -5,7 +5,7 @@
  *  - Lo guardado a mano (manual/ajustado) manda sobre lo calculado; lo calculado de meses cerrados se congela.
  */
 import type { Area, KpiDefinicion, KpiMedicion, KpiValor, KpiTablero, KpiDetalleTarea, Usuario } from '@backio/shared';
-import { AREAS, MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION } from '@backio/shared';
+import { AREAS, MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, diaLocal } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { listUsuarios } from './db/usuarios';
 import { listDefiniciones, listMediciones, cargarDatosKpi, guardarMedicion, type DatosKpi, type ReqKpi } from './db/kpis';
@@ -50,7 +50,6 @@ export function periodosAnteriores(periodo: string, n: number): string[] {
 export const periodoDeKpi = (def: Pick<KpiDefinicion, 'periodicidad'>, mes: string) => (def.periodicidad === 'trimestral' ? trimestreDe(mes) : mes);
 
 // ---------------------------------------------------------------- cálculo puro
-const diaGye = (iso: string) => new Date(new Date(iso).getTime() - 5 * 3600_000).toISOString().slice(0, 10);
 const enRango = (iso: string | null, r: { desde: string; hasta: string }) => !!iso && iso >= r.desde && iso < r.hasta;
 
 export interface ItemKpi { req: ReqKpi; a: boolean; miembros: string[] }
@@ -90,7 +89,7 @@ export function calcular(def: KpiDefinicion, d: DatosKpi, rango: { desde: string
   switch (def.calculo) {
     case 'a_tiempo':
       return { estimado: false, b_fijo: null, sin_dato: false, items: completadas.filter((r) => r.fecha_entrega_original || r.fecha_entrega).map((r) => {
-        const entregado = diaGye(r.completado_at!);
+        const entregado = diaLocal(r.completado_at!);
         const original = !!r.fecha_entrega_original && entregado <= r.fecha_entrega_original;
         // Excluye dependencias externas: si todas las reprogramaciones fueron del cliente o neutras, vale la fecha vigente.
         const reprogs = rgPorReq.get(r.id) ?? [];

@@ -11,7 +11,7 @@ import { briefDesdeTexto } from '../../lib/ia/brief';
 import { redactarRecordatorio } from '../../lib/ia/recordatorio';
 import { generarInformeMensual } from '../../lib/ia/informe';
 import { informeCanal, gruposInforme } from '../../lib/informe_canal';
-import { fechaLocal } from '../../lib/rituals/daily';
+import { hoyLocal } from '@backio/shared';
 
 /** Capa de IA: redacta, nunca publica. Todo lo que sale de aquí lo revisa y publica una persona. */
 export const ia = new Hono();
@@ -67,7 +67,7 @@ ia.get('/canal', requireScope('read:senales'), async (c) => {
   const ctx = ctxOf(c);
   const ids = (c.req.query('clientes') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
   if (!ids.length) return c.json({ error: 'Indica clientes=id1,id2' }, 400);
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   const desde = c.req.query('desde') ?? '2026-09-01';
   const hasta = c.req.query('hasta') ?? hoy;
   return c.json(await informeCanal(ctx, { clienteIds: ids, desde, hasta, titulo: c.req.query('titulo') || undefined }));

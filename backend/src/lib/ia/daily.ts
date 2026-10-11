@@ -8,9 +8,9 @@ import { listBacklog } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
 import { listClientes } from '../db/clientes';
 import { alcanceMesa } from '../db/mesas';
-import { fechaLocal, sumarDias } from '../rituals/daily';
 import { dailyItemTexto, type DailyItem, type DailyMensaje, type DailyKpis } from '../mcp/publish';
 import { generarTexto } from './index';
+import { hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
 
 /** El daily no se arma ni se publica con tareas sin responsable: nadie sabría a quién preguntar. */
 export class DailySinResponsable extends Error {
@@ -20,7 +20,7 @@ export class DailySinResponsable extends Error {
 export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura' | 'cierre', notas: string[], responsable: string): Promise<DailyMensaje> {
   const [alcance, usuarios, clientes] = await Promise.all([alcanceMesa(ctx, mesa.id), listUsuarios(ctx), listClientes(ctx, { incluirInactivos: true })]);
   const activos = await listBacklog(ctx, { solo_activos: true, mesa: alcance });
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   const mananaIso = sumarDias(hoy, 1);
   const hace24h = new Date(Date.now() - 86_400_000).toISOString();
   const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? 'sin asignar';
@@ -33,7 +33,7 @@ export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura'
   // Cierre: qué se completó hoy (completado_at desde las 00:00 de Guayaquil), separando lo que estaba en el daily de lo que no.
   let completadas: DailyItem[] = [], completadasFuera: DailyItem[] = [], kpis: DailyKpis | undefined;
   if (tipo === 'cierre') {
-    const inicioDia = new Date(`${hoy}T00:00:00-05:00`).toISOString();
+    const inicioDia = inicioDiaLocal(hoy);
     const hechas = (await listBacklog(ctx, { estado: 'completado', mesa: alcance })).filter((r) => r.completado_at && r.completado_at >= inicioDia);
     completadas = hechas.filter((r) => r.daily_fecha === hoy).map(linea);
     completadasFuera = hechas.filter((r) => r.daily_fecha !== hoy).map(linea);

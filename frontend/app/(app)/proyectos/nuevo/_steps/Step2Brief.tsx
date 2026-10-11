@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Cliente, BriefIA } from '@backio/shared';
-import { CANALES } from '@backio/shared';
+import { CANALES, hoyLocal } from '@backio/shared';
 import type { WizardState } from '../wizard';
 import { api, ApiError } from '@/lib/api';
 import { useIA } from '@/lib/useIA';
@@ -15,7 +15,7 @@ export function Step2Brief({ state: s, set, clientes, onSugerirPlantilla }: { st
   const b = s.brief;
   const setB = (p: Partial<WizardState['brief']>) => set({ brief: { ...b, ...p } });
   const toggleCanal = (c: string) => setB({ canales: b.canales.includes(c) ? b.canales.filter((x) => x !== c) : [...b.canales, c] });
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocal();
 
   return (
     <div className="card p-6 grid gap-5 md:grid-cols-2">

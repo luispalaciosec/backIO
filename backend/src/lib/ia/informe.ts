@@ -14,6 +14,7 @@ import { resumenHoras } from '../horas';
 import { listCumplimientoDesde } from '../db/historial';
 import { resumirCumplimiento, labelMotivoReproceso, labelMotivoReprogramacion } from '../cumplimiento';
 import { generarTexto } from './index';
+import { finDiaLocal, inicioDiaLocal } from '@backio/shared';
 
 export function rangoMes(mes: string): { desde: string; hasta: string; etiqueta: string } {
   const [y, m] = mes.split('-').map(Number);
@@ -38,17 +39,17 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
   if (!mesa) throw new Error('Mesa no encontrada');
   const { desde, hasta, etiqueta } = rangoMes(mes);
   const alcance = await alcanceMesa(ctx, mesaId);
-  const [clientes, usuarios, activos, horas] = await Promise.all([listClientes(ctx, { incluirInactivos: true }), listUsuarios(ctx), listBacklog(ctx, { solo_activos: true, mesa: alcance }), resumenHoras(ctx, `${desde}T00:00:00Z`, { clienteIds: alcance.clienteIds })]);
-  let q = ctx.db.from('v_requerimientos_metricas').select('*').eq('tenant_id', ctx.tenantId).eq('estado_operativo', 'completado').gte('completado_at', `${desde}T00:00:00Z`).lte('completado_at', `${hasta}T23:59:59Z`);
+  const [clientes, usuarios, activos, horas] = await Promise.all([listClientes(ctx, { incluirInactivos: true }), listUsuarios(ctx), listBacklog(ctx, { solo_activos: true, mesa: alcance }), resumenHoras(ctx, inicioDiaLocal(desde), { clienteIds: alcance.clienteIds })]);
+  let q = ctx.db.from('v_requerimientos_metricas').select('*').eq('tenant_id', ctx.tenantId).eq('estado_operativo', 'completado').gte('completado_at', inicioDiaLocal(desde)).lte('completado_at', finDiaLocal(hasta));
   const partes: string[] = [];
   if (alcance.clienteIds.length) partes.push(`cliente_id.in.(${alcance.clienteIds.join(',')})`);
   if (alcance.proyectoIds.length) partes.push(`proyecto_id.in.(${alcance.proyectoIds.join(',')})`);
   if (partes.length) q = q.or(partes.join(','));
   const { data: comp, error } = await q; throwIf(error);
   const completados = (comp ?? []) as RequerimientoMetricas[];
-  const cumpl = await listCumplimientoDesde(ctx, `${desde}T00:00:00Z`);
-  const reprogsMes = cumpl.reprogramaciones.filter((x) => x.created_at <= `${hasta}T23:59:59Z`);
-  const reprocsMes = cumpl.reprocesos.filter((x) => x.abierto_at <= `${hasta}T23:59:59Z`);
+  const cumpl = await listCumplimientoDesde(ctx, inicioDiaLocal(desde));
+  const reprogsMes = cumpl.reprogramaciones.filter((x) => x.created_at <= finDiaLocal(hasta));
+  const reprocsMes = cumpl.reprocesos.filter((x) => x.abierto_at <= finDiaLocal(hasta));
   const { data: sen } = await ctx.db.from('senales').select('tipo, severidad, semanas!inner(fecha_inicio)').eq('tenant_id', ctx.tenantId).gte('semanas.fecha_inicio', desde).lte('semanas.fecha_inicio', hasta);
   const senales = (sen ?? []) as { tipo: string; severidad: string }[];
   const { data: proys } = await ctx.db.from('proyectos').select('cliente_id, valor_cotizado').eq('tenant_id', ctx.tenantId).is('deleted_at', null).neq('estado', 'cerrado');

@@ -4,11 +4,10 @@
  * El texto pegado es del cliente hacia la agencia (no es texto de Basecamp). No se persiste.
  */
 import type { BriefIA } from '@backio/shared';
-import { CANALES } from '@backio/shared';
+import { CANALES, hoyLocal } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { listPlantillas } from '../db/plantillas';
 import { listTiposPieza } from '../db/tipos_pieza';
-import { fechaLocal } from '../rituals/daily';
 import { generarJson } from './index';
 
 const SYSTEM_BRIEF = `Eres la ejecutiva de cuentas senior de la agencia. Recibes el pedido de un cliente (correo, chat o notas)
@@ -36,7 +35,7 @@ y lo conviertes en el brief estructurado del proyecto. Devuelve JSON exacto:
 export async function briefDesdeTexto(ctx: DbCtx, texto: string, clienteId?: string | null): Promise<BriefIA> {
   const [plantillas, tipos] = await Promise.all([listPlantillas(ctx, { clienteId: clienteId ?? null }), listTiposPieza(ctx)]);
   const payload = {
-    hoy: fechaLocal(),
+    hoy: hoyLocal(),
     texto_del_cliente: texto.slice(0, 12_000),
     canales_validos: CANALES,
     plantillas: plantillas.map((p) => ({ id: p.id, nombre: p.nombre, pilar: p.pilar, familia: p.familia, recurrente: p.recurrente, descripcion: p.descripcion })),
@@ -51,7 +50,7 @@ export async function briefDesdeTexto(ctx: DbCtx, texto: string, clienteId?: str
     publico_objetivo: out.publico_objetivo ?? '',
     canales: (out.canales ?? []).filter((c) => CANALES.includes(c)),
     mandatorios_marca: out.mandatorios_marca ?? null,
-    fecha_entrega: out.fecha_entrega && out.fecha_entrega >= fechaLocal() ? out.fecha_entrega : null,
+    fecha_entrega: out.fecha_entrega && out.fecha_entrega >= hoyLocal() ? out.fecha_entrega : null,
     presupuesto_aprobado: typeof out.presupuesto_aprobado === 'number' ? out.presupuesto_aprobado : null,
     plantilla_sugerida_id: pl?.id ?? null,
     plantilla_sugerida_nombre: pl?.nombre ?? null,

@@ -5,11 +5,12 @@ import type { Cliente } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { Tarjeta, BarrasDobles, Lineas, Apiladas, Pastel, BarraEstado, type Serie } from '@/components/informe/Graficas';
+import { ZONA, hoyLocal } from '@backio/shared';
 
 interface Informe { titulo: string; desde: string; hasta: string; generado_at: string; canales: { cliente_id: string; nombre: string; color: string }[]; totales: { piezas: number; tareas: number; completadas: number; aprobadas: number; pendiente_cliente: number; pct_listo: number }; por_mes: { mes: string; etiqueta: string; piezas: number; tareas: number; por_canal: Record<string, { piezas: number; tareas: number }> }[]; por_semana: { semana: string; etiqueta: string; piezas: number; tareas: number }[]; estado: { completadas: number; en_proceso: number; otras: number }; aprobacion: { aprobado: number; pendiente_cliente: number; pendiente_interno: number; otros: number }; prioridad: { alta: number; media: number; baja: number }; sin_piezas: number }
 interface Grupo { id: string; nombre: string; cliente_ids: string[] }
 const PIEZAS: Serie = { id: 'p', nombre: 'Piezas', color: '#4f8df5' }; const RECUENTO: Serie = { id: 'r', nombre: 'Recuento', color: '#f5c518' };
-const hoy = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const hoy = hoyLocal;
 
 export default function InformeCanalPage() {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
@@ -27,7 +28,7 @@ export default function InformeCanalPage() {
   const series: Serie[] = d ? d.canales.map((c) => ({ id: c.cliente_id, nombre: c.nombre, color: c.color })) : [];
   const apil = (k: 'piezas' | 'tareas') => (d?.por_mes ?? []).map((m) => ({ etiqueta: m.etiqueta, total: m[k], valores: Object.fromEntries(Object.entries(m.por_canal).map(([id, v]) => [id, v[k]])) }));
   const totalCanal = (k: 'piezas' | 'tareas') => series.map((s) => ({ nombre: s.nombre, color: s.color, valor: (d?.por_mes ?? []).reduce((acc, m) => acc + (m.por_canal[s.id]?.[k] ?? 0), 0) }));
-  const fechaGen = d ? new Date(d.generado_at).toLocaleString('es-EC', { timeZone: 'America/Guayaquil', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+  const fechaGen = d ? new Date(d.generado_at).toLocaleString('es-EC', { timeZone: ZONA, day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
 
   return (
     <div className="space-y-4">

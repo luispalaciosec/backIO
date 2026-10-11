@@ -10,11 +10,10 @@ import { listProyectos } from './db/proyectos';
 import { listUsuarios } from './db/usuarios';
 import { listClientes } from './db/clientes';
 import { listMesas, alcanceMesa } from './db/mesas';
-import { fechaLocal } from './rituals/daily';
-import { lunesDe } from './builder/plan';
 import { listCumplimientoDesde } from './db/historial';
-import { resumirCumplimiento, labelMotivoReprogramacion, labelMotivoReproceso } from './cumplimiento';
+import { resumirCumplimiento, labelMotivoReprogramacion, labelMotivoReproceso, aTiempoOriginal, aTiempoVigente } from './cumplimiento';
 import { resumenHoras } from './horas';
+import { diaLocal, hoyLocal, inicioDiaLocal, lunesDe } from '@backio/shared';
 
 export interface DashboardKpis {
   activos: number;
@@ -87,7 +86,7 @@ async function completadosDesde(ctx: DbCtx, desdeIso: string, mesa?: { clienteId
 }
 
 export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promise<Dashboard> {
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   const lunes = lunesDe(hoy);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const hace56 = new Date(Date.now() - 56 * 86_400_000).toISOString();
@@ -130,9 +129,9 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     reprogramaciones_30d: cumplTotal.reprogramaciones,
     reprocesos_30d: cumplTotal.reprocesos,
     horas_reproceso_30d: cumplTotal.horas_reproceso,
-    fuera_weekly_semana: [...activos, ...completados30].filter((r) => r.planificacion !== 'planificado' && r.created_at >= `${lunes}T00:00:00-05:00`).length,
+    fuera_weekly_semana: [...activos, ...completados30].filter((r) => r.planificacion !== 'planificado' && r.created_at >= inicioDiaLocal(lunes)).length,
     urgentes_activos: activos.filter((r) => r.planificacion === 'urgente').length,
-    pct_fuera_weekly_semana: (() => { const sem = [...activos, ...completados30].filter((r) => r.created_at >= `${lunes}T00:00:00-05:00`); const f = sem.filter((r) => r.planificacion !== 'planificado').length; return sem.length ? Math.round((f / sem.length) * 100) : null; })(),
+    pct_fuera_weekly_semana: (() => { const sem = [...activos, ...completados30].filter((r) => r.created_at >= inicioDiaLocal(lunes)); const f = sem.filter((r) => r.planificacion !== 'planificado').length; return sem.length ? Math.round((f / sem.length) * 100) : null; })(),
   };
 
   const clientesIds = [...new Set([...activos.map((r) => r.cliente_id), ...completados30.map((r) => r.cliente_id), ...proyectosActivos.map((p) => p.cliente_id)])];
@@ -183,15 +182,15 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     const ini = d.toISOString().slice(0, 10);
     const fin = new Date(d); fin.setUTCDate(fin.getUTCDate() + 6);
     const finIso = fin.toISOString().slice(0, 10);
-    const comp = completados56.filter((r) => r.completado_at && r.completado_at.slice(0, 10) >= ini && r.completado_at.slice(0, 10) <= finIso);
+    const comp = completados56.filter((r) => r.completado_at && diaLocal(r.completado_at) >= ini && diaLocal(r.completado_at) <= finIso);
     const vencian = [...activos, ...completados56].filter((r) => r.fecha_entrega && r.fecha_entrega >= ini && r.fecha_entrega <= finIso);
     semanas.push({
       semana_inicio: ini,
       completados: comp.length,
       piezas: comp.reduce((s, r) => s + (r.piezas || 0), 0),
       vencian: vencian.length,
-      a_tiempo: vencian.filter((r) => r.estado_operativo === 'completado' && r.completado_at && r.fecha_entrega_original && r.completado_at.slice(0, 10) <= r.fecha_entrega_original).length,
-      a_tiempo_vigente: vencian.filter((r) => r.estado_operativo === 'completado' && r.completado_at && r.completado_at.slice(0, 10) <= (r.fecha_entrega as string)).length,
+      a_tiempo: vencian.filter((r) => r.estado_operativo === 'completado' && aTiempoOriginal(r) === true).length,
+      a_tiempo_vigente: vencian.filter((r) => r.estado_operativo === 'completado' && aTiempoVigente(r) === true).length,
     });
   }
 

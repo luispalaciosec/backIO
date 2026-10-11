@@ -17,8 +17,9 @@ import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
 import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
+import { ZONA } from '@backio/shared';
 
-const TZ = 'America/Guayaquil';
+const TZ = ZONA;
 
 function ahoraLocal(): { dia: number; hora: number; minuto: number; clave: string } {
   const f = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' });

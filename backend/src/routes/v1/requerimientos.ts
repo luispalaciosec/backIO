@@ -14,12 +14,11 @@ import { pushDueDate, pushRequerimiento } from '../../lib/basecamp/write';
 import { getProyecto } from '../../lib/db';
 import { generarPortalToken } from '../../lib/portal/token';
 import type { EstadoOperativo, Prioridad, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
-import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO } from '@backio/shared';
+import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, finDiaLocal, hoyLocal, inicioDiaLocal } from '@backio/shared';
 import { listReprogramaciones, listReprocesos, completarUltimaReprogramacion, setMotivoReprogramacion, listSinMotivo, updateReproceso } from '../../lib/db/historial';
 import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
 import { ensureSemana } from '../../lib/db/semanas';
-import { fechaLocal } from '../../lib/rituals/daily';
 
 export const requerimientos = new Hono();
 
@@ -57,8 +56,8 @@ requerimientos.get('/bitacora/ultimas', requireScope('read:backlog'), async (c) 
 requerimientos.get('/estatus', requireScope('read:backlog'), async (c) => {
   const ctx = ctxOf(c); const q = c.req.query();
   if (!q.cliente) return c.json({ error: 'cliente requerido' }, 400);
-  const hastaIso = q.hasta ? new Date(`${q.hasta}T23:59:59-05:00`).toISOString() : new Date().toISOString();
-  const desdeIso = q.desde ? new Date(`${q.desde}T00:00:00-05:00`).toISOString() : null;
+  const hastaIso = q.hasta ? finDiaLocal(q.hasta) : new Date().toISOString();
+  const desdeIso = q.desde ? inicioDiaLocal(q.desde) : null;
   const todas = await listBacklog(ctx, { cliente_id: q.cliente });
   const items = todas.filter((r) => !['completado', 'cancelado'].includes(r.estado_operativo) || (r.estado_operativo === 'completado' && r.completado_at && (!desdeIso || r.completado_at >= desdeIso) && r.completado_at <= hastaIso));
   const notas = await ultimaBitacoraPorRequerimiento(ctx, { ids: items.map((r) => r.id), hasta: hastaIso });
@@ -93,7 +92,7 @@ const crearSchema = z.object({
 /** Marca 'no_planificado' si la semana ya tiene plan y la tarea vence dentro de esa semana. */
 async function planificacionAutomatica(ctx: ReturnType<typeof ctxOf>, fechaEntrega: string | null | undefined): Promise<'planificado' | 'no_planificado'> {
   if (!fechaEntrega) return 'planificado';
-  const semana = await ensureSemana(ctx, fechaLocal());
+  const semana = await ensureSemana(ctx, hoyLocal());
   const { count } = await ctx.db.from('actas').select('id', { count: 'exact', head: true }).eq('tenant_id', ctx.tenantId).eq('semana_id', semana.id).eq('tipo', 'plan_operativo');
   const hayPlan = !!semana.plan_publicado_at || (count ?? 0) > 0;
   return hayPlan && fechaEntrega <= semana.fecha_fin ? 'no_planificado' : 'planificado';
@@ -364,7 +363,7 @@ requerimientos.post('/bulk', requireScope('write:requerimientos'), async (c) => 
       const clave = `${cliente.id}:${f.proyecto}`;
       proyectoId = proyectoPorClave.get(clave) ?? proyectosExistentes.find((p) => p.cliente_id === cliente.id && p.nombre === f.proyecto)?.id ?? null;
       if (!proyectoId) {
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = hoyLocal();
         const p = await insertProyecto(ctx, {
           cliente_id: cliente.id, plantilla_id: null, nombre: f.proyecto, brief: {},
           fecha_inicio: hoy, fecha_entrega: f.fecha_entrega || hoy, portal_token: generarPortalToken(),

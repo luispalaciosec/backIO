@@ -8,8 +8,8 @@ import { getSemana, listSenales, listAcuerdosAbiertos } from '../db/semanas';
 import { listUsuarios } from '../db/usuarios';
 import { getMesa } from '../db/mesas';
 import { buildDashboard } from '../dashboard';
-import { fechaLocal } from '../rituals/daily';
 import { generarTexto } from './index';
+import { hoyLocal } from '@backio/shared';
 
 export const CAUSAS: Record<TipoSenal, string> = {
   bloqueo_cliente: 'Dependencias del cliente',
@@ -63,7 +63,7 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
   if (!semana) throw new Error('Semana no encontrada');
   const mesa = mesaId ? await getMesa(ctx, mesaId) : null;
   const [senales, abiertos, usuarios, dash] = await Promise.all([listSenales(ctx, semanaId), listAcuerdosAbiertos(ctx), listUsuarios(ctx), buildDashboard(ctx, mesaId ?? null)]);
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
   const vencidos = abiertos.filter((a) => a.fecha_compromiso < hoy).map((a) => `${a.descripcion} · ${nombre(a.responsable_id)} · ${a.fecha_compromiso}`);
   const grupos = agruparPorCausa(senales, vencidos);

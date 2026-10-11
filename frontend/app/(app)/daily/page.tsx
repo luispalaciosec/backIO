@@ -6,6 +6,7 @@ import { apiServer } from '@/lib/api.server';
 import { meServer, puedeEscribir } from '@/lib/me.server';
 import { fecha } from '@/lib/format';
 import { EstadoChip } from '@/components/ui/EstadoChip';
+import { ZONA, hoyLocal } from '@backio/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
   const elegida = !!mesa || todas;
   const d = elegida ? await apiServer<DailyView>(`/semanas/daily${mesa ? `?mesa=${mesa.id}` : ''}`) : null;
   const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
-  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const hoy = hoyLocal();
   const escribe = puedeEscribir(me.rol);
   const mesaNombre = mesa?.nombre ?? 'Toda la agencia';
   // Regla del daily: ninguna tarea entra sin responsable. Se avisa aquí y el backend bloquea la publicación.
@@ -53,7 +54,7 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col gap-4">
       <header className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold">Daily · {new Intl.DateTimeFormat('es-EC', { timeZone: 'America/Guayaquil', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}{elegida && <span className="text-gray-400 font-normal"> · {mesaNombre}</span>}</h1>
+        <h1 className="text-2xl font-bold">Daily · {new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}{elegida && <span className="text-gray-400 font-normal"> · {mesaNombre}</span>}</h1>
         {elegida && (
           <div className="flex items-center gap-5 flex-wrap">
             <Paso n={1} titulo="Mesa"><MesaPaso mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))} mesa={mesa?.id ?? ''} todas={todas} /></Paso>

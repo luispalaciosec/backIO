@@ -4,17 +4,18 @@ import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { ensureSemana, getSemana, listSenales, marcarSenalAtendida, insertAcuerdo, cerrarAcuerdo, listAcuerdosSemana, listAcuerdosAbiertos, getActa, audit } from '../../lib/db';
 import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre } from '../../lib/rituals/service';
-import { getDaily, fechaLocal } from '../../lib/rituals/daily';
+import { getDaily } from '../../lib/rituals/daily';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 import { fotoDaily } from '../../lib/evolutivo';
 import { serviceClient } from '../../lib/db/client';
+import { hoyLocal } from '@backio/shared';
 
 export const semanas = new Hono();
 
-semanas.get('/actual', requireScope('read:senales'), async (c) => c.json(await ensureSemana(ctxOf(c), fechaLocal())));
+semanas.get('/actual', requireScope('read:senales'), async (c) => c.json(await ensureSemana(ctxOf(c), hoyLocal())));
 
 semanas.get('/daily', requireScope('read:backlog'), async (c) => c.json(await getDaily(ctxOf(c), { mesaId: c.req.query('mesa') || undefined })));
 
@@ -33,7 +34,7 @@ semanas.get('/:id/senales', requireScope('read:senales'), async (c) => {
 semanas.post('/:id/senales/recalcular', requireScope('write:actas'), async (c) => {
   // Una semana cerrada queda congelada: recalcular con el estado de hoy reescribiría su historia.
   const s = await getSemana(ctxOf(c), c.req.param('id'));
-  if (s && s.fecha_fin < fechaLocal()) return c.json({ error: 'Esa semana ya cerró: sus señales quedan como estaban.' }, 409);
+  if (s && s.fecha_fin < hoyLocal()) return c.json({ error: 'Esa semana ya cerró: sus señales quedan como estaban.' }, 409);
   const items = await recalcularSenales(ctxOf(c), c.req.param('id'));
   return c.json({ items, total: items.length });
 });

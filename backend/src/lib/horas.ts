@@ -8,11 +8,12 @@ import { listClientes } from './db/clientes';
 import { listUsuarios } from './db/usuarios';
 import { audit } from './db/audit';
 import { BasecampClient } from './basecamp/client';
+import { hoyLocal, sumarDias } from '@backio/shared';
 
 export async function sincronizarHoras(ctx: DbCtx, opts: { dias?: number; clienteId?: string } = {}): Promise<{ clientes: number; entradas: number; guardadas: number; sin_requerimiento: number }> {
   const dias = opts.dias ?? 45;
-  const hasta = new Date().toISOString().slice(0, 10);
-  const desde = new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
+  const hasta = hoyLocal();
+  const desde = sumarDias(hasta, -dias);
   const clientes = (await listClientes(ctx)).filter((c) => c.basecamp_project_id && (!opts.clienteId || c.id === opts.clienteId));
   if (!clientes.length) return { clientes: 0, entradas: 0, guardadas: 0, sin_requerimiento: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);

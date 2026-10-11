@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listRecurrencias, getRecurrencia, upsertRecurrencia, updateRecurrencia, recurrenciaDesdeProyecto, generarPeriodo, procesarRecurrencias, periodoSiguiente, nombreDelPeriodo } from '../../lib/recurrencias';
-import { fechaLocal } from '../../lib/rituals/daily';
+import { hoyLocal } from '@backio/shared';
 
 /** Recurrencia mensual de fees (D2). */
 export const recurrencias = new Hono();
@@ -11,7 +11,7 @@ export const recurrencias = new Hono();
 recurrencias.get('/', requireScope('read:proyectos'), async (c) => {
   const ctx = ctxOf(c);
   const items = await listRecurrencias(ctx);
-  const siguiente = periodoSiguiente(fechaLocal().slice(0, 7));
+  const siguiente = periodoSiguiente(hoyLocal().slice(0, 7));
   return c.json({ items: items.map((r) => ({ ...r, proximo_periodo: siguiente, proximo_nombre: nombreDelPeriodo(r.nombre_patron, siguiente), pendiente: r.activa && (!r.ultimo_mes_generado || r.ultimo_mes_generado < siguiente) })) });
 });
 
@@ -40,7 +40,7 @@ recurrencias.post('/:id/generar', requireScope('write:proyectos'), zValidator('j
   const ctx = ctxOf(c);
   const rec = await getRecurrencia(ctx, c.req.param('id'));
   if (!rec) return c.json({ error: 'Recurrencia no encontrada' }, 404);
-  const periodo = c.req.valid('json')?.periodo ?? periodoSiguiente(fechaLocal().slice(0, 7));
+  const periodo = c.req.valid('json')?.periodo ?? periodoSiguiente(hoyLocal().slice(0, 7));
   return c.json(await generarPeriodo(ctx, rec, periodo), 201);
 });
 

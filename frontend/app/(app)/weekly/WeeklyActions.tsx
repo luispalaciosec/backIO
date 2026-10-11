@@ -5,6 +5,7 @@ import type { Acta, WeeklyIA } from '@backio/shared';
 import { api } from '@/lib/api';
 import { useIA } from '@/lib/useIA';
 import { hrefExterno } from '@/lib/url';
+import { hoyLocal, sumarDias } from '@backio/shared';
 
 export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { id: string; nombre: string }[] }) {
   const router = useRouter();
@@ -81,7 +82,7 @@ export function AcuerdoForm({ semanaId, usuarios }: { semanaId: string; usuarios
   const router = useRouter();
   const [f, setF] = useState({ descripcion: '', responsable_id: '', fecha_compromiso: '' });
   const [err, setErr] = useState<string | null>(null);
-  const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const manana = sumarDias(hoyLocal(), 1);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

@@ -6,6 +6,7 @@
  *  - Alerta de concentración de carga (>30% de tareas de una semana en un owner).
  */
 import type { PlantillaArbol, BloqueAlcanceInput, TipoPieza } from '@backio/shared';
+import { lunesDe } from '@backio/shared';
 
 export interface TareaPlanificada {
   plantilla_tarea_id: string;
@@ -65,14 +66,6 @@ export function redistribuirPesos(bloques: { id: string; peso: number }[], activ
 export function restarDias(fechaISO: string, dias: number): string {
   const d = new Date(`${fechaISO}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() - dias);
-  return d.toISOString().slice(0, 10);
-}
-
-export function lunesDe(fechaISO: string): string {
-  const d = new Date(`${fechaISO}T12:00:00Z`);
-  const dow = d.getUTCDay(); // 0 domingo
-  const diff = dow === 0 ? 6 : dow - 1;
-  d.setUTCDate(d.getUTCDate() - diff);
   return d.toISOString().slice(0, 10);
 }
 

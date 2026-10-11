@@ -8,14 +8,13 @@ import Link from 'next/link';
 import type { RequerimientoMetricas, Cliente, Usuario, ActualizarRequerimientoInput } from '@backio/shared';
 import { CeldaSelect, CeldaFecha, CeldaTexto, CeldaOwners } from './Celdas';
 import { COLOR_ESTADO, COLOR_APROBACION, COLOR_PRIORIDAD, COLOR_TIPO, COLOR_PLANIFICACION, colorGrupo } from './colores';
-import { PLANIFICACION_LABEL, CLASE_LABEL, type ClaseTarea } from '@backio/shared';
+import { CLASE_LABEL, PLANIFICACION_LABEL, hoyLocal, type ClaseTarea } from '@backio/shared';
 import { ESTADO_LABEL, APROBACION_LABEL, PRIORIDAD_LABEL, TIPO_LABEL, haceCuanto, fechaCorta, diaLocal } from '@/lib/format';
 import { hrefExterno } from '@/lib/url';
 
 const ESTADOS = Object.keys(ESTADO_LABEL);
 const APROB = Object.keys(APROBACION_LABEL);
 const PLANIF = Object.keys(PLANIFICACION_LABEL);
-const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const PRIOS = Object.keys(PRIORIDAD_LABEL);
 
 export interface BacklogTableProps {

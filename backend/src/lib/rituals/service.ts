@@ -11,9 +11,9 @@ import { ensureSemana, getSemana, listAcuerdosAbiertos, listAcuerdosSemana, list
 import { listSinMotivo } from '../db/historial';
 import { calcularSenales, type SignalThresholds } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
-import { fechaLocal } from './daily';
 import { throwIf } from '../db/client';
 import type { Senal, Acta, CapacidadPersona } from '@backio/shared';
+import { hoyLocal } from '@backio/shared';
 
 async function umbrales(ctx: DbCtx): Promise<Partial<SignalThresholds>> {
   const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
@@ -22,7 +22,7 @@ async function umbrales(ctx: DbCtx): Promise<Partial<SignalThresholds>> {
 }
 
 export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<Senal[]> {
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   const semana = semanaId ? await getSemana(ctx, semanaId) : await ensureSemana(ctx, hoy);
   if (!semana) throw new Error('Semana no encontrada');
   const [activos, usuarios, clientes, acuerdosAbiertos, u, sinMotivo] = await Promise.all([

@@ -13,7 +13,7 @@ import { getPlantillaArbol } from './db/plantillas';
 import { audit } from './db/audit';
 import { notificar } from './notificaciones';
 import { crearProyectoDesdePlantilla, type ResultadoCreacion } from './builder/service';
-import { fechaLocal } from './rituals/daily';
+import { hoyLocal } from '@backio/shared';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -108,7 +108,7 @@ export async function generarPeriodo(ctx: DbCtx, rec: Recurrencia, periodo: stri
 }
 
 /** Corre a diario: genera el mes siguiente para cada recurrencia activa cuyo día ya llegó. */
-export async function procesarRecurrencias(ctx: DbCtx, hoy = fechaLocal()): Promise<{ revisadas: number; generadas: { nombre: string; periodo: string }[]; errores: string[] }> {
+export async function procesarRecurrencias(ctx: DbCtx, hoy = hoyLocal()): Promise<{ revisadas: number; generadas: { nombre: string; periodo: string }[]; errores: string[] }> {
   const recs = (await listRecurrencias(ctx)).filter((r) => r.activa);
   const dia = Number(hoy.slice(8, 10));
   const periodoActual = hoy.slice(0, 7);

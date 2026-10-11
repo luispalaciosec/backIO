@@ -4,6 +4,7 @@ import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
 import { CausasPendientes } from './CausasPendientes';
 import { meServer, puedeEscribir } from '@/lib/me.server';
+import { hoyLocal } from '@backio/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default async function WeeklyPage() {
   const titulos = Object.fromEntries(reqs.map((r) => [r.id, r.titulo_interno]));
   const dash = await apiServer<{ arrastre: { requerimiento_id: string; titulo: string; cliente: string; owner: string | null; veces_reprogramado: number; fecha_original: string | null; fecha_actual: string | null; dias_arrastre: number }[] }>('/dashboard');
   const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocal();
   const vencidos = abiertos.filter((a) => a.fecha_compromiso < hoy);
 
   return (

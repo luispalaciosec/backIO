@@ -22,7 +22,6 @@ import { listTiposPieza } from '../db/tipos_pieza';
 import { ensureSemana, getSemana, listSenales, getActa, listAcuerdosAbiertos } from '../db/semanas';
 import { audit } from '../db/audit';
 import { sanitizeForClient } from '../visibility';
-import { fechaLocal } from '../rituals/daily';
 import { capacidadSemana, generarPlanOperativo, generarActaCierre, recalcularSenales } from '../rituals/service';
 import { temaAgenda } from '../rituals/signals';
 import { previewProyecto, crearProyectoDesdePlantilla } from '../builder/service';
@@ -36,6 +35,7 @@ import { completarUltimaReprogramacion } from '../db/historial';
 import { registrarReproceso } from '../cumplimiento';
 import { narrarWeekly } from '../ia/weekly';
 import type { CrearProyectoInput, ActualizarRequerimientoInput, Requerimiento } from '@backio/shared';
+import { hoyLocal } from '@backio/shared';
 
 type Text = { content: { type: 'text'; text: string }[]; isError?: boolean };
 const ok = (data: unknown): Text => ({ content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] });
@@ -104,7 +104,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     if (args.cliente && !cliente) return fail(`Cliente "${args.cliente}" no encontrado`);
     const owner = args.owner ? m.usuarios.find((u) => u.id === args.owner || u.nombre.toLowerCase().includes(args.owner!.toLowerCase())) : null;
     let desde: string | undefined, hasta: string | undefined;
-    if (args.semana === 'actual') { const s = await ensureSemana(ctx, fechaLocal()); desde = s.fecha_inicio; hasta = s.fecha_fin; }
+    if (args.semana === 'actual') { const s = await ensureSemana(ctx, hoyLocal()); desde = s.fecha_inicio; hasta = s.fecha_fin; }
     let alcance;
     if (args.mesa) { const m2 = await resolverMesa(ctx, args.mesa); if (!m2) return fail(`Mesa "${args.mesa}" no encontrada`); alcance = await alcanceMesa(ctx, m2.id); }
     const items = await listBacklog(ctx, { cliente_id: cliente?.id, owner: owner?.id, estado: args.estado, min_dias_atraso: args.min_dias_atraso, solo_activos: args.solo_activos, desde, hasta, mesa: alcance });
@@ -136,7 +136,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     inputSchema: { semana_id: z.string().uuid().optional(), recalcular: z.boolean().default(false).describe('Recalcula las señales antes de devolverlas') },
   }, ({ semana_id, recalcular }) => guard(['read:senales'], async () => {
     if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
-    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, fechaLocal());
+    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, hoyLocal());
     if (!semana) return fail('Semana no encontrada');
     const senales = recalcular && tiene(auth, 'write:actas') ? await recalcularSenales(ctx, semana.id) : await listSenales(ctx, semana.id);
     const abiertos = await listAcuerdosAbiertos(ctx);
@@ -153,7 +153,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     inputSchema: { semana_id: z.string().uuid().optional() },
   }, ({ semana_id }) => guard(['read:capacidad'], async () => {
     if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
-    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, fechaLocal());
+    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, hoyLocal());
     if (!semana) return fail('Semana no encontrada');
     return ok({ semana: { id: semana.id, numero_iso: semana.numero_iso }, personas: await capacidadSemana(ctx, semana.id) });
   })());
@@ -231,7 +231,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     if (esScopeCliente(auth)) return fail('No disponible con scope cliente');
     const m = mesa ? await resolverMesa(ctx, mesa) : null;
     if (mesa && !m) return fail(`Mesa no encontrada: ${mesa}`);
-    const semana = await ensureSemana(ctx, fechaLocal());
+    const semana = await ensureSemana(ctx, hoyLocal());
     return ok(await narrarWeekly(ctx, semana.id, m?.id ?? null));
   })());
 
@@ -313,7 +313,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     description: 'Genera el Plan Operativo Semanal (markdown en el formato de Geeks). No publica.',
     inputSchema: { semana_id: z.string().uuid().optional(), mesa: z.string().describe('Mesa (Orión, Omega): el acta se publica en su proyecto Basecamp') },
   }, ({ semana_id, mesa }) => guard(['write:actas'], async () => {
-    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, fechaLocal());
+    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, hoyLocal());
     if (!semana) return fail('Semana no encontrada');
     const m = await resolverMesa(ctx, mesa);
     if (!m) return fail(`Mesa "${mesa}" no encontrada. Disponibles: ${(await listMesas(ctx)).map((x) => x.nombre).join(', ')}`);
@@ -326,7 +326,7 @@ export function buildMcpServer(auth: AuthInfo): McpServer {
     description: 'Genera el Acta de Cierre de la semana (markdown). No publica.',
     inputSchema: { semana_id: z.string().uuid().optional(), mesa: z.string().describe('Mesa (Orión, Omega): el acta se publica en su proyecto Basecamp') },
   }, ({ semana_id, mesa }) => guard(['write:actas'], async () => {
-    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, fechaLocal());
+    const semana = semana_id ? await getSemana(ctx, semana_id) : await ensureSemana(ctx, hoyLocal());
     if (!semana) return fail('Semana no encontrada');
     const m = await resolverMesa(ctx, mesa);
     if (!m) return fail(`Mesa "${mesa}" no encontrada. Disponibles: ${(await listMesas(ctx)).map((x) => x.nombre).join(', ')}`);

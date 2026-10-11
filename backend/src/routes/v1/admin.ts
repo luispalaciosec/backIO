@@ -8,6 +8,7 @@ import { frontendOrigins } from '../../config/env';
 import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
+import { finDiaLocal, inicioDiaLocal } from '@backio/shared';
 
 export const admin = new Hono();
 admin.use('*', requireScope('admin'));
@@ -206,8 +207,8 @@ admin.get('/audit', async (c) => {
     if (q.origen) x = x.eq('origen', q.origen);
     if (q.accion) x = x.ilike('accion', `%${q.accion}%`);
     if (q.entidad) x = x.ilike('entidad', `%${q.entidad}%`);
-    if (q.desde) x = x.gte('created_at', `${q.desde}T00:00:00-05:00`);
-    if (q.hasta) x = x.lte('created_at', `${q.hasta}T23:59:59-05:00`);
+    if (q.desde) x = x.gte('created_at', inicioDiaLocal(q.desde));
+    if (q.hasta) x = x.lte('created_at', finDiaLocal(q.hasta));
     return x;
   };
   const db = serviceClient();

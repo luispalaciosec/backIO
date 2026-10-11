@@ -5,7 +5,7 @@
  *  - Atribución: solo las reprogramaciones con motivo atribuible al equipo descuentan a la persona.
  */
 import type { Requerimiento, RequerimientoMetricas, Reprogramacion, Reproceso, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
-import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO } from '@backio/shared';
+import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, diaLocal, porcentaje } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { getRequerimiento, updateRequerimiento } from './db/requerimientos';
 import { insertReproceso, reprocesoAbierto, updateReproceso } from './db/historial';
@@ -13,7 +13,8 @@ import { audit } from './db/audit';
 import { throwIf } from './db/client';
 import { reabrirTodo } from './basecamp/write';
 
-const dia = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
+// «A tiempo» compara el día de cierre en hora de Guayaquil (B4: antes se tomaba el día UTC).
+const dia = diaLocal;
 
 export function aTiempoOriginal(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original'>): boolean | null {
   const c = dia(r.completado_at); const f = r.fecha_entrega_original;
@@ -71,11 +72,10 @@ export function resumirCumplimiento(completados: RequerimientoMetricas[], reprog
   const orig = conFecha.filter((r) => aTiempoOriginal(r)).length;
   const vig = completados.filter((r) => aTiempoVigente(r)).length;
   const conVig = completados.filter((r) => aTiempoVigente(r) !== null).length;
-  const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : null);
   return {
     entregados: completados.length,
     a_tiempo_original: orig, a_tiempo_vigente: vig,
-    pct_original: pct(orig, conFecha.length), pct_vigente: pct(vig, conVig),
+    pct_original: porcentaje(orig, conFecha.length), pct_vigente: porcentaje(vig, conVig),
     desvio_mediana_dias: mediana(conFecha.map((r) => desvioDias(r)!).filter((d) => d > 0)),
     reprogramaciones: reprogs.length,
     reprogramaciones_equipo: reprogs.filter((x) => atribuibleEquipo(x.motivo)).length,

@@ -10,7 +10,7 @@ import { listClientes } from './db/clientes';
 import { listBacklog } from './db/requerimientos';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento } from './cumplimiento';
-import { fechaLocal, sumarDias } from './rituals/daily';
+import { diaLocal, finDiaLocal, hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
 
 export type Periodo = 'dia' | 'semana' | 'mes';
 
@@ -28,7 +28,7 @@ export interface PersonaResumen {
   puntaje: number; // 0-100 orientativo
 }
 
-export function rangoPeriodo(periodo: Periodo, hoy = fechaLocal()): { desde: string; hasta: string; etiqueta: string; dias: number } {
+export function rangoPeriodo(periodo: Periodo, hoy = hoyLocal()): { desde: string; hasta: string; etiqueta: string; dias: number } {
   if (periodo === 'dia') return { desde: hoy, hasta: hoy, etiqueta: 'Hoy', dias: 1 };
   if (periodo === 'semana') {
     const d = new Date(`${hoy}T12:00:00Z`); const dow = (d.getUTCDay() + 6) % 7; // lunes = 0
@@ -42,12 +42,12 @@ export function rangoPeriodo(periodo: Periodo, hoy = fechaLocal()): { desde: str
 }
 
 export async function resumenPersonas(ctx: DbCtx, periodo: Periodo): Promise<{ periodo: Periodo; desde: string; hasta: string; etiqueta: string; personas: PersonaResumen[] }> {
-  const hoy = fechaLocal();
+  const hoy = hoyLocal();
   const { desde, hasta, etiqueta, dias } = rangoPeriodo(periodo, hoy);
   const desde30 = sumarDias(hoy, -29);
-  const desdeIso = `${desde}T00:00:00-05:00`; const hastaIso = `${hasta}T23:59:59-05:00`;
+  const desdeIso = inicioDiaLocal(desde); const hastaIso = finDiaLocal(hasta);
   const [usuarios, clientes, activos, cumpl] = await Promise.all([listUsuarios(ctx), listClientes(ctx, { incluirInactivos: true }), listBacklog(ctx, { solo_activos: true }), listCumplimientoDesde(ctx, desdeIso)]);
-  const { data: comp, error } = await ctx.db.from('v_requerimientos_metricas').select('*').eq('tenant_id', ctx.tenantId).eq('estado_operativo', 'completado').gte('completado_at', `${desde30 < desde ? desde30 : desde}T00:00:00-05:00`);
+  const { data: comp, error } = await ctx.db.from('v_requerimientos_metricas').select('*').eq('tenant_id', ctx.tenantId).eq('estado_operativo', 'completado').gte('completado_at', inicioDiaLocal(desde30 < desde ? desde30 : desde));
   throwIf(error);
   const completados = ((comp ?? []) as RequerimientoMetricas[]).map((r) => ({ ...r, peso: Number(r.peso) }));
   const { data: hrs, error: eh } = await ctx.db.from('horas').select('usuario_id, fecha, horas').eq('tenant_id', ctx.tenantId).gte('fecha', desde30 < desde ? desde30 : desde);
@@ -67,14 +67,14 @@ export async function resumenPersonas(ctx: DbCtx, periodo: Periodo): Promise<{ p
     const hMias = horas.filter((h) => h.usuario_id === u.id);
     const hPeriodo = hMias.filter((h) => h.fecha >= desde && h.fecha <= hasta).reduce((s, h) => s + Number(h.horas), 0);
     const cap = capacidadPeriodo(u);
-    const serie_30d = Array.from({ length: 30 }, (_, i) => { const f = sumarDias(desde30, i); return { fecha: f, entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && (r.completado_at ?? '').slice(0, 10) === f).length, horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s, h) => s + Number(h.horas), 0) * 10) / 10 }; });
+    const serie_30d = Array.from({ length: 30 }, (_, i) => { const f = sumarDias(desde30, i); return { fecha: f, entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && diaLocal(r.completado_at ?? '') === f).length, horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s, h) => s + Number(h.horas), 0) * 10) / 10 }; });
     // Timesheet día a día dentro del periodo (solo hasta hoy, lunes a viernes).
     const esperadoDia = u.capacidad_semanal / 5;
     const diasPeriodo: { fecha: string; horas: number; esperado: number; entregados: number }[] = [];
     for (let f = desde; f <= (hasta < hoy ? hasta : hoy); f = sumarDias(f, 1)) {
       const dow = new Date(`${f}T12:00:00Z`).getUTCDay();
       const laborable = dow >= 1 && dow <= 5;
-      diasPeriodo.push({ fecha: f, horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s2, h) => s2 + Number(h.horas), 0) * 10) / 10, esperado: laborable ? Math.round(esperadoDia * 10) / 10 : 0, entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && (r.completado_at ?? '').slice(0, 10) === f).length });
+      diasPeriodo.push({ fecha: f, horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s2, h) => s2 + Number(h.horas), 0) * 10) / 10, esperado: laborable ? Math.round(esperadoDia * 10) / 10 : 0, entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && diaLocal(r.completado_at ?? '') === f).length });
     }
     const laborables = diasPeriodo.filter((d) => d.esperado > 0);
     const diasSinHoras = laborables.filter((d) => d.horas === 0).map((d) => d.fecha);

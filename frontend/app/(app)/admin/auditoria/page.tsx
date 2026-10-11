@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Usuario } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { ZONA } from '@backio/shared';
 
 interface Evento { id: number; usuario_id: string | null; api_key_id: string | null; origen: string; accion: string; entidad: string; entidad_id: string | null; detalle: Record<string, unknown> | null; created_at: string }
 interface Resultado { items: Evento[]; total: number; con_error: number }
@@ -24,7 +25,7 @@ export default function AuditoriaPage() {
   useEffect(() => { api<{ items: Usuario[] }>('/admin/usuarios').then((x) => setUsuarios(x.items)).catch(() => {}); void cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const nombre = (id: string | null) => usuarios.find((u) => u.id === id);
   const esError = (e: Evento) => /rechaz|fall|error|invalid/i.test(e.accion) || !!(e.detalle && 'error' in e.detalle);
-  const fecha = (iso: string) => new Date(iso).toLocaleString('es-EC', { timeZone: 'America/Guayaquil', day: 'numeric', month: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' });
+  const fecha = (iso: string) => new Date(iso).toLocaleString('es-EC', { timeZone: ZONA, day: 'numeric', month: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' });
   return (
     <div className="space-y-4">
       <header>
