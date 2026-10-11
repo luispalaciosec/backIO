@@ -16,7 +16,7 @@
     "format": "prettier --write src --ignore-path ../.prettierignore"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
+    "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   }
 }
