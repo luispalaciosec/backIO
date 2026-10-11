@@ -1,0 +1,37 @@
+# Deploy del frontend a Vercel producción cuando el CI de main termina en verde (deuda técnica §8.7).
+# Hace lo mismo que el deploy manual (`vercel deploy --prod` desde la raíz del repo; Vercel usa la raíz `frontend`).
+# Requiere el secreto VERCEL_TOKEN en el repo (Settings → Secrets and variables → Actions). Sin él, el job avisa y no falla.
+# El backend no pasa por aquí: Railway despliega solo al subir a main.
+name: Deploy frontend
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      # Identificadores del proyecto (no son secretos; salen de .vercel/project.json).
+      VERCEL_ORG_ID: team_MRWfYG5MwQwkNXKgo7U5TgJZ
+      VERCEL_PROJECT_ID: prj_liPUpvKXzdBcHSj6jasKTGtEUh4t
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Falta el token de Vercel
+        if: env.VERCEL_TOKEN == ''
+        run: echo "::warning::Sin el secreto VERCEL_TOKEN no se despliega el frontend. Ver el encabezado de este archivo."
+      - uses: actions/checkout@v4
+        if: env.VERCEL_TOKEN != ''
+        with:
+          # El commit que pasó el CI, no lo último de main.
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Deploy a producción
+        if: env.VERCEL_TOKEN != ''
+        run: npx --yes vercel@59.12.0 deploy --prod --yes --token="$VERCEL_TOKEN"
