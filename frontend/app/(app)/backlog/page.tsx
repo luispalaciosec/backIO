@@ -1,8 +1,7 @@
 'use client';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { RequerimientoMetricas, Cliente, Usuario, Mesa, EstadoOperativo, ActualizarRequerimientoInput, Bitacora } from '@backio/shared';
+import type { RequerimientoMetricas, Cliente, EstadoOperativo, ActualizarRequerimientoInput, Bitacora } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
@@ -15,48 +14,16 @@ import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '
 import { CAMPOS_COLABORADOR, hoyLocal } from '@backio/shared';
 import { useAvisosCarga } from '@/lib/useAvisosCarga';
 import { AvisoCarga } from '@/components/ui/AvisoCarga';
+import { useCatalogosBacklog } from './useCatalogosBacklog';
+import { useFiltrosBacklog, type Vista } from './useFiltrosBacklog';
 
-type Vista = 'tabla' | 'kanban';
 
 function BacklogInner() {
   const [items, setItems] = useState<RequerimientoMetricas[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [horas, setHoras] = useState<Record<string, number>>({});
-  const [notas, setNotas] = useState<Record<string, Bitacora>>({});
-  const [proyectos, setProyectos] = useState<Record<string, string>>({});
-  const [proyectosCliente, setProyectosCliente] = useState<Record<string, { id: string; nombre: string; basecamp: boolean; completado: boolean }[]>>({});
-  const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
-  const [mesas, setMesas] = useState<Mesa[]>([]);
   const { fallos, avisar } = useAvisosCarga();
-  // Filtros, orden y vista viven en la URL (sobreviven al refresh y se comparten) con respaldo en localStorage (preferencia de UI).
-  const router = useRouter();
-  const sp = useSearchParams();
-  const FILTRO0 = { cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' };
-  const leerInicial = () => {
-    const desdeUrl = sp.toString() ? Object.fromEntries(sp.entries()) : null;
-    let guardado: Record<string, string> | null = null;
-    if (!desdeUrl) { try { guardado = JSON.parse(localStorage.getItem('backio:backlog:filtros') ?? 'null'); } catch { /* ignore */ } }
-    const src = desdeUrl ?? guardado ?? {};
-    return {
-      filtro: { ...FILTRO0, cliente: src.cliente ?? '', owner: src.owner ?? '', estado: src.estado ?? '', proyecto: src.proyecto ?? '', mesa: src.mesa ?? '', planificacion: src.planificacion ?? '', q: src.q ?? '', activos: src.activos === undefined ? true : src.activos !== '0' },
-      orden: { campo: (src.orden as CampoOrden) || 'fecha_entrega', dir: (src.dir as Dir) || 'asc' },
-      vista: (src.vista === 'kanban' ? 'kanban' : 'tabla') as Vista,
-    };
-  };
-  const inicial = useRef(leerInicial());
-  const [vista, setVista] = useState<Vista>(inicial.current.vista);
-  const [filtro, setFiltro] = useState(inicial.current.filtro);
-  const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>(inicial.current.orden);
+  const { clientes, usuarios, horas, notas, setNotas, proyectos, proyectosCliente, proyectoMesa, mesas } = useCatalogosBacklog(avisar);
+  const { vista, setVista, filtro, setFiltro, orden, setOrden, FILTRO0 } = useFiltrosBacklog();
   const [panel, setPanel] = useState(false);
-  useEffect(() => {
-    const q: Record<string, string> = {};
-    for (const [k, v] of Object.entries(filtro)) { if (k === 'activos') { if (!v) q.activos = '0'; } else if (v) q[k] = String(v); }
-    if (orden.campo !== 'fecha_entrega') q.orden = orden.campo; if (orden.dir !== 'asc') q.dir = orden.dir; if (vista !== 'tabla') q.vista = vista;
-    const qs = new URLSearchParams(q).toString();
-    router.replace(qs ? `/backlog?${qs}` : '/backlog', { scroll: false });
-    try { localStorage.setItem('backio:backlog:filtros', JSON.stringify(q)); } catch { /* ignore */ }
-  }, [filtro, orden, vista, router]);
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
   const [celebracion, setCelebracion] = useState<{ n: number; titulos: string[] } | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -83,21 +50,6 @@ function BacklogInner() {
     }
   }, [filtro]);
 
-  useEffect(() => {
-    api<{ items: Cliente[] }>('/clientes').then((r) => setClientes(r.items)).catch(avisar('los clientes'));
-    api<{ items: Usuario[] }>('/usuarios').then((r) => setUsuarios(r.items)).catch(avisar('las personas'));
-    api<{ items: { id: string; nombre: string; mesa_id: string | null; cliente_id: string; estado: string; basecamp_todolist_id: number | null }[] }>('/proyectos').then((r) => {
-      setProyectos(Object.fromEntries(r.items.map((p) => [p.id, p.nombre]))); setProyectoMesa(Object.fromEntries(r.items.map((p) => [p.id, p.mesa_id])));
-      // También los proyectos completados: una campaña cerrada puede recibir una tarea nueva (se reabre sola).
-      const pc: Record<string, { id: string; nombre: string; basecamp: boolean; completado: boolean }[]> = {};
-      const orden = (x: { estado: string; nombre: string }) => `${x.estado === 'completado' ? 1 : 0}${x.nombre.toLowerCase()}`;
-      for (const p of r.items.filter((x) => x.estado !== 'cancelado').sort((a, b) => orden(a).localeCompare(orden(b), 'es'))) (pc[p.cliente_id] ??= []).push({ id: p.id, nombre: p.nombre, basecamp: !!p.basecamp_todolist_id, completado: p.estado === 'completado' });
-      setProyectosCliente(pc);
-    }).catch(avisar('los proyectos'));
-    api<{ items: Mesa[] }>('/mesas').then((r) => setMesas(r.items.filter((m) => m.activa))).catch(avisar('las mesas'));
-    api<{ por_requerimiento: Record<string, number> }>('/horas/resumen?dias=90').then((r) => setHoras(r.por_requerimiento)).catch(avisar('las horas'));
-    api<{ items: Record<string, Bitacora> }>('/requerimientos/bitacora/ultimas').then((r) => setNotas(r.items)).catch(avisar('las últimas notas'));
-  }, [avisar]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   // Celebración por lo completado desde la última visita (la mayoría se completa en Basecamp, sin pulsar nada aquí).
