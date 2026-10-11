@@ -26,8 +26,8 @@ authPublico.post(
     if ((await sumarIntento(`recuperar_email:${email}`, 1, 60)).excedido) return c.json({ ok: true });
     try {
       const sb = serviceClient();
-      const { data: u } = await sb.from('usuarios').select('id, nombre, activo').eq('email', email).maybeSingle();
-      const usuario = u as { id: string; nombre: string; activo: boolean } | null;
+      const { data: u } = await sb.from('usuarios').select('id, nombre, activo, tenant_id').eq('email', email).maybeSingle();
+      const usuario = u as { id: string; nombre: string; activo: boolean; tenant_id: string } | null;
       if (!usuario?.activo) return c.json({ ok: true }); // no revelar
       const base = `${frontendOrigins()[0] ?? 'http://localhost:3000'}/auth/establecer-clave`;
       const { data, error } = await sb.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: base } });
@@ -50,7 +50,7 @@ authPublico.post(
       await sb
         .from('audit_log')
         .insert({
-          tenant_id: (await sb.from('usuarios').select('tenant_id').eq('id', usuario.id).single()).data?.tenant_id,
+          tenant_id: usuario.tenant_id,
           usuario_id: usuario.id,
           origen: 'ui',
           accion: 'recuperar_contrasena',

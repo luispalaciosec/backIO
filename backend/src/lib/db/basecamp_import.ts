@@ -1,6 +1,6 @@
 /** Consultas de la importación de Basecamp (lib/basecamp/importar.ts). */
 import type { Requerimiento } from '@backio/shared';
-import { type DbCtx, serviceClient, throwIf } from './client';
+import { type DbCtx, type FilaUpdate, serviceClient, throwIf } from './client';
 import { paginar } from './paginar';
 import type { Enlazado, FilaDesdeTodo } from '../basecamp/decisiones';
 
@@ -66,7 +66,7 @@ export async function insertarEnlazado(ctx: DbCtx, fila: FilaDesdeTodo): Promise
   return data as Requerimiento;
 }
 
-export async function actualizarEnlazado(ctx: DbCtx, id: string, patch: Record<string, unknown>): Promise<void> {
+export async function actualizarEnlazado(ctx: DbCtx, id: string, patch: FilaUpdate<'requerimientos'>): Promise<void> {
   const { error } = await ctx.db.from('requerimientos').update(patch).eq('id', id).eq('tenant_id', ctx.tenantId);
   throwIf(error);
 }

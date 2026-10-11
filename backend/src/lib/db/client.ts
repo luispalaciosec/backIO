@@ -8,8 +8,14 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../../config/env';
+import type { Database } from './database.types';
 
-export type Db = SupabaseClient;
+/** Cliente tipado con el esquema real (database.types.ts, generado con `pnpm db:types`). */
+export type Db = SupabaseClient<Database>;
+type Tablas = Database['public']['Tables'];
+/** Fila para insertar / campos para actualizar en una tabla, según el esquema real. */
+export type FilaInsert<T extends keyof Tablas> = Tablas[T]['Insert'];
+export type FilaUpdate<T extends keyof Tablas> = Tablas[T]['Update'];
 
 export interface DbCtx {
   db: Db;
@@ -24,7 +30,7 @@ let service: Db | null = null;
 export function serviceClient(): Db {
   if (service) return service;
   const e = env();
-  service = createClient(e.SUPABASE_URL, e.SUPABASE_SERVICE_ROLE_KEY, {
+  service = createClient<Database>(e.SUPABASE_URL, e.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return service;
@@ -32,7 +38,7 @@ export function serviceClient(): Db {
 
 export function userClient(jwt: string): Db {
   const e = env();
-  return createClient(e.SUPABASE_URL, e.SUPABASE_ANON_KEY, {
+  return createClient<Database>(e.SUPABASE_URL, e.SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${jwt}` } },
   });

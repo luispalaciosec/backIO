@@ -3,6 +3,7 @@
  */
 import { diaLocal, sumarDias } from '@backio/shared';
 import { ownersDeBasecamp, type TodoPlano } from './recorrer';
+import type { FilaUpdate } from '../db/client';
 
 /** Prefijos en el título del to-do que fijan clase y proactividad al importarlo. null si no hay ninguno. */
 export function marcasDeTitulo(titulo: string | null | undefined): { clase?: 'propuesta' | 'incidencia'; proactiva?: true } | null {
@@ -43,8 +44,8 @@ export function cambiosDeEnlazado(
   t: TodoPlano,
   destino: { proyectoId: string | null; listaId: number },
   porBcUser: Map<number, string>,
-): { patch: Record<string, unknown>; titulo: boolean; movido: boolean; responsables: boolean } {
-  const patch: Record<string, unknown> = {};
+): { patch: FilaUpdate<'requerimientos'>; titulo: boolean; movido: boolean; responsables: boolean } {
+  const patch: FilaUpdate<'requerimientos'> = {};
   const titulo = !!t.titulo && t.titulo !== ex.titulo_interno;
   if (titulo) patch.titulo_interno = t.titulo;
   if ((t.bloque ?? null) !== (ex.bloque_nombre ?? null)) patch.bloque_nombre = t.bloque;

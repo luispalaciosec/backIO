@@ -3,7 +3,7 @@
  * La descripción de cada entrada nunca entra (se descarta en BasecampClient.timesheetSafe).
  */
 import type { DbCtx } from './db/client';
-import { throwIf } from './db/client';
+import { throwIf, type FilaInsert } from './db/client';
 import { listClientes } from './db/clientes';
 import { listUsuarios } from './db/usuarios';
 import { audit } from './db/audit';
@@ -48,7 +48,7 @@ export async function sincronizarHoras(
     sinCliente = 0;
   try {
     const items = await bc.timesheetSafe(desde, hasta);
-    const filas = [] as Record<string, unknown>[];
+    const filas: FilaInsert<'horas'>[] = [];
     for (const e of items) {
       const c = e.bucket_id ? porProyecto.get(e.bucket_id) : undefined;
       if (!c) {

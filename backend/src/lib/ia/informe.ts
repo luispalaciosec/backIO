@@ -71,12 +71,15 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
     .gte('semanas.fecha_inicio', desde)
     .lte('semanas.fecha_inicio', hasta);
   const senales = (sen ?? []) as { tipo: string; severidad: string }[];
-  const { data: proys } = await ctx.db
+  // Proyectos activos, igual que el dashboard. Antes filtraba por un estado «cerrado» que no existe: la consulta
+  // fallaba sin revisar el error y el valor cotizado del informe salía siempre en 0 (lo destapó el tipado de la Ola 6).
+  const { data: proys, error: eProys } = await ctx.db
     .from('proyectos')
     .select('cliente_id, valor_cotizado')
     .eq('tenant_id', ctx.tenantId)
     .is('deleted_at', null)
-    .neq('estado', 'cerrado');
+    .not('estado', 'in', '(completado,cancelado)');
+  throwIf(eProys);
   const cotizado = new Map<string, number>();
   for (const p of (proys ?? []) as { cliente_id: string; valor_cotizado: number | null }[])
     cotizado.set(p.cliente_id, (cotizado.get(p.cliente_id) ?? 0) + Number(p.valor_cotizado ?? 0));

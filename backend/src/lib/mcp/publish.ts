@@ -79,10 +79,10 @@ async function publicarReservada(ctx: DbCtx, acta: Acta): Promise<{ acta_id: str
   const { error: e2 } = await ctx.db.from('actas').update({ basecamp_doc_id: doc.id }).eq('id', acta.id);
   throwIf(e2);
   if (acta.tipo !== 'informe_mensual') {
-    const col = acta.tipo === 'plan_operativo' ? 'plan_publicado_at' : 'acta_publicada_at';
+    const ahora = new Date().toISOString();
     await ctx.db
       .from('semanas')
-      .update({ [col]: new Date().toISOString() })
+      .update(acta.tipo === 'plan_operativo' ? { plan_publicado_at: ahora } : { acta_publicada_at: ahora })
       .eq('id', acta.semana_id);
   }
   return { acta_id: acta.id, basecamp_doc_id: doc.id, url: doc.app_url };

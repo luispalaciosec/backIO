@@ -94,7 +94,8 @@ export async function insertRequerimientos(ctx: DbCtx, rows: InsertRequerimiento
 export async function updateRequerimiento(
   ctx: DbCtx,
   id: string,
-  patch: ActualizarRequerimientoInput &
+  // Sin los campos de motivo: no son columnas (van a la tabla reprogramaciones vía actualizarRequerimiento).
+  patch: Omit<ActualizarRequerimientoInput, 'motivo_reprogramacion' | 'observacion_reprogramacion'> &
     Partial<
       Pick<
         Requerimiento,

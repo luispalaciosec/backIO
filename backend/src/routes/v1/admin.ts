@@ -264,7 +264,7 @@ admin.post(
         .maybeSingle();
       if (!cl) return c.json({ error: 'Cliente no encontrado' }, 404);
     }
-    const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : PERFILES[body.perfil]!;
+    const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : [...PERFILES[body.perfil]!];
     const key = `bk_live_${randomBytes(24).toString('base64url')}`;
     const { data, error } = await serviceClient()
       .from('api_keys')
