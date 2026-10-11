@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Requerimiento } from '@backio/shared';
 
 const estado = vi.hoisted(() => ({ req: null as Record<string, unknown> | null, auditoria: [] as unknown[], updates: [] as unknown[] }));
 const espias = vi.hoisted(() => ({
