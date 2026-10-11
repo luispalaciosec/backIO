@@ -82,6 +82,7 @@ const ADMIN_GRUPOS: Grupo[] = [
       { href: '/admin/api-keys', label: 'API keys', icon: '⚿' },
       { href: '/admin/servicios', label: 'Servicios', icon: '♡' },
       { href: '/admin/auditoria', label: 'Auditoría', icon: '≡' },
+      { href: '/admin/mantenimiento', label: 'Mantenimiento', icon: '⚒' },
     ],
   },
 ];

@@ -67,7 +67,7 @@ webhooks e IA · frontend, secretos y dependencias). Cada hallazgo fue verificad
 | M7 | Scheduler sin lock: corridas solapadas duplicaban proyectos | ✅ Lock por job. 🗄️ Migración 21: índice único `proyectos(tenant_id, basecamp_todolist_id)`. Desde el 10/10 el lock es la fila única de `cron_runs (job, ventana)` más un set en memoria del scheduler para no lanzar un job que sigue en curso |
 | M8 | Webhook PrometIO sin anti-replay | ✅ Ventana de ±5 min si viene `X-Prometio-Timestamp` y rechazo de cuerpos repetidos en 10 min |
 | M9 | `esc()` no escapaba comillas y se usaba en atributos | ✅ |
-| M10 | Scripts con `PUT` crudo a Basecamp y one-offs sin confirmación en el repo | ✅ `exp_*` eliminados; `scripts/README.md` con reglas. ⏳ Convertir reparaciones recurrentes en endpoints de admin |
+| M10 | Scripts con `PUT` crudo a Basecamp y one-offs sin confirmación en el repo | ✅ `exp_*` eliminados; `scripts/README.md` con reglas. ✅ Reparaciones recurrentes en Admin → Mantenimiento (revisar y aplicar, auditado) |
 | M11 | `ultimo_uso_at` de API keys nunca se actualizaba (builder sin `await`) | ✅ |
 | M12 | «Entradas desde Basecamp» leía `audit_log` con el cliente del usuario (vacío para no-admin) | ✅ Service role acotado al tenant |
 | M13 | Registro dinámico OAuth sin límite y `client_name` arbitrario en el consentimiento; códigos sin hash | ✅ Límite por IP en `/oauth/register` y consentimiento con nombre y hosts tomados del servidor (10/10, S6). Códigos guardados como hash (11/10) |

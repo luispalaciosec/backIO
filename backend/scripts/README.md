@@ -15,10 +15,7 @@ Reglas:
 
 | Script | Escribe | Para qué |
 |---|---|---|
-| `diag_asignados.ts`, `diag_informe_canal.ts`, `sin_owner_mapeable.ts`, `audit_resumen.ts`, `duplicados_detectar.ts` | No | Diagnóstico |
-| `reparar_asignados.ts` (`--ver` para simular) | Basecamp | Reenvía asignados perdidos |
-| `duplicados_limpiar.ts` | DB | Borra requerimientos duplicados detectados |
-| `duplicados_sin_enlace.ts` | DB | Archiva duplicados sin enlace a Basecamp |
+| `diag_asignados.ts`, `diag_informe_canal.ts`, `sin_owner_mapeable.ts`, `audit_resumen.ts` | No | Diagnóstico |
 
-Deuda registrada en `docs/17-arquitectura-tecnica.md` §8: convertir estas reparaciones en endpoints de admin con
-auditoría (y entonces borrar los scripts).
+Las reparaciones (responsables perdidos en Basecamp, duplicados, huérfanos adoptados sin enlace) se hacen desde
+**Admin → Mantenimiento**, con revisión previa y auditoría. Los scripts que las hacían se borraron el 11/10/2026.

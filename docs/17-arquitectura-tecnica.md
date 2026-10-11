@@ -306,11 +306,15 @@ Scripts operativos en `backend/scripts/` (se corren en local contra producción 
 `backend/scripts/README.md`):
 
 - Diagnóstico, solo lectura: `audit_resumen.ts`, `diag_asignados.ts`, `diag_informe_canal.ts`,
-  `duplicados_detectar.ts`, `sin_owner_mapeable.ts`.
-- Reparaciones: `reparar_asignados.ts` (Basecamp), `duplicados_limpiar.ts` y `duplicados_sin_enlace.ts` (base).
+  `sin_owner_mapeable.ts`.
 - Generadores: `gen_tipos_db.ts` (detrás de `db:types`) y `gen_docs_api.ts` (detrás de `docs:api`).
 
 Los que hablan con Basecamp **requieren `BASECAMP_ACCOUNT_ID` en el entorno**.
+
+Las reparaciones de datos ya no son scripts: están en **Admin → Mantenimiento** (`lib/mantenimiento.ts`,
+`/api/v1/admin/mantenimiento`). Cada tarea se revisa primero sin tocar nada; al aplicar, el backend vuelve a calcular y
+ejecuta solo lo que la persona marcó y sigue haciendo falta, y deja cada cambio en `audit_log`
+(`mantenimiento_<tarea>`). Las que escriben en Basecamp aplican como máximo 50 to-dos por vez.
 
 ---
 
@@ -322,15 +326,14 @@ Actualizada el 11/10/2026, al cerrar la auditoría externa (ver `HARDENING-CHANG
    (ya existe el cliente de pruebas "Acme EC S.A.S", proyecto 48775530).
 2. **Tests de integración con Basecamp** sobre el sandbox: actualizar fecha sin perder asignados,
    timesheet, importación, papelera.
-3. **Reparaciones de datos por script local.** Acción: convertir las recurrentes en endpoints de admin.
-4. **Consultas fuera de `lib/db`** en el resto de `lib` (115, aviso de lint); en las rutas ya es error.
-5. **Portal:** mostrar notas de bitácora `visible_cliente` (toca `lib/visibility/`, revisión humana).
+3. **Portal:** mostrar notas de bitácora `visible_cliente` (toca `lib/visibility/`, revisión humana).
 
 
 Resuelto en la auditoría del 10/10: CI en cada push (typecheck, lint, tests, build y `pnpm audit`), tipos generados de
 Supabase (`pnpm --filter @backio/backend db:types`), jobs en una sola tabla con registro. Después (11/10): vigía de jobs
 (`lib/vigia.ts`: correo a admin y Sentry si una tarea programada no corre; estado en Admin → Servicios) y deploy
-automático del frontend (`.github/workflows/deploy-frontend.yml`, con el secreto `VERCEL_TOKEN`).
+automático del frontend (`.github/workflows/deploy-frontend.yml`, con el secreto `VERCEL_TOKEN`). Reparaciones de datos
+en Admin → Mantenimiento en lugar de scripts locales.
 
 ---
 

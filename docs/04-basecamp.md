@@ -239,7 +239,7 @@ Basecamp, la tarea quedaba sin dueño; y las fechas cambiadas en BackIO no llega
 `description`, `due_on`, `starts_on`, `assignee_ids` y `completion_subscriber_ids`, cambiando solo lo pedido. La
 descripción se reenvía en memoria y nunca se guarda en BackIO (regla 1 intacta). Antes de reenviarla se limpian
 los adjuntos que trae incrustados, para que Basecamp no los desarme en cada cambio de fecha
-(`descripcionParaGuardar`). Reparación: `scripts/reparar_asignados.ts` volvió a
+(`descripcionParaGuardar`). Reparación: un script (hoy Admin → Mantenimiento, «Responsables perdidos en Basecamp») volvió a
 poner el responsable de BackIO en los to-dos abiertos que quedaron sin asignar (43 + 23).
 
 ## Basecamp como origen aceptado (23/09/2026)

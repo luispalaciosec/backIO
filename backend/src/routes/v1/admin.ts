@@ -9,6 +9,7 @@ import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 import { quitarAcceso } from '../../lib/db/lote';
+import { aplicar, revisar, TAREAS, TopeExcedido, type Tarea } from '../../lib/mantenimiento';
 import {
   actualizarUsuario,
   borrarInvitacion,
@@ -277,6 +278,33 @@ admin.get('/audit', async (c) => {
 
 // ---------------- salud del sistema
 admin.get('/salud', async (c) => c.json(await verificarSalud(ctxOf(c).tenantId)));
+
+// ---------------- mantenimiento: reparaciones de datos en dos pasos (revisar → aplicar)
+const tareaValida = (t: string): t is Tarea => Object.hasOwn(TAREAS, t);
+
+admin.get('/mantenimiento', (c) => c.json({ items: Object.entries(TAREAS).map(([id, t]) => ({ id, ...t })) }));
+
+admin.post('/mantenimiento/:tarea/revisar', async (c) => {
+  const tarea = c.req.param('tarea');
+  if (!tareaValida(tarea)) return c.json({ error: 'Tarea desconocida' }, 404);
+  const acciones = await revisar(ctxOf(c), tarea);
+  return c.json({ items: acciones.map(({ datos: _datos, ...a }) => a) });
+});
+
+admin.post(
+  '/mantenimiento/:tarea/aplicar',
+  zValidator('json', z.object({ ids: z.array(z.string().uuid()).min(1).max(2000) })),
+  async (c) => {
+    const tarea = c.req.param('tarea');
+    if (!tareaValida(tarea)) return c.json({ error: 'Tarea desconocida' }, 404);
+    try {
+      return c.json(await aplicar(ctxOf(c), tarea, c.req.valid('json').ids));
+    } catch (e) {
+      if (e instanceof TopeExcedido) return c.json({ error: e.message }, 422);
+      throw e;
+    }
+  },
+);
 
 // ---------------- accesos: quitar (renuncia) y restaurar
 /**

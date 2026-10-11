@@ -72,7 +72,8 @@ problema**. No vuelve a avisar una corrida que terminó con errores: ese error y
 
 Es el incidente del 22/09 ([Basecamp](./04-basecamp.md)): una actualización parcial de un to-do borra los asignados. El
 código actual siempre reenvía responsables y descripción (`BasecampClient.updateTodo`). Si vuelve a pasar, para
-reparar está `backend/scripts/reparar_asignados.ts --ver` (primero en modo simulación).
+reparar está Admin → Mantenimiento → «Responsables perdidos en Basecamp»: «Revisar» lista los to-dos abiertos que
+quedaron sin responsables y «Aplicar» les reenvía los de BackIO, hasta 50 por vez.
 
 ### Basecamp aparece desconectado
 
