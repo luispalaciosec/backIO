@@ -1,4 +1,4 @@
-import { ZONA, diaLocal, hoyLocal } from '@backio/shared';
+import { ZONA, diaLocal, hoyLocal, ESTADO_OPERATIVO_LABEL, ESTADO_APROBACION_LABEL, PRIORIDAD_LABEL as PRIORIDAD_LABEL_SHARED } from '@backio/shared';
 export function fecha(iso: string | null | undefined): string {
   if (!iso) return '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
@@ -38,14 +38,10 @@ export function haceCuanto(iso: string | null | undefined): string {
   return `hace ${a} ${a === 1 ? 'año' : 'años'}`;
 }
 
-export const ESTADO_LABEL: Record<string, string> = {
-  backlog: 'Backlog', priorizado: 'Priorizado', en_ejecucion: 'En proceso', en_revision: 'En revisión',
-  reprogramado: 'Reprogramado', bloqueado: 'Bloqueado', completado: 'Completado', cancelado: 'Cancelado',
-};
-export const APROBACION_LABEL: Record<string, string> = {
-  no_aplica: 'Sin estado', pendiente_interno: 'Pendiente interno', pendiente_cliente: 'Pendiente cliente', aprobado: 'Aprobado', rechazado: 'Cambios solicitados',
-};
-export const PRIORIDAD_LABEL: Record<string, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' };
+// Etiquetas de estado: definidas en shared (también las usa el backend). Indexables por string para la UI.
+export const ESTADO_LABEL: Record<string, string> = ESTADO_OPERATIVO_LABEL;
+export const APROBACION_LABEL: Record<string, string> = ESTADO_APROBACION_LABEL;
+export const PRIORIDAD_LABEL: Record<string, string> = PRIORIDAD_LABEL_SHARED;
 export const TIPO_LABEL: Record<string, string> = { fee: 'FEE', proyecto: 'Proyecto' };
 
 export function iniciales(nombre: string): string {

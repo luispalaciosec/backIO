@@ -5,7 +5,15 @@
  */
 import type { DbCtx } from './db/client';
 import { serviceClient, throwIf } from './db/client';
-import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, finDiaLocal, inicioDiaLocal } from '@backio/shared';
+import {
+  ESTADO_APROBACION_LABEL,
+  ESTADO_OPERATIVO_LABEL,
+  MOTIVOS_REPROCESO,
+  MOTIVOS_REPROGRAMACION,
+  etiqueta,
+  finDiaLocal,
+  inicioDiaLocal,
+} from '@backio/shared';
 
 export interface EventoActividad {
   id: string;
@@ -25,113 +33,75 @@ export interface EventoActividad {
 }
 
 const FIX_AUDITORIA = '2026-09-21T00:00:00-05:00';
-const ESTADO: Record<string, string> = {
-  backlog: 'Backlog',
-  priorizado: 'Priorizado',
-  en_ejecucion: 'En proceso',
-  en_revision: 'En revisión',
-  reprogramado: 'Reprogramado',
-  bloqueado: 'Bloqueado',
-  completado: 'Completado',
-  cancelado: 'Cancelado',
-};
-const APROB: Record<string, string> = {
-  no_aplica: 'Sin estado',
-  pendiente_interno: 'Pendiente interno',
-  pendiente_cliente: 'Pendiente cliente',
-  aprobado: 'Aprobado',
-  rechazado: 'Cambios solicitados',
-};
 const fmt = (iso: unknown) => (typeof iso === 'string' && iso.length >= 10 ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '—');
+const motivoReprogramacion = (v: unknown) => MOTIVOS_REPROGRAMACION.find((m) => m.valor === v)?.label ?? v;
+const motivoReproceso = (v: unknown) => MOTIVOS_REPROCESO.find((m) => m.valor === v)?.label ?? v;
 
-function describir(accion: string, d: Record<string, unknown>): string {
-  switch (accion) {
-    case 'crear':
-      return 'creó la tarea';
-    case 'eliminar':
-      return 'eliminó la tarea';
-    case 'reprogramar':
-      return `movió la entrega del ${fmt(d.de)} al ${fmt(d.a)}${d.motivo_reprogramacion ? ` · ${MOTIVOS_REPROGRAMACION.find((m) => m.valor === d.motivo_reprogramacion)?.label ?? d.motivo_reprogramacion}` : ''}`;
-    case 'actualizar': {
-      const p: string[] = [];
-      if (d.estado_operativo) p.push(`estado → ${ESTADO[String(d.estado_operativo)] ?? d.estado_operativo}`);
-      if (d.estado_aprobacion) p.push(`aprobación → ${APROB[String(d.estado_aprobacion)] ?? d.estado_aprobacion}`);
-      if (d.prioridad) p.push(`prioridad → ${d.prioridad}`);
-      if (d.planificacion) p.push(`planificación → ${String(d.planificacion).replace('_', ' ')}`);
-      if (d.owner_agencia) p.push('cambió responsables');
-      if (d.titulo_interno) p.push('renombró la tarea');
-      if ('daily_fecha' in d) p.push(d.daily_fecha ? 'la marcó para el daily de hoy' : 'la quitó del daily');
-      if (d.entregable_urls) p.push('actualizó entregables');
-      if (d.piezas !== undefined) p.push(`piezas → ${d.piezas}`);
-      if (d.peso !== undefined) p.push(`peso → ${d.peso}`);
-      if (d.fecha_pedido !== undefined) p.push('cambió la fecha de pedido');
-      return p.length ? p.join(' · ') : 'actualizó la tarea';
-    }
-    case 'reproceso':
-      return `registró un reproceso (${d.origen ?? ''}${d.motivo ? ` · ${MOTIVOS_REPROCESO.find((m) => m.valor === d.motivo)?.label ?? d.motivo}` : ''})`;
-    case 'reproceso_cerrado':
-      return 'cerró el reproceso (entregado de nuevo)';
-    case 'crear_proyecto':
-      return `creó el proyecto (${d.requerimientos ?? 0} tareas)`;
-    case 'recurrencia_guardar':
-      return 'configuró la recurrencia mensual';
-    case 'recurrencia_generar':
-      return `generó el fee de ${d.periodo ?? ''}`;
-    case 'generar_plan_operativo':
-      return 'generó el Plan Operativo';
-    case 'generar_acta_cierre':
-      return 'generó el Acta de Cierre';
-    case 'generar_informe_mensual':
-      return `generó el informe mensual ${d.mes ?? ''}`;
-    case 'publicar_acta':
-      return 'publicó el documento en Basecamp';
-    case 'publicar_daily_apertura':
-      return 'publicó la apertura de mesa en Basecamp';
-    case 'publicar_daily_cierre':
-      return 'publicó el cierre de mesa en Basecamp';
-    case 'basecamp_importar':
-      return `sincronizó con Basecamp (${d.requerimientos_creados ?? 0} nuevas · ${d.titulos_actualizados ?? 0} títulos · ${d.eliminados_en_basecamp ?? 0} eliminadas)`;
-    case 'adoptar_huerfano':
-      return 'adoptó un huérfano de Basecamp';
-    case 'basecamp_entrada':
-      return `entró desde Basecamp${d.lista ? ` · lista ${d.lista}` : ''}${d.creador ? ` · creada por ${d.creador}` : ''}`;
-    case 'revisar_entrada':
-      return 'revisó la entrada desde Basecamp';
-    case 'respondido':
-      return 'marcó la primera respuesta al cliente';
-    case 'respondido_deshacer':
-      return 'deshizo la marca de primera respuesta';
-    case 'kpi_medicion':
-      return `registró el KPI ${d.codigo ?? ''} (${d.periodo ?? ''})${d.origen === 'ajustado' ? ' con ajuste' : ''}`;
-    case 'kpi_definicion':
-      return `editó la definición del KPI ${d.codigo ?? ''}`;
-    case 'bitacora':
-      return `anotó en la bitácora${d.visible_cliente ? ' (visible al cliente)' : ''}: “${String(d.nota ?? '').slice(0, 120)}”`;
-    case 'bitacora_eliminar':
-      return 'borró una nota de la bitácora';
-    case 'ia_brief':
-      return 'usó la IA para extraer un brief';
-    case 'ia_recordatorio':
-      return 'redactó un recordatorio al cliente con IA';
-    case 'crear_cliente':
-      return `dio de alta al cliente ${d.nombre ?? ''}`;
-    case 'actualizar_usuario':
-      return 'actualizó un usuario';
-    case 'quitar_acceso':
-      return `quitó el acceso a ${d.email ?? 'un usuario'}`;
-    case 'restaurar_acceso':
-      return `restauró el acceso a ${d.email ?? 'un usuario'}`;
-    case 'vincular_basecamp_usuarios':
-      return `vinculó usuarios con Basecamp (${d.vinculados ?? 0})`;
-    case 'crear_api_key':
-      return 'creó una API key';
-    case 'revocar_api_key':
-      return 'revocó una API key';
-    case 'mcp_confirm':
-      return 'confirmó un plan de un agente (MCP)';
-    default:
-      return accion.replace(/_/g, ' ');
-  }
+type Detalle = Record<string, unknown>;
+
+/** Qué cambió en una actualización, en el orden en que se lee. */
+const CAMBIOS: [campo: string, frase: (d: Detalle) => string | null][] = [
+  ['estado_operativo', (d) => (d.estado_operativo ? `estado → ${etiqueta(ESTADO_OPERATIVO_LABEL, d.estado_operativo)}` : null)],
+  ['estado_aprobacion', (d) => (d.estado_aprobacion ? `aprobación → ${etiqueta(ESTADO_APROBACION_LABEL, d.estado_aprobacion)}` : null)],
+  ['prioridad', (d) => (d.prioridad ? `prioridad → ${d.prioridad}` : null)],
+  ['planificacion', (d) => (d.planificacion ? `planificación → ${String(d.planificacion).replace('_', ' ')}` : null)],
+  ['owner_agencia', (d) => (d.owner_agencia ? 'cambió responsables' : null)],
+  ['titulo_interno', (d) => (d.titulo_interno ? 'renombró la tarea' : null)],
+  ['daily_fecha', (d) => ('daily_fecha' in d ? (d.daily_fecha ? 'la marcó para el daily de hoy' : 'la quitó del daily') : null)],
+  ['entregable_urls', (d) => (d.entregable_urls ? 'actualizó entregables' : null)],
+  ['piezas', (d) => (d.piezas !== undefined ? `piezas → ${d.piezas}` : null)],
+  ['peso', (d) => (d.peso !== undefined ? `peso → ${d.peso}` : null)],
+  ['fecha_pedido', (d) => (d.fecha_pedido !== undefined ? 'cambió la fecha de pedido' : null)],
+];
+
+/** Frase de la bitácora de actividad por acción de auditoría. Las acciones sin entrada se leen por su nombre. */
+const FRASES: Record<string, string | ((d: Detalle) => string)> = {
+  crear: 'creó la tarea',
+  eliminar: 'eliminó la tarea',
+  reprogramar: (d) =>
+    `movió la entrega del ${fmt(d.de)} al ${fmt(d.a)}${d.motivo_reprogramacion ? ` · ${motivoReprogramacion(d.motivo_reprogramacion)}` : ''}`,
+  actualizar: (d) => {
+    const p = CAMBIOS.map(([, frase]) => frase(d)).filter((x): x is string => x !== null);
+    return p.length ? p.join(' · ') : 'actualizó la tarea';
+  },
+  reproceso: (d) => `registró un reproceso (${d.origen ?? ''}${d.motivo ? ` · ${motivoReproceso(d.motivo)}` : ''})`,
+  reproceso_cerrado: 'cerró el reproceso (entregado de nuevo)',
+  crear_proyecto: (d) => `creó el proyecto (${d.requerimientos ?? 0} tareas)`,
+  recurrencia_guardar: 'configuró la recurrencia mensual',
+  recurrencia_generar: (d) => `generó el fee de ${d.periodo ?? ''}`,
+  generar_plan_operativo: 'generó el Plan Operativo',
+  generar_acta_cierre: 'generó el Acta de Cierre',
+  generar_informe_mensual: (d) => `generó el informe mensual ${d.mes ?? ''}`,
+  publicar_acta: 'publicó el documento en Basecamp',
+  publicar_daily_apertura: 'publicó la apertura de mesa en Basecamp',
+  publicar_daily_cierre: 'publicó el cierre de mesa en Basecamp',
+  basecamp_importar: (d) =>
+    `sincronizó con Basecamp (${d.requerimientos_creados ?? 0} nuevas · ${d.titulos_actualizados ?? 0} títulos · ${d.eliminados_en_basecamp ?? 0} eliminadas)`,
+  adoptar_huerfano: 'adoptó un huérfano de Basecamp',
+  basecamp_entrada: (d) => `entró desde Basecamp${d.lista ? ` · lista ${d.lista}` : ''}${d.creador ? ` · creada por ${d.creador}` : ''}`,
+  revisar_entrada: 'revisó la entrada desde Basecamp',
+  respondido: 'marcó la primera respuesta al cliente',
+  respondido_deshacer: 'deshizo la marca de primera respuesta',
+  kpi_medicion: (d) => `registró el KPI ${d.codigo ?? ''} (${d.periodo ?? ''})${d.origen === 'ajustado' ? ' con ajuste' : ''}`,
+  kpi_definicion: (d) => `editó la definición del KPI ${d.codigo ?? ''}`,
+  bitacora: (d) => `anotó en la bitácora${d.visible_cliente ? ' (visible al cliente)' : ''}: “${String(d.nota ?? '').slice(0, 120)}”`,
+  bitacora_eliminar: 'borró una nota de la bitácora',
+  ia_brief: 'usó la IA para extraer un brief',
+  ia_recordatorio: 'redactó un recordatorio al cliente con IA',
+  crear_cliente: (d) => `dio de alta al cliente ${d.nombre ?? ''}`,
+  actualizar_usuario: 'actualizó un usuario',
+  quitar_acceso: (d) => `quitó el acceso a ${d.email ?? 'un usuario'}`,
+  restaurar_acceso: (d) => `restauró el acceso a ${d.email ?? 'un usuario'}`,
+  vincular_basecamp_usuarios: (d) => `vinculó usuarios con Basecamp (${d.vinculados ?? 0})`,
+  crear_api_key: 'creó una API key',
+  revocar_api_key: 'revocó una API key',
+  mcp_confirm: 'confirmó un plan de un agente (MCP)',
+};
+
+export function describir(accion: string, d: Detalle): string {
+  const f = Object.hasOwn(FRASES, accion) ? FRASES[accion] : undefined;
+  if (f === undefined) return accion.replace(/_/g, ' ');
+  return typeof f === 'string' ? f : f(d);
 }
 
 export async function actividadDelDia(
