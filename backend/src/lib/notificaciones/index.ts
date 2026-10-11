@@ -145,6 +145,17 @@ export async function procesarPendientes(tenantId?: string): Promise<{ enviadas:
     if (f.email_destino && f.email_destino.trim().toLowerCase() !== destino.trim().toLowerCase())
       log.warn('[notificaciones] email_destino no coincide con el usuario; se envía al correo del usuario', f.id);
     const { cuerpo, ruta } = separarRuta(f.cuerpo);
+    // Reserva atómica antes de enviar: solo el proceso que logra subir `intentos` de N a N+1 manda el correo. Si
+    // coinciden el scheduler y un disparo externo de /api/cron, el otro no encuentra la fila y la salta.
+    const { data: reservada, error: eReserva } = await db
+      .from('notificaciones')
+      .update({ intentos: f.intentos + 1 })
+      .eq('id', f.id)
+      .eq('intentos', f.intentos)
+      .is('enviada_at', null)
+      .select('id');
+    throwIf(eReserva);
+    if (!reservada?.length) continue;
     try {
       await sendEmail({
         to: destino,
@@ -152,15 +163,12 @@ export async function procesarPendientes(tenantId?: string): Promise<{ enviadas:
         html: plantillaHtml(f.titulo, cuerpo ?? '', ruta ? `${base}${ruta}` : undefined),
         text: cuerpo,
       });
-      await db
-        .from('notificaciones')
-        .update({ enviada_at: new Date().toISOString(), intentos: f.intentos + 1, ultimo_error: null })
-        .eq('id', f.id);
+      await db.from('notificaciones').update({ enviada_at: new Date().toISOString(), ultimo_error: null }).eq('id', f.id);
       enviadas += 1;
     } catch (err) {
       await db
         .from('notificaciones')
-        .update({ intentos: f.intentos + 1, ultimo_error: err instanceof Error ? err.message.slice(0, 500) : String(err) })
+        .update({ ultimo_error: err instanceof Error ? err.message.slice(0, 500) : String(err) })
         .eq('id', f.id);
       fallidas += 1;
     }

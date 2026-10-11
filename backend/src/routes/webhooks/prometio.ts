@@ -15,6 +15,7 @@ import { notificar } from '../../lib/notificaciones';
 import { tenantPorDefecto } from '../../lib/db/tenants';
 import { ponerLogoSiFalta } from '../../lib/db/clientes';
 import { guardarBorradorPrometio, plantillaParaServicio } from '../../lib/db/proyectos';
+import { urlHttps } from '../../lib/validacion';
 
 export const prometioWebhook = new Hono();
 
@@ -23,7 +24,12 @@ const empresa = z.object({
   nombre: z.string(),
   activo: z.boolean().default(true),
   ruc: z.string().nullable().optional(),
-  logo_url: z.string().nullable().optional(),
+  // Un logo que no sea https se descarta (no se rechaza el evento): termina en un <img> del portal del cliente.
+  logo_url: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((u) => (u && urlHttps().safeParse(u).success ? u.trim() : null)),
 });
 
 const envelope = z.object({

@@ -8,17 +8,20 @@ pendiente. Las tablas del 23/09 están actualizadas con lo que se cerró despué
 
 ## Pendiente hoy
 
+Los tres pendientes de código que quedaban se cerraron el 11/10/2026 (ver más abajo, «Cerrado el 11/10»).
+
 - **Rotar credenciales de Basecamp es una práctica manual.** Los tokens OAuth se renuevan reconectando la cuenta en
   Admin → Integraciones, y el secreto del webhook cambiando `BASECAMP_WEBHOOK_SECRET` y actualizando los webhooks
   ([cómo](./operacion.md#rotar-el-secreto-del-webhook-de-basecamp)). No hay rotación automática ni calendario.
-- **Códigos OAuth en claro** (M13). Los códigos de autorización del MCP se guardan tal cual en `oauth_codes`
-  (`lib/oauth/index.ts`). Son de un solo uso y con PKCE obligatorio, pero falta guardarlos como `sha256(code)`, como
-  ya se hace con los tokens.
-- **`logo_url` de PrometIO sin validar.** El webhook (`routes/webhooks/prometio.ts`) acepta cualquier texto y lo guarda
-  si el cliente no tenía logo. Falta exigir una URL https.
-- **`procesarPendientes` sin claim atómico** (`lib/notificaciones/index.ts`). Si coinciden el scheduler y un disparo
-  externo de `/api/cron`, un correo puede salir dos veces.
 - **Capturas del manual con datos reales** (M15) y **reparaciones por script** (M10): ver la tabla de medios.
+
+## Cerrado el 11/10/2026
+
+| Hallazgo | Qué se hizo | Prueba |
+|---|---|---|
+| Códigos OAuth en claro (M13) | El código de autorización se guarda como `sha256(code)`, igual que los tokens; el valor guardado no sirve para canjear | `oauth_codigos.test.ts` |
+| `logo_url` sin validar | Solo se aceptan direcciones https: en Admin → Clientes (error de validación) y desde PrometIO (un logo inválido se descarta sin rechazar el evento). Al mostrarlo, el portal y el Builder solo usan URLs https | `webhook_prometio.test.ts`, `validacion_errores.test.ts` |
+| Correos que podían salir dos veces | Cada correo se reserva con un update condicional antes de enviarse: si el scheduler y `/api/cron` coinciden, solo uno lo manda | `notificaciones_destino.test.ts` |
 
 ## Revisión del 23/09/2026
 
@@ -67,7 +70,7 @@ webhooks e IA · frontend, secretos y dependencias). Cada hallazgo fue verificad
 | M10 | Scripts con `PUT` crudo a Basecamp y one-offs sin confirmación en el repo | ✅ `exp_*` eliminados; `scripts/README.md` con reglas. ⏳ Convertir reparaciones recurrentes en endpoints de admin |
 | M11 | `ultimo_uso_at` de API keys nunca se actualizaba (builder sin `await`) | ✅ |
 | M12 | «Entradas desde Basecamp» leía `audit_log` con el cliente del usuario (vacío para no-admin) | ✅ Service role acotado al tenant |
-| M13 | Registro dinámico OAuth sin límite y `client_name` arbitrario en el consentimiento; códigos sin hash | Parcial. ✅ Límite por IP en `/oauth/register` y consentimiento con nombre y hosts tomados del servidor (10/10, S6). ⏳ Los códigos siguen guardados en claro (`lib/oauth/index.ts`) |
+| M13 | Registro dinámico OAuth sin límite y `client_name` arbitrario en el consentimiento; códigos sin hash | ✅ Límite por IP en `/oauth/register` y consentimiento con nombre y hosts tomados del servidor (10/10, S6). Códigos guardados como hash (11/10) |
 | M14 | `pushDueDate` en reconciliación sin tope ni auditoría | ✅ Máximo 25 fechas por corrida, cada una auditada (`lib/basecamp/reconcile.ts`, 10/10) |
 | M15 | Datos personales reales en las capturas del manual (`docs/manual/img`) y project ref de Supabase en docs | ⏳ Regenerar capturas con datos semilla si el repo deja de ser privado |
 

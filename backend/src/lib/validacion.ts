@@ -29,3 +29,12 @@ export const zValidator = <T extends z.ZodTypeAny, Target extends keyof Validati
       400,
     );
   });
+
+/** URL externa segura: solo https (un logo o enlace con `javascript:` o `http:` se rechaza). */
+export const urlHttps = () =>
+  z
+    .string()
+    .trim()
+    .max(2048)
+    .url()
+    .refine((u) => u.startsWith('https://'), 'Debe ser una dirección https');

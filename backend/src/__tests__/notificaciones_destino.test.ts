@@ -18,6 +18,8 @@ const USUARIOS = [
 ];
 const enviados: string[] = [];
 const updates: Record<string, unknown>[] = [];
+// false simula que otro proceso ya reservó la fila (el update condicional no encuentra nada).
+let RESERVA_OK = true;
 
 vi.mock('../lib/db/client', async (orig) => {
   const mod = await orig<typeof import('../lib/db/client')>();
@@ -39,7 +41,8 @@ vi.mock('../lib/db/client', async (orig) => {
         then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => {
           if (upd) {
             updates.push(upd);
-            return Promise.resolve({ error: null }).then(res, rej);
+            const reserva = 'intentos' in upd && !('ultimo_error' in upd);
+            return Promise.resolve({ data: reserva && !RESERVA_OK ? [] : [{ id: 'n1' }], error: null }).then(res, rej);
           }
           return Promise.resolve({ data: tabla === 'usuarios' ? USUARIOS : FILAS, error: null }).then(res, rej);
         },
@@ -71,6 +74,7 @@ const fila = (p: Record<string, unknown>) => ({
 
 describe('procesarPendientes: destinatario', () => {
   beforeEach(() => {
+    RESERVA_OK = true;
     enviados.length = 0;
     updates.length = 0;
   });
@@ -100,5 +104,14 @@ describe('procesarPendientes: destinatario', () => {
     await procesarPendientes();
     expect(enviados).toEqual([]);
     expect(updates.every((u) => u.ultimo_error === 'sin destinatario válido')).toBe(true);
+  });
+
+  // Seguridad (pendiente del 11/10): si el scheduler y /api/cron procesan a la vez, el correo sale una sola vez.
+  it('si otro proceso ya reservó la notificación, no la envía de nuevo', async () => {
+    FILAS = [fila({})];
+    RESERVA_OK = false;
+    const { procesarPendientes } = await import('../lib/notificaciones');
+    expect(await procesarPendientes()).toEqual({ enviadas: 0, fallidas: 0 });
+    expect(enviados).toEqual([]);
   });
 });

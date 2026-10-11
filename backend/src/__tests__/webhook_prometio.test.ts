@@ -65,6 +65,12 @@ describe('webhook de PrometIO', () => {
     await enviar('empresa.actualizada', { ...empresa, logo_url: 'https://cdn/logo.png' });
     expect(m.logo).toHaveBeenCalledWith(expect.anything(), empresa.id, 'https://cdn/logo.png');
   });
+  it('un logo que no es https se descarta sin rechazar el evento', async () => {
+    for (const malo of ['javascript:alert(1)', 'http://cdn/logo.png', 'no es url']) {
+      expect((await enviar('empresa.actualizada', { ...empresa, logo_url: malo })).status).toBe(200);
+    }
+    expect(m.logo).not.toHaveBeenCalled();
+  });
   it('cotización aprobada: solo un borrador para revisar (nunca un proyecto) y aviso a ejecutivas y operaciones', async () => {
     m.getCliente.mockResolvedValue({ id: empresa.id, nombre: 'Acme EC' });
     const res = await enviar('cotizacion.aprobada', {

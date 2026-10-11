@@ -153,10 +153,11 @@ export async function emitirCodigo(p: {
   usuario_id: string;
 }): Promise<string> {
   const code = b64url(randomBytes(32));
+  // Se guarda solo el hash, igual que los tokens: quien lea la tabla no puede canjear un código vigente (M13).
   const { error } = await serviceClient()
     .from('oauth_codes')
     .insert({
-      code,
+      code: sha256(code),
       client_id: p.client_id,
       redirect_uri: p.redirect_uri,
       code_challenge: p.code_challenge,
@@ -224,7 +225,7 @@ export async function canjearCodigo(p: {
   const cliente = await getCliente(p.client_id);
   if (!cliente || !verificarSecreto(cliente, p.client_secret)) throw new DbError('invalid_client', 401);
   const db = serviceClient();
-  const { data, error } = await db.from('oauth_codes').select('*').eq('code', p.code).eq('client_id', p.client_id).maybeSingle();
+  const { data, error } = await db.from('oauth_codes').select('*').eq('code', sha256(p.code)).eq('client_id', p.client_id).maybeSingle();
   throwIf(error);
   const c = data as {
     code: string;
@@ -245,7 +246,7 @@ export async function canjearCodigo(p: {
   const { data: marcado } = await db
     .from('oauth_codes')
     .update({ usado_at: new Date().toISOString() })
-    .eq('code', p.code)
+    .eq('code', sha256(p.code))
     .is('usado_at', null)
     .select('code');
   if (!marcado?.length) throw new DbError('invalid_grant', 400);

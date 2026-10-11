@@ -6,7 +6,7 @@ import { log } from './lib/logger';
 import { iniciarSentry } from './lib/sentry';
 
 // Sentry (si hay SENTRY_DSN) antes de levantar el servidor y el scheduler.
-iniciarSentry();
+await iniciarSentry();
 
 // Red de seguridad: un rechazo o excepción suelta se registra en vez de terminar el proceso (Node 22 lo terminaría).
 process.on('unhandledRejection', (razon) => log.error('[proceso] promesa rechazada sin manejar', razon));

@@ -3,14 +3,15 @@
  * sin IP, sin cuerpo ni cabeceras de la petición, y la URL pasa por redactarRuta (tokens del portal y secreto
  * del webhook fuera).
  */
-import * as Sentry from '@sentry/node';
 import { redactarRuta } from './log';
 
-let activo = false;
+// El SDK se carga solo si hay DSN: importarlo arrastra OpenTelemetry y hacía lento el arranque (y los tests).
+let Sentry: typeof import('@sentry/node') | null = null;
 
-export function iniciarSentry(): void {
+export async function iniciarSentry(): Promise<void> {
   const dsn = process.env.SENTRY_DSN;
-  if (!dsn || activo) return;
+  if (!dsn || Sentry) return;
+  Sentry = await import('@sentry/node');
   Sentry.init({
     dsn,
     environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'development',
@@ -35,20 +36,20 @@ export function iniciarSentry(): void {
       return evento;
     },
   });
-  activo = true;
 }
 
 /** Envía un error del logger. Si entre los extras hay un Error, se manda ese (con su stack); si no, el mensaje. */
 export function capturarError(mensaje: string, extra: unknown[]): void {
-  if (!activo) return;
+  const s = Sentry;
+  if (!s) return;
   const err = extra.find((x): x is Error => x instanceof Error);
-  Sentry.withScope((scope) => {
+  s.withScope((scope) => {
     scope.setExtra('mensaje', mensaje);
-    if (err) Sentry.captureException(err);
-    else Sentry.captureMessage(mensaje, 'error');
+    if (err) s.captureException(err);
+    else s.captureMessage(mensaje, 'error');
   });
 }
 
 export async function vaciarSentry(): Promise<void> {
-  if (activo) await Sentry.flush(2000);
+  if (Sentry) await Sentry.flush(2000);
 }

@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { zValidator } from '../../lib/validacion';
+import { zValidator, urlHttps } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listClientes, getCliente, updateClienteConfig, listProyectos, listBacklog, audit } from '../../lib/db';
 import type { ResumenClientePrometio } from '@backio/shared';
@@ -63,7 +63,7 @@ const patchSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
-  logo_url: z.string().url().nullable().optional(),
+  logo_url: urlHttps().nullable().optional(),
   config: z.record(z.unknown()).optional(),
   mesa_id: z.string().uuid().nullable().optional(),
   activo: z.boolean().optional(),
