@@ -1,121 +1,126 @@
+<div align="center">
+
+<img src="frontend/public/backio-icon.svg" alt="BackIO" width="96" height="96" />
+
 # BackIO
 
-**Sistema operativo de backlog de Geeks Ecuador.** Reemplaza Monday.com como tablero de
-requerimientos y vista de cuenta del cliente, apoyándose en Basecamp como sistema de ejecución.
+**El backlog operativo de Geeks Ecuador.**<br />
+Requerimientos, rituales de equipo y vista del cliente, sobre Basecamp como sistema de ejecución.
 
-En producción desde el 04/09/2026 · `backio.vercel.app` · sincronizado con Basecamp.
+[![CI](https://github.com/luispalaciosec/backIO/actions/workflows/ci.yml/badge.svg)](https://github.com/luispalaciosec/backIO/actions/workflows/ci.yml)
+[![Deploy frontend](https://github.com/luispalaciosec/backIO/actions/workflows/deploy-frontend.yml/badge.svg)](https://github.com/luispalaciosec/backIO/actions/workflows/deploy-frontend.yml)
+
+[Aplicación](https://backio.vercel.app) · [Documentación](https://backio.vercel.app/docs) · [Arquitectura técnica](docs/17-arquitectura-tecnica.md) · [Decisiones](docs/decisiones.md)
+
+</div>
+
+---
+
+BackIO reemplaza a Monday.com como tablero de requerimientos y como vista de cuenta para el cliente. El equipo sigue
+ejecutando en Basecamp; BackIO organiza el trabajo, mide el cumplimiento y muestra al cliente solo lo que la agencia
+decidió mostrar. En producción desde el 04/09/2026.
+
+```mermaid
+flowchart LR
+  Cliente([Cliente]) -->|portal por enlace| BackIO
+  Equipo([Equipo Geeks]) -->|backlog · rituales · KPIs| BackIO
+  PrometIO[PrometIO · CRM] -->|cotizaciones · empresas| BackIO
+  BackIO -->|tareas y fechas| Basecamp[Basecamp · ejecución]
+  Basecamp -->|completado · asignados · horas| BackIO
+  Agentes([Agentes de IA]) -->|MCP con confirmación| BackIO
+```
 
 ## Qué hace
 
 | Para | Qué resuelve |
 |---|---|
-| **Ejecutivas de cuenta** | Backlog por cliente estilo Monday (filtros en la URL, columnas fijas, edición en línea), bitácora con el cliente, hoja de estatus imprimible, reprogramaciones con motivo, reprocesos |
-| **Mesas de operación** | Daily por mesa (elegir tareas, tablero, apertura y cierre publicados en Basecamp con menciones y métricas), Weekly con motor de señales, Plan Operativo y Acta de Cierre |
-| **Gerencia** | Dashboard, cumplimiento a fecha original vs vigente, personas (performance con evidencia del timesheet), informes mensuales y por canal |
-| **Clientes** | Portal por token con lo que la agencia decidió mostrar. Nada interno puede llegar ahí por diseño |
-| **Agentes de IA** | API REST con scopes y MCP Server con preview + confirmación para toda escritura |
+| **Ejecutivas de cuenta** | Backlog por cliente con filtros en la URL y edición en línea, bitácora, hoja de estatus, reprogramaciones con motivo y reprocesos |
+| **Mesas de operación** | Daily por mesa con apertura y cierre publicados en Basecamp, weekly con motor de señales, Plan Operativo y Acta de Cierre |
+| **Gerencia** | Dashboard, cumplimiento a fecha original y vigente, KPIs por persona y equipo, evolutivo de rituales e informes mensuales |
+| **Clientes** | Portal por enlace (con PIN opcional) que muestra solo lo marcado como visible |
+| **Agentes de IA** | API REST con scopes y servidor MCP donde toda escritura pasa por un plan que una persona confirma |
 
-Basecamp sigue siendo donde el equipo trabaja. BackIO lee de ahí solo lo estructural (títulos,
-fechas, responsables, completado, horas) y escribe de vuelta fechas, to-dos nuevos y mensajes.
+## Las reglas que no se rompen
 
-## Las cinco reglas que nunca se rompen
+1. **El texto de Basecamp no entra a BackIO.** Ni comentarios, ni descripciones, ni adjuntos: solo títulos, fechas,
+   responsables, completado y horas. Es la garantía de que un comentario interno no llegue al cliente.
+2. **La visibilidad para el cliente se hereda de la plantilla y nunca se abre.** Lo impide un trigger de la base.
+3. **Un dueño por dato.** Basecamp manda sobre «completado»; BackIO, sobre todo lo demás.
+4. **Un agente propone, una persona confirma.** Las tools de escritura del MCP devuelven un plan; no ejecutan.
+5. **`tenant_id` y RLS en todas las tablas**, aunque hoy exista una sola organización.
 
-1. **El texto de Basecamp jamás entra a BackIO.** Descripciones, comentarios y adjuntos se quedan
-   allá. Solo entran títulos (excepción D1), fechas, responsables, completado y horas. Es la
-   garantía estructural de que un comentario interno no llegue al cliente.
-2. **La visibilidad al cliente se hereda, nunca se abre.** Un trigger de base de datos impide
-   pasar de oculto a visible.
-3. **Los estados no se sincronizan en dos direcciones.** Basecamp manda sobre `completed`;
-   BackIO sobre todo lo demás.
-4. **Toda escritura desde un agente requiere preview + confirmación.**
-5. **`tenant_id` y RLS en toda tabla**, aunque hoy solo exista un tenant.
-
-Detalle y defensas en `docs/02-visibilidad.md`. Zonas que no se cambian sin revisión humana:
-`lib/visibility/`, `lib/basecamp/write.ts`, tools MCP de escritura y políticas RLS (`CLAUDE.md`).
+Por qué existe cada una: [registro de decisiones](docs/decisiones.md). El mayor riesgo del sistema es que contenido
+interno llegue al portal; las defensas están en [Qué ve el cliente](docs/02-visibilidad.md).
 
 ## Stack
 
 | Capa | Tecnología |
 |---|---|
-| Base de datos y auth | Supabase (Postgres + RLS + Auth) |
+| Datos y autenticación | Supabase: Postgres, RLS y Auth |
 | Backend | Hono sobre Node 22, TypeScript estricto, zod · Railway |
-| Frontend | Next.js 15.5 (App Router) + React 19 + Tailwind · Vercel |
-| Ejecución | Basecamp 3 API (OAuth2, webhooks, polling) |
-| CRM | PrometIO (webhook, `cliente_id` compartido) |
-| IA | Claude (Anthropic API): redacta dailies, weeklies, briefs e informes; una persona publica |
-| Agentes | MCP Server + API REST con OpenAPI |
-| Operación | Logger JSON con niveles, Sentry sin datos personales (opcional), Turnstile en login y recuperar contraseña |
-| CI | GitHub Actions: `pnpm audit`, typecheck, lint, tests y build en cada push; Dependabot semanal |
+| Frontend | Next.js 15 (App Router), React 19, Tailwind · Vercel |
+| Integraciones | Basecamp 3 (OAuth2, webhooks, reconciliación) · PrometIO (webhook firmado) |
+| IA | Claude, de Anthropic: redacta dailies, weeklies, briefs e informes; una persona publica |
+| Operación | Logs JSON con niveles, Sentry sin datos personales, vigía de tareas programadas |
 
-## Correr en local
+## Empezar
+
+Requisitos: Node 20 o superior (producción usa 22) y pnpm 9.
 
 ```bash
 pnpm install
-cp backend/.env.example backend/.env      # Supabase, Basecamp, Anthropic, Resend
+cp backend/.env.example backend/.env          # Supabase, Basecamp, Anthropic, Resend…
 cp frontend/.env.example frontend/.env.local
-pnpm dev                                   # backend :4000 · frontend :3000
-pnpm test && pnpm typecheck && pnpm lint
+pnpm dev                                       # backend en :4000 · frontend en :3000
 ```
 
-Requisitos, variables, base de datos, usuarios y API keys: `docs/11-setup.md`. Despliegue:
-`docs/12-despliegue.md`.
+```bash
+pnpm typecheck && pnpm lint && pnpm test       # lo mismo que corre el CI
+pnpm --filter @backio/docs dev                 # documentación en local
+```
+
+Base de datos, usuarios y API keys: [Levantar el proyecto en local](docs/11-setup.md).
 
 ## Estructura
 
 ```
-shared/     tipos compartidos y sanitizeForClient (única salida al cliente)
-backend/    src/app.ts (routers) · src/routes/v1 · src/lib (dominio, db, basecamp, ia, mcp)
-            supabase/migrations (SQL versionado, 01–29) · scripts (operación)
-frontend/   app/(app) área interna · app/p portal · components · lib
-docs/       sitio VitePress: specs, arquitectura técnica, operación, decisiones, manual de uso (HTML + PDF)
+backend/    API Hono: routes/ (REST, portal, MCP, OAuth, webhooks) · lib/ (dominio, db, basecamp, ia, jobs)
+            supabase/migrations/ (SQL numerado) · scripts/ (generadores y diagnóstico)
+frontend/   Next.js: app/(app) área interna · app/p portal del cliente · components · lib
+shared/     Tipos, fechas, métricas y la sanitización que decide qué llega al cliente
+docs/       Sitio de documentación (VitePress), publicado en /docs
 ```
 
-Cómo está armado por dentro, ciclo de una petición, crons, integraciones y deuda técnica:
-**`docs/17-arquitectura-tecnica.md`**.
+## Calidad y despliegue
+
+- **CI en cada push** (GitHub Actions): auditoría de dependencias, tipos, lint con formato obligatorio, tests de
+  backend, frontend y shared, build del frontend y de la documentación.
+- **Despliegue:** Railway publica el backend con cada push a `main`. El frontend y la documentación se publican en
+  Vercel cuando el CI termina en verde.
+- **Migraciones:** archivos numerados en `backend/supabase/migrations/`, revisados antes de aplicarse. Después de cada
+  una: `pnpm --filter @backio/backend db:types`.
+
+Qué corre solo y qué hacer cuando algo falla: [Operación](docs/operacion.md).
 
 ## Documentación
 
-La carpeta `docs/` es un sitio VitePress publicado en **https://backio.vercel.app/docs** (se compila junto con el
-frontend). Para leerlo en local mientras se edita:
+Todo está en **[backio.vercel.app/docs](https://backio.vercel.app/docs)**. Para empezar: [Por dónde empezar](docs/empezar.md).
 
-```bash
-pnpm --filter @backio/docs dev
-```
-
-Se empieza por `docs/empezar.md`. Los documentos que más se consultan:
-
-| Doc | Contenido |
+| Si vas a… | Lee |
 |---|---|
-| `CLAUDE.md` | Reglas, convenciones, zonas de revisión humana |
-| `docs/02-visibilidad.md` | Frontera cliente/interno. Léelo antes de tocar el portal o la sincronización |
-| `docs/17-arquitectura-tecnica.md` | Arquitectura a nivel de código y deuda técnica |
-| `docs/operacion.md` | Qué corre solo, qué hacer cuando algo falla, tareas de rutina |
-| `docs/decisiones.md` | Registro de decisiones vigentes |
-| `docs/18-seguridad.md` | Revisiones de seguridad: hallazgos, correcciones y pendientes |
-| `HARDENING-CHANGELOG.md` | Detalle, hallazgo por hallazgo, de la auditoría externa del 10/10/2026 |
-| `docs/manual/` | Manual de uso para el equipo (HTML y PDF con pantallas) |
+| Entender el sistema | [Arquitectura](docs/00-arquitectura.md) · [Glosario](docs/glosario.md) |
+| Tocar el portal o la sincronización | [Qué ve el cliente](docs/02-visibilidad.md) · [Basecamp](docs/04-basecamp.md) |
+| Cambiar código | [Arquitectura técnica](docs/17-arquitectura-tecnica.md) · [`CLAUDE.md`](CLAUDE.md) |
+| Integrar un sistema o un agente | [API y agentes](docs/07-api-mcp.md) · [Referencia de la API](docs/referencia-api.md) |
+| Revisar la seguridad | [Seguridad](docs/18-seguridad.md) · [`HARDENING-CHANGELOG.md`](HARDENING-CHANGELOG.md) |
 
-## Estado y deuda técnica
+## Cómo contribuir
 
-Fases 0 a 4 y sprints v2 1 a 4 en producción. Ya están el CI en GitHub Actions, el vigía que avisa si una tarea
-programada no corre y el despliegue automático del frontend (requiere el secreto `VERCEL_TOKEN`). Pendiente de
-plataforma: ambiente de staging y tests de integración con Basecamp. Lista completa y priorizada en
-`docs/17-arquitectura-tecnica.md` §8.
+- Las zonas `lib/visibility/`, `lib/basecamp/write.ts`, las tools MCP de escritura y las políticas RLS no se cambian
+  sin revisión humana ([`CLAUDE.md`](CLAUDE.md)).
+- Si un cambio altera un comportamiento documentado, la página de `docs/` se corrige en el mismo commit.
+- La documentación es pública: en `docs/` no van secretos, datos de clientes ni vulnerabilidades abiertas.
 
-## Decisiones vigentes
-
-| Decisión | Resultado |
-|---|---|
-| Product owner | Marcia (jefa de operaciones) |
-| Basecamp como origen de trabajo | **Aceptado (23/09/2026).** Lo creado allá entra solo en segundos por el webhook, con una pasada de respaldo cada 15 min; la ejecutiva clasifica en «Entradas desde Basecamp» |
-| Colaboradores | Editan solo sus tareas (estado, fecha con motivo, entregables, piezas, daily) |
-| Daily | Es de una mesa; ninguna tarea entra sin responsable |
-| Canal de notificación | Correo |
-| Todo SQL | Archivo numerado en `backend/supabase/migrations/`, lo aplica Luis |
-
-## Riesgo #1
-
-**Fuga de contenido interno al cliente.** Un comentario de dirección de arte visible en el portal
-es la pérdida de una cuenta. Mitigación: las tres defensas de `docs/02-visibilidad.md`, tests que
-las protegen (`sanitize.test.ts`, `sync.test.ts`, `portal.test.ts`, entre otros) y revisión humana obligatoria
-en las zonas listadas arriba.
+<div align="center">
+<sub>BackIO · Geeks Ecuador · uso interno</sub>
+</div>
