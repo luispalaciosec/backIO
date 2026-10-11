@@ -1,5 +1,7 @@
 # 16 · Cumplimiento: reprogramaciones y reprocesos
 
+> Revisado contra el código el 11/10/2026.
+
 > Aprobado por Luis el 04/09/2026 (siguió las recomendaciones propuestas). Migración `20260904000015`.
 
 ## Principio
@@ -11,9 +13,11 @@ nunca el texto del comentario del cliente o del equipo (regla 1).
 
 ## Reprogramación
 
-- Desde la UI el **motivo es obligatorio** (modal al cambiar la fecha en backlog o Kanban). API y MCP pueden
-  omitirlo: la fila queda "sin causa" y aparece como señal `reprogramacion_sin_motivo` y en el panel
-  "Causas pendientes" del Weekly, donde se completa con un clic.
+- Desde la UI el **motivo es obligatorio** (modal al cambiar la fecha en backlog o Kanban). El MCP también lo
+  exige: `plan_requirement_update` no genera el plan sin motivo. Solo una llamada a la API REST que no viene de la
+  pantalla puede omitirlo (`exigirMotivo` en `backend/src/lib/requerimientos/actualizar.ts`). En ese caso la fila
+  queda "sin causa" y aparece como señal `reprogramacion_sin_motivo` y en el panel "Causas pendientes" del
+  Weekly, donde se completa con un clic.
 - Catálogo y atribución (`MOTIVOS_REPROGRAMACION` en `shared`):
 
 | Motivo | Atribuible a |
@@ -38,8 +42,9 @@ nunca el texto del comentario del cliente o del equipo (regla 1).
   (`lib/basecamp/write.ts › reabrirTodo`, zona de revisión humana).
 - Se cierra con "Entregado de nuevo" en el historial, o solo cuando el to-do se completa en Basecamp / la tarea
   pasa a completado. Al cerrar se guardan las **horas del timesheet** consumidas desde la apertura.
-- Catálogo (`MOTIVOS_REPROCESO`): brief incompleto (ejecutiva), error de ejecución (equipo), cambio de opinión
-  del cliente (cliente), ajuste de marca o legal (cliente), dirección de arte (líder), error de texto (equipo).
+- Catálogo (`MOTIVOS_REPROCESO` en `shared/src/types.ts`): brief incompleto o ambiguo (ejecutiva), info
+  incompleta o incorrecta del levantamiento (ejecutiva), error de ejecución (equipo), cambio de opinión del
+  cliente (cliente), ajuste de marca o legal (cliente), dirección de arte (líder), error de texto (equipo).
 - Idempotente por tarea: mientras hay un reproceso abierto no se crea otro (el webhook `todo_uncompleted`
   que vuelve tras reabrir desde BackIO no duplica).
 
@@ -47,18 +52,24 @@ nunca el texto del comentario del cliente o del equipo (regla 1).
 
 Reprocesos y reprogramaciones admiten una **observación** libre escrita en BackIO por el equipo (máx. 1000
 caracteres). Es texto propio de BackIO, no copiado de Basecamp, y nunca llega al portal del cliente. Migración
-`20260907000017`; el backend tolera la columna ausente (guarda sin observación) hasta que se aplique.
+`20260907000017`, ya aplicada. Mientras no estaba aplicada, el backend guardaba sin observación; ese respaldo ya
+no existe en el código.
 
 ## Indicadores
 
 | Indicador | Cálculo | Dónde |
 |---|---|---|
-| A tiempo (original) | `completado_at <= fecha_entrega_original` | KPI, cliente, persona, informe, serie semanal |
-| A tiempo (vigente) | `completado_at <= fecha_entrega` | KPI secundario, persona (tooltip), informe |
+| A tiempo (original) | `cerradaATiempo(completado_at, fecha_entrega_original)` | KPI, cliente, persona, informe, serie semanal |
+| A tiempo (vigente) | `cerradaATiempo(completado_at, fecha_entrega)` | KPI secundario, persona (tooltip), informe |
 | Desvío | mediana de días entre fecha original y entrega real (solo tardías) | persona |
 | Reprogramaciones del equipo | filas con motivo atribuible `equipo` | persona |
 | Reprocesos y horas de reproceso | filas de `reprocesos` y suma de `horas_reproceso` | KPI, cliente, persona, informe |
 | Causa dominante | motivo más frecuente | persona (tooltip), informe |
+
+«A tiempo» tiene una sola definición: la función `cerradaATiempo` de `shared/src/metricas.ts`. Toma el día de
+cierre en hora de Guayaquil y lo compara con la fecha comprometida, incluyendo ese día. La usan cumplimiento,
+KPIs, evolutivo, dashboard, personas e informes. Ejemplo: una tarea con fecha 15/10 cerrada el 15/10 a las 19:30
+está a tiempo; cerrada el 16/10 a las 00:30 está tarde.
 
 Señales nuevas del Weekly: `reproceso_reincidente` (crítica, ≥ 2 reprocesos), `reprogramacion_sin_motivo` y
 `reproceso_sin_motivo` (media). Causa de agenda IA: "Calidad y reprocesos" / "Causas pendientes de registrar".
@@ -68,12 +79,16 @@ Señales nuevas del Weekly: `reproceso_reincidente` (crítica, ≥ 2 reprocesos)
 ```
 PATCH /requerimientos/:id                       + motivo_reprogramacion (obligatorio desde UI si cambia fecha_entrega)
 GET   /requerimientos/:id/historial             → { reprogramaciones, reprocesos }
-POST  /requerimientos/:id/reprocesos            { origen, motivo, paso_retorno?, reabrir_basecamp }
-PATCH /requerimientos/:id/reprocesos/:rid       { motivo?, paso_retorno? }
+POST  /requerimientos/:id/reprocesos            { origen, motivo, paso_retorno?, observacion?, reabrir_basecamp,
+                                                  area_responsable?, atribuible? }
+PATCH /requerimientos/:id/reprocesos/:rid       { motivo?, paso_retorno?, observacion?, area_responsable?, atribuible? }
 POST  /requerimientos/:id/reprocesos/:rid/cerrar
-PATCH /requerimientos/reprogramaciones/:rid     { motivo }
+PATCH /requerimientos/reprogramaciones/:rid     { motivo, observacion? }
 GET   /requerimientos/causas-pendientes         (últimos 45 días sin motivo)
 ```
+
+`area_responsable` admite `cuentas`, `produccion`, `diseno`, `creatividad` o `content`. `atribuible` admite
+`equipo`, `cliente` o `externo`. La lista completa de rutas está en la [referencia de la API](./referencia-api.md).
 
 Colaboradores: pueden reprogramar (con motivo), registrar y cerrar reprocesos solo en sus tareas.
 

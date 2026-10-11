@@ -2,7 +2,7 @@
  * Cliente HTTP de Basecamp 3.
  *  - User-Agent obligatorio (Basecamp bloquea sin él).
  *  - Rate limit 50 req / 10 s → cola con backoff exponencial.
- *  - OAuth2 a nivel de organización; tokens en tenants.config.basecamp (refresh automático).
+ *  - OAuth2 a nivel de organización; tokens en integracion_credenciales, solo servidor (refresh automático, credenciales.ts).
  * Las respuestas se tipan SOLO con los campos que BackIO necesita. Nunca se guardan enteras.
  */
 import { env } from '../../config/env';

@@ -13,7 +13,8 @@
     "db:seed": "supabase db reset --linked",
     "lint": "eslint src && prettier --check src --ignore-path ../.prettierignore",
     "format": "prettier --write src --ignore-path ../.prettierignore",
-    "db:types": "tsx scripts/gen_tipos_db.ts && prettier --write src/lib/db/database.types.ts"
+    "db:types": "tsx scripts/gen_tipos_db.ts && prettier --write src/lib/db/database.types.ts",
+    "docs:api": "tsx scripts/gen_docs_api.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

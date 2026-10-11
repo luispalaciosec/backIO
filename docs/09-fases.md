@@ -1,5 +1,10 @@
 # 09 · Plan de fases
 
+::: warning Documento histórico
+Plan de fases original (septiembre 2026). Sirve de contexto; no describe el estado actual. Lo vigente está en
+[Arquitectura técnica](./17-arquitectura-tecnica.md) y en el [registro de decisiones](./decisiones.md).
+:::
+
 ## Estimación total: 37 días hábiles (~7-8 semanas)
 
 Nota de calibración: el CRM (PrometIO) se construyó en semana y media. BackIO no es
@@ -82,7 +87,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
 | **Fuga de contenido interno al cliente** | Pérdida de cuenta. Excede varios años del ahorro | Tres defensas en `02-visibilidad.md` + revisión humana obligatoria |
-| **Escritura masiva errónea en Basecamp** | Ensucia producción real | Sandbox primero, límite de 60, idempotencia, rollback |
+| **Escritura masiva errónea en Basecamp** | Ensucia producción real | Sandbox primero, límite de 50 to-dos por operación, idempotencia, rollback |
 | **Falta de adopción** | BackIO muere como murieron los intentos anteriores de WorkOS | Product owner designado + notificaciones desde Fase 1 + el GG modela cumplimiento |
 | **Baja de Monday prematura** | Operación sin herramienta | No dar de baja hasta completar Fase 5 con 4 semanas de coexistencia |
 | **Alcance creciente hacia SaaS** | Meses de trabajo sin retorno en el año de extracción | `tenant_id` sí, billing/onboarding/soporte **no** en 2026 |

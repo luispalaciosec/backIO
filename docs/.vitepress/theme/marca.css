@@ -1,0 +1,18 @@
+/* Colores de BackIO (los mismos del frontend: brand #0073EA). */
+:root {
+  --vp-c-brand-1: #0073ea;
+  --vp-c-brand-2: #0056b3;
+  --vp-c-brand-3: #0073ea;
+  --vp-c-brand-soft: rgba(0, 115, 234, 0.12);
+}
+.dark {
+  --vp-c-brand-1: #5aa9ff;
+  --vp-c-brand-2: #8cc2ff;
+  --vp-c-brand-3: #0073ea;
+  --vp-c-brand-soft: rgba(90, 169, 255, 0.16);
+}
+/* Tablas anchas (modelo de datos, referencia): desplazamiento propio sin romper la página. */
+.vp-doc table {
+  display: block;
+  overflow-x: auto;
+}

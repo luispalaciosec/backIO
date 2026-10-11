@@ -1,5 +1,7 @@
 # 13 · Conectar agentes al MCP Server
 
+> Revisado contra el código el 11/10/2026.
+
 Endpoint: `https://backiobackend-production.up.railway.app/mcp` (Streamable HTTP, sin estado).
 Auth: `Authorization: Bearer bk_live_…` con una API key creada en Admin → API keys.
 
@@ -8,16 +10,27 @@ Auth: `Authorization: Bearer bk_live_…` con una API key creada en Admin → AP
 | gerencial | todas las de lectura |
 | ejecutiva | lectura + `plan_requirement_update` / `confirm_plan` |
 | operaciones | lectura + escritura completa (proyectos, requerimientos, actas, publicar) |
-| cliente | solo `get_project_status` (sanitizado) y `get_client_health` (con etiquetas cliente) |
+| prometio | lectura de proyectos (`get_project_status`, `get_client_health`, `list_clients_and_templates`) + `plan_project_from_template` / `confirm_plan` |
+| cliente | solo `get_project_status`, sanitizado y únicamente para proyectos del cliente asignado a la key |
+| custom | las que permitan los scopes elegidos al crear la key |
+
+Una key de perfil cliente recibe error en cualquier otra tool, incluida `get_client_health`. Tampoco
+puede usar la API REST. Ver los perfiles y scopes en [07-api-mcp.md](./07-api-mcp.md#scopes-de-api-key).
 
 ## Tools
 
 **Lectura**: `list_backlog`, `get_project_status`, `get_weekly_signals`, `get_capacity`,
-`get_client_health`, `search_requirements`, `list_clients_and_templates`.
+`get_client_health`, `search_requirements`, `list_clients_and_templates`, `get_dashboard`, `get_hours`,
+`get_weekly_narrative`.
 
 **Escritura (preview + confirm)**: `plan_project_from_template` → `confirm_plan`,
 `plan_requirement_update` → `confirm_plan`, `generate_weekly_plan`, `generate_closing_minutes`,
-`publish_document`. Los `plan_id` expiran en 15 minutos y son de un solo uso.
+`publish_document`. `generate_weekly_plan` y `generate_closing_minutes` exigen el parámetro `mesa`. Los
+`plan_id` expiran en 15 minutos, son de un solo uso y solo los puede confirmar la misma credencial que los
+generó.
+
+Los parámetros de cada tool están en [07-api-mcp.md](./07-api-mcp.md) y las rutas REST en la
+[referencia de la API](./referencia-api.md).
 
 Ninguna tool devuelve texto de Basecamp: ese texto nunca entra a la base.
 
@@ -33,7 +46,12 @@ Settings → Connectors → Add custom connector → URL `https://backiobackend-
 El cliente descubre `/.well-known/oauth-protected-resource`, se registra solo (RFC 7591), y al
 autorizar te lleva a `backio.vercel.app/oauth/consent` con tu sesión de BackIO. El token resultante
 actúa con tu usuario y tu rol; los scopes se muestran en la pantalla de consentimiento. Tokens de
-acceso de 1 hora con refresh de 30 días, guardados hasheados. PKCE S256 obligatorio.
+acceso de 1 hora (`bko_…`) con refresh de 30 días (`bkr_…`), guardados hasheados. PKCE S256 obligatorio.
+
+- OAuth nunca concede `admin`. Para escribir hace falta el scope concedido y, además, que tu rol sea de
+  gestión (admin, gerencia, operaciones, ejecutiva o líder).
+- El registro dinámico de clientes admite 10 registros por hora por IP.
+- Un token se revoca con `POST /oauth/revoke`.
 
 ## OpenAPI (Gemini y clientes REST)
 
@@ -41,9 +59,19 @@ acceso de 1 hora con refresh de 30 días, guardados hasheados. PKCE S256 obligat
 mismos esquemas zod de las rutas. En Gemini: crear una herramienta con esa spec y auth Bearer con
 una API key de BackIO.
 
+## Límites y alertas
+
+- 100 peticiones por minuto por credencial. Al pasarse, `/mcp` responde 429 con el encabezado `Retry-After`.
+- Si una API key hace más de 20 escrituras en 5 minutos, se avisa a admin y operaciones.
+
 ## Publicar actas en Basecamp
 
-`publish_document` crea un Documento en el proyecto Basecamp de operaciones. Configurar una vez:
+Como `generate_*` exige mesa, `publish_document` publica el acta como Message en el board Weekly de esa mesa.
+La mesa necesita tener configurados `basecamp_project_id` y `basecamp_board_weekly_id` (Admin → Mesas →
+Detectar boards).
+
+`tenants.config.basecamp_docs_project_id` solo se usa para actas sin mesa, que se publican como Doc. Esas
+actas se generan desde la pantalla o la API REST sin `?mesa=`, no desde el MCP:
 
 ```sql
 update tenants set config = config || '{"basecamp_docs_project_id": 12345678}' where slug = 'geeks';

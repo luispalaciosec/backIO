@@ -1,5 +1,7 @@
 # 19 · KPIs por persona y por equipo (25/09/2026)
 
+> Revisado contra el código el 11/10/2026.
+
 Reemplaza la hoja `Plantilla_KPIs.xlsx`. 17 indicadores de 5 áreas (Ejecutiva de Cuentas, Producción,
 Arte y Diseño, Creatividad, Content). Cada KPI se mide **a cada persona del área y al equipo**.
 
@@ -11,7 +13,6 @@ Arte y Diseño, Creatividad, Content). Cada KPI se mide **a cada persona del ár
 | Personas → modal → pestaña KPIs | Roles de gestión | Ficha de la persona en el mes en curso |
 | Admin → Catálogo → KPIs | Admin | Meta, operador, periodicidad, cálculo, textos, activo |
 | Admin → Usuarios → Área | Admin | Área de cada persona: define qué KPIs le aplican. Admin, gerencia y operaciones no se miden (Marcia, 26/09) |
-
 | Menú → Mis KPIs (`/kpis`, `GET /kpis/mios`) | Colaboradores | Solo su propia ficha y el agregado de su equipo, nunca a sus compañeros |
 
 Registrar mediciones (manuales, ajustes, causa, plan de mejora): **admin, gerencia y operaciones**.
@@ -36,15 +37,27 @@ consejo concreto para mejorarlo (`frontend/components/kpis/ComoSeCalcula.tsx`).
 
 | Cálculo | KPIs | A | B |
 |---|---|---|---|
-| `a_tiempo` | PRO-01, DIS-01, CRE-03, CON-01 | completadas ≤ fecha original, o ≤ vigente si todas sus reprogramaciones fueron del cliente/neutras | completadas en el mes |
-| `retrabajo` | PRO-02, DIS-03, CRE-02, CON-04 | completadas con reproceso `atribuible = equipo` del área | completadas |
-| `levantamiento` | CUE-01 | completadas sin reproceso por brief o levantamiento incompleto | completadas |
-| `aprobacion_primera` | DIS-02 | aprobadas en ronda 1 (`aprobacion_eventos`); sin rondas: proxy «sin reproceso del cliente» marcado *estimado* | aprobadas en el mes |
-| `propuestas_aprobadas` | CRE-01 | `clase = propuesta` aprobadas | propuestas con decisión |
-| `sla_respuesta` | CUE-03 | creadas con «Respondido» dentro del SLA hábil de su prioridad | creadas en el mes |
-| `sla_incidencia` | CON-02 | `clase = incidencia` completadas dentro del SLA hábil | incidencias completadas |
-| `proactividad` | CRE-04, CON-03 | tareas `proactiva` creadas | meta fija del catálogo |
-| `manual` | CUE-02, PRO-03 | se ingresa | se ingresa |
+| `a_tiempo` | KPI-PRO-01, KPI-DIS-01, KPI-CRE-03, KPI-CON-01 | completadas a tiempo según `cerradaATiempo` contra la fecha original; vale la fecha vigente solo si la tarea tuvo reprogramaciones y todas tienen motivo registrado atribuible al cliente o neutro | completadas en el mes |
+| `retrabajo` | KPI-PRO-02, KPI-DIS-03, KPI-CRE-02, KPI-CON-04 | completadas con reproceso atribuible al equipo y al área (ver nota debajo) | completadas |
+| `levantamiento` | KPI-CUE-01 | completadas sin reproceso por brief o levantamiento incompleto | completadas |
+| `aprobacion_primera` | KPI-DIS-02 | aprobadas en ronda 1 (`aprobacion_eventos`); sin rondas: proxy «sin reproceso del cliente» marcado *estimado* | aprobadas en el mes |
+| `propuestas_aprobadas` | KPI-CRE-01 | `clase = propuesta` aprobadas | propuestas con decisión |
+| `sla_respuesta` | KPI-CUE-03 | creadas con «Respondido» dentro del SLA hábil de su prioridad | creadas en el mes |
+| `sla_incidencia` | KPI-CON-02 | `clase = incidencia` completadas dentro del SLA hábil | incidencias completadas |
+| `proactividad` | KPI-CRE-04, KPI-CON-03 | tareas `proactiva` creadas | meta fija del catálogo |
+| `manual` | KPI-CUE-02, KPI-PRO-03 | se ingresa | se ingresa |
+
+Los códigos y la semilla del catálogo están en la migración `20260925000022_kpis.sql`.
+
+«A tiempo» usa la misma función que el resto de BackIO, `cerradaATiempo` (`shared/src/metricas.ts`): compara el
+día de cierre en hora de Guayaquil con la fecha, incluyendo ese día. Ver
+[16-cumplimiento.md](./16-cumplimiento.md).
+
+**Cómo se asigna el retrabajo a un área** (`esRetrabajoDelArea` en `backend/src/lib/kpis.ts`). Si el reproceso
+no tiene `atribuible`, se deduce del motivo: los motivos del cliente no cuentan como retrabajo y el resto sí.
+Si no tiene `area_responsable`, también se deduce del motivo: el brief incompleto y el levantamiento incompleto
+se cargan a Cuentas, y los demás (error de ejecución, error de texto, dirección de arte) al área de quien hizo
+la tarea.
 
 SLA (`lib/horas_habiles.ts`): Alta 30 min, Media 1,5 h, Baja 8 h, en horas hábiles L-V 09:00–18:00 Guayaquil.
 Los cálculos que dependen de datos nuevos solo miden meses completos desde el 25/09/2026 (`FEATURES_DESDE`):
@@ -68,5 +81,5 @@ de atraso, y medirlas castigaba al equipo por la limpieza (a tiempo de Diseño p
 
 `GET /kpis?periodo=YYYY-MM` · `GET /kpis/:codigo?periodo&usuario` · `PUT /kpis/:codigo/mediciones`
 (ajustar un automático exige `justificacion_ajuste`) · `DELETE /kpis/:codigo/mediciones/:id` ·
-`GET/PUT /kpis/definiciones` · `GET /kpis/export?hasta&meses` (CSV con columnas de la plantilla) ·
-`POST /requerimientos/:id/respondido`.
+`GET /kpis/definiciones` · `PUT /kpis/definiciones/:codigo` (solo admin) · `GET /kpis/export?hasta&meses` (CSV con columnas de la plantilla) ·
+`POST /requerimientos/:id/respondido`. Detalle de cada ruta en la [referencia de la API](./referencia-api.md).

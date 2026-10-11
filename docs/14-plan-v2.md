@@ -1,5 +1,11 @@
 # 14 · Plan v2 — BackIO como capa organizativa (septiembre–octubre 2026)
 
+::: warning Documento histórico
+Plan de sprints de septiembre y octubre de 2026, con su estado al 04/09. Varias piezas cambiaron después: Basecamp pasó
+a ser un origen aceptado (23/09), las recurrencias crean el proyecto completo sin borrador, y el detector de huérfanos
+ya no corre solo. Ver [decisiones](./decisiones.md).
+:::
+
 > Estado al 04/09/2026: las fases 0 a 4 del plan original están en producción. Este plan
 > consolida los inputs nuevos de Luis (estructura real de Basecamp, mesas, horas, capa de IA)
 > en cinco sprints de una semana.

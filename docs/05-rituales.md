@@ -1,5 +1,7 @@
 # 05 · Rituales: Weekly, Daily y motor de señales
 
+> Revisado contra el código el 11/10/2026.
+
 ## Diagnóstico del proceso actual
 
 Hoy en Geeks:
@@ -31,7 +33,8 @@ Ahorro estimado: 2-3 horas semanales de Operaciones.
 
 ### Señales del Weekly
 
-Se calculan el domingo a las 18:00 y se persisten en `senales`.
+Se calculan el domingo a las 18:00 y se persisten en `senales`. Hay 11 reglas, todas en
+`backend/src/lib/rituals/signals.ts`.
 
 | Tipo | Condición | Severidad | Tema que entra a agenda |
 |---|---|---|---|
@@ -39,48 +42,25 @@ Se calculan el domingo a las 18:00 y se persisten en `senales`.
 | `reproceso_reincidente` | `veces_reproceso >= 2` | Crítica | "Revisar brief y control de calidad antes de enviar" (ver `16-cumplimiento.md`) |
 | `reprogramacion_sin_motivo` | reprogramación sin causa en 45 días | Media | "Completar la causa de la reprogramación" |
 | `reproceso_sin_motivo` | reproceso sin causa en 45 días | Media | "Completar la causa del reproceso" |
-| `concentracion_carga` | Un owner con >30% de tareas de la semana | Crítica | "Redistribución de carga — riesgo de punto único" |
-| `bloqueo_cliente` | `estado_aprobacion = 'pendiente_cliente'` y >5 días | Alta | "Escalamiento a ejecutiva de cuenta" |
+| `concentracion_carga` | Un owner con >30% de las tareas de la semana (solo si la semana tiene al menos 3 tareas) | Crítica | "Redistribución de carga — riesgo de punto único" |
+| `bloqueo_cliente` | `estado_aprobacion = 'pendiente_cliente'` y `dias_sin_movimiento > 5` | Alta | "Escalamiento a ejecutiva de cuenta" |
 | `cuenta_silenciosa` | Cliente sin requerimientos completados en 14 días | Alta | "Revisión de estado de cuenta" |
 | `compromiso_vencido` | `acuerdos.fecha_compromiso < hoy` y estado pendiente | Crítica | "Rendición de cuentas" |
-| `sobrecarga_proyectada` | Σ tareas asignadas > capacidad declarada del owner | Alta | "Recortar alcance de la semana" |
-| `sin_movimiento` | `dias_sin_movimiento > 14` en requerimiento activo | Media | "Requerimiento huérfano" |
+| `sobrecarga_proyectada` | Tareas de la semana del owner × 4 h > su `capacidad_semanal` | Alta | "Recortar alcance de la semana" |
+| `sin_movimiento` | `dias_sin_movimiento > 14` en requerimiento activo que no está en `pendiente_cliente` | Media | "Requerimiento huérfano" |
 | `atraso_critico` | `dias_atraso > 30` | Crítica | "Atraso material — decisión de cuenta" |
 
 ### Implementación
 
-```typescript
-// lib/rituals/signals.ts
+Cada regla de `signals.ts` declara su `tipo`, su `severidad`, el `tema_agenda` que la acompaña y una
+función `detectar(ctx, umbrales)`. Esa función es síncrona: recibe un contexto ya cargado (tareas activas,
+completadas recientes, personas, clientes, acuerdos abiertos y reprogramaciones o reprocesos sin causa) y
+devuelve las señales con su título ya armado. `calcularSenales` corre todas las reglas y las ordena por
+severidad. La carga de datos y el guardado en `senales` están en `backend/src/lib/rituals/service.ts`
+(`recalcularSenales`).
 
-interface SignalRule {
-  tipo: string;
-  severidad: 'critica' | 'alta' | 'media';
-  detectar: (ctx: WeekContext) => Promise<Signal[]>;
-  titulo: (s: Signal) => string;
-}
-
-export const REGLAS: SignalRule[] = [
-  {
-    tipo: 'concentracion_carga',
-    severidad: 'critica',
-    detectar: async (ctx) => {
-      const porOwner = groupBy(ctx.requerimientos, r => r.owner_agencia[0]);
-      const total = ctx.requerimientos.length;
-      return Object.entries(porOwner)
-        .filter(([_, tareas]) => tareas.length / total > 0.30)
-        .map(([ownerId, tareas]) => ({
-          entidad_tipo: 'usuario',
-          entidad_id: ownerId,
-          detalle: { tareas: tareas.length, total, pct: Math.round(tareas.length/total*100) }
-        }));
-    },
-    titulo: (s) => `${s.detalle.nombre} concentra ${s.detalle.tareas} de ${s.detalle.total} tareas (${s.detalle.pct}%)`
-  },
-  // ... resto de reglas
-];
-```
-
-Los umbrales viven en `tenants.config.signal_thresholds` — parametrizables sin deploy.
+Los umbrales viven en `tenants.config.signal_thresholds` y se pueden cambiar sin deploy. Los valores por
+defecto están en `UMBRALES_DEFAULT`. Las horas por tarea de `sobrecarga_proyectada` (4) están fijas en el código.
 
 ### Ejemplo real: semana del 03/08/2026
 
@@ -101,7 +81,9 @@ Ninguna de estas fue tema explícito de agenda en el acta real. Todas estaban en
 
 ## Weekly Operativo (lunes)
 
-**Agenda generada automáticamente**, enviada domingo 18:00 al facilitador.
+**Agenda generada automáticamente** el domingo a las 18:00. La tarea programada `senales`
+(`backend/src/lib/jobs.ts`) recalcula las señales y avisa a las personas con rol `operaciones` y `admin`
+con las 15 primeras señales y su tema de agenda.
 
 Estructura:
 1. Compromisos vencidos de la semana anterior (señales `compromiso_vencido`)
@@ -139,7 +121,7 @@ Solo tres señales:
 Si el daily muestra más que eso, se convierte en un weekly y muere en tres semanas. Los
 rituales no fallan por falta de contenido, fallan por exceso.
 
-Vista dedicada: `/daily` — una sola pantalla, sin scroll, proyectable.
+Vista dedicada: `/daily`, armada como un flujo de cuatro pasos por mesa.
 
 **Construcción secuencial por mesa (22/09/2026).** El daily es de una mesa, no de la agencia:
 
@@ -161,6 +143,15 @@ se bloquea con `DailySinResponsable` hasta que se asigne a alguien.
 (persona → board → tareas, una tarea con varios responsables aparece bajo cada uno; lista anidada porque
 Basecamp no admite tablas) y después la lista *Por tarea* de siempre. El resto del mensaje no cambia.
 
+**Títulos fijos de las secciones (11/10/2026).** Cuando se usa el borrador con IA, los títulos de cada sección
+los pone el código, no la IA. Están en `SECCIONES_DAILY` (`backend/src/lib/ia/daily.ts`): la apertura lleva
+«🎯 Foco del día», «📋 En la mesa hoy», «⏰ Vence hoy o mañana», «⛔ Bloqueos» y «📅 Cambios de fecha»; el
+cierre lleva «🎯 Balance del día», «✅ Completado hoy», «➕ Completadas fuera del daily», «⏳ Quedó abierto»,
+«⛔ Bloqueos» y «➡️ Para mañana». La IA solo escribe el contenido y marca dónde empieza cada sección con
+`[[clave]]`; `armarDaily` pone los títulos en el orden de siempre y omite las secciones vacías. Si la IA no usa
+ninguna marca, se publica su texto tal cual. Luis decidió el 11/10/2026 mantener los emojis en los títulos,
+porque son el formato que el equipo ya usa en Basecamp.
+
 **Cierre (22/09/2026).** Antes de lo que quedó abierto, el cierre lleva «✅ Completado hoy» (completadas con
 `completado_at` desde las 00:00 de Guayaquil que estaban en el daily, por persona → board → tarea) y
 «➕ Completadas fuera del daily» (completadas hoy sin `daily_fecha`). «Hoy se trabaja» pasa a llamarse
@@ -176,26 +167,23 @@ La IA recibe `kpis` para el balance del día.
 
 ## Generación de documentos
 
-```typescript
-// lib/rituals/documents.ts
+El Plan Operativo y el Acta de Cierre se generan a pedido, no por calendario. Alguien los dispara desde la
+pantalla del weekly, que llama a `POST /semanas/:id/plan` y `POST /semanas/:id/acta`. Ambas rutas aceptan
+`?mesa=` para acotar el documento a una mesa, y `?ia=1` para anteponer el resumen redactado por la IA.
 
-async function generarPlanOperativo(semanaId: string): Promise<Acta> {
-  const data = {
-    semana: await getSemana(semanaId),
-    capacidad: await calcularCapacidadPorEquipo(semanaId),
-    prioridades: await getRequerimientosDeSemana(semanaId),
-    riesgos: await getSenales(semanaId, ['bloqueo_cliente','sobrecarga_proyectada']),
-    pendientes_anteriores: await getAcuerdosAbiertos(semanaId)
-  };
-  return {
-    contenido: data,
-    markdown: renderPlanOperativo(data)   // formato actual de Geeks, respetado
-  };
-}
-```
+- `backend/src/lib/rituals/service.ts` reúne los datos (`generarPlanOperativo`, `generarActaCierre`): tareas
+  de la semana, capacidad, señales de riesgo, acuerdos abiertos y, en el acta, las señales y acuerdos de la
+  semana. Guarda el resultado en `actas`.
+- `backend/src/lib/rituals/documents.ts` solo arma el texto (`renderPlanOperativo`, `renderActaCierre`) y
+  calcula la capacidad por persona.
+
+Ver la lista de rutas en la [referencia de la API](./referencia-api.md).
 
 El markdown resultante **replica el formato actual de las actas de Geeks**, para que la
-transición sea invisible para el equipo. Se publica en Basecamp como Doc vía API.
+transición sea invisible para el equipo. La publicación es otro paso (`POST /semanas/actas/:actaId/publicar`,
+lógica en `backend/src/lib/mcp/publish.ts`). Un documento de una mesa se publica como Message en el board
+Weekly de esa mesa. Solo un documento sin mesa se publica como Doc en el proyecto de
+`tenants.config.basecamp_docs_project_id`.
 
 ---
 
@@ -226,6 +214,9 @@ hizo fracasar los intentos anteriores de implementar WorkOS.
 - **Reprogramar no cambia el estado.** Mover la fecha incrementa `veces_reprogramado` y queda en `reprogramaciones` con motivo, pero la tarea conserva su estado ("En proceso" sigue en proceso). El estado "Reprogramado" queda como estado manual.
 - **Planificación.** `requerimientos.planificacion`: `planificado` (entró por el weekly), `no_planificado` (se creó durante la semana, con plan ya generado y fecha dentro de la semana; automático al crear) o `urgente` (manual). Columna en el backlog, filtro "Fuera del weekly", KPI en el dashboard.
 - **Selección del daily.** `requerimientos.daily_fecha`: la mesa elige qué se trabaja hoy («Elegir tareas de hoy» en Daily o ☀ en el backlog). Columna «Hoy se trabaja» en el Daily y sección 🎯 en la apertura/cierre publicados.
+- **Motivo obligatorio.** Desde la pantalla no se puede cambiar la fecha de entrega sin elegir el motivo de la
+  reprogramación: la API responde 422 si falta (`backend/src/lib/requerimientos/actualizar.ts`). Ver
+  [16-cumplimiento.md](./16-cumplimiento.md).
 - **Fecha a Basecamp.** Al reprogramar, `due_on` se envía de inmediato y la pantalla confirma «Fecha enviada a Basecamp ✓»; si falla, se avisa y la reconciliación (cada 30 min) la reenvía.
 
 ## Evolutivo (26/09/2026)
@@ -249,3 +240,11 @@ se sobrescribía cada día. Ahora queda una **foto por mesa y día hábil** y un
 - **Semanas cerradas congeladas**: `POST /semanas/:id/senales/recalcular` devuelve 409 si la semana ya cerró.
 - **Pantalla**: Rituales → Evolutivo (gestión): resumen del mes con comparación vs mes anterior, gráficas día a
   día, tabla con detalle por persona, tabla semanal y CSV.
+
+## Otras tareas programadas
+
+Además de `senales` (domingo 18:00), `foto_daily` (L-V 19:30) y `foto_semana` (domingo 17:55), el backend corre
+otras tareas: `informe_mensual` (día 1, 08:00), `kpis_congelar` (día 1, 08:10), `horas` (cada 6 h),
+`limpieza` (diario 03:30) y `vigia` (cada hora), entre otras. Todas están declaradas en
+`backend/src/lib/jobs.ts`. La tabla completa, con qué hace cada una, está en
+[Operar BackIO](./operacion.md#lo-que-corre-solo).

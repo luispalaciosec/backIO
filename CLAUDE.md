@@ -21,18 +21,19 @@ como sistema de ejecución.
 | Capa | Tecnología |
 |---|---|
 | Base de datos + Auth | Supabase (Postgres + RLS) |
-| Frontend | Next.js 14 (App Router) en Vercel |
+| Frontend | Next.js 15 (App Router) + React 19 en Vercel |
 | Estilos | Tailwind CSS |
 | Integración ejecución | Basecamp 3 API (OAuth2 + webhooks) |
 | Capa agentes | MCP Server + API REST |
-| LLM | Claude (Anthropic API) para resúmenes ejecutivos |
+| LLM | Claude (Anthropic API): resumen del portal, daily, weekly, brief, recordatorios e informe mensual (`lib/ia/`) |
 
 ## Las cinco reglas que NUNCA se rompen
 
 ### 1. El texto de Basecamp jamás entra a BackIO
 BackIO sincroniza desde Basecamp únicamente: `completed (bool)`, `completed_at`, `due_on`,
 `assignee_ids`. **Nunca** el cuerpo de comentarios, nunca descripciones, nunca adjuntos de
-discusión. El canal de producción vive y muere en Basecamp.
+discusión. El canal de producción vive y muere en Basecamp. Excepciones acotadas y aprobadas: el título del to-do
+entra como `titulo_interno`, nunca visible al cliente (D1, 04/09/2026), y las horas del timesheet (sin descripción).
 
 Razón: es la única garantía estructural de que un comentario interno ("esto está horrible")
 no pueda llegar al cliente. Si el texto nunca entra, no hay bug posible que lo saque.
@@ -91,8 +92,15 @@ En estas zonas: generar, detener, pedir revisión. No hacer commit automático.
 12. `docs/15-ia.md` — capa de IA: qué redacta, con qué datos, quién publica
 13. `docs/16-cumplimiento.md` — reprogramaciones y reprocesos: fecha original, causas, indicadores
 14. `docs/17-arquitectura-tecnica.md` — cómo está armado el código: rutas, auth, db, crons, deuda técnica
-15. `docs/18-seguridad.md` — revisión de seguridad del 23/09: hallazgos, qué se corrigió, qué depende de Luis
+15. `docs/18-seguridad.md` — revisiones de seguridad (23/09, run-1 del 30/09 y auditoría externa del 10/10): hallazgos y estado
 16. `docs/19-kpis.md` — KPIs por persona y equipo: cálculos, datos que los alimentan, permisos
+17. `docs/operacion.md` — tareas programadas, qué hacer cuando algo falla, rutinas (migraciones, altas, bajas)
+18. `docs/decisiones.md` — registro de decisiones con su porqué
+19. `docs/esquema.md` y `docs/referencia-api.md` — generados desde el código (`db:types`, `docs:api`); no se editan a mano
+
+La documentación se publica como sitio con VitePress (`pnpm --filter @backio/docs dev`). Si cambias un comportamiento
+documentado, corrige la página en el mismo commit. `HARDENING-CHANGELOG.md` registra el trabajo posterior a la
+auditoría del 10/10/2026.
 
 ## Definition of Done por fase
 

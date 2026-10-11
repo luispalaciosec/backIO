@@ -1,6 +1,6 @@
 /**
  * Recurrencia mensual de fees (D2). Decidido 04/09/2026 con las recomendaciones por defecto:
- *  - Se genera el día 25 del mes anterior (configurable 1–28) a las 08:00 Guayaquil.
+ *  - Se genera el día 25 del mes anterior (configurable 1–28); el job «recurrencias» corre a diario a las 08:05 Guayaquil.
  *  - Nombre según patron de la plantilla ("… - {mes} {año}"); inicio = día 1, entrega = último día del mes.
  *  - Misma configuración del Builder que el último proyecto (bloques, piezas, owners, brief).
  *  - Pasa por el mismo camino que un proyecto normal: plan, requerimientos, Basecamp, correo a los owners.

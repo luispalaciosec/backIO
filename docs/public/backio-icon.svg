@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="BackIO">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A84FF"/>
+      <stop offset="1" stop-color="#0056B3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+
+  <!-- Backlog: tres filas priorizadas. La primera completada (verde), la segunda en curso, la tercera pendiente. -->
+  <!-- Fila 1: completada -->
+  <rect x="52" y="62" width="32" height="32" rx="9" fill="#00C875"/>
+  <path d="M60 78 l7 7 l13 -14" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="100" y="70" width="104" height="16" rx="8" fill="#FFFFFF"/>
+
+  <!-- Fila 2: en proceso -->
+  <rect x="52" y="112" width="32" height="32" rx="9" fill="#FFFFFF"/>
+  <path d="M68 116 a12 12 0 0 1 0 24 z" fill="#0073EA"/>
+  <rect x="100" y="120" width="72" height="16" rx="8" fill="#FFFFFF"/>
+  <rect x="172" y="120" width="32" height="16" rx="8" fill="#FFFFFF" fill-opacity="0.35"/>
+
+  <!-- Fila 3: pendiente -->
+  <rect x="52" y="162" width="32" height="32" rx="9" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <rect x="100" y="170" width="104" height="16" rx="8" fill="#FFFFFF" fill-opacity="0.35"/>
+</svg>

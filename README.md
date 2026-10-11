@@ -3,7 +3,7 @@
 **Sistema operativo de backlog de Geeks Ecuador.** Reemplaza Monday.com como tablero de
 requerimientos y vista de cuenta del cliente, apoyándose en Basecamp como sistema de ejecución.
 
-En producción desde el 04/09/2026 · `backio.vercel.app` · 15 clientes sincronizados con Basecamp.
+En producción desde el 04/09/2026 · `backio.vercel.app` · sincronizado con Basecamp.
 
 ## Qué hace
 
@@ -38,12 +38,14 @@ Detalle y defensas en `docs/02-visibilidad.md`. Zonas que no se cambian sin revi
 | Capa | Tecnología |
 |---|---|
 | Base de datos y auth | Supabase (Postgres + RLS + Auth) |
-| Backend | Hono sobre Node 20, TypeScript estricto, zod · Railway |
-| Frontend | Next.js 14 (App Router) + Tailwind · Vercel |
+| Backend | Hono sobre Node 22, TypeScript estricto, zod · Railway |
+| Frontend | Next.js 15.5 (App Router) + React 19 + Tailwind · Vercel |
 | Ejecución | Basecamp 3 API (OAuth2, webhooks, polling) |
 | CRM | PrometIO (webhook, `cliente_id` compartido) |
 | IA | Claude (Anthropic API): redacta dailies, weeklies, briefs e informes; una persona publica |
 | Agentes | MCP Server + API REST con OpenAPI |
+| Operación | Logger JSON con niveles, Sentry sin datos personales (opcional), Turnstile en login y recuperar contraseña |
+| CI | GitHub Actions: `pnpm audit`, typecheck, lint, tests y build en cada push; Dependabot semanal |
 
 ## Correr en local
 
@@ -52,10 +54,10 @@ pnpm install
 cp backend/.env.example backend/.env      # Supabase, Basecamp, Anthropic, Resend
 cp frontend/.env.example frontend/.env.local
 pnpm dev                                   # backend :4000 · frontend :3000
-pnpm test && pnpm typecheck
+pnpm test && pnpm typecheck && pnpm lint
 ```
 
-Variables, usuarios de prueba y verificación de RLS: `docs/11-setup.md`. Despliegue:
+Requisitos, variables, base de datos, usuarios y API keys: `docs/11-setup.md`. Despliegue:
 `docs/12-despliegue.md`.
 
 ## Estructura
@@ -65,7 +67,7 @@ shared/     tipos compartidos y sanitizeForClient (única salida al cliente)
 backend/    src/app.ts (routers) · src/routes/v1 · src/lib (dominio, db, basecamp, ia, mcp)
             supabase/migrations (SQL versionado, 01–29) · scripts (operación)
 frontend/   app/(app) área interna · app/p portal · components · lib
-docs/       specs, arquitectura técnica, manual de uso (HTML + PDF)
+docs/       sitio VitePress: specs, arquitectura técnica, operación, decisiones, manual de uso (HTML + PDF)
 ```
 
 Cómo está armado por dentro, ciclo de una petición, crons, integraciones y deuda técnica:
@@ -73,39 +75,38 @@ Cómo está armado por dentro, ciclo de una petición, crons, integraciones y de
 
 ## Documentación
 
+La carpeta `docs/` es un sitio VitePress. Para leerlo en local:
+
+```bash
+pnpm --filter @backio/docs dev
+```
+
+Se empieza por `docs/empezar.md`. Los documentos que más se consultan:
+
 | Doc | Contenido |
 |---|---|
 | `CLAUDE.md` | Reglas, convenciones, zonas de revisión humana |
-| `docs/00-arquitectura.md` | Modelo mental y alcance de la suite (PrometIO, DatIO, BackIO) |
-| `docs/01-modelo-datos.md` | Esquema, RLS, índices |
 | `docs/02-visibilidad.md` | Frontera cliente/interno. Léelo antes de tocar el portal o la sincronización |
-| `docs/03-builder.md` | Creación de proyectos (Builder, importación, desde Basecamp) |
-| `docs/04-basecamp.md` | Integración: qué entra, qué sale, incidentes y lecciones |
-| `docs/05-rituales.md` | Daily, Weekly, motor de señales, formato de mensajes |
-| `docs/06-portal-cliente.md` | Portal público y resumen ejecutivo |
-| `docs/07-api-mcp.md` · `docs/13-mcp.md` | API REST, scopes, MCP Server |
-| `docs/08-prometio.md` | Interconexión con el CRM |
-| `docs/09-fases.md` · `docs/14-plan-v2.md` | Plan de ejecución y v2 |
-| `docs/11-setup.md` · `docs/12-despliegue.md` | Entorno local, Railway, Vercel, Supabase |
-| `docs/15-ia.md` | Capa de IA: qué redacta, con qué datos, quién publica |
-| `docs/16-cumplimiento.md` | Reprogramaciones, reprocesos, bitácora, estatus por cliente |
-| `docs/17-arquitectura-tecnica.md` | Arquitectura a nivel de código, operación, deuda técnica |
-| `docs/18-seguridad.md` | Revisión de seguridad: hallazgos, correcciones y pendientes |
-| `docs/19-kpis.md` | KPIs por persona y por equipo |
+| `docs/17-arquitectura-tecnica.md` | Arquitectura a nivel de código y deuda técnica |
+| `docs/operacion.md` | Qué corre solo, qué hacer cuando algo falla, tareas de rutina |
+| `docs/decisiones.md` | Registro de decisiones vigentes |
+| `docs/18-seguridad.md` | Revisiones de seguridad: hallazgos, correcciones y pendientes |
+| `HARDENING-CHANGELOG.md` | Detalle, hallazgo por hallazgo, de la auditoría externa del 10/10/2026 |
 | `docs/manual/` | Manual de uso para el equipo (HTML y PDF con pantallas) |
 
 ## Estado y deuda técnica
 
-Fases 0 a 4 y sprints v2 1 a 4 en producción. Pendiente de plataforma: CI en GitHub Actions,
-ambiente de staging, alertas de crons, tests de integración con Basecamp y despliegue automático
-del frontend. Lista completa y priorizada en `docs/17-arquitectura-tecnica.md` §8.
+Fases 0 a 4 y sprints v2 1 a 4 en producción. Ya están el CI en GitHub Actions, el vigía que avisa si una tarea
+programada no corre y el despliegue automático del frontend (requiere el secreto `VERCEL_TOKEN`). Pendiente de
+plataforma: ambiente de staging y tests de integración con Basecamp. Lista completa y priorizada en
+`docs/17-arquitectura-tecnica.md` §8.
 
 ## Decisiones vigentes
 
 | Decisión | Resultado |
 |---|---|
 | Product owner | Marcia (jefa de operaciones) |
-| Basecamp como origen de trabajo | **Aceptado (23/09/2026).** Lo creado allá entra solo cada 30 min; la ejecutiva clasifica en «Entradas desde Basecamp» |
+| Basecamp como origen de trabajo | **Aceptado (23/09/2026).** Lo creado allá entra solo en segundos por el webhook, con una pasada de respaldo cada 15 min; la ejecutiva clasifica en «Entradas desde Basecamp» |
 | Colaboradores | Editan solo sus tareas (estado, fecha con motivo, entregables, piezas, daily) |
 | Daily | Es de una mesa; ninguna tarea entra sin responsable |
 | Canal de notificación | Correo |
@@ -115,5 +116,5 @@ del frontend. Lista completa y priorizada en `docs/17-arquitectura-tecnica.md` �
 
 **Fuga de contenido interno al cliente.** Un comentario de dirección de arte visible en el portal
 es la pérdida de una cuenta. Mitigación: las tres defensas de `docs/02-visibilidad.md`, tests que
-las protegen (`sanitize.test.ts`, `sync.test.ts`, `portal.test.ts`) y revisión humana obligatoria
+las protegen (`sanitize.test.ts`, `sync.test.ts`, `portal.test.ts`, entre otros) y revisión humana obligatoria
 en las zonas listadas arriba.

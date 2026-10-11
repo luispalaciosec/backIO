@@ -13,3 +13,7 @@ coverage/
 backend/supabase/.branches
 backend/supabase/.temp
 .vercel
+
+# Sitio de documentación (VitePress)
+docs/.vitepress/cache
+docs/.vitepress/dist

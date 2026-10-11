@@ -1,13 +1,88 @@
 # 01 · Modelo de datos
 
+> Revisado contra el código el 11/10/2026.
+
+Cómo están organizados los datos de BackIO y qué reglas los protegen. La lista completa de tablas y columnas, siempre
+al día, está en el [esquema de la base](./esquema.md), que se genera desde producción.
+
 ## Principios
 
-1. `tenant_id UUID NOT NULL` en toda tabla de negocio. RLS activa en todas.
-2. `cliente_id` es la clave compartida con PrometIO. Mismo valor en ambos sistemas.
-3. Soft delete (`deleted_at`) en entidades de negocio. Nunca `DELETE` físico.
-4. Auditoría: `created_at`, `updated_at`, `created_by`, `updated_by` en todas.
+1. **Un tenant por organización.** Las tablas de negocio llevan `tenant_id` y todas tienen seguridad por fila (RLS).
+   Las únicas sin `tenant_id` son dos tablas globales del sistema, `limites` y `cron_runs`, que solo usa el servidor.
+2. **`cliente_id` compartido con PrometIO.** Un cliente tiene el mismo id en los dos sistemas.
+3. **Borrado lógico.** Las entidades de negocio se marcan con `deleted_at`; no se borran.
+4. **Auditoría.** Las tablas principales llevan `created_at` y `updated_at`, y la mayoría `created_by` y `updated_by`.
+   Lo que hace cada persona o proceso queda además en `audit_log`.
+5. **Fechas en UTC, días en Guayaquil.** Los instantes se guardan en UTC. Cuando importa el día (atraso, «a tiempo»,
+   selección del daily) se calcula en hora de Guayaquil.
 
----
+## Cómo se relacionan
+
+```mermaid
+erDiagram
+  tenants ||--o{ clientes : tiene
+  mesas ||--o{ clientes : atiende
+  clientes ||--o{ proyectos : tiene
+  proyectos ||--o{ requerimientos : agrupa
+  plantillas ||--o{ plantilla_bloques : tiene
+  plantilla_bloques ||--o{ plantilla_tareas : tiene
+  plantillas ||--o{ proyectos : "origen de"
+  requerimientos ||--o{ reprogramaciones : registra
+  requerimientos ||--o{ reprocesos : registra
+  requerimientos ||--o{ bitacora : anota
+  requerimientos ||--o{ horas : "suma"
+  semanas ||--o{ senales : calcula
+  semanas ||--o{ acuerdos : cierra
+  semanas ||--o{ actas : genera
+  usuarios ||--o{ requerimientos : "responsable de"
+```
+
+## Reglas que la base hace cumplir
+
+Estas reglas viven en la base (triggers y funciones), así que valen aunque la pantalla o el backend fallen.
+
+| Regla | Dónde |
+|---|---|
+| La visibilidad para el cliente solo puede cerrarse, nunca abrirse; y una tarea creada sin plantilla por alguien que no es de gestión nace oculta | `enforce_visibilidad_monotonica`, `requerimientos_visibilidad_insert` |
+| La primera fecha de entrega queda guardada como fecha original | `requerimientos_before_insert` |
+| Cada cambio de fecha cuenta como reprogramación y deja su fila en `reprogramaciones` | `requerimientos_before_update`, `requerimientos_after_update_reprogramacion` |
+| Cada cambio de estado de aprobación queda registrado (para los KPIs) | `requerimientos_registrar_aprobacion` |
+| El estado del proyecto se recalcula cuando cambian sus tareas | `requerimientos_after_change_estado_proyecto`, `proyectos_recalcular_estado` |
+| Un colaborador solo cambia campos permitidos de sus propias tareas | `requerimientos_limitar_colaborador` |
+| Solo un admin cambia rol, estado, correo, capacidad o vínculo con Basecamp de una persona | `usuarios_proteger_columnas` |
+| Quien no es de gestión no puede mover un registro de reprogramaciones, reprocesos o bitácora a otra tarea ni a otro autor; sus notas de bitácora nacen no visibles al cliente | `historial_proteger_no_gestion` |
+| Una notificación solo puede marcarse como leída | `notificaciones_solo_leida` |
+| Una cuenta nueva solo se crea con una invitación y el correo confirmado | `handle_new_auth_user` |
+
+Funciones que el backend llama directamente:
+
+- `crear_lote` (proyectos y tareas en una transacción).
+- `quitar_acceso` (revoca credenciales, desactiva y reasigna, todo o nada).
+- `ensure_semana`.
+- `limite_sumar`, `limite_estado` y `limites_limpiar` (límite de peticiones).
+
+## Quién lee qué
+
+- **Sesión de una persona** (`userClient`): la base aplica las políticas RLS. `auth_tenant_id()` solo devuelve el
+  tenant si la persona está activa, y `auth_es_admin()` y `auth_es_gestion()` miran su rol.
+- **El servidor** (`serviceClient`, service role): salta RLS. Se usa en webhooks, tareas programadas, el portal público
+  y las API keys. Toda consulta de este tipo filtra por `tenant_id` a mano. Las tablas con credenciales
+  (`integracion_credenciales`, `portal_pines`, `limites`, `cron_runs`) no tienen políticas: solo el servidor las lee.
+
+## Vistas
+
+- `v_requerimientos_metricas`: cada tarea con sus días de atraso y sus días sin movimiento, calculados en hora de
+  Guayaquil. La usan el backlog, el dashboard y las señales.
+- `v_proyectos_avance`: el avance de cada proyecto según el peso de sus tareas completadas.
+
+## Migraciones
+
+El esquema se construye con los archivos numerados de `backend/supabase/migrations/`. Cómo aplicar una nueva está en
+[Operación](./operacion.md#aplicar-una-migracion).
+
+::: details Diseño original (Fase 0, 03/09/2026)
+Este es el esquema con el que empezó BackIO. Se conserva como referencia: muchas tablas y columnas cambiaron o se
+agregaron después. Lo vigente está en el [esquema de la base](./esquema.md).
 
 ## Esquema
 
@@ -342,3 +417,5 @@ create index idx_senales_semana       on senales(semana_id, atendida);
 
 
 > **Cambio 04/09/2026 (aprobado por Luis):** `requerimientos_select` ya no filtra por `owner_agencia` para colaboradores. Todo el equipo interno lee el backlog completo del tenant; la escritura de un colaborador sigue limitada a sus propias tareas (política de update + campos acotados en el backend: estado, fecha de entrega, entregables). Migración `20260904000014_rls_colaborador_lee_todo.sql`.
+
+:::

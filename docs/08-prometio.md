@@ -1,5 +1,7 @@
 # 08 · Interconexión BackIO ↔ PrometIO
 
+> Revisado contra el código el 11/10/2026.
+
 ## Contexto
 
 PrometIO es el CRM de Geeks (construido internamente). BackIO es el sistema de backlog y
@@ -34,55 +36,62 @@ Regla: cada dato tiene un dueño. Ninguno se edita en ambos lados.
 Este es el flujo que cierra el ciclo comercial-operativo que hoy vive en WhatsApp.
 
 ```
-PrometIO: cotización pasa a "ganada"
+PrometIO: cotización aprobada
         ↓
-POST https://backio.geeks.ec/api/v1/webhooks/prometio
+POST https://backiobackend-production.up.railway.app/api/v1/webhooks/prometio
 {
-  "evento": "cotizacion_ganada",
-  "cotizacion_id": "uuid",
-  "cliente_id": "uuid",            ← el MISMO id
-  "monto": 12500.00,
-  "fecha_cierre_estimada": "2026-12-15",
-  "lineas": [
-    { "servicio": "Campaña 360", "cantidad": 1 },
-    { "servicio": "Piezas Instagram", "cantidad": 8 },
-    { "servicio": "Mailing", "cantidad": 2 }
-  ]
+  "evento": "cotizacion.aprobada",
+  "timestamp": "2026-10-11T15:04:05Z",
+  "data": {
+    "cotizacion_id": "uuid",
+    "numero": "COT-0123",
+    "oportunidad_id": "uuid",
+    "empresa": { "id": "uuid", "nombre": "...", "activo": true, "ruc": "...", "logo_url": "..." },
+    "valor": 12500.00,
+    "valido_hasta": "2026-12-15",
+    "lineas": [
+      { "servicio": "Campaña 360", "cantidad": 1, "descripcion": "..." },
+      { "servicio": "Piezas Instagram", "cantidad": 8 }
+    ]
+  }
 }
         ↓
-BackIO crea un BORRADOR de proyecto (no lo ejecuta)
-  - Sugiere plantilla según la línea principal
-  - Prellena alcance desde las líneas
-  - Prellena fecha de entrega
+Si el cliente no existe en BackIO, se crea con el MISMO id de la empresa
         ↓
-Notifica a la ejecutiva de cuenta
+BackIO guarda un BORRADOR de proyecto (nunca un proyecto)
+  - Sugiere plantilla según la primera línea
         ↓
-Ejecutiva abre el Builder en paso 2 (brief) — pasos 1 y 3 ya prellenados
-Revisa, ajusta, confirma en paso 5
+Aviso a las personas con rol ejecutiva y operaciones
+        ↓
+La ejecutiva abre el borrador en el Builder:
+  - con plantilla sugerida, entra al paso 2 (brief) con cliente, nombre, fecha
+    y piezas prellenados
+  - sin plantilla sugerida, entra al paso 1 para elegirla
+Revisa, ajusta, confirma en el paso 5
         ↓
 Se crean requerimientos + to-dos en Basecamp
 ```
+
+En `data.empresa`, `ruc` y `logo_url` son opcionales. En cada línea, `descripcion` también. El
+esquema exacto está en `backend/src/routes/webhooks/prometio.ts`. La lógica del Builder está en
+`frontend/app/(app)/proyectos/nuevo/page.tsx`.
 
 **El webhook no crea nada ejecutable.** Crea un borrador que requiere confirmación humana.
 Misma lógica que el patrón preview + confirm de MCP.
 
 ### Mapeo servicio → plantilla
 
-Tabla configurable, no hardcodeada:
+La tabla `mapeo_servicios` relaciona el nombre de un servicio de PrometIO con una plantilla
+(`plantilla_id`) o con un tipo de pieza (`tipo_pieza_id`, agregado en la migración de tipos de pieza). Es
+configurable, no está en el código.
 
-```sql
-create table mapeo_servicios (
-  id                uuid primary key default gen_random_uuid(),
-  tenant_id         uuid not null references tenants(id),
-  servicio_prometio text not null,
-  plantilla_id      uuid references plantillas(id),
-  bloque_nombre     text,          -- si el servicio mapea a un bloque, no a plantilla completa
-  unique (tenant_id, servicio_prometio)
-);
-```
+BackIO busca la primera línea de la cotización en `servicio_prometio` sin distinguir mayúsculas
+(`plantillaParaServicio` en `backend/src/lib/db/proyectos.ts`). Si encuentra una plantilla, la deja como
+sugerida en el borrador. Si el servicio no está mapeado, el borrador queda sin plantilla y la ejecutiva elige
+en el paso 1.
 
-Si un servicio no está mapeado, el borrador se crea sin plantilla y la ejecutiva elige en
-el paso 1.
+Las cantidades de piezas se prellenan en el Builder: cada línea se compara por nombre con los tipos de pieza y
+la cantidad se pone en el bloque de mayor peso de la plantilla.
 
 ---
 
@@ -123,12 +132,16 @@ PrometIO es la fuente. BackIO recibe altas y cambios:
 
 ```
 POST /api/v1/webhooks/prometio
-{ "evento": "cliente_creado" | "cliente_actualizado",
-  "cliente": { "id": "uuid", "nombre": "...", "activo": true } }
+{ "evento": "empresa.creada" | "empresa.actualizada",
+  "timestamp": "...",
+  "data": { "id": "uuid", "nombre": "...", "activo": true, "ruc": "...", "logo_url": "..." } }
 ```
 
-BackIO hace upsert por `id`. Nunca crea clientes por su cuenta — solo la interfaz de admin
-puede, y solo para casos excepcionales.
+BackIO hace upsert por `id`. Si llega `logo_url`, solo se guarda cuando el cliente todavía no tiene logo.
+
+Un admin también puede crear clientes a mano en Admin → Clientes (`POST /clientes`). Sirve para casos que
+PrometIO no cubre, como un cliente con un proyecto de Basecamp por rama. Ese cliente recibe un id propio; si
+después PrometIO envía la empresa, se enlaza por nombre desde Admin.
 
 Campos que BackIO agrega y PrometIO no conoce:
 - `basecamp_project_id`
@@ -152,21 +165,33 @@ X-Prometio-Timestamp: <unix>
 
 | Evento | `data` | Efecto en BackIO |
 |---|---|---|
-| `cotizacion.aprobada` | `cotizacion_id, numero, oportunidad_id, empresa{id,nombre,activo}, valor, valido_hasta, lineas[{servicio,cantidad}]` | Borrador de proyecto + correo a ejecutivas/operaciones |
-| `empresa.creada` / `empresa.actualizada` | `id, nombre, activo, ruc, logo_url` | Upsert de cliente con el mismo id |
+| `cotizacion.aprobada` | `cotizacion_id, numero, oportunidad_id, empresa{id,nombre,activo,ruc?,logo_url?}, valor, valido_hasta, lineas[{servicio,cantidad,descripcion?}]` | Crea el cliente si falta, guarda un borrador de proyecto y avisa a ejecutiva y operaciones |
+| `empresa.creada` / `empresa.actualizada` | `id, nombre, activo, ruc?, logo_url?` | Upsert de cliente con el mismo id; logo solo si falta |
+| Cualquier otro | — | Responde 200 `{ ignorado: evento }` para que PrometIO no reintente |
 
 El `secreto` lo genera PrometIO al crear la fila de `organizacion_webhook`; el mismo valor va en
 `PROMETIO_WEBHOOK_SECRET` de BackIO. Una fila por evento, las tres con el mismo secreto.
+
+### Controles del webhook
+
+- La firma se valida con HMAC-SHA256 sobre el cuerpo. Se lee de `X-Prometio-Signature: sha256=<hmac>`; si no
+  viene, se acepta `X-Signature` como respaldo.
+- Anti-replay: el `timestamp` del cuerpo (que va firmado) debe estar a menos de 5 minutos de la hora de
+  BackIO. Si además llega `X-Prometio-Timestamp`, también se revisa. Un cuerpo idéntico que se repite dentro de
+  10 minutos se descarta como duplicado.
+- Los rechazos quedan en la auditoría: `webhook_rechazado` (firma inválida o secreto sin configurar) y
+  `webhook_payload_invalido` (cuerpo que no cumple el esquema).
+- En producción, si `PROMETIO_WEBHOOK_SECRET` no está configurado, todo webhook recibe 401.
 
 ## Autenticación entre sistemas
 
 | Dirección | Método |
 |---|---|
-| PrometIO → BackIO | API key con scope `read:proyectos`, `write:proyectos` |
-| BackIO → PrometIO | API key de PrometIO, scope de lectura de clientes y cotizaciones |
-| Webhooks | HMAC-SHA256 con secreto compartido en header `X-Signature` |
+| PrometIO → BackIO (consulta) | API key de perfil `prometio` (`read:proyectos`, `write:proyectos`) |
+| PrometIO → BackIO (webhook) | HMAC-SHA256 con secreto compartido en `X-Prometio-Signature` |
+| BackIO → PrometIO | Ninguna llamada autenticada. BackIO solo usa `PROMETIO_URL` para revisar `/health` en Admin → Servicios |
 
-Los secretos viven en variables de entorno de Vercel, nunca en el repo.
+El secreto del webhook va en las variables del backend en Railway, nunca en el repo.
 
 ---
 

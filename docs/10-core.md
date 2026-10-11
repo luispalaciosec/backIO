@@ -1,6 +1,9 @@
 # 10 · CoreIO — capa compartida de la suite
 
-> **Estado: propuesto.** No decidido. Requiere aprobación de Luis antes de la Fase 1 de BackIO.
+::: warning Propuesta descartada
+El 03/09/2026 Luis decidió no construir CoreIO por ahora: BackIO mantiene sus propias tablas y comparte con PrometIO
+el mismo `cliente_id`, más un webhook. Se conserva como referencia.
+:::
 
 ## Qué es
 
