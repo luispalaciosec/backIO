@@ -1,6 +1,17 @@
 /** Gráficos SVG sin dependencias. Altura fija; el ancho se adapta a la tarjeta. */
-export function Barras({ datos, color = '#0073EA', formato = (v: number) => String(v) }: { datos: { etiqueta: string; valor: number; secundario?: number }[]; color?: string; formato?: (v: number) => string }) {
-  const W = 480, H = 150, padTop = 16, padBottom = 22;
+export function Barras({
+  datos,
+  color = '#0073EA',
+  formato = (v: number) => String(v),
+}: {
+  datos: { etiqueta: string; valor: number; secundario?: number }[];
+  color?: string;
+  formato?: (v: number) => string;
+}) {
+  const W = 480,
+    H = 150,
+    padTop = 16,
+    padBottom = 22;
   const areaH = H - padTop - padBottom;
   const max = Math.max(1, ...datos.map((d) => Math.max(d.valor, d.secundario ?? 0)));
   const w = W / Math.max(1, datos.length);
@@ -13,23 +24,47 @@ export function Barras({ datos, color = '#0073EA', formato = (v: number) => Stri
         const x = i * w;
         return (
           <g key={i}>
-            {d.secundario !== undefined && d.secundario > 0 && <rect x={x + w * 0.2} y={padTop + areaH - h2} width={w * 0.6} height={h2} fill="#E5E7EB" rx={3} />}
+            {d.secundario !== undefined && d.secundario > 0 && (
+              <rect x={x + w * 0.2} y={padTop + areaH - h2} width={w * 0.6} height={h2} fill="#E5E7EB" rx={3} />
+            )}
             {d.valor > 0 && (
               <rect x={x + w * 0.3} y={padTop + areaH - h} width={w * 0.4} height={h} fill={color} rx={3}>
-                <title>{d.etiqueta}: {formato(d.valor)}</title>
+                <title>
+                  {d.etiqueta}: {formato(d.valor)}
+                </title>
               </rect>
             )}
-            {d.valor > 0 && <text x={x + w / 2} y={padTop + areaH - h - 4} fontSize="11" fontWeight="600" textAnchor="middle" fill="#374151">{formato(d.valor)}</text>}
-            <text x={x + w / 2} y={H - 6} fontSize="10" textAnchor="middle" fill="#6B7280">{d.etiqueta}</text>
+            {d.valor > 0 && (
+              <text x={x + w / 2} y={padTop + areaH - h - 4} fontSize="11" fontWeight="600" textAnchor="middle" fill="#374151">
+                {formato(d.valor)}
+              </text>
+            )}
+            <text x={x + w / 2} y={H - 6} fontSize="10" textAnchor="middle" fill="#6B7280">
+              {d.etiqueta}
+            </text>
           </g>
         );
       })}
-      {datos.every((d) => d.valor === 0) && <text x={W / 2} y={padTop + areaH / 2} fontSize="12" textAnchor="middle" fill="#9CA3AF">Sin datos en el período</text>}
+      {datos.every((d) => d.valor === 0) && (
+        <text x={W / 2} y={padTop + areaH / 2} fontSize="12" textAnchor="middle" fill="#9CA3AF">
+          Sin datos en el período
+        </text>
+      )}
     </svg>
   );
 }
 
-export function Kpi({ etiqueta, valor, sub, tono = 'neutral' }: { etiqueta: string; valor: number | string; sub?: string; tono?: 'neutral' | 'ok' | 'warn' | 'bad' }) {
+export function Kpi({
+  etiqueta,
+  valor,
+  sub,
+  tono = 'neutral',
+}: {
+  etiqueta: string;
+  valor: number | string;
+  sub?: string;
+  tono?: 'neutral' | 'ok' | 'warn' | 'bad';
+}) {
   const color = { neutral: 'text-gray-900', ok: 'text-green-600', warn: 'text-amber-600', bad: 'text-red-600' }[tono];
   return (
     <div className="card p-4">

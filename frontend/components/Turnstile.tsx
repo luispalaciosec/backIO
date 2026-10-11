@@ -20,7 +20,13 @@ function cargarScript(): Promise<void> {
   if (window.turnstile) return Promise.resolve();
   cargando ??= new Promise((ok, mal) => {
     const s = document.createElement('script');
-    s.src = SCRIPT; s.async = true; s.onload = () => ok(); s.onerror = () => { cargando = null; mal(new Error('Turnstile no cargó')); };
+    s.src = SCRIPT;
+    s.async = true;
+    s.onload = () => ok();
+    s.onerror = () => {
+      cargando = null;
+      mal(new Error('Turnstile no cargó'));
+    };
     document.head.appendChild(s);
   });
   return cargando;
@@ -32,17 +38,24 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
     if (!SITE_KEY_TURNSTILE || !ref.current) return;
     let id: string | null = null;
     let vivo = true;
-    cargarScript().then(() => {
-      if (!vivo || !ref.current || !window.turnstile) return;
-      id = window.turnstile.render(ref.current, {
-        sitekey: SITE_KEY_TURNSTILE, language: 'es', theme: 'light', // Turnstile mide al menos 300 px: en pantallas angostas (celular) va en formato compacto.
-        size: ref.current.clientWidth < 300 ? 'compact' : 'flexible',
-        callback: (t: string) => onToken(t),
-        'expired-callback': () => onToken(null),
-        'error-callback': () => onToken(null),
-      });
-    }).catch(() => onToken(null));
-    return () => { vivo = false; if (id && window.turnstile) window.turnstile.remove(id); };
+    cargarScript()
+      .then(() => {
+        if (!vivo || !ref.current || !window.turnstile) return;
+        id = window.turnstile.render(ref.current, {
+          sitekey: SITE_KEY_TURNSTILE,
+          language: 'es',
+          theme: 'light', // Turnstile mide al menos 300 px: en pantallas angostas (celular) va en formato compacto.
+          size: ref.current.clientWidth < 300 ? 'compact' : 'flexible',
+          callback: (t: string) => onToken(t),
+          'expired-callback': () => onToken(null),
+          'error-callback': () => onToken(null),
+        });
+      })
+      .catch(() => onToken(null));
+    return () => {
+      vivo = false;
+      if (id && window.turnstile) window.turnstile.remove(id);
+    };
   }, [onToken]);
   if (!SITE_KEY_TURNSTILE) return null;
   return <div ref={ref} className="w-full min-h-[65px]" />;

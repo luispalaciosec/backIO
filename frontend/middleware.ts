@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-const PUBLICAS = [/^\/login/, /^\/auth\//, /^\/oauth\//, /^\/p\//, /^\/robots\.txt/, /^\/_next\//, /^\/favicon/, /\.(svg|png|jpg|jpeg|ico|webp|txt|xml|webmanifest)$/];
+const PUBLICAS = [
+  /^\/login/,
+  /^\/auth\//,
+  /^\/oauth\//,
+  /^\/p\//,
+  /^\/robots\.txt/,
+  /^\/_next\//,
+  /^\/favicon/,
+  /\.(svg|png|jpg|jpeg|ico|webp|txt|xml|webmanifest)$/,
+];
 
 /**
  * CSP con nonce (auditoría 10/10, M2). La sesión de Supabase es legible desde JS, así que la CSP es la defensa
@@ -47,7 +56,10 @@ export async function middleware(req: NextRequest) {
     h.set('content-security-policy', csp);
     return NextResponse.next({ request: { headers: h } });
   };
-  const conCsp = (r: NextResponse) => { r.headers.set('Content-Security-Policy', csp); return r; };
+  const conCsp = (r: NextResponse) => {
+    r.headers.set('Content-Security-Policy', csp);
+    return r;
+  };
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {

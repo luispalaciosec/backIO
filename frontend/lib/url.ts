@@ -6,7 +6,11 @@
 /** URL externa segura para un enlace: solo https. Devuelve undefined si no lo es (el enlace queda inerte). */
 export function hrefExterno(u: string | null | undefined): string | undefined {
   if (!u) return undefined;
-  try { return new URL(u).protocol === 'https:' ? u : undefined; } catch { return undefined; }
+  try {
+    return new URL(u).protocol === 'https:' ? u : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -18,5 +22,7 @@ export function rutaInterna(next: string | null | undefined, porDefecto = '/back
   try {
     const u = new URL(next, window.location.origin);
     return u.origin === window.location.origin ? `${u.pathname}${u.search}${u.hash}` : porDefecto;
-  } catch { return porDefecto; }
+  } catch {
+    return porDefecto;
+  }
 }

@@ -1,4 +1,11 @@
-import { ZONA, diaLocal, hoyLocal, ESTADO_OPERATIVO_LABEL, ESTADO_APROBACION_LABEL, PRIORIDAD_LABEL as PRIORIDAD_LABEL_SHARED } from '@backio/shared';
+import {
+  ZONA,
+  diaLocal,
+  hoyLocal,
+  ESTADO_OPERATIVO_LABEL,
+  ESTADO_APROBACION_LABEL,
+  PRIORIDAD_LABEL as PRIORIDAD_LABEL_SHARED,
+} from '@backio/shared';
 export function fecha(iso: string | null | undefined): string {
   if (!iso) return '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
@@ -45,5 +52,10 @@ export const PRIORIDAD_LABEL: Record<string, string> = PRIORIDAD_LABEL_SHARED;
 export const TIPO_LABEL: Record<string, string> = { fee: 'FEE', proyecto: 'Proyecto' };
 
 export function iniciales(nombre: string): string {
-  return nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
 }

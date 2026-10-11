@@ -39,16 +39,35 @@ export interface BacklogTableProps {
 }
 
 // w-max min-w-full: la fila mide lo que suman sus columnas; sin esto el contenedor recortaba las últimas (Basecamp, Última act.).
-const COLS = 'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_130px_90px_80px_80px_70px_240px_120px_120px]';
+const COLS =
+  'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_130px_90px_80px_80px_70px_240px_120px_120px]';
 
-export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, horas = {}, notas = {}, puedeEditar, proyectos = {}, proyectosCliente = {}, onCambio = () => undefined, onSincronizar }: BacklogTableProps) {
+export function BacklogTable({
+  items,
+  clientes,
+  usuarios,
+  onPatch,
+  onCrear,
+  horas = {},
+  notas = {},
+  puedeEditar,
+  proyectos = {},
+  proyectosCliente = {},
+  onCambio = () => undefined,
+  onSincronizar,
+}: BacklogTableProps) {
   const [sincronizando, setSincronizando] = useState<string | null>(null);
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
   const grupos = clientes
     .map((c, i) => ({ cliente: c, color: colorGrupo(i, c.color_primario), reqs: items.filter((r) => r.cliente_id === c.id) }))
     .filter((g) => g.reqs.length > 0 || !colapsados.has(`vacio-${g.cliente.id}`));
 
-  const toggle = (id: string) => setColapsados((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggle = (id: string) =>
+    setColapsados((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
 
   return (
     <div className="space-y-6 min-w-[1700px]">
@@ -56,28 +75,98 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
         const cerrado = colapsados.has(cliente.id);
         return (
           <section key={cliente.id}>
-            <div className="flex items-center gap-3 mb-1 sticky left-0 z-20 bg-[#f6f8fb] py-1" style={{ width: 'max-content', maxWidth: 'calc(100vw - 20rem)' }}>
-              <button type="button" onClick={() => toggle(cliente.id)} className="flex items-center gap-2 text-lg font-semibold" style={{ color }}>
+            <div
+              className="flex items-center gap-3 mb-1 sticky left-0 z-20 bg-[#f6f8fb] py-1"
+              style={{ width: 'max-content', maxWidth: 'calc(100vw - 20rem)' }}
+            >
+              <button
+                type="button"
+                onClick={() => toggle(cliente.id)}
+                className="flex items-center gap-2 text-lg font-semibold"
+                style={{ color }}
+              >
                 <span className={`inline-block transition-transform ${cerrado ? '' : 'rotate-90'}`}>▸</span>
-                {cliente.nombre} <span className="text-sm font-normal text-gray-400">{reqs.length} {reqs.length === 1 ? 'requerimiento' : 'requerimientos'}</span>
+                {cliente.nombre}{' '}
+                <span className="text-sm font-normal text-gray-400">
+                  {reqs.length} {reqs.length === 1 ? 'requerimiento' : 'requerimientos'}
+                </span>
               </button>
-              <Link href={`/informes/estatus?cliente=${cliente.id}`} className="btn-ghost text-xs py-1" title="Hoja de estatus para la reunión con el cliente: tareas, estado y última observación">📝 Estatus</Link>
+              <Link
+                href={`/informes/estatus?cliente=${cliente.id}`}
+                className="btn-ghost text-xs py-1"
+                title="Hoja de estatus para la reunión con el cliente: tareas, estado y última observación"
+              >
+                📝 Estatus
+              </Link>
               {onSincronizar && cliente.basecamp_project_id && (
-                <button type="button" className="btn-ghost text-xs py-1" disabled={sincronizando !== null} title="Trae de Basecamp los to-dos nuevos y actualiza títulos, listas, grupos, responsables y eliminados" onClick={async () => { setSincronizando(cliente.id); await onSincronizar(cliente); setSincronizando(null); }}>{sincronizando === cliente.id ? '⏳ Sincronizando…' : '↻ Sincronizar Basecamp'}</button>
+                <button
+                  type="button"
+                  className="btn-ghost text-xs py-1"
+                  disabled={sincronizando !== null}
+                  title="Trae de Basecamp los to-dos nuevos y actualiza títulos, listas, grupos, responsables y eliminados"
+                  onClick={async () => {
+                    setSincronizando(cliente.id);
+                    await onSincronizar(cliente);
+                    setSincronizando(null);
+                  }}
+                >
+                  {sincronizando === cliente.id ? '⏳ Sincronizando…' : '↻ Sincronizar Basecamp'}
+                </button>
               )}
             </div>
             {!cerrado && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden w-max min-w-full">
                 <div className={`grid ${COLS} text-xs font-medium text-gray-500 border-b border-gray-200 bg-gray-50 sticky top-0 z-10`}>
-                  <div className="flex sticky left-0 z-10 bg-gray-50"><span className="w-1.5 shrink-0" style={{ backgroundColor: color }} /><span className="px-3 py-2">Requerimiento</span></div>
-                  {['Proyecto', 'Owner agencia', 'Fecha pedido', 'Fecha entrega', 'Prioridad', 'Estado', 'Aprobación', 'Planificación', 'Piezas', 'Tipo', 'Clase', 'Atraso', 'Sin mov.', 'Horas', 'Observación', 'Basecamp', 'Última act.'].map((h) => (
-                    <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">{h}</div>
+                  <div className="flex sticky left-0 z-10 bg-gray-50">
+                    <span className="w-1.5 shrink-0" style={{ backgroundColor: color }} />
+                    <span className="px-3 py-2">Requerimiento</span>
+                  </div>
+                  {[
+                    'Proyecto',
+                    'Owner agencia',
+                    'Fecha pedido',
+                    'Fecha entrega',
+                    'Prioridad',
+                    'Estado',
+                    'Aprobación',
+                    'Planificación',
+                    'Piezas',
+                    'Tipo',
+                    'Clase',
+                    'Atraso',
+                    'Sin mov.',
+                    'Horas',
+                    'Observación',
+                    'Basecamp',
+                    'Última act.',
+                  ].map((h) => (
+                    <div key={h} className="px-2 py-2 text-center border-l border-gray-100 truncate">
+                      {h}
+                    </div>
                   ))}
                 </div>
                 {reqs.map((r) => (
-                  <Fila key={r.id} r={r} color={color} usuarios={usuarios} onPatch={onPatch} horas={horas[r.id]} nota={notas[r.id]} bloqueada={puedeEditar ? !puedeEditar(r) : false} proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined} onCambio={onCambio} />
+                  <Fila
+                    key={r.id}
+                    r={r}
+                    color={color}
+                    usuarios={usuarios}
+                    onPatch={onPatch}
+                    horas={horas[r.id]}
+                    nota={notas[r.id]}
+                    bloqueada={puedeEditar ? !puedeEditar(r) : false}
+                    proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined}
+                    onCambio={onCambio}
+                  />
                 ))}
-                {onCrear && <NuevaFila color={color} usuarios={usuarios} proyectos={proyectosCliente[cliente.id] ?? []} onCrear={(d) => onCrear(cliente.id, d)} />}
+                {onCrear && (
+                  <NuevaFila
+                    color={color}
+                    usuarios={usuarios}
+                    proyectos={proyectosCliente[cliente.id] ?? []}
+                    onCrear={(d) => onCrear(cliente.id, d)}
+                  />
+                )}
               </div>
             )}
           </section>
@@ -88,77 +177,317 @@ export function BacklogTable({ items, clientes, usuarios, onPatch, onCrear, hora
   );
 }
 
-function Fila({ r, color, usuarios, onPatch, horas, nota, bloqueada, proyecto, onCambio }: { r: RequerimientoMetricas; color: string; usuarios: Usuario[]; onPatch: BacklogTableProps['onPatch']; horas?: number; nota?: Bitacora; bloqueada?: boolean; proyecto?: string; onCambio: () => void }) {
+function Fila({
+  r,
+  color,
+  usuarios,
+  onPatch,
+  horas,
+  nota,
+  bloqueada,
+  proyecto,
+  onCambio,
+}: {
+  r: RequerimientoMetricas;
+  color: string;
+  usuarios: Usuario[];
+  onPatch: BacklogTableProps['onPatch'];
+  horas?: number;
+  nota?: Bitacora;
+  bloqueada?: boolean;
+  proyecto?: string;
+  onCambio: () => void;
+}) {
   const p = (patch: ActualizarRequerimientoInput) => onPatch(r.id, patch);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
   const [avisoBasecamp, setAvisoBasecamp] = useState(false);
   return (
-    <div className={`group grid ${COLS} border-b border-gray-100 hover:bg-gray-50/70 items-stretch ${hecho ? 'opacity-70' : ''} ${bloqueada ? 'pointer-events-none select-text bg-gray-50/40' : ''}`} title={bloqueada ? 'Tarea de otra persona: solo lectura' : undefined}>
+    <div
+      className={`group grid ${COLS} border-b border-gray-100 hover:bg-gray-50/70 items-stretch ${hecho ? 'opacity-70' : ''} ${bloqueada ? 'pointer-events-none select-text bg-gray-50/40' : ''}`}
+      title={bloqueada ? 'Tarea de otra persona: solo lectura' : undefined}
+    >
       <div className="flex min-w-0 sticky left-0 z-[5] bg-white group-hover:bg-gray-50">
         <span className="w-1.5 shrink-0" style={{ backgroundColor: color }} />
         <div className="flex-1 min-w-0 flex items-center gap-1 pl-1">
-          <CeldaTexto valor={r.titulo_interno} onCommit={(v) => p({ titulo_interno: v })} className={hecho ? 'line-through text-gray-500' : ''} />
-          {r.visible_cliente && <span className="text-xs shrink-0 pr-1" title={`El cliente ve: ${r.etiqueta_cliente}`}>👁</span>}
-          {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />}
+          <CeldaTexto
+            valor={r.titulo_interno}
+            onCommit={(v) => p({ titulo_interno: v })}
+            className={hecho ? 'line-through text-gray-500' : ''}
+          />
+          {r.visible_cliente && (
+            <span className="text-xs shrink-0 pr-1" title={`El cliente ve: ${r.etiqueta_cliente}`}>
+              👁
+            </span>
+          )}
+          {!hecho && (r.estado_aprobacion === 'pendiente_cliente' || r.estado_operativo === 'bloqueado') && (
+            <RecordatorioIA requerimientoId={r.id} titulo={r.titulo_interno} />
+          )}
           <HistorialReq r={r} onCambio={onCambio} usuarios={usuarios} />
-          {!hecho && <button type="button" className={`text-xs shrink-0 px-1 rounded ${r.daily_fecha === hoyLocal() ? 'bg-amber-200 ring-1 ring-amber-400' : 'grayscale opacity-30 hover:opacity-80'}`} title={r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'} onClick={(e) => { e.stopPropagation(); void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() }); }}>☀</button>}
-          {r.proyecto_id && <Link href={`/proyectos/${r.proyecto_id}`} className="text-xs text-gray-400 hover:text-brand shrink-0" title={r.bloque_nombre ?? 'proyecto'}>↗</Link>}
-          {r.basecamp_url && <a href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 pr-2 text-xs font-bold text-emerald-700 hover:text-emerald-900" title="Abrir el to-do en Basecamp">Bc↗</a>}
+          {!hecho && (
+            <button
+              type="button"
+              className={`text-xs shrink-0 px-1 rounded ${r.daily_fecha === hoyLocal() ? 'bg-amber-200 ring-1 ring-amber-400' : 'grayscale opacity-30 hover:opacity-80'}`}
+              title={
+                r.daily_fecha === hoyLocal() ? 'Seleccionada para el daily de hoy (clic para quitar)' : 'Marcar para trabajar hoy (daily)'
+              }
+              onClick={(e) => {
+                e.stopPropagation();
+                void p({ daily_fecha: r.daily_fecha === hoyLocal() ? null : hoyLocal() });
+              }}
+            >
+              ☀
+            </button>
+          )}
+          {r.proyecto_id && (
+            <Link
+              href={`/proyectos/${r.proyecto_id}`}
+              className="text-xs text-gray-400 hover:text-brand shrink-0"
+              title={r.bloque_nombre ?? 'proyecto'}
+            >
+              ↗
+            </Link>
+          )}
+          {r.basecamp_url && (
+            <a
+              href={hrefExterno(r.basecamp_url)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 pr-2 text-xs font-bold text-emerald-700 hover:text-emerald-900"
+              title="Abrir el to-do en Basecamp"
+            >
+              Bc↗
+            </a>
+          )}
         </div>
       </div>
-      <div className="border-l border-gray-100 flex items-center px-2 min-w-0 text-xs">{r.proyecto_id ? <Link href={`/proyectos/${r.proyecto_id}`} className="truncate text-gray-700 hover:text-brand" title={`${proyecto ?? 'Proyecto'}${r.bloque_nombre ? ` · ${r.bloque_nombre}` : ''}`}>{proyecto ?? '…'}</Link> : <span className="text-gray-300">—</span>}</div>
-      {/* Owner cliente oculto por ahora (pedido de Luis 04/09); el dato sigue en la base. */}
-      <div className="border-l border-gray-100"><CeldaOwners ids={r.owner_agencia} usuarios={usuarios} onChange={(ids) => p({ owner_agencia: ids })} /></div>
-      <div className="border-l border-gray-100"><CeldaFecha valor={r.fecha_pedido} onChange={(v) => p({ fecha_pedido: v })} /></div>
-      <div className="border-l border-gray-100 relative" title={r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega ? `Comprometida originalmente: ${r.fecha_entrega_original} · reprogramada ${r.veces_reprogramado}×` : undefined}>
-        <CeldaFecha valor={r.fecha_entrega} onChange={(v) => p({ fecha_entrega: v })} alerta={r.dias_atraso > 0} />
-        {r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega && <span className="absolute right-1 top-0.5 text-[10px] leading-none text-amber-700 pointer-events-none">↺{r.veces_reprogramado}</span>}
+      <div className="border-l border-gray-100 flex items-center px-2 min-w-0 text-xs">
+        {r.proyecto_id ? (
+          <Link
+            href={`/proyectos/${r.proyecto_id}`}
+            className="truncate text-gray-700 hover:text-brand"
+            title={`${proyecto ?? 'Proyecto'}${r.bloque_nombre ? ` · ${r.bloque_nombre}` : ''}`}
+          >
+            {proyecto ?? '…'}
+          </Link>
+        ) : (
+          <span className="text-gray-300">—</span>
+        )}
       </div>
-      <div className="border-l border-gray-100"><CeldaSelect valor={r.prioridad} opciones={PRIOS} colores={COLOR_PRIORIDAD} labels={PRIORIDAD_LABEL} onChange={(v) => p({ prioridad: v as RequerimientoMetricas['prioridad'] })} /></div>
-      <div className="border-l border-gray-100 relative" title={r.basecamp_todo_id && !hecho ? 'Completado se marca en Basecamp: BackIO lo refleja en segundos' : undefined}>
-        <CeldaSelect valor={r.estado_operativo} opciones={ESTADOS} colores={COLOR_ESTADO} labels={ESTADO_LABEL} disabledValues={r.basecamp_todo_id ? ['completado'] : []} disabledLabel={r.basecamp_todo_id ? '· se marca en Basecamp' : undefined} onDisabledPick={() => setAvisoBasecamp(true)} onChange={(v) => p({ estado_operativo: v as RequerimientoMetricas['estado_operativo'] })} />
+      {/* Owner cliente oculto por ahora (pedido de Luis 04/09); el dato sigue en la base. */}
+      <div className="border-l border-gray-100">
+        <CeldaOwners ids={r.owner_agencia} usuarios={usuarios} onChange={(ids) => p({ owner_agencia: ids })} />
+      </div>
+      <div className="border-l border-gray-100">
+        <CeldaFecha valor={r.fecha_pedido} onChange={(v) => p({ fecha_pedido: v })} />
+      </div>
+      <div
+        className="border-l border-gray-100 relative"
+        title={
+          r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega
+            ? `Comprometida originalmente: ${r.fecha_entrega_original} · reprogramada ${r.veces_reprogramado}×`
+            : undefined
+        }
+      >
+        <CeldaFecha valor={r.fecha_entrega} onChange={(v) => p({ fecha_entrega: v })} alerta={r.dias_atraso > 0} />
+        {r.fecha_entrega_original && r.fecha_entrega_original !== r.fecha_entrega && (
+          <span className="absolute right-1 top-0.5 text-[10px] leading-none text-amber-700 pointer-events-none">
+            ↺{r.veces_reprogramado}
+          </span>
+        )}
+      </div>
+      <div className="border-l border-gray-100">
+        <CeldaSelect
+          valor={r.prioridad}
+          opciones={PRIOS}
+          colores={COLOR_PRIORIDAD}
+          labels={PRIORIDAD_LABEL}
+          onChange={(v) => p({ prioridad: v as RequerimientoMetricas['prioridad'] })}
+        />
+      </div>
+      <div
+        className="border-l border-gray-100 relative"
+        title={r.basecamp_todo_id && !hecho ? 'Completado se marca en Basecamp: BackIO lo refleja en segundos' : undefined}
+      >
+        <CeldaSelect
+          valor={r.estado_operativo}
+          opciones={ESTADOS}
+          colores={COLOR_ESTADO}
+          labels={ESTADO_LABEL}
+          disabledValues={r.basecamp_todo_id ? ['completado'] : []}
+          disabledLabel={r.basecamp_todo_id ? '· se marca en Basecamp' : undefined}
+          onDisabledPick={() => setAvisoBasecamp(true)}
+          onChange={(v) => p({ estado_operativo: v as RequerimientoMetricas['estado_operativo'] })}
+        />
         {avisoBasecamp && (
-          <div className="absolute z-30 left-0 top-full mt-1 w-72 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-lg pointer-events-auto" onMouseLeave={() => setAvisoBasecamp(false)}>
+          <div
+            className="absolute z-30 left-0 top-full mt-1 w-72 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-lg pointer-events-auto"
+            onMouseLeave={() => setAvisoBasecamp(false)}
+          >
             <b>Se completa desde Basecamp.</b> Marca el to-do como hecho allá y BackIO lo pasa a Completado en segundos.
-            {r.basecamp_url && <a className="block mt-2 btn-primary text-xs py-1 text-center" href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer">Abrir el to-do en Basecamp ↗</a>}
-            <button type="button" className="mt-2 link-action" onClick={() => setAvisoBasecamp(false)}>Cerrar</button>
+            {r.basecamp_url && (
+              <a
+                className="block mt-2 btn-primary text-xs py-1 text-center"
+                href={hrefExterno(r.basecamp_url)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir el to-do en Basecamp ↗
+              </a>
+            )}
+            <button type="button" className="mt-2 link-action" onClick={() => setAvisoBasecamp(false)}>
+              Cerrar
+            </button>
           </div>
         )}
       </div>
-      <div className="border-l border-gray-100"><CeldaSelect valor={r.estado_aprobacion} opciones={APROB} colores={COLOR_APROBACION} labels={APROBACION_LABEL} onChange={(v) => p({ estado_aprobacion: v as RequerimientoMetricas['estado_aprobacion'] })} /></div>
-      <div className="border-l border-gray-100" title="Planificado: entró por el weekly · No planificado: entró durante la semana · Urgente"><CeldaSelect valor={r.planificacion ?? 'planificado'} opciones={PLANIF} colores={COLOR_PLANIFICACION} labels={PLANIFICACION_LABEL} onChange={(v) => p({ planificacion: v as RequerimientoMetricas['planificacion'] })} /></div>
-      <div className={`border-l border-gray-100 ${!r.piezas && !hecho ? 'bg-amber-50' : ''}`} title="Piezas del requerimiento (lo llena la ejecutiva). Alimenta el informe por canal."><CeldaPiezas valor={r.piezas ?? 0} onCommit={(n) => p({ piezas: n })} /></div>
-      <div className="border-l border-gray-100"><span className="h-9 flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: COLOR_TIPO[r.tipo_trabajo] }}>{TIPO_LABEL[r.tipo_trabajo]}</span></div>
-      <div className="border-l border-gray-100 h-9 flex items-center gap-1 px-1" title="Clase de tarea (KPIs): Propuesta cuenta para campañas aprobadas; Incidencia para SLA de resolución. ✦ = propuesta proactiva.">
-        <select className={`h-7 flex-1 min-w-0 rounded text-xs px-1 border ${r.clase === 'propuesta' ? 'bg-violet-50 border-violet-300 text-violet-800' : r.clase === 'incidencia' ? 'bg-orange-50 border-orange-300 text-orange-800' : 'bg-transparent border-transparent text-gray-500'}`} value={r.clase ?? 'tarea'} onChange={(e) => void p({ clase: e.target.value as ClaseTarea })}>
-          {(Object.keys(CLASE_LABEL) as ClaseTarea[]).map((c) => <option key={c} value={c}>{CLASE_LABEL[c]}</option>)}
-        </select>
-        <button type="button" className={`text-sm shrink-0 ${r.proactiva ? 'text-amber-500' : 'text-gray-200 hover:text-gray-400'}`} title={r.proactiva ? 'Propuesta proactiva (clic para quitar)' : 'Marcar como propuesta proactiva'} onClick={(e) => { e.stopPropagation(); void p({ proactiva: !r.proactiva }); }}>✦</button>
+      <div className="border-l border-gray-100">
+        <CeldaSelect
+          valor={r.estado_aprobacion}
+          opciones={APROB}
+          colores={COLOR_APROBACION}
+          labels={APROBACION_LABEL}
+          onChange={(v) => p({ estado_aprobacion: v as RequerimientoMetricas['estado_aprobacion'] })}
+        />
       </div>
-      <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_atraso > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{r.dias_atraso || ''}</div>
-      <div className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_sin_movimiento > 14 ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{r.dias_sin_movimiento}</div>
-      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums text-gray-600" title="Horas registradas en Basecamp (últimos 90 días)">{horas ? horas.toFixed(1) : ''}</div>
-      <div className="border-l border-gray-100 min-w-0"><CeldaNota r={r} nota={nota} usuarios={usuarios} onCambio={onCambio} /></div>
-      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs">{r.basecamp_url ? <a href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer" className="text-brand underline truncate px-2">Basecamp</a> : <span className="text-gray-300">—</span>}</div>
-      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs text-gray-500" title={r.ultima_actualizacion}>{haceCuanto(r.ultima_actualizacion)}</div>
+      <div
+        className="border-l border-gray-100"
+        title="Planificado: entró por el weekly · No planificado: entró durante la semana · Urgente"
+      >
+        <CeldaSelect
+          valor={r.planificacion ?? 'planificado'}
+          opciones={PLANIF}
+          colores={COLOR_PLANIFICACION}
+          labels={PLANIFICACION_LABEL}
+          onChange={(v) => p({ planificacion: v as RequerimientoMetricas['planificacion'] })}
+        />
+      </div>
+      <div
+        className={`border-l border-gray-100 ${!r.piezas && !hecho ? 'bg-amber-50' : ''}`}
+        title="Piezas del requerimiento (lo llena la ejecutiva). Alimenta el informe por canal."
+      >
+        <CeldaPiezas valor={r.piezas ?? 0} onCommit={(n) => p({ piezas: n })} />
+      </div>
+      <div className="border-l border-gray-100">
+        <span
+          className="h-9 flex items-center justify-center text-white text-xs font-medium"
+          style={{ backgroundColor: COLOR_TIPO[r.tipo_trabajo] }}
+        >
+          {TIPO_LABEL[r.tipo_trabajo]}
+        </span>
+      </div>
+      <div
+        className="border-l border-gray-100 h-9 flex items-center gap-1 px-1"
+        title="Clase de tarea (KPIs): Propuesta cuenta para campañas aprobadas; Incidencia para SLA de resolución. ✦ = propuesta proactiva."
+      >
+        <select
+          className={`h-7 flex-1 min-w-0 rounded text-xs px-1 border ${r.clase === 'propuesta' ? 'bg-violet-50 border-violet-300 text-violet-800' : r.clase === 'incidencia' ? 'bg-orange-50 border-orange-300 text-orange-800' : 'bg-transparent border-transparent text-gray-500'}`}
+          value={r.clase ?? 'tarea'}
+          onChange={(e) => void p({ clase: e.target.value as ClaseTarea })}
+        >
+          {(Object.keys(CLASE_LABEL) as ClaseTarea[]).map((c) => (
+            <option key={c} value={c}>
+              {CLASE_LABEL[c]}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className={`text-sm shrink-0 ${r.proactiva ? 'text-amber-500' : 'text-gray-200 hover:text-gray-400'}`}
+          title={r.proactiva ? 'Propuesta proactiva (clic para quitar)' : 'Marcar como propuesta proactiva'}
+          onClick={(e) => {
+            e.stopPropagation();
+            void p({ proactiva: !r.proactiva });
+          }}
+        >
+          ✦
+        </button>
+      </div>
+      <div
+        className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_atraso > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}
+      >
+        {r.dias_atraso || ''}
+      </div>
+      <div
+        className={`border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums ${r.dias_sin_movimiento > 14 ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}
+      >
+        {r.dias_sin_movimiento}
+      </div>
+      <div
+        className="border-l border-gray-100 h-9 flex items-center justify-center text-sm tabular-nums text-gray-600"
+        title="Horas registradas en Basecamp (últimos 90 días)"
+      >
+        {horas ? horas.toFixed(1) : ''}
+      </div>
+      <div className="border-l border-gray-100 min-w-0">
+        <CeldaNota r={r} nota={nota} usuarios={usuarios} onCambio={onCambio} />
+      </div>
+      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs">
+        {r.basecamp_url ? (
+          <a href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer" className="text-brand underline truncate px-2">
+            Basecamp
+          </a>
+        ) : (
+          <span className="text-gray-300">—</span>
+        )}
+      </div>
+      <div className="border-l border-gray-100 h-9 flex items-center justify-center text-xs text-gray-500" title={r.ultima_actualizacion}>
+        {haceCuanto(r.ultima_actualizacion)}
+      </div>
     </div>
   );
 }
 
 function CeldaPiezas({ valor, onCommit }: { valor: number; onCommit: (n: number) => void | Promise<void> }) {
   const [v, setV] = useState(String(valor || ''));
-  useEffect(() => { setV(String(valor || '')); }, [valor]);
-  const commit = () => { const n = Math.max(0, Math.floor(Number(v) || 0)); if (n !== valor) void onCommit(n); setV(String(n || '')); };
-  return <input className="h-9 w-full bg-transparent text-sm text-center tabular-nums placeholder:text-amber-500 focus:outline-none focus:ring-2 focus:ring-brand/40" inputMode="numeric" placeholder="¿piezas?" value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />;
+  useEffect(() => {
+    setV(String(valor || ''));
+  }, [valor]);
+  const commit = () => {
+    const n = Math.max(0, Math.floor(Number(v) || 0));
+    if (n !== valor) void onCommit(n);
+    setV(String(n || ''));
+  };
+  return (
+    <input
+      className="h-9 w-full bg-transparent text-sm text-center tabular-nums placeholder:text-amber-500 focus:outline-none focus:ring-2 focus:ring-brand/40"
+      inputMode="numeric"
+      placeholder="¿piezas?"
+      value={v}
+      onChange={(e) => setV(e.target.value.replace(/\D/g, ''))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
 }
 
-export interface NuevoRequerimiento { titulo: string; proyecto_id: string | null; owner_agencia: string[]; fecha_entrega: string | null; piezas: number; clase: ClaseTarea; proactiva: boolean }
+export interface NuevoRequerimiento {
+  titulo: string;
+  proyecto_id: string | null;
+  owner_agencia: string[];
+  fecha_entrega: string | null;
+  piezas: number;
+  clase: ClaseTarea;
+  proactiva: boolean;
+}
 
 /**
  * Alta rápida desde el backlog: título, proyecto, responsables, entrega y piezas. Si el proyecto está enlazado a
  * Basecamp y hay fecha, el to-do se crea allá al guardar (cliente → ejecutiva → BackIO → Basecamp).
  */
-function NuevaFila({ color, usuarios, proyectos, onCrear }: { color: string; usuarios: Usuario[]; proyectos: { id: string; nombre: string; basecamp: boolean; completado?: boolean }[]; onCrear: (d: NuevoRequerimiento) => Promise<void> }) {
+function NuevaFila({
+  color,
+  usuarios,
+  proyectos,
+  onCrear,
+}: {
+  color: string;
+  usuarios: Usuario[];
+  proyectos: { id: string; nombre: string; basecamp: boolean; completado?: boolean }[];
+  onCrear: (d: NuevoRequerimiento) => Promise<void>;
+}) {
   const [v, setV] = useState('');
   const [proyecto, setProyecto] = useState('');
   const [owners, setOwners] = useState<string[]>([]);
@@ -172,42 +501,164 @@ function NuevaFila({ color, usuarios, proyectos, onCrear }: { color: string; usu
   const crear = async () => {
     if (!v.trim() || busy) return;
     setBusy(true);
-    await onCrear({ titulo: v.trim(), proyecto_id: proyecto || null, owner_agencia: owners, fecha_entrega: fechaEnt || null, piezas: Math.max(0, Number(piezas) || 0), clase, proactiva });
-    setV(''); setOwners([]); setFechaEnt(''); setPiezas(''); setClase('tarea'); setProactiva(false); setBusy(false);
+    await onCrear({
+      titulo: v.trim(),
+      proyecto_id: proyecto || null,
+      owner_agencia: owners,
+      fecha_entrega: fechaEnt || null,
+      piezas: Math.max(0, Number(piezas) || 0),
+      clase,
+      proactiva,
+    });
+    setV('');
+    setOwners([]);
+    setFechaEnt('');
+    setPiezas('');
+    setClase('tarea');
+    setProactiva(false);
+    setBusy(false);
   };
   return (
     <div className="flex items-center sticky left-0 z-[5] bg-white" style={{ width: 'max-content', maxWidth: 'calc(100vw - 20rem)' }}>
       <span className="w-1.5 self-stretch" style={{ backgroundColor: color, opacity: 0.4 }} />
-      <input className="h-9 w-72 bg-transparent text-sm px-3 placeholder:text-gray-400 focus:outline-none" placeholder="+ Agregar requerimiento" value={v} disabled={busy} onChange={(e) => setV(e.target.value)} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
-      <select className="h-9 w-48 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={proyecto} disabled={busy} onChange={(e) => setProyecto(e.target.value)} title="Proyecto (lista de Basecamp) donde entra la tarea">
+      <input
+        className="h-9 w-72 bg-transparent text-sm px-3 placeholder:text-gray-400 focus:outline-none"
+        placeholder="+ Agregar requerimiento"
+        value={v}
+        disabled={busy}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={async (e) => {
+          if (e.key === 'Enter') await crear();
+        }}
+      />
+      <select
+        className="h-9 w-48 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700"
+        value={proyecto}
+        disabled={busy}
+        onChange={(e) => setProyecto(e.target.value)}
+        title="Proyecto (lista de Basecamp) donde entra la tarea"
+      >
         <option value="">Sin proyecto</option>
-        {proyectos.map((x) => <option key={x.id} value={x.id}>{x.completado ? '✓ ' : ''}{x.nombre}{x.basecamp ? '' : ' (sin Basecamp)'}{x.completado ? ' · completado, se reabre' : ''}</option>)}
+        {proyectos.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.completado ? '✓ ' : ''}
+            {x.nombre}
+            {x.basecamp ? '' : ' (sin Basecamp)'}
+            {x.completado ? ' · completado, se reabre' : ''}
+          </option>
+        ))}
       </select>
-      <div className="w-32 border-l border-gray-100"><CeldaOwners ids={owners} usuarios={usuarios} onChange={setOwners} /></div>
-      <input type="date" className="h-9 w-36 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={fechaEnt} disabled={busy} onChange={(e) => setFechaEnt(e.target.value)} title="Fecha de entrega" />
-      <input className="h-9 w-20 bg-transparent text-sm text-center border-l border-gray-100 placeholder:text-gray-400 focus:outline-none" inputMode="numeric" placeholder="piezas" value={piezas} disabled={busy} onChange={(e) => setPiezas(e.target.value.replace(/\D/g, ''))} onKeyDown={async (e) => { if (e.key === 'Enter') await crear(); }} />
-      <select className="h-9 w-28 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700" value={clase} disabled={busy} onChange={(e) => setClase(e.target.value as ClaseTarea)} title="Clase de tarea (KPIs)">
-        {(Object.keys(CLASE_LABEL) as ClaseTarea[]).map((c) => <option key={c} value={c}>{CLASE_LABEL[c]}</option>)}
+      <div className="w-32 border-l border-gray-100">
+        <CeldaOwners ids={owners} usuarios={usuarios} onChange={setOwners} />
+      </div>
+      <input
+        type="date"
+        className="h-9 w-36 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700"
+        value={fechaEnt}
+        disabled={busy}
+        onChange={(e) => setFechaEnt(e.target.value)}
+        title="Fecha de entrega"
+      />
+      <input
+        className="h-9 w-20 bg-transparent text-sm text-center border-l border-gray-100 placeholder:text-gray-400 focus:outline-none"
+        inputMode="numeric"
+        placeholder="piezas"
+        value={piezas}
+        disabled={busy}
+        onChange={(e) => setPiezas(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={async (e) => {
+          if (e.key === 'Enter') await crear();
+        }}
+      />
+      <select
+        className="h-9 w-28 bg-transparent text-xs border-l border-gray-100 px-2 focus:outline-none text-gray-700"
+        value={clase}
+        disabled={busy}
+        onChange={(e) => setClase(e.target.value as ClaseTarea)}
+        title="Clase de tarea (KPIs)"
+      >
+        {(Object.keys(CLASE_LABEL) as ClaseTarea[]).map((c) => (
+          <option key={c} value={c}>
+            {CLASE_LABEL[c]}
+          </option>
+        ))}
       </select>
-      <label className="h-9 flex items-center gap-1 px-2 border-l border-gray-100 text-xs text-gray-600 whitespace-nowrap" title="Propuesta proactiva: no la pidió el cliente"><input type="checkbox" checked={proactiva} disabled={busy} onChange={(e) => setProactiva(e.target.checked)} /> ✦ Proactiva</label>
-      <span className={`text-xs px-2 whitespace-nowrap ${iraBasecamp ? 'text-emerald-700 font-semibold' : 'text-gray-400'}`} title={iraBasecamp ? 'Al guardar se crea el to-do en la lista de Basecamp del proyecto, con responsables y fecha' : p && !p.basecamp ? 'Ese proyecto no está enlazado a una lista de Basecamp' : !p ? 'Elige un proyecto enlazado a Basecamp para que el to-do se cree allá' : 'Pon fecha de entrega para crear el to-do en Basecamp'}>{iraBasecamp ? 'Bc↗ se crea en Basecamp' : 'solo en BackIO'}</span>
-      <button type="button" className="btn-primary text-xs py-1 mx-2" disabled={busy || !v.trim()} onClick={crear}>{busy ? 'Creando…' : 'Crear'}</button>
+      <label
+        className="h-9 flex items-center gap-1 px-2 border-l border-gray-100 text-xs text-gray-600 whitespace-nowrap"
+        title="Propuesta proactiva: no la pidió el cliente"
+      >
+        <input type="checkbox" checked={proactiva} disabled={busy} onChange={(e) => setProactiva(e.target.checked)} /> ✦ Proactiva
+      </label>
+      <span
+        className={`text-xs px-2 whitespace-nowrap ${iraBasecamp ? 'text-emerald-700 font-semibold' : 'text-gray-400'}`}
+        title={
+          iraBasecamp
+            ? 'Al guardar se crea el to-do en la lista de Basecamp del proyecto, con responsables y fecha'
+            : p && !p.basecamp
+              ? 'Ese proyecto no está enlazado a una lista de Basecamp'
+              : !p
+                ? 'Elige un proyecto enlazado a Basecamp para que el to-do se cree allá'
+                : 'Pon fecha de entrega para crear el to-do en Basecamp'
+        }
+      >
+        {iraBasecamp ? 'Bc↗ se crea en Basecamp' : 'solo en BackIO'}
+      </span>
+      <button type="button" className="btn-primary text-xs py-1 mx-2" disabled={busy || !v.trim()} onClick={crear}>
+        {busy ? 'Creando…' : 'Crear'}
+      </button>
     </div>
   );
 }
 
 /** Última observación de la bitácora; clic para anotar sin salir del backlog. */
-function CeldaNota({ r, nota, usuarios, onCambio }: { r: RequerimientoMetricas; nota?: Bitacora; usuarios: Usuario[]; onCambio: () => void }) {
+function CeldaNota({
+  r,
+  nota,
+  usuarios,
+  onCambio,
+}: {
+  r: RequerimientoMetricas;
+  nota?: Bitacora;
+  usuarios: Usuario[];
+  onCambio: () => void;
+}) {
   const [abierto, setAbierto] = useState(false);
   return (
     <>
-      <button type="button" className="h-9 w-full text-left px-2 text-xs truncate hover:bg-gray-100" title={nota ? `${fechaCorta(diaLocal(nota.created_at))} · ${nota.nota}\n\nClic para ver la bitácora o anotar` : 'Sin observaciones · clic para anotar'} onClick={(e) => { e.stopPropagation(); setAbierto(true); }}>
-        {nota ? <><span className="text-gray-400 mr-1">{fechaCorta(diaLocal(nota.created_at))}</span><span className="text-gray-700">{nota.nota}</span></> : <span className="text-gray-300">+ observación</span>}
+      <button
+        type="button"
+        className="h-9 w-full text-left px-2 text-xs truncate hover:bg-gray-100"
+        title={
+          nota
+            ? `${fechaCorta(diaLocal(nota.created_at))} · ${nota.nota}\n\nClic para ver la bitácora o anotar`
+            : 'Sin observaciones · clic para anotar'
+        }
+        onClick={(e) => {
+          e.stopPropagation();
+          setAbierto(true);
+        }}
+      >
+        {nota ? (
+          <>
+            <span className="text-gray-400 mr-1">{fechaCorta(diaLocal(nota.created_at))}</span>
+            <span className="text-gray-700">{nota.nota}</span>
+          </>
+        ) : (
+          <span className="text-gray-300">+ observación</span>
+        )}
       </button>
       {abierto && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setAbierto(false)}>
           <div className="card w-full max-w-xl max-h-[85vh] overflow-auto p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3"><div><div className="font-semibold">{r.titulo_interno}</div><div className="text-xs text-gray-500">Bitácora con el cliente</div></div><button className="btn-ghost" onClick={() => setAbierto(false)}>×</button></div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold">{r.titulo_interno}</div>
+                <div className="text-xs text-gray-500">Bitácora con el cliente</div>
+              </div>
+              <button className="btn-ghost" onClick={() => setAbierto(false)}>
+                ×
+              </button>
+            </div>
             <BitacoraReq requerimientoId={r.id} usuarios={usuarios} visibleCliente={r.visible_cliente} onCambio={onCambio} compacto />
           </div>
         </div>

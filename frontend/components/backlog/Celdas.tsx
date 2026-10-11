@@ -3,9 +3,22 @@ import { useEffect, useRef, useState } from 'react';
 import { iniciales } from '@/lib/format';
 
 /** Celda de color sólido con selector nativo superpuesto (click en toda la celda). */
-export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabledValues = [], disabledLabel, onDisabledPick }: {
-  valor: string; opciones: readonly string[]; colores: Record<string, string>; labels: Record<string, string>;
-  onChange: (v: string) => void | Promise<void>; disabledValues?: string[];
+export function CeldaSelect({
+  valor,
+  opciones,
+  colores,
+  labels,
+  onChange,
+  disabledValues = [],
+  disabledLabel,
+  onDisabledPick,
+}: {
+  valor: string;
+  opciones: readonly string[];
+  colores: Record<string, string>;
+  labels: Record<string, string>;
+  onChange: (v: string) => void | Promise<void>;
+  disabledValues?: string[];
   /** Sufijo que explica por qué una opción está apagada (ej. "· se completa desde Basecamp"). */
   disabledLabel?: string;
   /** Se llama si el usuario intenta elegir una opción apagada (algunos navegadores lo permiten). */
@@ -13,7 +26,10 @@ export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabl
 }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="relative h-9 min-w-[120px] text-white text-xs font-medium flex items-center justify-center select-none" style={{ backgroundColor: colores[valor] ?? '#C4C4C4', opacity: busy ? 0.6 : 1 }}>
+    <div
+      className="relative h-9 min-w-[120px] text-white text-xs font-medium flex items-center justify-center select-none"
+      style={{ backgroundColor: colores[valor] ?? '#C4C4C4', opacity: busy ? 0.6 : 1 }}
+    >
       <span className="truncate px-2">{labels[valor] ?? valor}</span>
       <select
         aria-label="Cambiar"
@@ -22,15 +38,43 @@ export function CeldaSelect({ valor, opciones, colores, labels, onChange, disabl
         // y en Chrome/Windows las opciones salían blancas sobre blanco. Color explícito en select y options.
         style={{ color: '#1b2430', backgroundColor: '#ffffff' }}
         value={valor}
-        onChange={async (e) => { const v = e.target.value; if (disabledValues.includes(v)) { onDisabledPick?.(v); return; } setBusy(true); await onChange(v); setBusy(false); }}
+        onChange={async (e) => {
+          const v = e.target.value;
+          if (disabledValues.includes(v)) {
+            onDisabledPick?.(v);
+            return;
+          }
+          setBusy(true);
+          await onChange(v);
+          setBusy(false);
+        }}
       >
-        {opciones.map((o) => <option key={o} value={o} disabled={disabledValues.includes(o)} title={disabledValues.includes(o) ? disabledLabel : undefined} style={{ color: disabledValues.includes(o) ? '#9ca3af' : '#1b2430', backgroundColor: '#ffffff' }}>{labels[o] ?? o}{disabledValues.includes(o) && disabledLabel ? ` ${disabledLabel}` : ''}</option>)}
+        {opciones.map((o) => (
+          <option
+            key={o}
+            value={o}
+            disabled={disabledValues.includes(o)}
+            title={disabledValues.includes(o) ? disabledLabel : undefined}
+            style={{ color: disabledValues.includes(o) ? '#9ca3af' : '#1b2430', backgroundColor: '#ffffff' }}
+          >
+            {labels[o] ?? o}
+            {disabledValues.includes(o) && disabledLabel ? ` ${disabledLabel}` : ''}
+          </option>
+        ))}
       </select>
     </div>
   );
 }
 
-export function CeldaFecha({ valor, onChange, alerta }: { valor: string | null; onChange: (v: string | null) => void | Promise<void>; alerta?: boolean }) {
+export function CeldaFecha({
+  valor,
+  onChange,
+  alerta,
+}: {
+  valor: string | null;
+  onChange: (v: string | null) => void | Promise<void>;
+  alerta?: boolean;
+}) {
   return (
     <input
       type="date"
@@ -41,7 +85,17 @@ export function CeldaFecha({ valor, onChange, alerta }: { valor: string | null; 
   );
 }
 
-export function CeldaTexto({ valor, onCommit, placeholder, className = '' }: { valor: string; onCommit: (v: string) => void | Promise<void>; placeholder?: string; className?: string }) {
+export function CeldaTexto({
+  valor,
+  onCommit,
+  placeholder,
+  className = '',
+}: {
+  valor: string;
+  onCommit: (v: string) => void | Promise<void>;
+  placeholder?: string;
+  className?: string;
+}) {
   const [v, setV] = useState(valor);
   return (
     <input
@@ -50,7 +104,10 @@ export function CeldaTexto({ valor, onCommit, placeholder, className = '' }: { v
       placeholder={placeholder}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== valor && onCommit(v)}
-      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setV(valor); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setV(valor);
+      }}
     />
   );
 }
@@ -59,14 +116,26 @@ const AVATAR_COLORS = ['#E2445C', '#0073EA', '#00C875', '#A25DDC', '#FDAB3D', '#
 export function Avatar({ nombre, size = 28 }: { nombre: string; size?: number }) {
   const idx = [...nombre].reduce((s, ch) => s + ch.charCodeAt(0), 0) % AVATAR_COLORS.length;
   return (
-    <span title={nombre} className="inline-flex items-center justify-center rounded-full text-white font-semibold ring-2 ring-white" style={{ width: size, height: size, fontSize: size * 0.4, backgroundColor: AVATAR_COLORS[idx] }}>
+    <span
+      title={nombre}
+      className="inline-flex items-center justify-center rounded-full text-white font-semibold ring-2 ring-white"
+      style={{ width: size, height: size, fontSize: size * 0.4, backgroundColor: AVATAR_COLORS[idx] }}
+    >
       {iniciales(nombre) || '?'}
     </span>
   );
 }
 
 /** Selector de owners: avatares apilados + select para agregar/quitar. */
-export function CeldaOwners({ ids, usuarios, onChange }: { ids: string[]; usuarios: { id: string; nombre: string }[]; onChange: (ids: string[]) => void | Promise<void> }) {
+export function CeldaOwners({
+  ids,
+  usuarios,
+  onChange,
+}: {
+  ids: string[];
+  usuarios: { id: string; nombre: string }[];
+  onChange: (ids: string[]) => void | Promise<void>;
+}) {
   const [abierto, setAbierto] = useState(false);
   const [q, setQ] = useState('');
   const [pos, setPos] = useState<{ x: number; y: number; arriba: boolean }>({ x: 0, y: 0, arriba: false });
@@ -74,34 +143,92 @@ export function CeldaOwners({ ids, usuarios, onChange }: { ids: string[]; usuari
   const seleccionados = ids.map((id) => usuarios.find((u) => u.id === id)).filter((u): u is { id: string; nombre: string } => !!u);
   const abrir = () => {
     const r = btn.current?.getBoundingClientRect();
-    if (r) { const arriba = window.innerHeight - r.bottom < 320; setPos({ x: r.left + r.width / 2, y: arriba ? r.top - 4 : r.bottom + 4, arriba }); }
-    setQ(''); setAbierto((a) => !a);
+    if (r) {
+      const arriba = window.innerHeight - r.bottom < 320;
+      setPos({ x: r.left + r.width / 2, y: arriba ? r.top - 4 : r.bottom + 4, arriba });
+    }
+    setQ('');
+    setAbierto((a) => !a);
   };
   useEffect(() => {
     if (!abierto) return;
-    const cerrar = (e: MouseEvent) => { const t = e.target as HTMLElement; if (!t.closest('[data-owners-pop]') && !btn.current?.contains(t)) setAbierto(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false); };
-    document.addEventListener('mousedown', cerrar); document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', cerrar); document.removeEventListener('keydown', esc); };
+    const cerrar = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest('[data-owners-pop]') && !btn.current?.contains(t)) setAbierto(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAbierto(false);
+    };
+    document.addEventListener('mousedown', cerrar);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', cerrar);
+      document.removeEventListener('keydown', esc);
+    };
   }, [abierto]);
   const filtrados = usuarios.filter((u) => !q || u.nombre.toLowerCase().includes(q.toLowerCase()));
-  const ordenados = [...filtrados].sort((a, b) => Number(ids.includes(b.id)) - Number(ids.includes(a.id)) || a.nombre.localeCompare(b.nombre));
+  const ordenados = [...filtrados].sort(
+    (a, b) => Number(ids.includes(b.id)) - Number(ids.includes(a.id)) || a.nombre.localeCompare(b.nombre),
+  );
   return (
     <div className="relative h-9 flex items-center justify-center">
-      <button ref={btn} type="button" className="flex -space-x-2 items-center" onClick={abrir} title={seleccionados.map((u) => u.nombre).join(', ') || 'Asignar'}>
-        {seleccionados.length === 0 && <span className="inline-flex items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400" style={{ width: 28, height: 28, fontSize: 14 }}>+</span>}
-        {seleccionados.slice(0, 3).map((u) => <Avatar key={u.id} nombre={u.nombre} />)}
-        {seleccionados.length > 3 && <span className="inline-flex items-center justify-center rounded-full bg-gray-200 text-gray-700 text-[10px] ring-2 ring-white" style={{ width: 28, height: 28 }}>+{seleccionados.length - 3}</span>}
+      <button
+        ref={btn}
+        type="button"
+        className="flex -space-x-2 items-center"
+        onClick={abrir}
+        title={seleccionados.map((u) => u.nombre).join(', ') || 'Asignar'}
+      >
+        {seleccionados.length === 0 && (
+          <span
+            className="inline-flex items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400"
+            style={{ width: 28, height: 28, fontSize: 14 }}
+          >
+            +
+          </span>
+        )}
+        {seleccionados.slice(0, 3).map((u) => (
+          <Avatar key={u.id} nombre={u.nombre} />
+        ))}
+        {seleccionados.length > 3 && (
+          <span
+            className="inline-flex items-center justify-center rounded-full bg-gray-200 text-gray-700 text-[10px] ring-2 ring-white"
+            style={{ width: 28, height: 28 }}
+          >
+            +{seleccionados.length - 3}
+          </span>
+        )}
       </button>
       {abierto && (
         // Posición fija: escapa del overflow del tablero y del grupo.
-        <div data-owners-pop className="fixed z-50 w-64 card shadow-xl flex flex-col" style={{ left: pos.x, top: pos.arriba ? undefined : pos.y, bottom: pos.arriba ? window.innerHeight - pos.y : undefined, transform: 'translateX(-50%)', maxHeight: 320 }}>
-          <div className="p-2 border-b border-gray-100"><input autoFocus className="input py-1 text-sm" placeholder="Buscar persona…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <div
+          data-owners-pop
+          className="fixed z-50 w-64 card shadow-xl flex flex-col"
+          style={{
+            left: pos.x,
+            top: pos.arriba ? undefined : pos.y,
+            bottom: pos.arriba ? window.innerHeight - pos.y : undefined,
+            transform: 'translateX(-50%)',
+            maxHeight: 320,
+          }}
+        >
+          <div className="p-2 border-b border-gray-100">
+            <input
+              autoFocus
+              className="input py-1 text-sm"
+              placeholder="Buscar persona…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
           <div className="overflow-y-auto p-1">
             {ordenados.map((u) => {
               const on = ids.includes(u.id);
               return (
-                <label key={u.id} className={`flex items-center gap-2 px-2 py-1 text-sm rounded hover:bg-gray-50 cursor-pointer ${on ? 'bg-brand/5' : ''}`}>
+                <label
+                  key={u.id}
+                  className={`flex items-center gap-2 px-2 py-1 text-sm rounded hover:bg-gray-50 cursor-pointer ${on ? 'bg-brand/5' : ''}`}
+                >
                   <input type="checkbox" checked={on} onChange={() => onChange(on ? ids.filter((x) => x !== u.id) : [...ids, u.id])} />
                   <Avatar nombre={u.nombre} size={22} /> <span className="truncate">{u.nombre}</span>
                 </label>
@@ -109,7 +236,16 @@ export function CeldaOwners({ ids, usuarios, onChange }: { ids: string[]; usuari
             })}
             {ordenados.length === 0 && <div className="text-xs text-gray-400 p-2">Sin coincidencias</div>}
           </div>
-          <div className="p-2 border-t border-gray-100 flex justify-between text-xs"><span className="text-gray-400">{ids.length} asignad{ids.length === 1 ? 'o' : 'os'}</span>{ids.length > 0 && <button type="button" className="link-danger" onClick={() => onChange([])}>Quitar todos</button>}</div>
+          <div className="p-2 border-t border-gray-100 flex justify-between text-xs">
+            <span className="text-gray-400">
+              {ids.length} asignad{ids.length === 1 ? 'o' : 'os'}
+            </span>
+            {ids.length > 0 && (
+              <button type="button" className="link-danger" onClick={() => onChange([])}>
+                Quitar todos
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
 node_modules
 dist
 .next
-frontend
+frontend/next-env.d.ts
+frontend/public
 backend/scripts
 backend/supabase
 docs

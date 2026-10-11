@@ -22,10 +22,15 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabaseBrowser().auth.signInWithPassword({ email, password, ...(captcha ? { options: { captchaToken: captcha } } : {}) });
+    const { error } = await supabaseBrowser().auth.signInWithPassword({
+      email,
+      password,
+      ...(captcha ? { options: { captchaToken: captcha } } : {}),
+    });
     setLoading(false);
     if (error) {
-      setCaptcha(null); setIntento((n) => n + 1);
+      setCaptcha(null);
+      setIntento((n) => n + 1);
       return setError(/captcha/i.test(error.message) ? 'Completa la verificación y vuelve a intentar.' : 'Credenciales inválidas');
     }
     // Solo rutas internas: un `next` externo convertía el login en un redirector abierto (phishing).
@@ -41,17 +46,41 @@ function LoginForm() {
         <div className="text-sm text-gray-500">Geeks Ecuador · acceso interno</div>
       </div>
       <div>
-        <label className="label" htmlFor="email">Correo</label>
-        <input id="email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label className="label" htmlFor="email">
+          Correo
+        </label>
+        <input
+          id="email"
+          className="input"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
       </div>
       <div>
-        <label className="label" htmlFor="password">Contraseña</label>
-        <input id="password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <label className="label" htmlFor="password">
+          Contraseña
+        </label>
+        <input
+          id="password"
+          className="input"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
       </div>
       <Turnstile key={intento} onToken={recibirToken} />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="btn-primary w-full" disabled={loading || (!!SITE_KEY_TURNSTILE && !captcha)}>{loading ? 'Entrando…' : 'Entrar'}</button>
-      <Link href="/auth/recuperar" className="block text-center text-sm link-action">¿Olvidaste tu contraseña?</Link>
+      <button className="btn-primary w-full" disabled={loading || (!!SITE_KEY_TURNSTILE && !captcha)}>
+        {loading ? 'Entrando…' : 'Entrar'}
+      </button>
+      <Link href="/auth/recuperar" className="block text-center text-sm link-action">
+        ¿Olvidaste tu contraseña?
+      </Link>
     </form>
   );
 }

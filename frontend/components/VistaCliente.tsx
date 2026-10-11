@@ -25,8 +25,11 @@ export function VistaCliente({
     <div className="card overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-3">
         {/* Logos de clientes vienen de dominios arbitrarios: <img> a propósito, next/image exigiría whitelist */}
-        {logoUrl ? // eslint-disable-next-line @next/next/no-img-element
-        <img src={logoUrl} alt={clienteNombre} className="h-8 w-auto" /> : <div className="h-8 w-8 rounded bg-gray-200" />}
+        {logoUrl ? ( // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={clienteNombre} className="h-8 w-auto" />
+        ) : (
+          <div className="h-8 w-8 rounded bg-gray-200" />
+        )}
         <div className="min-w-0">
           <div className="font-semibold truncate">{data.nombre}</div>
           <div className="text-xs text-gray-500">Geeks · Entrega {fechaLarga(data.fecha_entrega)}</div>
@@ -40,7 +43,9 @@ export function VistaCliente({
         <div className="mx-5 mb-4 rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm">
           <div className="font-semibold text-amber-900">Pendiente de tu revisión</div>
           {data.bloqueado_por_cliente.map((b, i) => (
-            <div key={i} className="text-amber-900">{b.titulo} · {b.dias} {b.dias === 1 ? 'día' : 'días'}</div>
+            <div key={i} className="text-amber-900">
+              {b.titulo} · {b.dias} {b.dias === 1 ? 'día' : 'días'}
+            </div>
           ))}
         </div>
       )}
@@ -50,7 +55,10 @@ export function VistaCliente({
         <ul className="divide-y divide-gray-100">
           {data.hitos.map((h) => (
             <li key={h.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-              <span className="flex items-center gap-2"><span className="text-gray-400 w-4">{icono[h.estado]}</span>{h.titulo}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-gray-400 w-4">{icono[h.estado]}</span>
+                {h.titulo}
+              </span>
               <EstadoClienteChip estado={h.estado} esperando={h.esperando_cliente} />
             </li>
           ))}

@@ -16,10 +16,26 @@ export function useFiltrosBacklog() {
   const leerInicial = () => {
     const desdeUrl = sp.toString() ? Object.fromEntries(sp.entries()) : null;
     let guardado: Record<string, string> | null = null;
-    if (!desdeUrl) { try { guardado = JSON.parse(localStorage.getItem('backio:backlog:filtros') ?? 'null'); } catch { /* ignore */ } }
+    if (!desdeUrl) {
+      try {
+        guardado = JSON.parse(localStorage.getItem('backio:backlog:filtros') ?? 'null');
+      } catch {
+        /* ignore */
+      }
+    }
     const src = desdeUrl ?? guardado ?? {};
     return {
-      filtro: { ...FILTRO0, cliente: src.cliente ?? '', owner: src.owner ?? '', estado: src.estado ?? '', proyecto: src.proyecto ?? '', mesa: src.mesa ?? '', planificacion: src.planificacion ?? '', q: src.q ?? '', activos: src.activos === undefined ? true : src.activos !== '0' },
+      filtro: {
+        ...FILTRO0,
+        cliente: src.cliente ?? '',
+        owner: src.owner ?? '',
+        estado: src.estado ?? '',
+        proyecto: src.proyecto ?? '',
+        mesa: src.mesa ?? '',
+        planificacion: src.planificacion ?? '',
+        q: src.q ?? '',
+        activos: src.activos === undefined ? true : src.activos !== '0',
+      },
       orden: { campo: (src.orden as CampoOrden) || 'fecha_entrega', dir: (src.dir as Dir) || 'asc' },
       vista: (src.vista === 'kanban' ? 'kanban' : 'tabla') as Vista,
     };
@@ -30,11 +46,21 @@ export function useFiltrosBacklog() {
   const [orden, setOrden] = useState<{ campo: CampoOrden; dir: Dir }>(inicial.current.orden);
   useEffect(() => {
     const q: Record<string, string> = {};
-    for (const [k, v] of Object.entries(filtro)) { if (k === 'activos') { if (!v) q.activos = '0'; } else if (v) q[k] = String(v); }
-    if (orden.campo !== 'fecha_entrega') q.orden = orden.campo; if (orden.dir !== 'asc') q.dir = orden.dir; if (vista !== 'tabla') q.vista = vista;
+    for (const [k, v] of Object.entries(filtro)) {
+      if (k === 'activos') {
+        if (!v) q.activos = '0';
+      } else if (v) q[k] = String(v);
+    }
+    if (orden.campo !== 'fecha_entrega') q.orden = orden.campo;
+    if (orden.dir !== 'asc') q.dir = orden.dir;
+    if (vista !== 'tabla') q.vista = vista;
     const qs = new URLSearchParams(q).toString();
     router.replace(qs ? `/backlog?${qs}` : '/backlog', { scroll: false });
-    try { localStorage.setItem('backio:backlog:filtros', JSON.stringify(q)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('backio:backlog:filtros', JSON.stringify(q));
+    } catch {
+      /* ignore */
+    }
   }, [filtro, orden, vista, router]);
   return { vista, setVista, filtro, setFiltro, orden, setOrden, FILTRO0 };
 }

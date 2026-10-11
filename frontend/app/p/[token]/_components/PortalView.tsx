@@ -13,37 +13,70 @@ export function PortalView({ token }: { token: string }) {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
 
-  const cargar = useCallback(async (p?: string) => {
-    try {
-      setData(await apiPortal<Payload>(`/${token}`, {}, p));
-      setEstado('ok');
-    } catch (e) {
-      // PIN pedido, incorrecto o bloqueado por intentos: el visitante sabe qué pasó (antes un PIN errado no decía nada
-      // y el bloqueo se presentaba como «enlace no disponible»).
-      if (e instanceof ApiError && (e.status === 401 || e.status === 429)) {
-        setEstado('pin');
-        setPinError(e.status === 429 ? 'Demasiados intentos. Espera 15 minutos.' : p ? 'PIN incorrecto.' : null);
-      } else setEstado('no_disponible');
-    }
-  }, [token]);
-  useEffect(() => { void cargar(); }, [cargar]);
+  const cargar = useCallback(
+    async (p?: string) => {
+      try {
+        setData(await apiPortal<Payload>(`/${token}`, {}, p));
+        setEstado('ok');
+      } catch (e) {
+        // PIN pedido, incorrecto o bloqueado por intentos: el visitante sabe qué pasó (antes un PIN errado no decía nada
+        // y el bloqueo se presentaba como «enlace no disponible»).
+        if (e instanceof ApiError && (e.status === 401 || e.status === 429)) {
+          setEstado('pin');
+          setPinError(e.status === 429 ? 'Demasiados intentos. Espera 15 minutos.' : p ? 'PIN incorrecto.' : null);
+        } else setEstado('no_disponible');
+      }
+    },
+    [token],
+  );
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
 
   if (estado === 'cargando') return <div className="text-center text-gray-500 py-20">Cargando…</div>;
   if (estado === 'no_disponible')
-    return <div className="card p-10 text-center text-gray-600">Este enlace no está disponible. Si crees que es un error, escríbenos a tu ejecutiva de cuenta en Geeks.</div>;
+    return (
+      <div className="card p-10 text-center text-gray-600">
+        Este enlace no está disponible. Si crees que es un error, escríbenos a tu ejecutiva de cuenta en Geeks.
+      </div>
+    );
   if (estado === 'pin')
     return (
-      <form className="card p-8 space-y-3 max-w-xs mx-auto" onSubmit={(e) => { e.preventDefault(); void cargar(pin); }}>
+      <form
+        className="card p-8 space-y-3 max-w-xs mx-auto"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void cargar(pin);
+        }}
+      >
         <div className="font-semibold">Ingresa el PIN del proyecto</div>
-        <input className="input text-center tracking-[0.5em]" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} aria-describedby="pin-error" />
-        {pinError && <p id="pin-error" role="alert" className="text-sm text-red-700">{pinError}</p>}
+        <input
+          className="input text-center tracking-[0.5em]"
+          inputMode="numeric"
+          maxLength={6}
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          aria-describedby="pin-error"
+        />
+        {pinError && (
+          <p id="pin-error" role="alert" className="text-sm text-red-700">
+            {pinError}
+          </p>
+        )}
         <button className="btn-primary w-full">Entrar</button>
       </form>
     );
   if (!data) return null;
   return (
-    <VistaCliente data={data} clienteNombre={data.cliente.nombre} logoUrl={data.cliente.logo_url} color={data.cliente.color_primario ?? '#0073EA'}>
-      <div className="px-5 pb-5"><ResumenEjecutivo token={token} pin={pin || undefined} /></div>
+    <VistaCliente
+      data={data}
+      clienteNombre={data.cliente.nombre}
+      logoUrl={data.cliente.logo_url}
+      color={data.cliente.color_primario ?? '#0073EA'}
+    >
+      <div className="px-5 pb-5">
+        <ResumenEjecutivo token={token} pin={pin || undefined} />
+      </div>
       <div className="px-5 pb-4 text-[11px] text-gray-400 text-center">Geeks Ecuador · BackIO</div>
     </VistaCliente>
   );

@@ -38,19 +38,27 @@ export default function NuevoProyectoPage() {
     ])
       .then(([p, c, u]) => setCat({ plantillas: p.items, clientes: c.items, usuarios: u.items }))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar el catálogo'));
-    api<{ items: Borrador[] }>('/proyectos/borradores').then((r) => setBorradores(r.items)).catch(avisar('los borradores de PrometIO'));
+    api<{ items: Borrador[] }>('/proyectos/borradores')
+      .then((r) => setBorradores(r.items))
+      .catch(avisar('los borradores de PrometIO'));
   }, [avisar]);
-  useEffect(() => { guardarBorrador(s); }, [s]);
+  useEffect(() => {
+    guardarBorrador(s);
+  }, [s]);
   // Plantillas propias del cliente: al elegir cliente se recarga la lista (generales + suyas).
   useEffect(() => {
-    api<{ items: Plantilla[] }>(`/plantillas${s.cliente_id ? `?cliente=${s.cliente_id}` : ''}`).then((r) => setCat((c) => ({ ...c, plantillas: r.items }))).catch(avisar('las plantillas del cliente'));
+    api<{ items: Plantilla[] }>(`/plantillas${s.cliente_id ? `?cliente=${s.cliente_id}` : ''}`)
+      .then((r) => setCat((c) => ({ ...c, plantillas: r.items })))
+      .catch(avisar('las plantillas del cliente'));
   }, [s.cliente_id, avisar]);
 
   const set = (patch: Partial<WizardState>) => setS((prev) => ({ ...prev, ...patch }));
 
   async function elegirPlantilla(id: string, extra: Partial<WizardState> = {}) {
     const arbol = await api<PlantillaArbol>(`/plantillas/${id}`);
-    const bloques = Object.fromEntries(arbol.bloques.map((b) => [b.id, { bloque_id: b.id, activo: true, owner_id: null, piezas_por_canal: {} }]));
+    const bloques = Object.fromEntries(
+      arbol.bloques.map((b) => [b.id, { bloque_id: b.id, activo: true, owner_id: null, piezas_por_canal: {} }]),
+    );
     set({ plantilla: arbol, bloques, paso: 2, ...extra });
   }
 
@@ -60,25 +68,46 @@ export default function NuevoProyectoPage() {
     const extra: Partial<WizardState> = {
       cliente_id: b.cliente_id,
       prometio_cotizacion_id: b.prometio_cotizacion_id,
-      nombre: p.lineas?.[0]?.servicio ? `${p.lineas[0].servicio} - ${p.empresa?.nombre ?? ''}`.trim() : `Cotización ${p.numero ?? ''}`.trim(),
+      nombre: p.lineas?.[0]?.servicio
+        ? `${p.lineas[0].servicio} - ${p.empresa?.nombre ?? ''}`.trim()
+        : `Cotización ${p.numero ?? ''}`.trim(),
       fecha_entrega: p.valido_hasta ?? '',
-      brief: { ...s.brief, objetivo_negocio: `Cotización ${p.numero ?? ''} aprobada en PrometIO${p.valor ? ` por USD ${p.valor}` : ''}. Líneas: ${(p.lineas ?? []).map((l) => `${l.servicio} ×${l.cantidad}`).join(', ')}.` },
+      brief: {
+        ...s.brief,
+        objetivo_negocio: `Cotización ${p.numero ?? ''} aprobada en PrometIO${p.valor ? ` por USD ${p.valor}` : ''}. Líneas: ${(p.lineas ?? []).map((l) => `${l.servicio} ×${l.cantidad}`).join(', ')}.`,
+      },
     };
     if (b.plantilla_sugerida_id) {
       await elegirPlantilla(b.plantilla_sugerida_id, extra);
       // Líneas de la cotización → cantidades por tipo de pieza en el bloque de mayor peso.
       try {
-        const [{ items: tipos }, arbol] = await Promise.all([api<{ items: TipoPieza[] }>('/tipos-pieza'), api<PlantillaArbol>(`/plantillas/${b.plantilla_sugerida_id}`)]);
+        const [{ items: tipos }, arbol] = await Promise.all([
+          api<{ items: TipoPieza[] }>('/tipos-pieza'),
+          api<PlantillaArbol>(`/plantillas/${b.plantilla_sugerida_id}`),
+        ]);
         const piezas: Record<string, number> = {};
         for (const l of p.lineas ?? []) {
-          const t = tipos.find((x) => l.servicio.toLowerCase().includes(x.slug) || l.servicio.toLowerCase().includes(x.nombre.toLowerCase()));
+          const t = tipos.find(
+            (x) => l.servicio.toLowerCase().includes(x.slug) || l.servicio.toLowerCase().includes(x.nombre.toLowerCase()),
+          );
           if (t) piezas[t.id] = (piezas[t.id] ?? 0) + Math.max(1, Math.round(l.cantidad));
         }
         const bloque = [...arbol.bloques].sort((x, y) => y.peso - x.peso)[0];
         if (bloque && Object.keys(piezas).length) {
-          setS((prev) => ({ ...prev, bloques: { ...prev.bloques, [bloque.id]: { ...(prev.bloques[bloque.id] ?? { bloque_id: bloque.id, activo: true, owner_id: null, piezas_por_canal: {} }), piezas_por_tipo: piezas } } }));
+          setS((prev) => ({
+            ...prev,
+            bloques: {
+              ...prev.bloques,
+              [bloque.id]: {
+                ...(prev.bloques[bloque.id] ?? { bloque_id: bloque.id, activo: true, owner_id: null, piezas_por_canal: {} }),
+                piezas_por_tipo: piezas,
+              },
+            },
+          }));
         }
-      } catch { /* sin prellenado */ }
+      } catch {
+        /* sin prellenado */
+      }
     } else set({ ...extra, paso: 1 });
   }
 
@@ -95,7 +124,13 @@ export default function NuevoProyectoPage() {
     }
   }
 
-  const puedeAvanzar2 = s.cliente_id && s.nombre.length >= 3 && s.brief.objetivo_negocio && s.brief.publico_objetivo && s.brief.canales.length > 0 && s.fecha_entrega;
+  const puedeAvanzar2 =
+    s.cliente_id &&
+    s.nombre.length >= 3 &&
+    s.brief.objetivo_negocio &&
+    s.brief.publico_objetivo &&
+    s.brief.canales.length > 0 &&
+    s.fecha_entrega;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -107,7 +142,10 @@ export default function NuevoProyectoPage() {
             const activo = s.paso === n;
             const hecho = s.paso > n;
             return (
-              <li key={p} className={`flex items-center gap-2 rounded-full px-3 py-1 ${activo ? 'bg-brand text-white' : hecho ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+              <li
+                key={p}
+                className={`flex items-center gap-2 rounded-full px-3 py-1 ${activo ? 'bg-brand text-white' : hecho ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}
+              >
                 <span className="font-semibold">{n}</span> {p}
               </li>
             );
@@ -119,35 +157,89 @@ export default function NuevoProyectoPage() {
       <AvisoCarga fallos={fallos} />
       {pendiente && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm flex items-center justify-between gap-3">
-          <span className="text-blue-900">Dejaste un proyecto a medio crear{pendiente.nombre ? `: "${pendiente.nombre}"` : ''} (paso {pendiente.paso}).</span>
+          <span className="text-blue-900">
+            Dejaste un proyecto a medio crear{pendiente.nombre ? `: "${pendiente.nombre}"` : ''} (paso {pendiente.paso}).
+          </span>
           <span className="flex gap-2">
-            <button className="btn-primary" onClick={() => { setS(pendiente); setPendiente(null); }}>Continuar</button>
-            <button className="btn-ghost" onClick={() => { limpiarBorrador(); setPendiente(null); }}>Descartar</button>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setS(pendiente);
+                setPendiente(null);
+              }}
+            >
+              Continuar
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                limpiarBorrador();
+                setPendiente(null);
+              }}
+            >
+              Descartar
+            </button>
           </span>
         </div>
       )}
 
       {borradores.length > 0 && s.paso === 1 && (
-        <Borradores items={borradores} clientes={cat.clientes} plantillas={cat.plantillas} onUsar={usarBorrador} onDescartar={async (id) => { await api(`/proyectos/borradores/${id}/descartar`, { method: 'POST' }); setBorradores((b) => b.filter((x) => x.id !== id)); }} />
+        <Borradores
+          items={borradores}
+          clientes={cat.clientes}
+          plantillas={cat.plantillas}
+          onUsar={usarBorrador}
+          onDescartar={async (id) => {
+            await api(`/proyectos/borradores/${id}/descartar`, { method: 'POST' });
+            setBorradores((b) => b.filter((x) => x.id !== id));
+          }}
+        />
       )}
       {borradores.length > 0 && s.paso > 1 && !s.prometio_cotizacion_id && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm flex items-center justify-between gap-3">
-          <span className="text-amber-900">Hay {borradores.length} {borradores.length === 1 ? 'cotización ganada' : 'cotizaciones ganadas'} en PrometIO esperando convertirse en proyecto.</span>
-          <button className="btn-secondary" onClick={() => { limpiarBorrador(); setS({ ...ESTADO_INICIAL }); }}>Ver cotizaciones</button>
+          <span className="text-amber-900">
+            Hay {borradores.length} {borradores.length === 1 ? 'cotización ganada' : 'cotizaciones ganadas'} en PrometIO esperando
+            convertirse en proyecto.
+          </span>
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              limpiarBorrador();
+              setS({ ...ESTADO_INICIAL });
+            }}
+          >
+            Ver cotizaciones
+          </button>
         </div>
       )}
-      {s.paso === 1 && <Step1Plantilla plantillas={cat.plantillas} onSelect={(id) => elegirPlantilla(id)} seleccionada={s.plantilla?.id ?? null} />}
-      {s.paso === 2 && s.plantilla && <Step2Brief state={s} set={set} clientes={cat.clientes} onSugerirPlantilla={(id) => elegirPlantilla(id, { paso: 2 })} />}
+      {s.paso === 1 && (
+        <Step1Plantilla plantillas={cat.plantillas} onSelect={(id) => elegirPlantilla(id)} seleccionada={s.plantilla?.id ?? null} />
+      )}
+      {s.paso === 2 && s.plantilla && (
+        <Step2Brief state={s} set={set} clientes={cat.clientes} onSugerirPlantilla={(id) => elegirPlantilla(id, { paso: 2 })} />
+      )}
       {s.paso === 3 && s.plantilla && <Step3Alcance state={s} set={set} />}
       {s.paso === 4 && s.plantilla && <Step4EquipoFechas state={s} set={set} usuarios={cat.usuarios} />}
       {s.paso === 5 && s.plantilla && <Step5Revision state={s} usuarios={cat.usuarios} clientes={cat.clientes} set={set} />}
 
       <footer className="flex justify-between border-t border-gray-200 pt-4">
-        <button className="btn-secondary" disabled={s.paso === 1} onClick={() => set({ paso: (s.paso - 1) as WizardState['paso'] })}>Volver</button>
+        <button className="btn-secondary" disabled={s.paso === 1} onClick={() => set({ paso: (s.paso - 1) as WizardState['paso'] })}>
+          Volver
+        </button>
         {s.paso < 5 && s.paso > 1 && (
-          <button className="btn-primary" disabled={s.paso === 2 && !puedeAvanzar2} onClick={() => set({ paso: (s.paso + 1) as WizardState['paso'] })}>Continuar</button>
+          <button
+            className="btn-primary"
+            disabled={s.paso === 2 && !puedeAvanzar2}
+            onClick={() => set({ paso: (s.paso + 1) as WizardState['paso'] })}
+          >
+            Continuar
+          </button>
         )}
-        {s.paso === 5 && <button className="btn-primary" disabled={creando} onClick={crear}>{creando ? 'Creando…' : 'Crear proyecto'}</button>}
+        {s.paso === 5 && (
+          <button className="btn-primary" disabled={creando} onClick={crear}>
+            {creando ? 'Creando…' : 'Crear proyecto'}
+          </button>
+        )}
       </footer>
     </div>
   );

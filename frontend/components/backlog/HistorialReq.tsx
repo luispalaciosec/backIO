@@ -13,12 +13,28 @@ const labelRc = (m: string | null) => MOTIVOS_REPROCESO.find((x) => x.valor === 
 const ORIGEN: Record<string, string> = { cliente: 'Cliente', interno: 'Revisión interna', basecamp: 'Desmarcado en Basecamp' };
 
 /** Botón ↺ en la fila: registrar reproceso, ver historial de reprogramaciones/reprocesos y completar causas. */
-export function HistorialReq({ r, onCambio, usuarios = [] }: { r: RequerimientoMetricas; onCambio: () => void; usuarios?: Pick<Usuario, 'id' | 'nombre' | 'area'>[] }) {
+export function HistorialReq({
+  r,
+  onCambio,
+  usuarios = [],
+}: {
+  r: RequerimientoMetricas;
+  onCambio: () => void;
+  usuarios?: Pick<Usuario, 'id' | 'nombre' | 'area'>[];
+}) {
   const [abierto, setAbierto] = useState(false);
   const tiene = r.veces_reprogramado > 0 || (r.veces_reproceso ?? 0) > 0;
   return (
     <>
-      <button type="button" className={`text-xs shrink-0 px-1 ${tiene ? 'text-amber-700 font-semibold' : 'text-gray-300 hover:text-gray-600'}`} title={`Reprogramaciones: ${r.veces_reprogramado} · Reprocesos: ${r.veces_reproceso ?? 0}. Clic para historial y reproceso`} onClick={(e) => { e.stopPropagation(); setAbierto(true); }}>
+      <button
+        type="button"
+        className={`text-xs shrink-0 px-1 ${tiene ? 'text-amber-700 font-semibold' : 'text-gray-300 hover:text-gray-600'}`}
+        title={`Reprogramaciones: ${r.veces_reprogramado} · Reprocesos: ${r.veces_reproceso ?? 0}. Clic para historial y reproceso`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setAbierto(true);
+        }}
+      >
         ↺{tiene ? `${r.veces_reprogramado}/${r.veces_reproceso ?? 0}` : ''}
       </button>
       {abierto && <Modal r={r} usuarios={usuarios} onClose={() => setAbierto(false)} onCambio={onCambio} />}
@@ -26,35 +42,92 @@ export function HistorialReq({ r, onCambio, usuarios = [] }: { r: RequerimientoM
   );
 }
 
-function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; usuarios: Pick<Usuario, 'id' | 'nombre' | 'area'>[]; onClose: () => void; onCambio: () => void }) {
+function Modal({
+  r,
+  usuarios,
+  onClose,
+  onCambio,
+}: {
+  r: RequerimientoMetricas;
+  usuarios: Pick<Usuario, 'id' | 'nombre' | 'area'>[];
+  onClose: () => void;
+  onCambio: () => void;
+}) {
   const [h, setH] = useState<HistorialRequerimiento | null>(null);
   const [tab, setTab] = useState<'bitacora' | 'historial' | 'reproceso'>('bitacora');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const areaResp = usuarios.find((u) => u.id === r.owner_agencia[0])?.area ?? '';
-  const [f, setF] = useState<{ origen: 'cliente' | 'interno'; motivo: MotivoReproceso | ''; paso: string; reabrir: boolean; observacion: string; area: Area | ''; atribuible: Atribuible | '' }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true, observacion: '', area: areaResp, atribuible: '' });
+  const [f, setF] = useState<{
+    origen: 'cliente' | 'interno';
+    motivo: MotivoReproceso | '';
+    paso: string;
+    reabrir: boolean;
+    observacion: string;
+    area: Area | '';
+    atribuible: Atribuible | '';
+  }>({ origen: 'cliente', motivo: '', paso: '', reabrir: true, observacion: '', area: areaResp, atribuible: '' });
   const [respondido, setRespondido] = useState<string | null>(r.primera_respuesta_at ?? null);
-  const cargar = () => api<HistorialRequerimiento>(`/requerimientos/${r.id}/historial`).then(setH).catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
-  useEffect(() => { void cargar(); }, [r.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cargar = () =>
+    api<HistorialRequerimiento>(`/requerimientos/${r.id}/historial`)
+      .then(setH)
+      .catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
+  useEffect(() => {
+    void cargar();
+  }, [r.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const abiertoRp = h?.reprocesos.find((x) => !x.cerrado_at);
   const hecho = r.estado_operativo === 'completado' || r.estado_operativo === 'cancelado';
 
   async function registrar() {
     if (!f.motivo) return;
-    setBusy(true); setErr(null);
-    try { await api(`/requerimientos/${r.id}/reprocesos`, { method: 'POST', json: { origen: f.origen, motivo: f.motivo, paso_retorno: f.paso || null, observacion: f.observacion.trim() || null, reabrir_basecamp: f.reabrir, area_responsable: f.area || null, atribuible: f.atribuible || null } }); await cargar(); onCambio(); setTab('historial'); }
-    catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/requerimientos/${r.id}/reprocesos`, {
+        method: 'POST',
+        json: {
+          origen: f.origen,
+          motivo: f.motivo,
+          paso_retorno: f.paso || null,
+          observacion: f.observacion.trim() || null,
+          reabrir_basecamp: f.reabrir,
+          area_responsable: f.area || null,
+          atribuible: f.atribuible || null,
+        },
+      });
+      await cargar();
+      onCambio();
+      setTab('historial');
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Error');
+    }
     setBusy(false);
   }
   async function patchRp(id: string, motivo: MotivoReprogramacion) {
-    try { await api(`/requerimientos/reprogramaciones/${id}`, { method: 'PATCH', json: { motivo } }); await cargar(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
+    try {
+      await api(`/requerimientos/reprogramaciones/${id}`, { method: 'PATCH', json: { motivo } });
+      await cargar();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Error');
+    }
   }
   async function patchRc(id: string, motivo: MotivoReproceso) {
-    try { await api(`/requerimientos/${r.id}/reprocesos/${id}`, { method: 'PATCH', json: { motivo } }); await cargar(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
+    try {
+      await api(`/requerimientos/${r.id}/reprocesos/${id}`, { method: 'PATCH', json: { motivo } });
+      await cargar();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Error');
+    }
   }
   async function cerrar(id: string) {
     setBusy(true);
-    try { await api(`/requerimientos/${r.id}/reprocesos/${id}/cerrar`, { method: 'POST' }); await cargar(); onCambio(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
+    try {
+      await api(`/requerimientos/${r.id}/reprocesos/${id}/cerrar`, { method: 'POST' });
+      await cargar();
+      onCambio();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Error');
+    }
     setBusy(false);
   }
   const info = MOTIVOS_REPROCESO.find((m) => m.valor === f.motivo);
@@ -65,44 +138,210 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="font-semibold">{r.titulo_interno}</div>
-            <div className="text-xs text-gray-500 mt-1">Comprometida {fecha(r.fecha_entrega_original)}{r.fecha_entrega !== r.fecha_entrega_original ? <> · vigente <b>{fecha(r.fecha_entrega)}</b></> : null} · {r.veces_reprogramado} reprogramaciones · {r.veces_reproceso ?? 0} reprocesos</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Comprometida {fecha(r.fecha_entrega_original)}
+              {r.fecha_entrega !== r.fecha_entrega_original ? (
+                <>
+                  {' '}
+                  · vigente <b>{fecha(r.fecha_entrega)}</b>
+                </>
+              ) : null}{' '}
+              · {r.veces_reprogramado} reprogramaciones · {r.veces_reproceso ?? 0} reprocesos
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button type="button" className={`text-xs rounded border px-2 py-0.5 ${respondido ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-300 hover:bg-gray-50'}`} disabled={busy} title={respondido ? `Primera respuesta al cliente: ${new Date(respondido).toLocaleString('es-EC', { timeZone: ZONA })}. Clic para deshacer.` : 'Marca la primera respuesta efectiva al cliente (SLA de Cuentas, KPI-CUE-03)'} onClick={async () => {
-              setErr(null);
-              try { const x = await api<{ primera_respuesta_at: string | null }>(`/requerimientos/${r.id}/respondido`, { method: 'POST', json: { deshacer: !!respondido } }); setRespondido(x.primera_respuesta_at); onCambio(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
-            }}>{respondido ? '✓ Respondido' : 'Respondido'}</button>
-            <button className="link-danger text-xs" disabled={busy} title="Quita la tarea de BackIO (queda en el historial de auditoría). No borra nada en Basecamp." onClick={async () => {
-              if (!confirm(`Eliminar "${r.titulo_interno}" de BackIO.${r.basecamp_todo_id ? ' El to-do de Basecamp no se toca: si sigue existiendo allá, aparecerá como huérfano.' : ''} ¿Continuar?`)) return;
-              setBusy(true); setErr(null);
-              try { await api(`/requerimientos/${r.id}`, { method: 'DELETE' }); onCambio(); onClose(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Error'); }
-              setBusy(false);
-            }}>🗑 Eliminar tarea</button>
-            <button className="btn-ghost" onClick={onClose}>×</button>
+            <button
+              type="button"
+              className={`text-xs rounded border px-2 py-0.5 ${respondido ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-300 hover:bg-gray-50'}`}
+              disabled={busy}
+              title={
+                respondido
+                  ? `Primera respuesta al cliente: ${new Date(respondido).toLocaleString('es-EC', { timeZone: ZONA })}. Clic para deshacer.`
+                  : 'Marca la primera respuesta efectiva al cliente (SLA de Cuentas, KPI-CUE-03)'
+              }
+              onClick={async () => {
+                setErr(null);
+                try {
+                  const x = await api<{ primera_respuesta_at: string | null }>(`/requerimientos/${r.id}/respondido`, {
+                    method: 'POST',
+                    json: { deshacer: !!respondido },
+                  });
+                  setRespondido(x.primera_respuesta_at);
+                  onCambio();
+                } catch (e) {
+                  setErr(e instanceof ApiError ? e.message : 'Error');
+                }
+              }}
+            >
+              {respondido ? '✓ Respondido' : 'Respondido'}
+            </button>
+            <button
+              className="link-danger text-xs"
+              disabled={busy}
+              title="Quita la tarea de BackIO (queda en el historial de auditoría). No borra nada en Basecamp."
+              onClick={async () => {
+                if (
+                  !confirm(
+                    `Eliminar "${r.titulo_interno}" de BackIO.${r.basecamp_todo_id ? ' El to-do de Basecamp no se toca: si sigue existiendo allá, aparecerá como huérfano.' : ''} ¿Continuar?`,
+                  )
+                )
+                  return;
+                setBusy(true);
+                setErr(null);
+                try {
+                  await api(`/requerimientos/${r.id}`, { method: 'DELETE' });
+                  onCambio();
+                  onClose();
+                } catch (e) {
+                  setErr(e instanceof ApiError ? e.message : 'Error');
+                }
+                setBusy(false);
+              }}
+            >
+              🗑 Eliminar tarea
+            </button>
+            <button className="btn-ghost" onClick={onClose}>
+              ×
+            </button>
           </div>
         </div>
         <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
-          <button className={`px-3 py-1 rounded ${tab === 'bitacora' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('bitacora')}>📝 Bitácora</button>
-          <button className={`px-3 py-1 rounded ${tab === 'historial' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('historial')}>Historial</button>
-          <button className={`px-3 py-1 rounded ${tab === 'reproceso' ? 'bg-brand text-white' : 'text-gray-600'}`} onClick={() => setTab('reproceso')} disabled={!!abiertoRp}>{abiertoRp ? 'Reproceso abierto' : '⟲ Registrar reproceso'}</button>
+          <button
+            className={`px-3 py-1 rounded ${tab === 'bitacora' ? 'bg-brand text-white' : 'text-gray-600'}`}
+            onClick={() => setTab('bitacora')}
+          >
+            📝 Bitácora
+          </button>
+          <button
+            className={`px-3 py-1 rounded ${tab === 'historial' ? 'bg-brand text-white' : 'text-gray-600'}`}
+            onClick={() => setTab('historial')}
+          >
+            Historial
+          </button>
+          <button
+            className={`px-3 py-1 rounded ${tab === 'reproceso' ? 'bg-brand text-white' : 'text-gray-600'}`}
+            onClick={() => setTab('reproceso')}
+            disabled={!!abiertoRp}
+          >
+            {abiertoRp ? 'Reproceso abierto' : '⟲ Registrar reproceso'}
+          </button>
         </div>
         {err && <p className="text-sm text-red-600">{err}</p>}
 
-        {tab === 'bitacora' && <BitacoraReq requerimientoId={r.id} usuarios={usuarios} visibleCliente={r.visible_cliente} onCambio={onCambio} />}
+        {tab === 'bitacora' && (
+          <BitacoraReq requerimientoId={r.id} usuarios={usuarios} visibleCliente={r.visible_cliente} onCambio={onCambio} />
+        )}
 
         {tab === 'reproceso' && !abiertoRp && (
           <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm text-amber-900">El entregable vuelve al equipo. La tarea pasa a «En ejecución»{r.basecamp_todo_id ? ' y el to-do se reabre en Basecamp' : ''}. La causa alimenta los indicadores; la observación es para el equipo (no se copia del comentario de Basecamp y nunca la ve el cliente).</p>
+            <p className="text-sm text-amber-900">
+              El entregable vuelve al equipo. La tarea pasa a «En ejecución»{r.basecamp_todo_id ? ' y el to-do se reabre en Basecamp' : ''}.
+              La causa alimenta los indicadores; la observación es para el equipo (no se copia del comentario de Basecamp y nunca la ve el
+              cliente).
+            </p>
             <div className="grid gap-3 md:grid-cols-2">
-              <div><label className="label">Quién lo pide</label><select className="input" value={f.origen} onChange={(e) => setF({ ...f, origen: e.target.value as 'cliente' | 'interno' })}><option value="cliente">Cliente</option><option value="interno">Revisión interna</option></select></div>
-              <div><label className="label">Causa *</label><select className="input" value={f.motivo} onChange={(e) => { const mo = e.target.value as MotivoReproceso; const resp = MOTIVOS_REPROCESO.find((m) => m.valor === mo)?.responsable; setF({ ...f, motivo: mo, atribuible: resp === 'cliente' ? 'cliente' : resp ? 'equipo' : '', area: resp === 'ejecutiva' ? 'cuentas' : f.area === 'cuentas' ? areaResp : f.area }); }}><option value="">Selecciona…</option>{MOTIVOS_REPROCESO.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>{info && <p className="text-xs text-gray-600 mt-1">Responsable natural: {info.responsable}.</p>}</div>
-              <div><label className="label">Regresa al paso</label><select className="input" value={f.paso} onChange={(e) => setF({ ...f, paso: e.target.value })}><option value="">No aplica / pieza simple</option>{PASOS_RETORNO.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
-              {r.basecamp_todo_id && <label className="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" checked={f.reabrir} onChange={(e) => setF({ ...f, reabrir: e.target.checked })} /> Reabrir el to-do en Basecamp</label>}
-              <div><label className="label">Atribuible a</label><select className="input" value={f.atribuible} onChange={(e) => setF({ ...f, atribuible: e.target.value as Atribuible | '' })}><option value="">—</option>{(Object.keys(ATRIBUIBLE_LABEL) as Atribuible[]).map((a) => <option key={a} value={a}>{ATRIBUIBLE_LABEL[a]}</option>)}</select></div>
-              <div><label className="label">Área responsable</label><select className="input" value={f.area} onChange={(e) => setF({ ...f, area: e.target.value as Area | '' })} disabled={f.atribuible !== 'equipo'}><option value="">—</option>{AREAS.map((a) => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}</select><p className="text-[11px] text-gray-500 mt-0.5">Solo si es del equipo: cuenta en el KPI de retrabajo de esa área.</p></div>
-              <div className="md:col-span-2"><label className="label">Observación</label><textarea className="input" rows={3} maxLength={1000} placeholder="Qué hay que corregir y por qué. Ej.: el cliente pidió cambiar el color del logo a la versión 2024 y quitar el claim." value={f.observacion} onChange={(e) => setF({ ...f, observacion: e.target.value })} /></div>
+              <div>
+                <label className="label">Quién lo pide</label>
+                <select
+                  className="input"
+                  value={f.origen}
+                  onChange={(e) => setF({ ...f, origen: e.target.value as 'cliente' | 'interno' })}
+                >
+                  <option value="cliente">Cliente</option>
+                  <option value="interno">Revisión interna</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Causa *</label>
+                <select
+                  className="input"
+                  value={f.motivo}
+                  onChange={(e) => {
+                    const mo = e.target.value as MotivoReproceso;
+                    const resp = MOTIVOS_REPROCESO.find((m) => m.valor === mo)?.responsable;
+                    setF({
+                      ...f,
+                      motivo: mo,
+                      atribuible: resp === 'cliente' ? 'cliente' : resp ? 'equipo' : '',
+                      area: resp === 'ejecutiva' ? 'cuentas' : f.area === 'cuentas' ? areaResp : f.area,
+                    });
+                  }}
+                >
+                  <option value="">Selecciona…</option>
+                  {MOTIVOS_REPROCESO.map((m) => (
+                    <option key={m.valor} value={m.valor}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                {info && <p className="text-xs text-gray-600 mt-1">Responsable natural: {info.responsable}.</p>}
+              </div>
+              <div>
+                <label className="label">Regresa al paso</label>
+                <select className="input" value={f.paso} onChange={(e) => setF({ ...f, paso: e.target.value })}>
+                  <option value="">No aplica / pieza simple</option>
+                  {PASOS_RETORNO.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {r.basecamp_todo_id && (
+                <label className="flex items-center gap-2 text-sm self-end pb-2">
+                  <input type="checkbox" checked={f.reabrir} onChange={(e) => setF({ ...f, reabrir: e.target.checked })} /> Reabrir el to-do
+                  en Basecamp
+                </label>
+              )}
+              <div>
+                <label className="label">Atribuible a</label>
+                <select
+                  className="input"
+                  value={f.atribuible}
+                  onChange={(e) => setF({ ...f, atribuible: e.target.value as Atribuible | '' })}
+                >
+                  <option value="">—</option>
+                  {(Object.keys(ATRIBUIBLE_LABEL) as Atribuible[]).map((a) => (
+                    <option key={a} value={a}>
+                      {ATRIBUIBLE_LABEL[a]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Área responsable</label>
+                <select
+                  className="input"
+                  value={f.area}
+                  onChange={(e) => setF({ ...f, area: e.target.value as Area | '' })}
+                  disabled={f.atribuible !== 'equipo'}
+                >
+                  <option value="">—</option>
+                  {AREAS.map((a) => (
+                    <option key={a} value={a}>
+                      {AREA_LABEL[a]}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500 mt-0.5">Solo si es del equipo: cuenta en el KPI de retrabajo de esa área.</p>
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Observación</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="Qué hay que corregir y por qué. Ej.: el cliente pidió cambiar el color del logo a la versión 2024 y quitar el claim."
+                  value={f.observacion}
+                  onChange={(e) => setF({ ...f, observacion: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="flex justify-end"><button className="btn-danger" disabled={!f.motivo || busy} onClick={registrar}>{busy ? 'Registrando…' : '⟲ Registrar reproceso'}</button></div>
+            <div className="flex justify-end">
+              <button className="btn-danger" disabled={!f.motivo || busy} onClick={registrar}>
+                {busy ? 'Registrando…' : '⟲ Registrar reproceso'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -110,8 +349,17 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
           <div className="space-y-4">
             {abiertoRp && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm flex items-center justify-between gap-3">
-                <span><b>Reproceso abierto</b> desde {fecha(abiertoRp.abierto_at.slice(0, 10))} · {ORIGEN[abiertoRp.origen]} · {labelRc(abiertoRp.motivo)}{abiertoRp.paso_retorno ? ` · vuelve a ${abiertoRp.paso_retorno}` : ''}{abiertoRp.observacion ? <span className="block text-xs text-red-800 mt-1">{abiertoRp.observacion}</span> : null}</span>
-                {!hecho && <button className="btn-success text-xs py-1" disabled={busy} onClick={() => cerrar(abiertoRp.id)}>Entregado de nuevo</button>}
+                <span>
+                  <b>Reproceso abierto</b> desde {fecha(abiertoRp.abierto_at.slice(0, 10))} · {ORIGEN[abiertoRp.origen]} ·{' '}
+                  {labelRc(abiertoRp.motivo)}
+                  {abiertoRp.paso_retorno ? ` · vuelve a ${abiertoRp.paso_retorno}` : ''}
+                  {abiertoRp.observacion ? <span className="block text-xs text-red-800 mt-1">{abiertoRp.observacion}</span> : null}
+                </span>
+                {!hecho && (
+                  <button className="btn-success text-xs py-1" disabled={busy} onClick={() => cerrar(abiertoRp.id)}>
+                    Entregado de nuevo
+                  </button>
+                )}
               </div>
             )}
             <section>
@@ -119,24 +367,100 @@ function Modal({ r, usuarios, onClose, onCambio }: { r: RequerimientoMetricas; u
               {!h && <p className="text-sm text-gray-400">Cargando…</p>}
               {h && h.reprogramaciones.length === 0 && <p className="text-sm text-gray-400">Nunca se movió la fecha.</p>}
               {h && h.reprogramaciones.length > 0 && (
-                <table className="w-full text-sm"><thead><tr><th className="th">Cuándo</th><th className="th">De</th><th className="th">A</th><th className="th">Causa</th><th className="th">Origen</th></tr></thead>
-                  <tbody>{h.reprogramaciones.map((x) => (
-                    <tr key={x.id}><td className="td whitespace-nowrap text-gray-500">{fecha(x.created_at.slice(0, 10))}</td><td className="td line-through text-gray-500">{fecha(x.fecha_anterior)}</td><td className="td font-medium">{fecha(x.fecha_nueva)}</td>
-                      <td className="td">{x.motivo ? labelRp(x.motivo) : <select className="input py-1 text-xs border-amber-300" defaultValue="" onChange={(e) => e.target.value && patchRp(x.id, e.target.value as MotivoReprogramacion)}><option value="">Sin causa · completar…</option>{MOTIVOS_REPROGRAMACION.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>}</td>
-                      <td className="td text-xs text-gray-500">{x.origen}{x.observacion ? <div className="text-gray-500 mt-0.5 max-w-56 whitespace-normal">{x.observacion}</div> : null}</td></tr>
-                  ))}</tbody></table>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="th">Cuándo</th>
+                      <th className="th">De</th>
+                      <th className="th">A</th>
+                      <th className="th">Causa</th>
+                      <th className="th">Origen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {h.reprogramaciones.map((x) => (
+                      <tr key={x.id}>
+                        <td className="td whitespace-nowrap text-gray-500">{fecha(x.created_at.slice(0, 10))}</td>
+                        <td className="td line-through text-gray-500">{fecha(x.fecha_anterior)}</td>
+                        <td className="td font-medium">{fecha(x.fecha_nueva)}</td>
+                        <td className="td">
+                          {x.motivo ? (
+                            labelRp(x.motivo)
+                          ) : (
+                            <select
+                              className="input py-1 text-xs border-amber-300"
+                              defaultValue=""
+                              onChange={(e) => e.target.value && patchRp(x.id, e.target.value as MotivoReprogramacion)}
+                            >
+                              <option value="">Sin causa · completar…</option>
+                              {MOTIVOS_REPROGRAMACION.map((m) => (
+                                <option key={m.valor} value={m.valor}>
+                                  {m.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="td text-xs text-gray-500">
+                          {x.origen}
+                          {x.observacion ? <div className="text-gray-500 mt-0.5 max-w-56 whitespace-normal">{x.observacion}</div> : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </section>
             <section>
               <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Reprocesos</div>
               {h && h.reprocesos.length === 0 && <p className="text-sm text-gray-400">Bien a la primera, por ahora.</p>}
               {h && h.reprocesos.length > 0 && (
-                <table className="w-full text-sm"><thead><tr><th className="th">Abierto</th><th className="th">Origen</th><th className="th">Causa</th><th className="th">Paso</th><th className="th">Cerrado</th><th className="th text-right">Horas</th></tr></thead>
-                  <tbody>{h.reprocesos.map((x) => (
-                    <tr key={x.id}><td className="td whitespace-nowrap text-gray-500">{fecha(x.abierto_at.slice(0, 10))}</td><td className="td">{ORIGEN[x.origen]}</td>
-                      <td className="td">{x.motivo ? labelRc(x.motivo) : <select className="input py-1 text-xs border-amber-300" defaultValue="" onChange={(e) => e.target.value && patchRc(x.id, e.target.value as MotivoReproceso)}><option value="">Sin causa · completar…</option>{MOTIVOS_REPROCESO.map((m) => <option key={m.valor} value={m.valor}>{m.label}</option>)}</select>}</td>
-                      <td className="td text-xs">{x.paso_retorno ?? '—'}{x.observacion ? <div className="text-gray-500 mt-0.5 max-w-56 whitespace-normal">{x.observacion}</div> : null}</td><td className="td whitespace-nowrap text-gray-500">{x.cerrado_at ? fecha(x.cerrado_at.slice(0, 10)) : <span className="text-red-700">abierto</span>}</td><td className="td text-right tabular-nums">{x.horas_reproceso ?? ''}</td></tr>
-                  ))}</tbody></table>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="th">Abierto</th>
+                      <th className="th">Origen</th>
+                      <th className="th">Causa</th>
+                      <th className="th">Paso</th>
+                      <th className="th">Cerrado</th>
+                      <th className="th text-right">Horas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {h.reprocesos.map((x) => (
+                      <tr key={x.id}>
+                        <td className="td whitespace-nowrap text-gray-500">{fecha(x.abierto_at.slice(0, 10))}</td>
+                        <td className="td">{ORIGEN[x.origen]}</td>
+                        <td className="td">
+                          {x.motivo ? (
+                            labelRc(x.motivo)
+                          ) : (
+                            <select
+                              className="input py-1 text-xs border-amber-300"
+                              defaultValue=""
+                              onChange={(e) => e.target.value && patchRc(x.id, e.target.value as MotivoReproceso)}
+                            >
+                              <option value="">Sin causa · completar…</option>
+                              {MOTIVOS_REPROCESO.map((m) => (
+                                <option key={m.valor} value={m.valor}>
+                                  {m.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="td text-xs">
+                          {x.paso_retorno ?? '—'}
+                          {x.observacion ? <div className="text-gray-500 mt-0.5 max-w-56 whitespace-normal">{x.observacion}</div> : null}
+                        </td>
+                        <td className="td whitespace-nowrap text-gray-500">
+                          {x.cerrado_at ? fecha(x.cerrado_at.slice(0, 10)) : <span className="text-red-700">abierto</span>}
+                        </td>
+                        <td className="td text-right tabular-nums">{x.horas_reproceso ?? ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </section>
           </div>

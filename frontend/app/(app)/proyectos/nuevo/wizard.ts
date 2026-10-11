@@ -49,11 +49,24 @@ export function toInput(s: WizardState): CrearProyectoInput {
 /** Borrador de UI (no negocio) en sessionStorage, permitido por CLAUDE.md como borrador. */
 const KEY = 'backio:builder:borrador';
 export function guardarBorrador(s: WizardState) {
-  try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
 }
 export function leerBorrador(): WizardState | null {
-  try { const raw = sessionStorage.getItem(KEY); return raw ? (JSON.parse(raw) as WizardState) : null; } catch { return null; }
+  try {
+    const raw = sessionStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as WizardState) : null;
+  } catch {
+    return null;
+  }
 }
 export function limpiarBorrador() {
-  try { sessionStorage.removeItem(KEY); } catch { /* ignore */ }
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
 }
