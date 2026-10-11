@@ -9,6 +9,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { Rol } from '@backio/shared';
 import { ROLES_INTERNOS_GESTION } from '@backio/shared';
 import { serviceClient, userClient, type DbCtx } from '../db/client';
+import { getApiKeyPorHash, getUsuarioOAuth, getUsuarioSesion, registrarUsoApiKey } from '../db/auth';
 import { resolverAccessToken } from '../oauth';
 
 export type Scope =
@@ -44,22 +45,10 @@ export function hashApiKey(key: string): string {
 
 async function resolveApiKey(key: string): Promise<AuthInfo | null> {
   const db = serviceClient();
-  const { data } = await db
-    .from('api_keys')
-    .select('id, tenant_id, nombre, scopes, perfil, cliente_id, revocada_at')
-    .eq('key_hash', hashApiKey(key))
-    .maybeSingle();
+  const data = await getApiKeyPorHash(db, hashApiKey(key));
   if (!data || (data as { revocada_at: string | null }).revocada_at) return null;
   const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[]; perfil: string | null; cliente_id: string | null };
-  // El builder de PostgREST es perezoso: sin then/await la petición nunca salía y ultimo_uso_at quedaba muerto.
-  void db
-    .from('api_keys')
-    .update({ ultimo_uso_at: new Date().toISOString() })
-    .eq('id', row.id)
-    .then(
-      () => undefined,
-      () => undefined,
-    );
+  registrarUsoApiKey(db, row.id);
   return {
     tipo: 'api_key',
     ctx: { db, tenantId: row.tenant_id, usuarioId: null, origen: 'api', apiKeyId: row.id },
@@ -75,7 +64,7 @@ async function resolveJwt(jwt: string): Promise<AuthInfo | null> {
   const db = userClient(jwt);
   const { data: auth, error } = await db.auth.getUser(jwt);
   if (error || !auth.user) return null;
-  const { data: u } = await db.from('usuarios').select('tenant_id, rol, nombre, activo').eq('id', auth.user.id).maybeSingle();
+  const u = await getUsuarioSesion(db, auth.user.id);
   if (!u) return null;
   const usuario = u as { tenant_id: string; rol: Rol; nombre: string; activo: boolean };
   if (!usuario.activo) return null;
@@ -92,12 +81,7 @@ async function resolveOAuth(token: string): Promise<AuthInfo | null> {
   const t = await resolverAccessToken(token);
   if (!t) return null;
   const db = serviceClient();
-  const { data: u } = await db
-    .from('usuarios')
-    .select('rol, nombre, activo')
-    .eq('id', t.usuario_id)
-    .eq('tenant_id', t.tenant_id)
-    .maybeSingle();
+  const u = await getUsuarioOAuth(db, t.usuario_id, t.tenant_id);
   const usuario = u as { rol: Rol; nombre: string; activo: boolean } | null;
   if (!usuario?.activo) return null;
   return {

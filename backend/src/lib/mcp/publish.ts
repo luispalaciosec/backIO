@@ -6,7 +6,14 @@
  */
 import type { Acta, Mesa } from '@backio/shared';
 import type { DbCtx } from '../db/client';
-import { throwIf, DbError } from '../db/client';
+import { DbError } from '../db/client';
+import {
+  basecampDocsProjectId,
+  guardarBasecampDocActa,
+  liberarReservaActa,
+  marcarPublicacionSemana,
+  reservarActaParaPublicar,
+} from '../db/actas_publicacion';
 import { BasecampClient } from '../basecamp/client';
 import { getMesa } from '../db/mesas';
 import { getSemana } from '../db/semanas';
@@ -33,18 +40,12 @@ export function tituloWeekly(acta: Acta, semana: { numero_iso: number; fecha_ini
  */
 export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
   const reservado = new Date().toISOString();
-  const { data: claim, error: e0 } = await ctx.db
-    .from('actas')
-    .update({ publicado_at: reservado, publicado_por: ctx.usuarioId })
-    .eq('id', acta.id)
-    .is('publicado_at', null)
-    .select('id');
-  throwIf(e0);
+  const claim = await reservarActaParaPublicar(ctx, acta.id, reservado);
   if (!claim?.length) throw new DbError('El acta ya fue publicada', 409);
   try {
     return await publicarReservada(ctx, acta);
   } catch (err) {
-    await ctx.db.from('actas').update({ publicado_at: null, publicado_por: null }).eq('id', acta.id).eq('publicado_at', reservado);
+    await liberarReservaActa(ctx, acta.id, reservado);
     throw err;
   }
 }
@@ -66,9 +67,7 @@ async function publicarReservada(ctx: DbCtx, acta: Acta): Promise<{ acta_id: str
       content: html,
     });
   } else {
-    const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
-    throwIf(error);
-    const projectId = (data as { config: { basecamp_docs_project_id?: number } }).config.basecamp_docs_project_id ?? null;
+    const projectId = await basecampDocsProjectId(ctx);
     if (!projectId) throw new Error('El acta no es de una mesa y falta tenants.config.basecamp_docs_project_id');
     const dock = await bc.getDock(projectId);
     const vault = dock.find((d) => d.name === 'vault');
@@ -77,14 +76,14 @@ async function publicarReservada(ctx: DbCtx, acta: Acta): Promise<{ acta_id: str
     doc = await bc.createDocument(projectId, vault.id, { title: titulo, content: html });
   }
 
-  const { error: e2 } = await ctx.db.from('actas').update({ basecamp_doc_id: doc.id }).eq('id', acta.id);
-  throwIf(e2);
+  await guardarBasecampDocActa(ctx, acta.id, doc.id);
   if (acta.tipo !== 'informe_mensual') {
     const ahora = new Date().toISOString();
-    await ctx.db
-      .from('semanas')
-      .update(acta.tipo === 'plan_operativo' ? { plan_publicado_at: ahora } : { acta_publicada_at: ahora })
-      .eq('id', acta.semana_id);
+    await marcarPublicacionSemana(
+      ctx,
+      acta.semana_id,
+      acta.tipo === 'plan_operativo' ? { plan_publicado_at: ahora } : { acta_publicada_at: ahora },
+    );
   }
   return { acta_id: acta.id, basecamp_doc_id: doc.id, url: doc.app_url };
 }

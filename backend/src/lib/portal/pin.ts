@@ -4,7 +4,7 @@
  * Formato: scrypt$N$r$p$sal$derivado (base64url).
  */
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { serviceClient, throwIf } from '../db/client';
+import { actualizarConfigCliente, borrarPin, configsClientes, getHashPin, idsClientesConPin, upsertPin } from '../db/portal';
 
 const N = 16384,
   R = 8,
@@ -26,40 +26,25 @@ export function pinCoincide(pin: string, guardado: string): boolean {
 }
 
 export async function leerHashPin(clienteId: string): Promise<string | null> {
-  const { data, error } = await serviceClient().from('portal_pines').select('hash').eq('cliente_id', clienteId).maybeSingle();
-  throwIf(error);
-  return (data as { hash: string } | null)?.hash ?? null;
+  return getHashPin(clienteId);
 }
 
 /** pin null = quitar el PIN del portal. */
 export async function guardarPin(tenantId: string, clienteId: string, pin: string | null): Promise<void> {
-  const db = serviceClient();
-  const { error } = pin
-    ? await db
-        .from('portal_pines')
-        .upsert(
-          { cliente_id: clienteId, tenant_id: tenantId, hash: hashPin(pin), updated_at: new Date().toISOString() },
-          { onConflict: 'cliente_id' },
-        )
-    : await db.from('portal_pines').delete().eq('cliente_id', clienteId).eq('tenant_id', tenantId);
-  throwIf(error);
+  if (pin) await upsertPin({ cliente_id: clienteId, tenant_id: tenantId, hash: hashPin(pin), updated_at: new Date().toISOString() });
+  else await borrarPin(tenantId, clienteId);
 }
 
 export async function clientesConPin(tenantId: string): Promise<Set<string>> {
-  const { data, error } = await serviceClient().from('portal_pines').select('cliente_id').eq('tenant_id', tenantId);
-  throwIf(error);
-  return new Set(((data ?? []) as { cliente_id: string }[]).map((x) => x.cliente_id));
+  return new Set(await idsClientesConPin(tenantId));
 }
 
 /**
  * Pasa los PIN que todavía estén en claro en clientes.config a portal_pines y los borra de config. Idempotente.
  */
 export async function migrarPinesEnClaro(tenantId: string): Promise<number> {
-  const db = serviceClient();
-  const { data, error } = await db.from('clientes').select('id, config').eq('tenant_id', tenantId);
-  throwIf(error);
   let migrados = 0;
-  for (const c of (data ?? []) as { id: string; config: Record<string, unknown> | null }[]) {
+  for (const c of await configsClientes(tenantId)) {
     if (!c.config || !('portal_pin' in c.config)) continue;
     const { portal_pin: pin, ...resto } = c.config;
     if (typeof pin === 'string' && pin.trim()) {
@@ -70,8 +55,7 @@ export async function migrarPinesEnClaro(tenantId: string): Promise<number> {
         throw new Error(`El PIN del cliente ${c.id} no se pudo verificar; no se borró de config`);
       migrados += 1;
     }
-    const { error: e2 } = await db.from('clientes').update({ config: resto }).eq('id', c.id).eq('tenant_id', tenantId);
-    throwIf(e2);
+    await actualizarConfigCliente(tenantId, c.id, resto);
   }
   return migrados;
 }

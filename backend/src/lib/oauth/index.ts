@@ -5,7 +5,20 @@
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { serviceClient, throwIf, DbError } from '../db/client';
+import { DbError } from '../db/client';
+import {
+  getAccessToken,
+  getClienteOAuth,
+  getCodigoOAuth,
+  getRefreshToken,
+  insertarClienteOAuth,
+  insertarCodigoOAuth,
+  insertarTokensOAuth,
+  marcarCodigoUsado,
+  revocarTokenPorHash,
+  revocarTokensDeUsuario,
+  rotarRefreshToken,
+} from '../db/oauth';
 
 export const SCOPES_SOPORTADOS = [
   'read:backlog',
@@ -107,16 +120,13 @@ export async function registrarCliente(cuerpo: unknown): Promise<{
   const publico = (body.token_endpoint_auth_method ?? 'none') === 'none';
   const id = `mcp_${randomBytes(12).toString('hex')}`;
   const secret = publico ? undefined : b64url(randomBytes(32));
-  const { error } = await serviceClient()
-    .from('oauth_clients')
-    .insert({
-      id,
-      secret_hash: secret ? sha256(secret) : null,
-      nombre: body.client_name || 'Cliente MCP',
-      redirect_uris: uris,
-      metadata: body,
-    });
-  throwIf(error);
+  await insertarClienteOAuth({
+    id,
+    secret_hash: secret ? sha256(secret) : null,
+    nombre: body.client_name || 'Cliente MCP',
+    redirect_uris: uris,
+    metadata: body,
+  });
   return {
     client_id: id,
     client_secret: secret,
@@ -129,12 +139,7 @@ export async function registrarCliente(cuerpo: unknown): Promise<{
 }
 
 export async function getCliente(clientId: string): Promise<OAuthClient | null> {
-  const { data, error } = await serviceClient()
-    .from('oauth_clients')
-    .select('id, secret_hash, nombre, redirect_uris')
-    .eq('id', clientId)
-    .maybeSingle();
-  throwIf(error);
+  const data = await getClienteOAuth(clientId);
   return (data as OAuthClient) ?? null;
 }
 
@@ -154,19 +159,16 @@ export async function emitirCodigo(p: {
 }): Promise<string> {
   const code = b64url(randomBytes(32));
   // Se guarda solo el hash, igual que los tokens: quien lea la tabla no puede canjear un código vigente (M13).
-  const { error } = await serviceClient()
-    .from('oauth_codes')
-    .insert({
-      code: sha256(code),
-      client_id: p.client_id,
-      redirect_uri: p.redirect_uri,
-      code_challenge: p.code_challenge,
-      scope: p.scope.join(' '),
-      tenant_id: p.tenant_id,
-      usuario_id: p.usuario_id,
-      expira_at: new Date(Date.now() + 5 * 60_000).toISOString(),
-    });
-  throwIf(error);
+  await insertarCodigoOAuth({
+    code: sha256(code),
+    client_id: p.client_id,
+    redirect_uri: p.redirect_uri,
+    code_challenge: p.code_challenge,
+    scope: p.scope.join(' '),
+    tenant_id: p.tenant_id,
+    usuario_id: p.usuario_id,
+    expira_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+  });
   return code;
 }
 
@@ -182,29 +184,26 @@ async function emitirTokens(p: { client_id: string; tenant_id: string; usuario_i
   const access = `bko_${b64url(randomBytes(32))}`;
   const refresh = `bkr_${b64url(randomBytes(32))}`;
   const ahora = Date.now();
-  const { error } = await serviceClient()
-    .from('oauth_tokens')
-    .insert([
-      {
-        token_hash: sha256(access),
-        tipo: 'access',
-        client_id: p.client_id,
-        tenant_id: p.tenant_id,
-        usuario_id: p.usuario_id,
-        scope: p.scope,
-        expira_at: new Date(ahora + 3600_000).toISOString(),
-      },
-      {
-        token_hash: sha256(refresh),
-        tipo: 'refresh',
-        client_id: p.client_id,
-        tenant_id: p.tenant_id,
-        usuario_id: p.usuario_id,
-        scope: p.scope,
-        expira_at: new Date(ahora + 30 * 86_400_000).toISOString(),
-      },
-    ]);
-  throwIf(error);
+  await insertarTokensOAuth([
+    {
+      token_hash: sha256(access),
+      tipo: 'access',
+      client_id: p.client_id,
+      tenant_id: p.tenant_id,
+      usuario_id: p.usuario_id,
+      scope: p.scope,
+      expira_at: new Date(ahora + 3600_000).toISOString(),
+    },
+    {
+      token_hash: sha256(refresh),
+      tipo: 'refresh',
+      client_id: p.client_id,
+      tenant_id: p.tenant_id,
+      usuario_id: p.usuario_id,
+      scope: p.scope,
+      expira_at: new Date(ahora + 30 * 86_400_000).toISOString(),
+    },
+  ]);
   return { access_token: access, token_type: 'Bearer', expires_in: 3600, refresh_token: refresh, scope: p.scope };
 }
 
@@ -224,9 +223,7 @@ export async function canjearCodigo(p: {
 }): Promise<TokenResponse> {
   const cliente = await getCliente(p.client_id);
   if (!cliente || !verificarSecreto(cliente, p.client_secret)) throw new DbError('invalid_client', 401);
-  const db = serviceClient();
-  const { data, error } = await db.from('oauth_codes').select('*').eq('code', sha256(p.code)).eq('client_id', p.client_id).maybeSingle();
-  throwIf(error);
+  const data = await getCodigoOAuth(sha256(p.code), p.client_id);
   const c = data as {
     code: string;
     redirect_uri: string;
@@ -243,12 +240,7 @@ export async function canjearCodigo(p: {
   if (!p.code_verifier) throw new DbError('invalid_request: code_verifier requerido (PKCE)', 400);
   const esperado = b64url(createHash('sha256').update(p.code_verifier).digest());
   if (esperado !== c.code_challenge) throw new DbError('invalid_grant: PKCE no coincide', 400);
-  const { data: marcado } = await db
-    .from('oauth_codes')
-    .update({ usado_at: new Date().toISOString() })
-    .eq('code', sha256(p.code))
-    .is('usado_at', null)
-    .select('code');
+  const marcado = await marcarCodigoUsado(sha256(p.code));
   if (!marcado?.length) throw new DbError('invalid_grant', 400);
   return emitirTokens({ client_id: p.client_id, tenant_id: c.tenant_id, usuario_id: c.usuario_id, scope: c.scope });
 }
@@ -256,43 +248,22 @@ export async function canjearCodigo(p: {
 export async function refrescar(p: { refresh_token: string; client_id: string; client_secret?: string }): Promise<TokenResponse> {
   const cliente = await getCliente(p.client_id);
   if (!cliente || !verificarSecreto(cliente, p.client_secret)) throw new DbError('invalid_client', 401);
-  const db = serviceClient();
-  const { data, error } = await db
-    .from('oauth_tokens')
-    .select('*')
-    .eq('token_hash', sha256(p.refresh_token))
-    .eq('tipo', 'refresh')
-    .eq('client_id', p.client_id)
-    .maybeSingle();
-  throwIf(error);
+  const data = await getRefreshToken(sha256(p.refresh_token), p.client_id);
   const t = data as { tenant_id: string; usuario_id: string; scope: string; expira_at: string; revocado_at: string | null } | null;
   if (!t || new Date(t.expira_at).getTime() < Date.now()) throw new DbError('invalid_grant', 400);
   // Rotación atómica: solo una petición puede usar este refresh. Si ya estaba usado (o dos compiten), es una
   // reutilización: se revocan todos los tokens vivos de ese cliente para ese usuario (auditoría 10/10, S8).
   const ahora = new Date().toISOString();
-  const { data: rotado, error: e2 } = t.revocado_at
-    ? { data: [], error: null }
-    : await db
-        .from('oauth_tokens')
-        .update({ revocado_at: ahora })
-        .eq('token_hash', sha256(p.refresh_token))
-        .is('revocado_at', null)
-        .select('token_hash');
-  throwIf(e2);
+  const rotado = t.revocado_at ? [] : await rotarRefreshToken(sha256(p.refresh_token), ahora);
   if (!rotado?.length) {
-    await db
-      .from('oauth_tokens')
-      .update({ revocado_at: ahora })
-      .eq('client_id', p.client_id)
-      .eq('usuario_id', t.usuario_id)
-      .is('revocado_at', null);
+    await revocarTokensDeUsuario(p.client_id, t.usuario_id, ahora);
     throw new DbError('invalid_grant', 400);
   }
   return emitirTokens({ client_id: p.client_id, tenant_id: t.tenant_id, usuario_id: t.usuario_id, scope: t.scope });
 }
 
 export async function revocar(token: string): Promise<void> {
-  await serviceClient().from('oauth_tokens').update({ revocado_at: new Date().toISOString() }).eq('token_hash', sha256(token));
+  await revocarTokenPorHash(sha256(token));
 }
 
 export interface AccessInfo {
@@ -303,12 +274,7 @@ export interface AccessInfo {
 }
 
 export async function resolverAccessToken(token: string): Promise<AccessInfo | null> {
-  const { data } = await serviceClient()
-    .from('oauth_tokens')
-    .select('tenant_id, usuario_id, scope, client_id, expira_at, revocado_at')
-    .eq('token_hash', sha256(token))
-    .eq('tipo', 'access')
-    .maybeSingle();
+  const data = await getAccessToken(sha256(token));
   const t = data as {
     tenant_id: string;
     usuario_id: string;

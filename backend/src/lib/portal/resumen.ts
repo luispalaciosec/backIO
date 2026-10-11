@@ -8,7 +8,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ClientSafeProject } from '@backio/shared';
 import { assertClientSafe } from '@backio/shared';
 import { env } from '../../config/env';
-import { serviceClient, throwIf } from '../db/client';
+import { getResumenPortal, guardarResumenPortal } from '../db/portal';
 
 const CACHE_MS = 6 * 3600 * 1000;
 
@@ -54,9 +54,8 @@ export async function generarResumen(proyectoId: string, tenantId: string, safe:
   assertClientSafe(safe);
   const payload = payloadDesdeSafe(safe, cliente);
   const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
-  const db = serviceClient();
 
-  const { data: cache } = await db.from('portal_resumenes').select('*').eq('proyecto_id', proyectoId).maybeSingle();
+  const cache = await getResumenPortal(proyectoId);
   const c = cache as { payload_hash: string; resumen: string; generado_at: string } | null;
   if (c && c.payload_hash === hash && Date.now() - new Date(c.generado_at).getTime() < CACHE_MS) return c.resumen;
 
@@ -76,13 +75,12 @@ export async function generarResumen(proyectoId: string, tenantId: string, safe:
     .join('\n')
     .trim();
 
-  const { error } = await db.from('portal_resumenes').upsert({
+  await guardarResumenPortal({
     proyecto_id: proyectoId,
     tenant_id: tenantId,
     payload_hash: hash,
     resumen: texto,
     generado_at: new Date().toISOString(),
   });
-  throwIf(error);
   return texto;
 }

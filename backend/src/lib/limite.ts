@@ -5,6 +5,7 @@
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import { serviceClient } from './db/client';
+import { borrarContadorLimite } from './db/limites';
 import { log } from './logger';
 
 export interface EstadoLimite {
@@ -52,7 +53,7 @@ export const estadoLimite = (clave: string, max: number, ventanaSeg: number) => 
 export async function limpiarLimite(clave: string): Promise<void> {
   memoria.delete(clave);
   try {
-    await serviceClient().from('limites').delete().eq('clave', clave);
+    await borrarContadorLimite(clave);
   } catch {
     /* sin tabla: solo memoria */
   }
