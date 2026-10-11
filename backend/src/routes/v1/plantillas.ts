@@ -4,6 +4,7 @@ import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listPlantillas, getPlantillaArbol, guardarPlantilla, getProyectoDetalle, audit } from '../../lib/db';
 import { unaLinea } from '../../lib/validacion';
+import { bloquesDesdeProyecto } from '../../lib/builder/desde_proyecto';
 
 export const plantillas = new Hono();
 
@@ -66,34 +67,11 @@ plantillas.post(
     const ctx = ctxOf(c);
     const det = await getProyectoDetalle(ctx, c.req.param('proyectoId'));
     if (!det) return c.json({ error: 'Proyecto no encontrado' }, 404);
-    const entrega = new Date(`${det.fecha_entrega}T12:00:00Z`).getTime();
-    const porBloque = new Map<string, typeof det.requerimientos>();
-    for (const r of det.requerimientos.filter((x) => x.estado_operativo !== 'cancelado' && !x.tipo_pieza_id)) {
-      const k = r.bloque_nombre ?? 'General';
-      porBloque.set(k, [...(porBloque.get(k) ?? []), r]);
-    }
-    const pesoTotal = det.requerimientos.reduce((s, r) => s + Number(r.peso), 0) || 1;
-    const bloques = [...porBloque.entries()].map(([nombre, reqs]) => ({
-      nombre,
-      opcional: false,
-      peso: Math.round((reqs.reduce((s, r) => s + Number(r.peso), 0) / pesoTotal) * 1000) / 10,
-      tareas: reqs.map((r) => ({
-        titulo_interno: r.titulo_interno,
-        etiqueta_cliente: r.etiqueta_cliente,
-        visible_cliente_default: r.visible_cliente,
-        peso_relativo: Number(r.peso) || 1,
-        dias_offset: r.fecha_entrega ? Math.round((entrega - new Date(`${r.fecha_entrega}T12:00:00Z`).getTime()) / 86_400_000) : 0,
-        rol_sugerido: null,
-      })),
-    }));
-    // Ajuste para que sume 100 exacto
-    const suma = bloques.reduce((s, b) => s + b.peso, 0);
-    if (bloques.length && suma !== 100)
-      bloques[bloques.length - 1]!.peso = Math.round((bloques[bloques.length - 1]!.peso + (100 - suma)) * 10) / 10;
+    const bloques = bloquesDesdeProyecto(det);
     const b = c.req.valid('json');
     const p = await guardarPlantilla(ctx, {
       nombre: b.nombre,
-      tipo: det.plantilla_id ? 'campana' : 'campana',
+      tipo: 'campana',
       cliente_id: b.solo_cliente ? det.cliente_id : null,
       descripcion: `Creada desde el proyecto "${det.nombre}"`,
       bloques,

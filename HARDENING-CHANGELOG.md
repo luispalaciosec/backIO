@@ -113,3 +113,9 @@ una acción de Luis) · **pendiente** (ola futura).
 | Cuatro copias del fetch del frontend; un 2xx no JSON se devolvía como `{}` | hecho | `frontend/lib/api.ts` (`pedir`), `api.server.ts` | `api`, `apiRaw`, `apiPortal` y `apiServer` son envoltorios del mismo núcleo: conserva 204, falla si la respuesta no es JSON, mensajes claros para 401 y 5xx |
 | OpenAPI con esquemas copiados (sin `planificacion`, `clase`, `proactiva`) | hecho | `routes/openapi.ts` usa `crearRequerimientoSchema`, `actualizarRequerimientoSchema`, `crearProyectoSchema` y `crearAcuerdoSchema` exportados por sus rutas; respuesta `Requerimiento` completada | `openapi.test.ts` |
 | MCP en un archivo de 694 líneas; la regla `lib/mcp/tools/*write*` de `CLAUDE.md` no cubría nada | hecho | `lib/mcp/server.ts` (arma el servidor), `comun.ts`, `tools/read.ts`, `tools/write_plans.ts`, `tools/write_actas.ts` (factoría para `generate_weekly_plan` y `generate_closing_minutes`), `tools/write_confirm.ts` | Con visto bueno de Luis. `tools/list` comparado antes y después por el protocolo MCP: 16 tools, 0 diferencias en nombre, descripción y esquema |
+
+## Ola 6 · Calidad III: transacciones, Basecamp y tipos
+
+| Hallazgo | Estado | Archivos | Verificación |
+|---|---|---|---|
+| B12 · Plantilla desde proyecto: ternario muerto y pesos con tareas excluidas (3 bloques iguales salían 1 %, 1 % y 98 %) | hecho | `backend/src/lib/builder/desde_proyecto.ts` (`bloquesDesdeProyecto`, pura), `routes/v1/plantillas.ts` | `plantilla_desde_proyecto.test.ts`: tres bloques iguales dan 33,4 / 33,3 / 33,3 y suman 100 |
