@@ -92,7 +92,7 @@ una acción de Luis) · **pendiente** (ola futura).
 |---|---|---|---|
 | A.1 · 13 scripts gastados (incluido `verificar_put.ts`, `PUT` crudo a Basecamp) | hecho | `backend/scripts/*`, `backend/scripts/README.md` | Borrados; el README ya no dice que `verificar_put.ts` no escribía y documenta `duplicados_sin_enlace.ts` |
 | A.1 · Exports y locales muertos | hecho | `db/usuarios.ts`, `builder/import.ts`, `cumplimiento.ts`, `ia/index.ts`, `ia/informe.ts`, `basecamp/client.ts`, `basecamp/oauth.ts`, `mcp/server.ts`, `shared/src/types.ts`, `shared/src/api.ts`, `BacklogTable.tsx`, `admin/recurrencias`, `Step3Alcance.tsx` | `tsc --noUnusedLocals --noUnusedParameters` limpio en los tres paquetes |
-| A.1 · Reexports de `lib/visibility/index.ts` | pendiente | — | Zona de revisión humana (`CLAUDE.md`): no se toca sin visto bueno |
+| A.1 · Reexports de `lib/visibility/index.ts` | hecho | `backend/src/lib/visibility/index.ts`, `sanitize.ts` y `basecamp/write.ts` (formato) | Con visto bueno de Luis (`ab3ac3d`): solo quedan `sanitizeForClient` y `assertClientSafe`, los únicos que se importan |
 | A.2 · `/cron/huerfanos` (detector retirado el 23/09) | hecho | `backend/src/routes/cron.ts` | Borrado |
 | A.3 · `dotenv` no declarado | hecho | `backend/package.json` | devDependency |
 | B14 · README con migraciones «01–20» y alerta de API keys dada por buena | hecho | `README.md`, `docs/18-seguridad.md` | Corregidos |
@@ -102,3 +102,9 @@ una acción de Luis) · **pendiente** (ola futura).
 | Utilidades de fecha y métrica duplicadas | hecho | `shared/src/fechas.ts` (`ZONA`, `diaLocal`, `hoyLocal`, `sumarDias`, `lunesDe`, `inicioDiaLocal`, `finDiaLocal`), `shared/src/metricas.ts` (`porcentaje`, `formatoFraccion`), `backend/src/lib/db/paginar.ts` | Quitadas las copias de `fechaLocal`, `sumarDias`, `diaGye`, `lunesDe`, `pct`, `paginar`, `hoyLocal` y los literales `-05:00`; `America/Guayaquil` solo vive en `ZONA` |
 | Formato y lint (789 líneas de más de 200 caracteres) | hecho | `.prettierrc.json`, `.prettierignore`, `eslint.config.mjs`, `.git-blame-ignore-revs`, CI | Commit solo de formato (`4e1fe2a`, ignorado en `git blame`); `pnpm lint` en CI: catch vacío y `any` son error, consulta a Supabase fuera de `lib/db` es aviso (172, se mueven en la Ola 6). Quedan 19 líneas largas (textos y plantillas). Las zonas de revisión humana no se formatearon |
 | Etiquetas de estado duplicadas; `describir` (CC 74) | hecho | `shared/src/etiquetas.ts`, `backend/src/lib/actividad.ts`, `frontend/lib/format.ts` | `describir` es una tabla de frases; comparado contra la versión anterior en 114 casos sin diferencias; `actividad_describir.test.ts` |
+
+## Ola 5 · Calidad II: flujos únicos
+
+| Hallazgo | Estado | Archivos | Verificación |
+|---|---|---|---|
+| B9 · Actualizar requerimiento con dos copias que divergían (REST y MCP) | parcial | `backend/src/lib/requerimientos/actualizar.ts` (`actualizarRequerimiento`, `validarActualizacion`, `ReglaError`), `routes/v1/requerimientos.ts` como adaptador, `CAMPOS_COLABORADOR` en shared (backend y backlog) | `actualizar_requerimiento.test.ts` (7): regla 3, daily sin responsable, colaborador, motivo, `pushDueDate` auditado si falla, reprocesos. El adaptador del MCP está escrito y espera revisión (zona de `CLAUDE.md`) |

@@ -12,7 +12,7 @@ import { MotivoReprogramacionModal } from '@/components/backlog/MotivoReprograma
 import { celebrar } from '@/lib/confetti';
 import { ESTADO_LABEL } from '@/lib/format';
 import { CAMPOS_ORDEN, ordenarRequerimientos, type CampoOrden, type Dir } from '@/lib/orden';
-import { hoyLocal } from '@backio/shared';
+import { CAMPOS_COLABORADOR, hoyLocal } from '@backio/shared';
 
 type Vista = 'tabla' | 'kanban';
 
@@ -118,7 +118,6 @@ function BacklogInner() {
 
   const me = useMe();
   const colaborador = me?.rol === 'colaborador';
-  const CAMPOS_COLABORADOR = ['estado_operativo', 'fecha_entrega', 'entregable_urls', 'motivo_reprogramacion', 'observacion_reprogramacion', 'daily_fecha', 'piezas'];
   /** Un colaborador solo edita sus tareas y solo estado, fecha y entregables; el backend lo exige igual. */
   const puedeEditar = (r: RequerimientoMetricas) => !colaborador || (!!me?.usuario_id && r.owner_agencia.includes(me.usuario_id));
 
@@ -131,7 +130,7 @@ function BacklogInner() {
     if (colaborador) {
       const r = items.find((x) => x.id === id);
       if (r && !puedeEditar(r)) { setError('Solo puedes actualizar las tareas asignadas a ti.'); return; }
-      const extra = Object.keys(p).filter((k) => !CAMPOS_COLABORADOR.includes(k));
+      const extra = Object.keys(p).filter((k) => !(CAMPOS_COLABORADOR as readonly string[]).includes(k));
       if (extra.length) { setError('Como colaborador solo puedes cambiar el estado, la fecha de entrega y los entregables.'); return; }
     }
     // Optimista: aplica en memoria y recarga en silencio.

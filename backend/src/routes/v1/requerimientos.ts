@@ -9,7 +9,6 @@ import {
   listBacklog,
   getRequerimiento,
   insertRequerimientos,
-  updateRequerimiento,
   softDeleteRequerimiento,
   audit,
   listClientes,
@@ -21,21 +20,15 @@ import {
   DbError,
 } from '../../lib/db';
 import { parseCSV, validarFilas, esVisible } from '../../lib/builder/import';
-import { pushDueDate, pushRequerimiento } from '../../lib/basecamp/write';
+import { pushRequerimiento } from '../../lib/basecamp/write';
 import { getProyecto } from '../../lib/db';
 import { generarPortalToken } from '../../lib/portal/token';
 import type { EstadoOperativo, Prioridad, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
 import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, finDiaLocal, hoyLocal, inicioDiaLocal } from '@backio/shared';
-import {
-  listReprogramaciones,
-  listReprocesos,
-  completarUltimaReprogramacion,
-  setMotivoReprogramacion,
-  listSinMotivo,
-  updateReproceso,
-} from '../../lib/db/historial';
+import { listReprogramaciones, listReprocesos, setMotivoReprogramacion, listSinMotivo, updateReproceso } from '../../lib/db/historial';
 import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
+import { actualizarRequerimiento, ReglaError } from '../../lib/requerimientos/actualizar';
 import { ensureSemana } from '../../lib/db/semanas';
 
 export const requerimientos = new Hono();
@@ -169,7 +162,7 @@ const patchSchema = z.object({
   brief_url: z.string().url().nullable().optional(),
   entregable_urls: z.array(z.string().url()).nullable().optional(),
   motivo_reprogramacion: z
-    .enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [string, ...string[]])
+    .enum(MOTIVOS_REPROGRAMACION.map((m) => m.valor) as [MotivoReprogramacion, ...MotivoReprogramacion[]])
     .nullable()
     .optional(),
   observacion_reprogramacion: z.string().max(1000).nullable().optional(),
@@ -179,17 +172,6 @@ const patchSchema = z.object({
   proactiva: z.boolean().optional(),
 });
 
-/** Campos que un colaborador puede cambiar en SUS tareas (owner_agencia lo incluye). El resto exige rol de gestión. */
-export const CAMPOS_COLABORADOR = [
-  'estado_operativo',
-  'fecha_entrega',
-  'entregable_urls',
-  'motivo_reprogramacion',
-  'observacion_reprogramacion',
-  'daily_fecha',
-  'piezas',
-] as const;
-
 const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   const a = c.get('auth');
   if (esColaboradorHumano(a)) return next(); // se valida en el handler
@@ -198,85 +180,17 @@ const escrituraOPropia: MiddlewareHandler = async (c, next) => {
 
 requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), async (c) => {
   const ctx = ctxOf(c);
-  const id = c.req.param('id');
-  const previo = await getRequerimiento(ctx, id);
-  if (!previo) return c.json({ error: 'No encontrado' }, 404);
-  const patch = c.req.valid('json');
-
-  const a = c.get('auth');
-  if (esColaborador(a)) {
-    if (!ctx.usuarioId || !previo.owner_agencia.includes(ctx.usuarioId))
-      return c.json({ error: 'Solo puedes actualizar las tareas asignadas a ti' }, 403);
-    const noPermitidos = Object.keys(patch).filter((k) => !(CAMPOS_COLABORADOR as readonly string[]).includes(k));
-    if (noPermitidos.length)
-      return c.json(
-        { error: `Como colaborador solo puedes cambiar estado, fecha de entrega y entregables (no: ${noPermitidos.join(', ')})` },
-        403,
-      );
-  }
-
-  // Basecamp manda sobre completed: no se completa desde BackIO si el to-do existe en Basecamp.
-  if (patch.estado_operativo === 'completado' && previo.basecamp_todo_id) {
-    return c.json({ error: 'Este requerimiento se completa desde Basecamp (fuente de verdad de completed).' }, 422);
-  }
-
-  // Regla del daily (22/09): ninguna tarea entra al daily sin al menos un responsable.
-  if (patch.daily_fecha) {
-    const owners = patch.owner_agencia ?? previo.owner_agencia ?? [];
-    if (owners.length === 0)
-      return c.json({ error: `«${previo.titulo_interno}» no tiene responsable. Asigna a alguien antes de ponerla en el daily.` }, 422);
-  }
-  const reprogramado = patch.fecha_entrega !== undefined && patch.fecha_entrega !== previo.fecha_entrega && previo.fecha_entrega !== null;
-  const { motivo_reprogramacion, observacion_reprogramacion, ...cambios } = patch;
-  // Motivo obligatorio para toda reprogramación desde la UI (decidido 04/09). API/MCP pueden omitirlo: queda "sin causa" y sale como señal.
-  if (reprogramado && ctx.origen === 'ui' && !motivo_reprogramacion) {
-    return c.json({ error: 'Para cambiar la fecha de entrega indica el motivo de la reprogramación.' }, 422);
-  }
-
-  const r = await updateRequerimiento(ctx, id, cambios);
-  if (reprogramado)
-    await completarUltimaReprogramacion(ctx, id, {
-      motivo: (motivo_reprogramacion as MotivoReprogramacion | null | undefined) ?? null,
-      origen: ctx.origen,
-      observacion: observacion_reprogramacion ?? null,
+  try {
+    const { requerimiento, basecamp_due_on } = await actualizarRequerimiento(ctx, c.req.param('id'), c.req.valid('json'), {
+      colaborador: esColaborador(c.get('auth')),
+      // Motivo obligatorio desde la UI (decidido 04/09). La API puede omitirlo: queda «sin causa» y sale como señal.
+      exigirMotivo: ctx.origen === 'ui',
     });
-  // Rechazo del cliente o reapertura de un completado = reproceso.
-  if (patch.estado_aprobacion === 'rechazado' && previo.estado_aprobacion !== 'rechazado') {
-    await registrarReproceso(ctx, id, { origen: 'cliente', motivo: null, reabrir_basecamp: true });
-  } else if (
-    previo.estado_operativo === 'completado' &&
-    patch.estado_operativo &&
-    patch.estado_operativo !== 'completado' &&
-    patch.estado_operativo !== 'cancelado'
-  ) {
-    await registrarReproceso(ctx, id, { origen: 'interno', motivo: null, reabrir_basecamp: true });
+    return c.json({ ...requerimiento, basecamp_due_on });
+  } catch (e) {
+    if (e instanceof ReglaError) return c.json({ error: e.message }, e.status);
+    throw e;
   }
-  if (patch.estado_operativo === 'completado' && previo.estado_operativo !== 'completado')
-    await cerrarReproceso(ctx, id).catch(() => undefined);
-  await audit(ctx, {
-    accion: reprogramado ? 'reprogramar' : 'actualizar',
-    entidad: 'requerimiento',
-    entidad_id: id,
-    detalle: reprogramado ? { de: previo.fecha_entrega, a: patch.fecha_entrega, ...patch } : cambios,
-  });
-  // La fecha baja a Basecamp de inmediato; se informa el resultado a la pantalla y a la auditoría.
-  let basecamp_due_on: 'ok' | 'error' | 'sin_todo' = 'sin_todo';
-  if (reprogramado && r.basecamp_todo_id) {
-    try {
-      await pushDueDate(ctx, r);
-      basecamp_due_on = 'ok';
-    } catch (err) {
-      basecamp_due_on = 'error';
-      console.error('[basecamp] due_on no sincronizado', err);
-      await audit(ctx, {
-        accion: 'basecamp_due_on_error',
-        entidad: 'requerimiento',
-        entidad_id: id,
-        detalle: { error: err instanceof Error ? err.message : String(err) },
-      });
-    }
-  }
-  return c.json({ ...r, basecamp_due_on });
 });
 
 // ---------------- Cumplimiento: historial, reprocesos y causas pendientes

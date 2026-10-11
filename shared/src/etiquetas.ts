@@ -26,3 +26,14 @@ export const PRIORIDAD_LABEL: Record<Prioridad, string> = { alta: 'Alta', media:
 export function etiqueta(tabla: Record<string, string>, valor: unknown): string {
   return tabla[String(valor)] ?? String(valor);
 }
+
+/** Campos que un colaborador puede cambiar en SUS tareas. El resto exige rol de gestión (backend y backlog los comparten). */
+export const CAMPOS_COLABORADOR = [
+  'estado_operativo',
+  'fecha_entrega',
+  'entregable_urls',
+  'motivo_reprogramacion',
+  'observacion_reprogramacion',
+  'daily_fecha',
+  'piezas',
+] as const;
