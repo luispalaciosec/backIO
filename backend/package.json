@@ -15,14 +15,14 @@
     "format": "prettier --write src --ignore-path ../.prettierignore"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.132.0",
     "@backio/shared": "workspace:*",
     "@hono/node-server": "^1.13.7",
-    "@hono/zod-validator": "^0.4.1",
+    "@hono/zod-validator": "^0.9.1",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@supabase/supabase-js": "^2.47.10",
+    "@supabase/supabase-js": "^2.117.3",
     "hono": "^4.13.13",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.15",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.25.2"
   },
