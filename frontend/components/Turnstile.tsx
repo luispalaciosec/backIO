@@ -35,7 +35,7 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
     cargarScript().then(() => {
       if (!vivo || !ref.current || !window.turnstile) return;
       id = window.turnstile.render(ref.current, {
-        sitekey: SITE_KEY_TURNSTILE, language: 'es', theme: 'light',
+        sitekey: SITE_KEY_TURNSTILE, language: 'es', theme: 'light', size: 'flexible',
         callback: (t: string) => onToken(t),
         'expired-callback': () => onToken(null),
         'error-callback': () => onToken(null),
@@ -44,5 +44,5 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
     return () => { vivo = false; if (id && window.turnstile) window.turnstile.remove(id); };
   }, [onToken]);
   if (!SITE_KEY_TURNSTILE) return null;
-  return <div ref={ref} className="flex justify-center min-h-[65px]" />;
+  return <div ref={ref} className="w-full min-h-[65px]" />;
 }
