@@ -33,6 +33,10 @@ describe('logger', () => {
 // Un 500 en el portal o en el webhook de Basecamp escribía la ruta con el token o el secreto.
 describe('errores sin secretos en el log', () => {
   it('la ruta del 500 va redactada', async () => {
+    // Variables de prueba: en CI no hay backend/.env y la app las valida al crearse.
+    vi.stubEnv('SUPABASE_URL', 'https://prueba.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon-prueba');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-prueba');
     const { createApp } = await import('../app');
     const escrito = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const app = createApp() as unknown as Hono;
