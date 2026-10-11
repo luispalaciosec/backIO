@@ -31,7 +31,7 @@ una acción de Luis) · **pendiente** (ola futura).
 | S4 · Fallback de credenciales de Basecamp a `tenants.config` | hecho | `lib/basecamp/credenciales.ts` | Solo `integracion_credenciales`; nunca se escriben tokens en `tenants` |
 | S5 · Botón del correo con ruta inyectable | hecho | `lib/notificaciones/index.ts`, `lib/validacion.ts`, requerimientos/plantillas/proyectos, `lib/builder/import.ts` | Marca neutralizada al encolar, se lee la última y lista blanca de secciones; títulos de una sola línea. Tests. Sin migración (se descartó la columna `ruta`) |
 | S6 / M13 · Consentimiento con el nombre de la URL | hecho | `routes/oauth.ts` (`GET /oauth/client/:id`), `lib/oauth/index.ts`, `frontend/app/oauth/consent/page.tsx` | Nombre, hosts y scopes vienen del servidor; «Autorizar» solo si el host está registrado. Esquema zod en registro, token y revoke. Tests |
-| S6 · Rate limit del registro dinámico | pendiente | Ola 3 (rate limit persistente) | — |
+| S6 · Rate limit del registro dinámico | hecho | `routes/oauth.ts` (Ola 3) | `/oauth/register` limitado a 10 por hora por IP con el límite persistente (ver «Punto 11», Ola 3) |
 | S7 · Doble publicación de actas | hecho | `lib/mcp/publish.ts` | Reserva atómica (`publicado_at is null`) antes de Basecamp y se libera si falla. Se mantiene el diseño de docs/07 (decisión de Luis) |
 | S8 · Rotación de refresh token no atómica | hecho | `lib/oauth/index.ts` | Update condicional; reutilización ⇒ se revocan los tokens vivos de ese cliente y usuario |
 | S9 · `confirm_plan` consumía antes de verificar | hecho (1a + 1b) | `lib/mcp/plans.ts` (`verPlan`), `lib/mcp/server.ts`, migración 27 | Scope antes de consumir; el plan solo lo confirma la misma API key o el mismo usuario (`agent_plans.usuario_id`) |
