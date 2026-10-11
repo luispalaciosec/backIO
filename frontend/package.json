@@ -11,22 +11,22 @@
   },
   "dependencies": {
     "@backio/shared": "workspace:*",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.47.10",
-    "canvas-confetti": "1.9.3",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.3",
+    "canvas-confetti": "1.9.4",
     "next": "15.5.27",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@types/canvas-confetti": "1.6.4",
+    "@types/canvas-confetti": "1.9.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.6.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.27",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.29",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3"
   }
