@@ -5,7 +5,7 @@
  */
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../lib/validacion';
 import { serviceClient } from '../lib/db';
 import { frontendOrigins } from '../config/env';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../lib/notificaciones/email';

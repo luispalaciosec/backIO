@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { audit } from '../../lib/db/audit';
 import { getMesa } from '../../lib/db/mesas';

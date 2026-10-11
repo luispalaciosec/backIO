@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listMesas, upsertMesa, updateMesa, getMesa, audit, slugify } from '../../lib/db';
 import { detectarBoardsMesa } from '../../lib/mcp/publish';

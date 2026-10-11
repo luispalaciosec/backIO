@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listClientes, getCliente, updateClienteConfig, listProyectos, listBacklog, audit } from '../../lib/db';
 import type { ResumenClientePrometio } from '@backio/shared';

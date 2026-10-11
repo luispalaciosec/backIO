@@ -1,7 +1,7 @@
 import { alcanceMesa } from '../../lib/db/mesas';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { esColaborador, esColaboradorHumano } from '../../lib/auth/roles';
 import { unaLinea } from '../../lib/validacion';

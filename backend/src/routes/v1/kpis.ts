@@ -4,7 +4,7 @@
  */
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { ROLES_INTERNOS_GESTION, type Rol } from '@backio/shared';
 import { ctxOf, requireScope } from '../../lib/auth/middleware';
 import { audit } from '../../lib/db/audit';

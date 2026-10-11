@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { upsertRecurrencia } from '../../lib/recurrencias';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { listProyectos, getProyectoDetalle, getProyecto, updateProyecto, audit, DbError, getPlantillaArbol } from '../../lib/db';
 import { generarPortalToken } from '../../lib/portal/token';

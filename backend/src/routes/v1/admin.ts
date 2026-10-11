@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from '../../lib/validacion';
 import { randomBytes } from 'node:crypto';
 import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
 import { listUsuarios, audit, throwIf, serviceClient } from '../../lib/db';
