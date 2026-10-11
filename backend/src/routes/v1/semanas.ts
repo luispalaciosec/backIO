@@ -65,25 +65,19 @@ semanas.get('/:id/acuerdos', requireScope('read:senales'), async (c) =>
   c.json({ items: await listAcuerdosSemana(ctxOf(c), c.req.param('id')) }),
 );
 
+export const crearAcuerdoSchema = z.object({
+  descripcion: z.string().min(3),
+  responsable_id: z.string().uuid(),
+  fecha_compromiso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
 // Tres campos: acuerdo, responsable, fecha. La fecha es un date picker real: sin "próxima weekly".
-semanas.post(
-  '/:id/acuerdos',
-  requireScope('write:actas'),
-  zValidator(
-    'json',
-    z.object({
-      descripcion: z.string().min(3),
-      responsable_id: z.string().uuid(),
-      fecha_compromiso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    }),
-  ),
-  async (c) => {
-    const ctx = ctxOf(c);
-    const a = await insertAcuerdo(ctx, { semana_id: c.req.param('id'), ...c.req.valid('json') });
-    await audit(ctx, { accion: 'crear_acuerdo', entidad: 'acuerdo', entidad_id: a.id });
-    return c.json(a, 201);
-  },
-);
+semanas.post('/:id/acuerdos', requireScope('write:actas'), zValidator('json', crearAcuerdoSchema), async (c) => {
+  const ctx = ctxOf(c);
+  const a = await insertAcuerdo(ctx, { semana_id: c.req.param('id'), ...c.req.valid('json') });
+  await audit(ctx, { accion: 'crear_acuerdo', entidad: 'acuerdo', entidad_id: a.id });
+  return c.json(a, 201);
+});
 
 semanas.post(
   '/:id/acuerdos/:acuerdoId/cerrar',

@@ -22,7 +22,7 @@ const bloqueSchema = z.object({
   una_tarea_por_pieza: z.boolean().default(false),
 });
 
-const crearSchema = z.object({
+export const crearProyectoSchema = z.object({
   cliente_id: z.string().uuid(),
   plantilla_id: z.string().uuid(),
   nombre: unaLinea(3, 120),
@@ -89,12 +89,12 @@ proyectos.get('/:id', requireScope('read:proyectos'), async (c) => {
 });
 
 /** Preview del paso 5: mismo plan que se ejecutará, con vista interna y vista cliente (misma sanitizeForClient). */
-proyectos.post('/preview', requireScope('read:proyectos'), zValidator('json', crearSchema), async (c) => {
+proyectos.post('/preview', requireScope('read:proyectos'), zValidator('json', crearProyectoSchema), async (c) => {
   const p = await previewProyecto(ctxOf(c), c.req.valid('json'));
   return c.json({ plan: p.plan, vista_cliente: p.vista_cliente, alertas: p.alertas, resumen: p.resumen });
 });
 
-proyectos.post('/', requireScope('write:proyectos'), zValidator('json', crearSchema), async (c) => {
+proyectos.post('/', requireScope('write:proyectos'), zValidator('json', crearProyectoSchema), async (c) => {
   const ctx = ctxOf(c);
   const input = c.req.valid('json');
   const r = await crearProyectoDesdePlantilla(ctx, input);
@@ -133,7 +133,7 @@ proyectos.post('/:id/basecamp/reintentar', requireScope('write:proyectos'), asyn
   }
 });
 
-const patchSchema = z.object({
+export const actualizarProyectoSchema = z.object({
   nombre: unaLinea(3, 120).optional(),
   estado: z
     .enum(['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'reprogramado', 'bloqueado', 'completado', 'cancelado'])
@@ -147,7 +147,7 @@ const patchSchema = z.object({
   mesa_id: z.string().uuid().nullable().optional(),
 });
 
-proyectos.patch('/:id', requireScope('write:proyectos'), zValidator('json', patchSchema), async (c) => {
+proyectos.patch('/:id', requireScope('write:proyectos'), zValidator('json', actualizarProyectoSchema), async (c) => {
   const ctx = ctxOf(c);
   const p = await updateProyecto(ctx, c.req.param('id'), c.req.valid('json'));
   await audit(ctx, { accion: 'actualizar_proyecto', entidad: 'proyecto', entidad_id: p.id, detalle: c.req.valid('json') });

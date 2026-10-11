@@ -87,7 +87,7 @@ requerimientos.get('/:id', requireScope('read:backlog'), async (c) => {
   return r ? c.json(r) : c.json({ error: 'No encontrado' }, 404);
 });
 
-const crearSchema = z.object({
+export const crearRequerimientoSchema = z.object({
   cliente_id: z.string().uuid(),
   proyecto_id: z.string().uuid().nullable().optional(),
   titulo_interno: unaLinea(2, 300),
@@ -124,7 +124,7 @@ async function planificacionAutomatica(
   return hayPlan && fechaEntrega <= semana.fecha_fin ? 'no_planificado' : 'planificado';
 }
 
-requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json', crearSchema), async (c) => {
+requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json', crearRequerimientoSchema), async (c) => {
   const ctx = ctxOf(c);
   const body = c.req.valid('json');
   const planificacion = body.planificacion ?? (await planificacionAutomatica(ctx, body.fecha_entrega));
@@ -146,7 +146,7 @@ requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json'
   return c.json({ ...r, basecamp }, 201);
 });
 
-const patchSchema = z.object({
+export const actualizarRequerimientoSchema = z.object({
   titulo_interno: unaLinea(2, 300).optional(),
   etiqueta_cliente: z.string().nullable().optional(),
   visible_cliente: z.literal(false).optional(), // solo restringir; abrir lo bloquea el trigger igualmente
@@ -178,7 +178,7 @@ const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   return requireScope('write:requerimientos')(c, next);
 };
 
-requerimientos.patch('/:id', escrituraOPropia, zValidator('json', patchSchema), async (c) => {
+requerimientos.patch('/:id', escrituraOPropia, zValidator('json', actualizarRequerimientoSchema), async (c) => {
   const ctx = ctxOf(c);
   try {
     const { requerimiento, basecamp_due_on } = await actualizarRequerimiento(ctx, c.req.param('id'), c.req.valid('json'), {

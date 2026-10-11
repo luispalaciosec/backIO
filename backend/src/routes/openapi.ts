@@ -1,10 +1,14 @@
 /**
- * Spec OpenAPI 3.1 de /api/v1 generada desde los mismos esquemas zod de las rutas.
+ * Spec OpenAPI 3.1 de /api/v1. Las entradas usan los esquemas zod que validan las rutas (no copias: antes la copia
+ * había quedado sin planificación, clase ni proactiva). Las respuestas se describen aquí.
  * Consumida por Gemini (function calling vía OpenAPI) y cualquier cliente REST.
  */
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { actualizarRequerimientoSchema, crearRequerimientoSchema } from './v1/requerimientos';
+import { crearProyectoSchema } from './v1/proyectos';
+import { crearAcuerdoSchema } from './v1/semanas';
 
 const fecha = z
   .string()
@@ -33,59 +37,19 @@ export const schemas = {
     owner_agencia: z.array(z.string().uuid()),
     piezas: z.number().int(),
     basecamp_url: z.string().nullable(),
+    fecha_entrega_original: fecha.nullable(),
+    veces_reproceso: z.number().int(),
+    planificacion: z.enum(['planificado', 'no_planificado', 'urgente']),
+    daily_fecha: fecha.nullable(),
+    clase: z.enum(['tarea', 'propuesta', 'incidencia']).optional(),
+    proactiva: z.boolean().optional(),
+    completado_at: z.string().nullable(),
     dias_atraso: z.number().int().optional(),
     dias_sin_movimiento: z.number().int().optional(),
   }),
-  CrearRequerimiento: z.object({
-    cliente_id: z.string().uuid(),
-    proyecto_id: z.string().uuid().nullable().optional(),
-    titulo_interno: z.string().min(2),
-    etiqueta_cliente: z.string().nullable().optional(),
-    visible_cliente: z.boolean().default(false),
-    bloque_nombre: z.string().nullable().optional(),
-    tipo_trabajo: z.enum(['fee', 'proyecto']).default('fee'),
-    prioridad: z.enum(['alta', 'media', 'baja']).default('media'),
-    peso: z.number().min(0).default(1),
-    fecha_pedido: fecha.nullable().optional(),
-    fecha_entrega: fecha.nullable().optional(),
-    owner_agencia: z.array(z.string().uuid()).default([]),
-    piezas: z.number().int().min(0).default(0),
-  }),
-  ActualizarRequerimiento: z.object({
-    titulo_interno: z.string().optional(),
-    etiqueta_cliente: z.string().nullable().optional(),
-    visible_cliente: z.literal(false).optional(),
-    estado_operativo: z.enum(ESTADOS).optional(),
-    estado_aprobacion: z.enum(APROB).optional(),
-    prioridad: z.enum(['alta', 'media', 'baja']).optional(),
-    peso: z.number().optional(),
-    fecha_entrega: fecha.nullable().optional(),
-    fecha_pedido: fecha.nullable().optional(),
-    owner_agencia: z.array(z.string().uuid()).optional(),
-    piezas: z.number().int().optional(),
-  }),
-  CrearProyecto: z.object({
-    cliente_id: z.string().uuid(),
-    plantilla_id: z.string().uuid(),
-    nombre: z.string().min(3),
-    fecha_entrega: fecha,
-    brief: z.object({
-      objetivo_negocio: z.string(),
-      publico_objetivo: z.string(),
-      canales: z.array(z.string()).min(1),
-      mandatorios_marca: z.string().optional(),
-    }),
-    bloques: z
-      .array(
-        z.object({
-          bloque_id: z.string().uuid(),
-          activo: z.boolean(),
-          owner_id: z.string().uuid().nullable(),
-          piezas_por_canal: z.record(z.number().int()),
-        }),
-      )
-      .default([]),
-  }),
+  CrearRequerimiento: crearRequerimientoSchema,
+  ActualizarRequerimiento: actualizarRequerimientoSchema,
+  CrearProyecto: crearProyectoSchema,
   Proyecto: z.object({
     id: z.string().uuid(),
     cliente_id: z.string().uuid(),
@@ -113,7 +77,7 @@ export const schemas = {
     atendida: z.boolean(),
     detalle: z.record(z.unknown()),
   }),
-  Acuerdo: z.object({ descripcion: z.string().min(3), responsable_id: z.string().uuid(), fecha_compromiso: fecha }),
+  Acuerdo: crearAcuerdoSchema,
   ResumenCliente: z.object({
     cliente_id: z.string().uuid(),
     proyectos_activos: z.number().int(),
