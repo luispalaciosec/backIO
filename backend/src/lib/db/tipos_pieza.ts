@@ -9,8 +9,15 @@ export async function listTiposPieza(ctx: DbCtx, incluirInactivos = false): Prom
   return ((data ?? []) as TipoPieza[]).map((t) => ({ ...t, esfuerzo: Number(t.esfuerzo) }));
 }
 
-export async function upsertTipoPieza(ctx: DbCtx, t: { id?: string; nombre: string; slug: string; esfuerzo: number; pasos: PasoPieza[]; activo?: boolean }): Promise<TipoPieza> {
-  const { data, error } = await ctx.db.from('tipos_pieza').upsert({ ...t, tenant_id: ctx.tenantId }, { onConflict: 'tenant_id,slug' }).select().single();
+export async function upsertTipoPieza(
+  ctx: DbCtx,
+  t: { id?: string; nombre: string; slug: string; esfuerzo: number; pasos: PasoPieza[]; activo?: boolean },
+): Promise<TipoPieza> {
+  const { data, error } = await ctx.db
+    .from('tipos_pieza')
+    .upsert({ ...t, tenant_id: ctx.tenantId }, { onConflict: 'tenant_id,slug' })
+    .select()
+    .single();
   throwIf(error);
   if (!data) throw new DbError('No se pudo guardar', 500);
   return { ...(data as TipoPieza), esfuerzo: Number((data as TipoPieza).esfuerzo) };

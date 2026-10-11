@@ -6,7 +6,10 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { serviceClient, throwIf } from '../db/client';
 
-const N = 16384, R = 8, P = 1, LARGO = 32;
+const N = 16384,
+  R = 8,
+  P = 1,
+  LARGO = 32;
 
 export function hashPin(pin: string): string {
   const sal = randomBytes(16);
@@ -32,7 +35,12 @@ export async function leerHashPin(clienteId: string): Promise<string | null> {
 export async function guardarPin(tenantId: string, clienteId: string, pin: string | null): Promise<void> {
   const db = serviceClient();
   const { error } = pin
-    ? await db.from('portal_pines').upsert({ cliente_id: clienteId, tenant_id: tenantId, hash: hashPin(pin), updated_at: new Date().toISOString() }, { onConflict: 'cliente_id' })
+    ? await db
+        .from('portal_pines')
+        .upsert(
+          { cliente_id: clienteId, tenant_id: tenantId, hash: hashPin(pin), updated_at: new Date().toISOString() },
+          { onConflict: 'cliente_id' },
+        )
     : await db.from('portal_pines').delete().eq('cliente_id', clienteId).eq('tenant_id', tenantId);
   throwIf(error);
 }
@@ -58,7 +66,8 @@ export async function migrarPinesEnClaro(tenantId: string): Promise<number> {
       await guardarPin(tenantId, c.id, pin.trim());
       // Se comprueba el hash guardado antes de borrar el PIN en claro: si algo falla, el cliente conserva su PIN.
       const guardado = await leerHashPin(c.id);
-      if (!guardado || !pinCoincide(pin.trim(), guardado)) throw new Error(`El PIN del cliente ${c.id} no se pudo verificar; no se borró de config`);
+      if (!guardado || !pinCoincide(pin.trim(), guardado))
+        throw new Error(`El PIN del cliente ${c.id} no se pudo verificar; no se borró de config`);
       migrados += 1;
     }
     const { error: e2 } = await db.from('clientes').update({ config: resto }).eq('id', c.id).eq('tenant_id', tenantId);

@@ -25,9 +25,14 @@ function splitLinea(l: string): string[] {
   for (let i = 0; i < l.length; i++) {
     const ch = l[i]!;
     if (ch === '"') {
-      if (inQ && l[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ;
-    } else if (ch === ',' && !inQ) { out.push(cur); cur = ''; }
-    else cur += ch;
+      if (inQ && l[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      out.push(cur);
+      cur = '';
+    } else cur += ch;
   }
   out.push(cur);
   return out;
@@ -37,10 +42,7 @@ const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const BOOL_TRUE = new Set(['true', '1', 'si', 'sí', 'yes']);
 const BOOL_FALSE = new Set(['false', '0', 'no', '']);
 
-export function validarFilas(
-  filas: FilaImportCSV[],
-  ctx: { clientesSlug: Set<string>; usuariosEmail: Set<string> },
-): PreviewImport {
+export function validarFilas(filas: FilaImportCSV[], ctx: { clientesSlug: Set<string>; usuariosEmail: Set<string> }): PreviewImport {
   const validas: PreviewImport['validas'] = [];
   const rechazadas: PreviewImport['rechazadas'] = [];
   filas.forEach((f, i) => {
@@ -59,7 +61,7 @@ export function validarFilas(
     if (f.fecha_pedido && !ES_FECHA.test(f.fecha_pedido)) motivos.push('fecha_pedido debe ser YYYY-MM-DD');
     if (f.fecha_entrega && !ES_FECHA.test(f.fecha_entrega)) motivos.push('fecha_entrega debe ser YYYY-MM-DD');
     if (f.owner_email && !ctx.usuariosEmail.has(f.owner_email.toLowerCase())) motivos.push(`owner "${f.owner_email}" no existe`);
-    if (f.piezas && (!/^\d+$/.test(f.piezas))) motivos.push('piezas debe ser entero');
+    if (f.piezas && !/^\d+$/.test(f.piezas)) motivos.push('piezas debe ser entero');
     if (motivos.length) rechazadas.push({ fila, motivo: motivos.join('; '), datos: f });
     else validas.push({ ...f, fila });
   });

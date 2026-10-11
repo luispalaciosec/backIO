@@ -1,7 +1,12 @@
 /** Envío por Resend (API REST, sin SDK). Remitente en dominio ya verificado por PrometIO. */
 import { env } from '../../config/env';
 
-export interface Email { to: string; subject: string; html: string; text?: string }
+export interface Email {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
 
 export function emailHabilitado(): boolean {
   return !!process.env.RESEND_API_KEY;
@@ -21,8 +26,13 @@ export async function sendEmail(m: Email): Promise<{ id: string }> {
 }
 
 export function plantillaHtml(titulo: string, cuerpo: string, url?: string): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  const parrafos = cuerpo.split('\n').filter(Boolean).map((p) => `<p style="margin:0 0 12px">${esc(p)}</p>`).join('');
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const parrafos = cuerpo
+    .split('\n')
+    .filter(Boolean)
+    .map((p) => `<p style="margin:0 0 12px">${esc(p)}</p>`)
+    .join('');
   return `<!doctype html><html><body style="margin:0;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937">
 <div style="max-width:560px;margin:24px auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:28px">
 <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin-bottom:8px">BackIO · Geeks</div>

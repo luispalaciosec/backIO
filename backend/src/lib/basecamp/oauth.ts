@@ -21,7 +21,9 @@ function firmar(payload: string): string {
 }
 
 export function buildState(tenantId: string, usuarioId: string): string {
-  const payload = Buffer.from(JSON.stringify({ t: tenantId, u: usuarioId, n: randomBytes(8).toString('hex'), e: Date.now() + 10 * 60_000 })).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({ t: tenantId, u: usuarioId, n: randomBytes(8).toString('hex'), e: Date.now() + 10 * 60_000 }),
+  ).toString('base64url');
   return `${payload}.${firmar(payload)}`;
 }
 
@@ -63,11 +65,20 @@ export async function exchangeCode(code: string): Promise<BasecampTokens> {
 
 export async function refreshTokens(tokens: BasecampTokens): Promise<BasecampTokens> {
   const e = env();
-  const q = new URLSearchParams({ type: 'refresh', refresh_token: tokens.refresh_token, client_id: e.BASECAMP_CLIENT_ID ?? '', client_secret: secret() });
+  const q = new URLSearchParams({
+    type: 'refresh',
+    refresh_token: tokens.refresh_token,
+    client_id: e.BASECAMP_CLIENT_ID ?? '',
+    client_secret: secret(),
+  });
   const res = await fetch(`${LAUNCHPAD}/authorization/token?${q}`, { method: 'POST', headers: { 'User-Agent': e.BASECAMP_USER_AGENT } });
   if (!res.ok) throw new Error(`Refresh de token Basecamp falló: ${res.status}`);
   const body = (await res.json()) as { access_token: string; expires_in: number };
-  return { access_token: body.access_token, refresh_token: tokens.refresh_token, expires_at: new Date(Date.now() + body.expires_in * 1000).toISOString() };
+  return {
+    access_token: body.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: new Date(Date.now() + body.expires_in * 1000).toISOString(),
+  };
 }
 
 export interface BasecampAuthInfo {
@@ -76,7 +87,9 @@ export interface BasecampAuthInfo {
 }
 
 export async function authorizationInfo(accessToken: string): Promise<BasecampAuthInfo> {
-  const res = await fetch(`${LAUNCHPAD}/authorization.json`, { headers: { Authorization: `Bearer ${accessToken}`, 'User-Agent': env().BASECAMP_USER_AGENT } });
+  const res = await fetch(`${LAUNCHPAD}/authorization.json`, {
+    headers: { Authorization: `Bearer ${accessToken}`, 'User-Agent': env().BASECAMP_USER_AGENT },
+  });
   if (!res.ok) throw new Error(`authorization.json falló: ${res.status}`);
   return (await res.json()) as BasecampAuthInfo;
 }
@@ -89,16 +102,34 @@ export interface BasecampConfig extends BasecampTokens {
 }
 
 /** Los tokens viven en `integracion_credenciales` (solo service role), nunca en `tenants.config`. Ver credenciales.ts. */
-export async function saveTokens(tenantId: string, tokens: BasecampTokens, extra: Omit<BasecampConfig, keyof BasecampTokens>): Promise<void> {
+export async function saveTokens(
+  tenantId: string,
+  tokens: BasecampTokens,
+  extra: Omit<BasecampConfig, keyof BasecampTokens>,
+): Promise<void> {
   const { guardarCredencialesBasecamp } = await import('./credenciales');
   await guardarCredencialesBasecamp(tenantId, { ...tokens, ...extra });
 }
 
-export async function getStatus(tenantId: string): Promise<{ conectado: boolean; cuenta?: string | null; cuenta_id?: number | null; autorizado_por?: string | null; expira_at?: string; conectado_at?: string }> {
+export async function getStatus(tenantId: string): Promise<{
+  conectado: boolean;
+  cuenta?: string | null;
+  cuenta_id?: number | null;
+  autorizado_por?: string | null;
+  expira_at?: string;
+  conectado_at?: string;
+}> {
   const { leerCredencialesBasecamp } = await import('./credenciales');
   const bc = await leerCredencialesBasecamp(tenantId);
   if (!bc?.access_token) return { conectado: false };
-  return { conectado: true, cuenta: bc.cuenta_nombre, cuenta_id: bc.cuenta_id, autorizado_por: bc.autorizado_por, expira_at: bc.expires_at, conectado_at: bc.conectado_at };
+  return {
+    conectado: true,
+    cuenta: bc.cuenta_nombre,
+    cuenta_id: bc.cuenta_id,
+    autorizado_por: bc.autorizado_por,
+    expira_at: bc.expires_at,
+    conectado_at: bc.conectado_at,
+  };
 }
 
 export async function disconnect(tenantId: string): Promise<void> {

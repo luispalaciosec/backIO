@@ -4,33 +4,15 @@
  */
 
 export type EstadoOperativo =
-  | 'backlog'
-  | 'priorizado'
-  | 'en_ejecucion'
-  | 'en_revision'
-  | 'reprogramado'
-  | 'bloqueado'
-  | 'completado'
-  | 'cancelado';
+  'backlog' | 'priorizado' | 'en_ejecucion' | 'en_revision' | 'reprogramado' | 'bloqueado' | 'completado' | 'cancelado';
 
-export type EstadoAprobacion =
-  | 'no_aplica'
-  | 'pendiente_interno'
-  | 'pendiente_cliente'
-  | 'aprobado'
-  | 'rechazado';
+export type EstadoAprobacion = 'no_aplica' | 'pendiente_interno' | 'pendiente_cliente' | 'aprobado' | 'rechazado';
 
 export type Prioridad = 'alta' | 'media' | 'baja';
 
 export type Rol = 'admin' | 'gerencia' | 'operaciones' | 'ejecutiva' | 'lider' | 'colaborador';
 
-export const ROLES_INTERNOS_GESTION: readonly Rol[] = [
-  'admin',
-  'gerencia',
-  'operaciones',
-  'ejecutiva',
-  'lider',
-];
+export const ROLES_INTERNOS_GESTION: readonly Rol[] = ['admin', 'gerencia', 'operaciones', 'ejecutiva', 'lider'];
 
 /** Puede generar/publicar y editar fuera de lo propio (weekly, daily, proyectos). Única definición para backend y frontend. */
 export function puedeEscribir(rol: Rol | null | undefined): boolean {
@@ -321,8 +303,16 @@ export const CANALES: readonly string[] = [
 ];
 
 /** Salidas de la capa de IA (Sprint 4). Solo se alimentan con datos estructurados de BackIO. */
-export interface AgendaIA { causa: string; items: string[]; pregunta: string }
-export interface WeeklyIA { narrativa: string; agenda: AgendaIA[]; generado_at: string }
+export interface AgendaIA {
+  causa: string;
+  items: string[];
+  pregunta: string;
+}
+export interface WeeklyIA {
+  narrativa: string;
+  agenda: AgendaIA[];
+  generado_at: string;
+}
 export interface BriefIA {
   nombre_proyecto: string | null;
   objetivo_negocio: string;
@@ -338,8 +328,16 @@ export interface BriefIA {
 }
 
 /** Cumplimiento: reprogramaciones y reprocesos (04/09/2026). Solo motivos de catálogo; nunca texto libre. */
-export type MotivoReprogramacion = 'insumos_cliente' | 'cambio_alcance' | 'capacidad_equipo' | 'prioridad_negocio' | 'error_estimacion' | 'reproceso' | 'otro';
-export type MotivoReproceso = 'brief_incompleto' | 'levantamiento_incompleto' | 'error_ejecucion' | 'cambio_opinion_cliente' | 'ajuste_marca_legal' | 'direccion_arte' | 'error_texto';
+export type MotivoReprogramacion =
+  'insumos_cliente' | 'cambio_alcance' | 'capacidad_equipo' | 'prioridad_negocio' | 'error_estimacion' | 'reproceso' | 'otro';
+export type MotivoReproceso =
+  | 'brief_incompleto'
+  | 'levantamiento_incompleto'
+  | 'error_ejecucion'
+  | 'cambio_opinion_cliente'
+  | 'ajuste_marca_legal'
+  | 'direccion_arte'
+  | 'error_texto';
 export type OrigenReproceso = 'cliente' | 'interno' | 'basecamp';
 
 /** atribuible: a quién se le cuenta. equipo = descuenta al equipo; cliente = no; neutro = ninguno. */
@@ -364,37 +362,88 @@ export const MOTIVOS_REPROCESO: { valor: MotivoReproceso; label: string; respons
 export const PASOS_RETORNO: readonly string[] = ['Idea', 'Guion', 'Copy', 'Storyboard', 'Diseño', 'Grabación', 'Edición', 'Posteo'];
 
 export interface Reprogramacion {
-  id: string; tenant_id: string; requerimiento_id: string; fecha_anterior: string | null; fecha_nueva: string | null;
-  motivo: MotivoReprogramacion | null; origen: string; usuario_id: string | null; created_at: string; observacion?: string | null;
+  id: string;
+  tenant_id: string;
+  requerimiento_id: string;
+  fecha_anterior: string | null;
+  fecha_nueva: string | null;
+  motivo: MotivoReprogramacion | null;
+  origen: string;
+  usuario_id: string | null;
+  created_at: string;
+  observacion?: string | null;
 }
 /** Observación fechada de una tarea (bitácora con el cliente). */
 export interface Bitacora {
-  id: string; tenant_id: string; requerimiento_id: string; usuario_id: string | null;
-  nota: string; estado_operativo: EstadoOperativo | null; estado_aprobacion: string | null;
-  visible_cliente: boolean; created_at: string;
+  id: string;
+  tenant_id: string;
+  requerimiento_id: string;
+  usuario_id: string | null;
+  nota: string;
+  estado_operativo: EstadoOperativo | null;
+  estado_aprobacion: string | null;
+  visible_cliente: boolean;
+  created_at: string;
 }
 export interface Reproceso {
-  id: string; tenant_id: string; requerimiento_id: string; origen: OrigenReproceso; motivo: MotivoReproceso | null; paso_retorno: string | null;
-  fecha_entrega_antes: string | null; abierto_at: string; cerrado_at: string | null; horas_reproceso: number | null; usuario_id: string | null; created_at: string; observacion?: string | null;
+  id: string;
+  tenant_id: string;
+  requerimiento_id: string;
+  origen: OrigenReproceso;
+  motivo: MotivoReproceso | null;
+  paso_retorno: string | null;
+  fecha_entrega_antes: string | null;
+  abierto_at: string;
+  cerrado_at: string | null;
+  horas_reproceso: number | null;
+  usuario_id: string | null;
+  created_at: string;
+  observacion?: string | null;
   /** Área a la que se le cuenta el retrabajo y si es del equipo, del cliente o externo (migración 22). */
-  area_responsable?: Area | null; atribuible?: Atribuible | null;
+  area_responsable?: Area | null;
+  atribuible?: Atribuible | null;
 }
-export interface HistorialRequerimiento { reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] }
+export interface HistorialRequerimiento {
+  reprogramaciones: Reprogramacion[];
+  reprocesos: Reproceso[];
+}
 
 /** Recurrencia mensual de un fee (D2, 04/09/2026). */
 export interface Recurrencia {
-  id: string; tenant_id: string; cliente_id: string; plantilla_id: string; nombre_patron: string;
-  brief: Record<string, unknown>; bloques: unknown[]; owner_ejecutiva: string | null;
-  dia_generacion: number; activa: boolean; ultimo_mes_generado: string | null; ultimo_proyecto_id: string | null; proyecto_origen_id: string | null;
-  created_by: string | null; created_at: string; updated_at: string;
+  id: string;
+  tenant_id: string;
+  cliente_id: string;
+  plantilla_id: string;
+  nombre_patron: string;
+  brief: Record<string, unknown>;
+  bloques: unknown[];
+  owner_ejecutiva: string | null;
+  dia_generacion: number;
+  activa: boolean;
+  ultimo_mes_generado: string | null;
+  ultimo_proyecto_id: string | null;
+  proyecto_origen_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-export const PLANIFICACION_LABEL: Record<'planificado' | 'no_planificado' | 'urgente', string> = { planificado: 'Planificado', no_planificado: 'No planificado', urgente: 'Urgente' };
+export const PLANIFICACION_LABEL: Record<'planificado' | 'no_planificado' | 'urgente', string> = {
+  planificado: 'Planificado',
+  no_planificado: 'No planificado',
+  urgente: 'Urgente',
+};
 
 // ---------------------------------------------------------------- KPIs (25/09/2026, docs/19-kpis.md)
 export type Area = 'cuentas' | 'produccion' | 'diseno' | 'creatividad' | 'content';
 export const AREAS: Area[] = ['cuentas', 'produccion', 'diseno', 'creatividad', 'content'];
-export const AREA_LABEL: Record<Area, string> = { cuentas: 'Ejecutiva de Cuentas', produccion: 'Producción', diseno: 'Arte y Diseño', creatividad: 'Creatividad', content: 'Content' };
+export const AREA_LABEL: Record<Area, string> = {
+  cuentas: 'Ejecutiva de Cuentas',
+  produccion: 'Producción',
+  diseno: 'Arte y Diseño',
+  creatividad: 'Creatividad',
+  content: 'Content',
+};
 export type ClaseTarea = 'tarea' | 'propuesta' | 'incidencia';
 export const CLASE_LABEL: Record<ClaseTarea, string> = { tarea: 'Tarea', propuesta: 'Propuesta', incidencia: 'Incidencia' };
 export type Atribuible = 'equipo' | 'cliente' | 'externo';
@@ -403,31 +452,77 @@ export const ATRIBUIBLE_LABEL: Record<Atribuible, string> = { equipo: 'Del equip
 /** SLA de primera respuesta / resolución por prioridad, en minutos hábiles (L-V 09:00–18:00 Guayaquil). */
 export const SLA_MINUTOS: Record<Prioridad, number> = { alta: 30, media: 90, baja: 480 };
 
-export type CalculoKpi = 'a_tiempo' | 'retrabajo' | 'levantamiento' | 'aprobacion_primera' | 'propuestas_aprobadas' | 'sla_respuesta' | 'sla_incidencia' | 'proactividad' | 'manual';
+export type CalculoKpi =
+  | 'a_tiempo'
+  | 'retrabajo'
+  | 'levantamiento'
+  | 'aprobacion_primera'
+  | 'propuestas_aprobadas'
+  | 'sla_respuesta'
+  | 'sla_incidencia'
+  | 'proactividad'
+  | 'manual';
 export const CALCULO_KPI_LABEL: Record<CalculoKpi, string> = {
-  a_tiempo: 'Entregas a tiempo', retrabajo: 'Retrabajo atribuible', levantamiento: 'Levantamiento correcto',
-  aprobacion_primera: 'Aprobación en 1ª revisión', propuestas_aprobadas: 'Propuestas aprobadas', sla_respuesta: 'SLA de primera respuesta',
-  sla_incidencia: 'Incidencias dentro de SLA', proactividad: 'Proactividad', manual: 'Manual',
+  a_tiempo: 'Entregas a tiempo',
+  retrabajo: 'Retrabajo atribuible',
+  levantamiento: 'Levantamiento correcto',
+  aprobacion_primera: 'Aprobación en 1ª revisión',
+  propuestas_aprobadas: 'Propuestas aprobadas',
+  sla_respuesta: 'SLA de primera respuesta',
+  sla_incidencia: 'Incidencias dentro de SLA',
+  proactividad: 'Proactividad',
+  manual: 'Manual',
 };
 
 export interface KpiDefinicion {
-  id: string; tenant_id: string; codigo: string; area: Area; indicador: string;
-  periodicidad: 'mensual' | 'trimestral'; operador: '>=' | '<='; meta: number; tipo: 'porcentaje' | 'margen';
-  numerador_label: string; denominador_label: string; denominador_fijo: number | null; calculo: CalculoKpi;
-  fuente: string | null; regla: string | null; formula: string | null; activo: boolean; orden: number;
+  id: string;
+  tenant_id: string;
+  codigo: string;
+  area: Area;
+  indicador: string;
+  periodicidad: 'mensual' | 'trimestral';
+  operador: '>=' | '<=';
+  meta: number;
+  tipo: 'porcentaje' | 'margen';
+  numerador_label: string;
+  denominador_label: string;
+  denominador_fijo: number | null;
+  calculo: CalculoKpi;
+  fuente: string | null;
+  regla: string | null;
+  formula: string | null;
+  activo: boolean;
+  orden: number;
 }
 
 export interface KpiMedicion {
-  id: string; tenant_id: string; kpi_id: string; periodo: string; usuario_id: string | null;
-  dato_a: number | null; dato_b: number | null; meta_individual: number | null; origen: 'auto' | 'manual' | 'ajustado';
-  justificacion_ajuste: string | null; tasa_respuesta: number | null; causa: string | null; atribuible: Atribuible | null;
-  evidencia_url: string | null; plan_mejora: string | null; responsable_id: string | null; fecha_seguimiento: string | null;
-  registrado_por: string | null; updated_at: string;
+  id: string;
+  tenant_id: string;
+  kpi_id: string;
+  periodo: string;
+  usuario_id: string | null;
+  dato_a: number | null;
+  dato_b: number | null;
+  meta_individual: number | null;
+  origen: 'auto' | 'manual' | 'ajustado';
+  justificacion_ajuste: string | null;
+  tasa_respuesta: number | null;
+  causa: string | null;
+  atribuible: Atribuible | null;
+  evidencia_url: string | null;
+  plan_mejora: string | null;
+  responsable_id: string | null;
+  fecha_seguimiento: string | null;
+  registrado_por: string | null;
+  updated_at: string;
 }
 
 /** Valor de un KPI en un nivel (persona o equipo) y periodo. */
 export interface KpiValor {
-  dato_a: number | null; dato_b: number | null; resultado: number | null; meta: number;
+  dato_a: number | null;
+  dato_b: number | null;
+  resultado: number | null;
+  meta: number;
   estado: 'cumple' | 'no_cumple' | 'sin_dato';
   origen: 'auto' | 'manual' | 'ajustado' | 'sin_dato';
   /** Automático calculado con datos anteriores a las features de la migración 22 (proxy). */
@@ -435,13 +530,37 @@ export interface KpiValor {
   medicion: KpiMedicion | null;
 }
 
-export interface KpiFilaPersona { usuario_id: string; nombre: string; avatar_url: string | null; valor: KpiValor }
+export interface KpiFilaPersona {
+  usuario_id: string;
+  nombre: string;
+  avatar_url: string | null;
+  valor: KpiValor;
+}
 
 export interface KpiTablero {
-  periodo: string; en_curso: boolean;
-  areas: { area: Area; integrantes: number; kpis: { definicion: KpiDefinicion; equipo: KpiValor; personas: KpiFilaPersona[]; serie: { periodo: string; resultado: number | null; estado: KpiValor['estado'] }[] }[] }[];
+  periodo: string;
+  en_curso: boolean;
+  areas: {
+    area: Area;
+    integrantes: number;
+    kpis: {
+      definicion: KpiDefinicion;
+      equipo: KpiValor;
+      personas: KpiFilaPersona[];
+      serie: { periodo: string; resultado: number | null; estado: KpiValor['estado'] }[];
+    }[];
+  }[];
   resumen: { cumple: number; no_cumple: number; sin_dato: number };
   sin_area: { usuario_id: string; nombre: string }[];
 }
 
-export interface KpiDetalleTarea { id: string; titulo: string; cliente: string; responsables: string; fecha: string | null; basecamp_url: string | null; cuenta_en_a: boolean; nota: string | null }
+export interface KpiDetalleTarea {
+  id: string;
+  titulo: string;
+  cliente: string;
+  responsables: string;
+  fecha: string | null;
+  basecamp_url: string | null;
+  cuenta_en_a: boolean;
+  nota: string | null;
+}

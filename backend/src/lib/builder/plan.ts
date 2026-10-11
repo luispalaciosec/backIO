@@ -74,9 +74,7 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
   const umbral = input.umbral_concentracion_pct ?? 30;
 
   const config = new Map(bloques.map((b) => [b.bloque_id, b]));
-  const activosIds = new Set(
-    plantilla.bloques.filter((b) => (config.get(b.id)?.activo ?? true) || !b.opcional).map((b) => b.id),
-  );
+  const activosIds = new Set(plantilla.bloques.filter((b) => (config.get(b.id)?.activo ?? true) || !b.opcional).map((b) => b.id));
   const pesos = redistribuirPesos(plantilla.bloques, activosIds);
 
   const tareas: TareaPlanificada[] = [];
@@ -113,7 +111,9 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
     for (const { tipo, n } of lotes) {
       const pesoLote = pesoBloque * ((tipo.esfuerzo * n) / sumaRel);
       const sumaPasos = tipo.pasos.reduce((s, p) => s + p.peso, 0) || 1;
-      const unidades = cfg?.una_tarea_por_pieza ? Array.from({ length: n }, (_, i) => ({ sufijo: ` ${i + 1}/${n}`, piezas: 1, factor: 1 / n })) : [{ sufijo: ` (${n})`, piezas: n, factor: 1 }];
+      const unidades = cfg?.una_tarea_por_pieza
+        ? Array.from({ length: n }, (_, i) => ({ sufijo: ` ${i + 1}/${n}`, piezas: 1, factor: 1 / n }))
+        : [{ sufijo: ` (${n})`, piezas: n, factor: 1 }];
       for (const u of unidades) {
         for (const paso of tipo.pasos) {
           const visible = paso.visible === true;
@@ -147,10 +147,7 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
   };
 }
 
-export function detectarConcentracion(
-  tareas: { fecha_entrega: string; owner_agencia: string[] }[],
-  umbralPct = 30,
-): AlertaCapacidad[] {
+export function detectarConcentracion(tareas: { fecha_entrega: string; owner_agencia: string[] }[], umbralPct = 30): AlertaCapacidad[] {
   const porSemana = new Map<string, { total: number; porOwner: Map<string, number> }>();
   for (const t of tareas) {
     const semana = lunesDe(t.fecha_entrega);

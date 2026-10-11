@@ -6,7 +6,8 @@ import type { Prioridad } from '@backio/shared';
 import { SLA_MINUTOS } from '@backio/shared';
 
 const OFFSET_MS = -5 * 3600_000;
-const INICIO = 9 * 60, FIN = 18 * 60;
+const INICIO = 9 * 60,
+  FIN = 18 * 60;
 
 /** Minutos hábiles transcurridos entre dos instantes (0 si hasta <= desde). */
 export function minutosHabiles(desde: Date, hasta: Date): number {

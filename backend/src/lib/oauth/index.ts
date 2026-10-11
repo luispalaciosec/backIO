@@ -7,7 +7,15 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { serviceClient, throwIf, DbError } from '../db/client';
 
-export const SCOPES_SOPORTADOS = ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos', 'write:proyectos', 'write:actas'] as const;
+export const SCOPES_SOPORTADOS = [
+  'read:backlog',
+  'read:proyectos',
+  'read:senales',
+  'read:capacidad',
+  'write:requerimientos',
+  'write:proyectos',
+  'write:actas',
+] as const;
 
 export function issuer(): string {
   return (process.env.BACKEND_PUBLIC_URL ?? 'http://localhost:4000').replace(/\/$/, '');
@@ -34,7 +42,12 @@ export function metadataAuthServer() {
 
 export function metadataProtectedResource() {
   const base = issuer();
-  return { resource: `${base}/mcp`, authorization_servers: [base], scopes_supported: SCOPES_SOPORTADOS, bearer_methods_supported: ['header'] };
+  return {
+    resource: `${base}/mcp`,
+    authorization_servers: [base],
+    scopes_supported: SCOPES_SOPORTADOS,
+    bearer_methods_supported: ['header'],
+  };
 }
 
 /**
@@ -43,26 +56,49 @@ export function metadataProtectedResource() {
  */
 export function redirectUriSegura(u: string): boolean {
   let url: URL;
-  try { url = new URL(u); } catch { return false; }
+  try {
+    url = new URL(u);
+  } catch {
+    return false;
+  }
   if (url.protocol === 'https:') return true;
   return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 }
 
-export interface OAuthClient { id: string; secret_hash: string | null; nombre: string; redirect_uris: string[] }
+export interface OAuthClient {
+  id: string;
+  secret_hash: string | null;
+  nombre: string;
+  redirect_uris: string[];
+}
 
 /**
  * Registro dinámico (RFC 7591) con esquema y límites: antes se guardaba el cuerpo crudo como `metadata`, sin
  * tamaño máximo, y el nombre podía traer saltos de línea (auditoría 10/10, S6 y punto 14 del checklist).
  */
 const registroSchema = z.object({
-  client_name: z.string().trim().max(100).regex(/^[^\r\n]*$/).optional(),
+  client_name: z
+    .string()
+    .trim()
+    .max(100)
+    .regex(/^[^\r\n]*$/)
+    .optional(),
   redirect_uris: z.array(z.string().max(500)).min(1).max(10),
   token_endpoint_auth_method: z.enum(['none', 'client_secret_post', 'client_secret_basic']).optional(),
 });
 
-export async function registrarCliente(cuerpo: unknown): Promise<{ client_id: string; client_secret?: string; client_name: string; redirect_uris: string[]; token_endpoint_auth_method: string; grant_types: string[]; response_types: string[] }> {
+export async function registrarCliente(cuerpo: unknown): Promise<{
+  client_id: string;
+  client_secret?: string;
+  client_name: string;
+  redirect_uris: string[];
+  token_endpoint_auth_method: string;
+  grant_types: string[];
+  response_types: string[];
+}> {
   const parsed = registroSchema.safeParse(cuerpo);
-  if (!parsed.success) throw new DbError(`invalid_client_metadata: ${parsed.error.issues.map((i) => i.path.join('.') || i.message).join(', ')}`, 400);
+  if (!parsed.success)
+    throw new DbError(`invalid_client_metadata: ${parsed.error.issues.map((i) => i.path.join('.') || i.message).join(', ')}`, 400);
   const body = parsed.data;
   const uris = body.redirect_uris;
   for (const u of uris) {
@@ -71,13 +107,33 @@ export async function registrarCliente(cuerpo: unknown): Promise<{ client_id: st
   const publico = (body.token_endpoint_auth_method ?? 'none') === 'none';
   const id = `mcp_${randomBytes(12).toString('hex')}`;
   const secret = publico ? undefined : b64url(randomBytes(32));
-  const { error } = await serviceClient().from('oauth_clients').insert({ id, secret_hash: secret ? sha256(secret) : null, nombre: body.client_name || 'Cliente MCP', redirect_uris: uris, metadata: body });
+  const { error } = await serviceClient()
+    .from('oauth_clients')
+    .insert({
+      id,
+      secret_hash: secret ? sha256(secret) : null,
+      nombre: body.client_name || 'Cliente MCP',
+      redirect_uris: uris,
+      metadata: body,
+    });
   throwIf(error);
-  return { client_id: id, client_secret: secret, client_name: body.client_name || 'Cliente MCP', redirect_uris: uris, token_endpoint_auth_method: publico ? 'none' : 'client_secret_post', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] };
+  return {
+    client_id: id,
+    client_secret: secret,
+    client_name: body.client_name || 'Cliente MCP',
+    redirect_uris: uris,
+    token_endpoint_auth_method: publico ? 'none' : 'client_secret_post',
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+  };
 }
 
 export async function getCliente(clientId: string): Promise<OAuthClient | null> {
-  const { data, error } = await serviceClient().from('oauth_clients').select('id, secret_hash, nombre, redirect_uris').eq('id', clientId).maybeSingle();
+  const { data, error } = await serviceClient()
+    .from('oauth_clients')
+    .select('id, secret_hash, nombre, redirect_uris')
+    .eq('id', clientId)
+    .maybeSingle();
   throwIf(error);
   return (data as OAuthClient) ?? null;
 }
@@ -88,23 +144,65 @@ export function validarScopes(scope: string | undefined): string[] {
   return validos.length ? validos : ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad'];
 }
 
-export async function emitirCodigo(p: { client_id: string; redirect_uri: string; code_challenge: string; scope: string[]; tenant_id: string; usuario_id: string }): Promise<string> {
+export async function emitirCodigo(p: {
+  client_id: string;
+  redirect_uri: string;
+  code_challenge: string;
+  scope: string[];
+  tenant_id: string;
+  usuario_id: string;
+}): Promise<string> {
   const code = b64url(randomBytes(32));
-  const { error } = await serviceClient().from('oauth_codes').insert({ code, client_id: p.client_id, redirect_uri: p.redirect_uri, code_challenge: p.code_challenge, scope: p.scope.join(' '), tenant_id: p.tenant_id, usuario_id: p.usuario_id, expira_at: new Date(Date.now() + 5 * 60_000).toISOString() });
+  const { error } = await serviceClient()
+    .from('oauth_codes')
+    .insert({
+      code,
+      client_id: p.client_id,
+      redirect_uri: p.redirect_uri,
+      code_challenge: p.code_challenge,
+      scope: p.scope.join(' '),
+      tenant_id: p.tenant_id,
+      usuario_id: p.usuario_id,
+      expira_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    });
   throwIf(error);
   return code;
 }
 
-export interface TokenResponse { access_token: string; token_type: 'Bearer'; expires_in: number; refresh_token: string; scope: string }
+export interface TokenResponse {
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+}
 
 async function emitirTokens(p: { client_id: string; tenant_id: string; usuario_id: string; scope: string }): Promise<TokenResponse> {
   const access = `bko_${b64url(randomBytes(32))}`;
   const refresh = `bkr_${b64url(randomBytes(32))}`;
   const ahora = Date.now();
-  const { error } = await serviceClient().from('oauth_tokens').insert([
-    { token_hash: sha256(access), tipo: 'access', client_id: p.client_id, tenant_id: p.tenant_id, usuario_id: p.usuario_id, scope: p.scope, expira_at: new Date(ahora + 3600_000).toISOString() },
-    { token_hash: sha256(refresh), tipo: 'refresh', client_id: p.client_id, tenant_id: p.tenant_id, usuario_id: p.usuario_id, scope: p.scope, expira_at: new Date(ahora + 30 * 86_400_000).toISOString() },
-  ]);
+  const { error } = await serviceClient()
+    .from('oauth_tokens')
+    .insert([
+      {
+        token_hash: sha256(access),
+        tipo: 'access',
+        client_id: p.client_id,
+        tenant_id: p.tenant_id,
+        usuario_id: p.usuario_id,
+        scope: p.scope,
+        expira_at: new Date(ahora + 3600_000).toISOString(),
+      },
+      {
+        token_hash: sha256(refresh),
+        tipo: 'refresh',
+        client_id: p.client_id,
+        tenant_id: p.tenant_id,
+        usuario_id: p.usuario_id,
+        scope: p.scope,
+        expira_at: new Date(ahora + 30 * 86_400_000).toISOString(),
+      },
+    ]);
   throwIf(error);
   return { access_token: access, token_type: 'Bearer', expires_in: 3600, refresh_token: refresh, scope: p.scope };
 }
@@ -116,20 +214,40 @@ function verificarSecreto(cliente: OAuthClient, secreto: string | undefined): bo
   return h.length === cliente.secret_hash.length && timingSafeEqual(Buffer.from(h), Buffer.from(cliente.secret_hash));
 }
 
-export async function canjearCodigo(p: { code: string; client_id: string; client_secret?: string; redirect_uri?: string; code_verifier?: string }): Promise<TokenResponse> {
+export async function canjearCodigo(p: {
+  code: string;
+  client_id: string;
+  client_secret?: string;
+  redirect_uri?: string;
+  code_verifier?: string;
+}): Promise<TokenResponse> {
   const cliente = await getCliente(p.client_id);
   if (!cliente || !verificarSecreto(cliente, p.client_secret)) throw new DbError('invalid_client', 401);
   const db = serviceClient();
   const { data, error } = await db.from('oauth_codes').select('*').eq('code', p.code).eq('client_id', p.client_id).maybeSingle();
   throwIf(error);
-  const c = data as { code: string; redirect_uri: string; code_challenge: string; scope: string; tenant_id: string; usuario_id: string; expira_at: string; usado_at: string | null } | null;
+  const c = data as {
+    code: string;
+    redirect_uri: string;
+    code_challenge: string;
+    scope: string;
+    tenant_id: string;
+    usuario_id: string;
+    expira_at: string;
+    usado_at: string | null;
+  } | null;
   if (!c) throw new DbError('invalid_grant', 400);
   if (c.usado_at || new Date(c.expira_at).getTime() < Date.now()) throw new DbError('invalid_grant', 400);
   if (p.redirect_uri && p.redirect_uri !== c.redirect_uri) throw new DbError('invalid_grant', 400);
   if (!p.code_verifier) throw new DbError('invalid_request: code_verifier requerido (PKCE)', 400);
   const esperado = b64url(createHash('sha256').update(p.code_verifier).digest());
   if (esperado !== c.code_challenge) throw new DbError('invalid_grant: PKCE no coincide', 400);
-  const { data: marcado } = await db.from('oauth_codes').update({ usado_at: new Date().toISOString() }).eq('code', p.code).is('usado_at', null).select('code');
+  const { data: marcado } = await db
+    .from('oauth_codes')
+    .update({ usado_at: new Date().toISOString() })
+    .eq('code', p.code)
+    .is('usado_at', null)
+    .select('code');
   if (!marcado?.length) throw new DbError('invalid_grant', 400);
   return emitirTokens({ client_id: p.client_id, tenant_id: c.tenant_id, usuario_id: c.usuario_id, scope: c.scope });
 }
@@ -138,17 +256,35 @@ export async function refrescar(p: { refresh_token: string; client_id: string; c
   const cliente = await getCliente(p.client_id);
   if (!cliente || !verificarSecreto(cliente, p.client_secret)) throw new DbError('invalid_client', 401);
   const db = serviceClient();
-  const { data, error } = await db.from('oauth_tokens').select('*').eq('token_hash', sha256(p.refresh_token)).eq('tipo', 'refresh').eq('client_id', p.client_id).maybeSingle();
+  const { data, error } = await db
+    .from('oauth_tokens')
+    .select('*')
+    .eq('token_hash', sha256(p.refresh_token))
+    .eq('tipo', 'refresh')
+    .eq('client_id', p.client_id)
+    .maybeSingle();
   throwIf(error);
   const t = data as { tenant_id: string; usuario_id: string; scope: string; expira_at: string; revocado_at: string | null } | null;
   if (!t || new Date(t.expira_at).getTime() < Date.now()) throw new DbError('invalid_grant', 400);
   // Rotación atómica: solo una petición puede usar este refresh. Si ya estaba usado (o dos compiten), es una
   // reutilización: se revocan todos los tokens vivos de ese cliente para ese usuario (auditoría 10/10, S8).
   const ahora = new Date().toISOString();
-  const { data: rotado, error: e2 } = t.revocado_at ? { data: [], error: null } : await db.from('oauth_tokens').update({ revocado_at: ahora }).eq('token_hash', sha256(p.refresh_token)).is('revocado_at', null).select('token_hash');
+  const { data: rotado, error: e2 } = t.revocado_at
+    ? { data: [], error: null }
+    : await db
+        .from('oauth_tokens')
+        .update({ revocado_at: ahora })
+        .eq('token_hash', sha256(p.refresh_token))
+        .is('revocado_at', null)
+        .select('token_hash');
   throwIf(e2);
   if (!rotado?.length) {
-    await db.from('oauth_tokens').update({ revocado_at: ahora }).eq('client_id', p.client_id).eq('usuario_id', t.usuario_id).is('revocado_at', null);
+    await db
+      .from('oauth_tokens')
+      .update({ revocado_at: ahora })
+      .eq('client_id', p.client_id)
+      .eq('usuario_id', t.usuario_id)
+      .is('revocado_at', null);
     throw new DbError('invalid_grant', 400);
   }
   return emitirTokens({ client_id: p.client_id, tenant_id: t.tenant_id, usuario_id: t.usuario_id, scope: t.scope });
@@ -158,11 +294,28 @@ export async function revocar(token: string): Promise<void> {
   await serviceClient().from('oauth_tokens').update({ revocado_at: new Date().toISOString() }).eq('token_hash', sha256(token));
 }
 
-export interface AccessInfo { tenant_id: string; usuario_id: string; scopes: string[]; client_id: string }
+export interface AccessInfo {
+  tenant_id: string;
+  usuario_id: string;
+  scopes: string[];
+  client_id: string;
+}
 
 export async function resolverAccessToken(token: string): Promise<AccessInfo | null> {
-  const { data } = await serviceClient().from('oauth_tokens').select('tenant_id, usuario_id, scope, client_id, expira_at, revocado_at').eq('token_hash', sha256(token)).eq('tipo', 'access').maybeSingle();
-  const t = data as { tenant_id: string; usuario_id: string; scope: string; client_id: string; expira_at: string; revocado_at: string | null } | null;
+  const { data } = await serviceClient()
+    .from('oauth_tokens')
+    .select('tenant_id, usuario_id, scope, client_id, expira_at, revocado_at')
+    .eq('token_hash', sha256(token))
+    .eq('tipo', 'access')
+    .maybeSingle();
+  const t = data as {
+    tenant_id: string;
+    usuario_id: string;
+    scope: string;
+    client_id: string;
+    expira_at: string;
+    revocado_at: string | null;
+  } | null;
   if (!t || t.revocado_at || new Date(t.expira_at).getTime() < Date.now()) return null;
   return { tenant_id: t.tenant_id, usuario_id: t.usuario_id, scopes: t.scope.split(' ').filter(Boolean), client_id: t.client_id };
 }

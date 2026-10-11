@@ -13,8 +13,14 @@ export interface BasecampTokens {
   expires_at: string; // ISO
 }
 
-export interface BcTodolistRef { id: number; app_url: string }
-export interface BcTodoRef { id: number; app_url: string }
+export interface BcTodolistRef {
+  id: number;
+  app_url: string;
+}
+export interface BcTodoRef {
+  id: number;
+  app_url: string;
+}
 
 const MAX_POR_VENTANA = 45;
 const VENTANA_MS = 10_000;
@@ -48,7 +54,8 @@ export class BasecampClient {
   static async forTenant(tenantId: string): Promise<BasecampClient> {
     const { leerCredencialesBasecamp } = await import('./credenciales');
     const cfg = await leerCredencialesBasecamp(tenantId);
-    if (!cfg?.access_token || !cfg.refresh_token || !cfg.expires_at) throw new Error('Basecamp no está conectado para este tenant (falta OAuth)');
+    if (!cfg?.access_token || !cfg.refresh_token || !cfg.expires_at)
+      throw new Error('Basecamp no está conectado para este tenant (falta OAuth)');
     return new BasecampClient(tenantId, { access_token: cfg.access_token, refresh_token: cfg.refresh_token, expires_at: cfg.expires_at });
   }
 
@@ -73,7 +80,13 @@ export class BasecampClient {
     const { leerCredencialesBasecamp, guardarCredencialesBasecamp } = await import('./credenciales');
     // Si otra instancia (scheduler u otra petición) ya refrescó, se reutiliza ese token en vez de pisarlo.
     const actual = await leerCredencialesBasecamp(this.tenantId);
-    if (actual?.access_token && actual.refresh_token && actual.expires_at && actual.access_token !== this.tokens.access_token && new Date(actual.expires_at).getTime() - Date.now() > 60_000) {
+    if (
+      actual?.access_token &&
+      actual.refresh_token &&
+      actual.expires_at &&
+      actual.access_token !== this.tokens.access_token &&
+      new Date(actual.expires_at).getTime() - Date.now() > 60_000
+    ) {
       this.tokens = { access_token: actual.access_token, refresh_token: actual.refresh_token, expires_at: actual.expires_at };
       return;
     }
@@ -114,7 +127,10 @@ export class BasecampClient {
 
   /** Dock del proyecto: herramientas con id y título (todoset, message_board ×N, vault, schedule…). Solo metadatos. */
   async getDock(projectId: number): Promise<{ name: string; title: string; id: number; enabled: boolean }[]> {
-    const p = await this.request<{ dock: { name: string; title: string; id: number; enabled: boolean }[] }>('GET', `/projects/${projectId}.json`);
+    const p = await this.request<{ dock: { name: string; title: string; id: number; enabled: boolean }[] }>(
+      'GET',
+      `/projects/${projectId}.json`,
+    );
     return p.dock.map((d) => ({ name: d.name, title: d.title, id: d.id, enabled: d.enabled }));
   }
 
@@ -122,7 +138,10 @@ export class BasecampClient {
   async listTodolists(projectId: number, todosetId: number): Promise<{ id: number; name: string }[]> {
     const out: { id: number; name: string }[] = [];
     for (const status of ['active']) {
-      const r = await this.request<{ id: number; name: string }[]>('GET', `/buckets/${projectId}/todosets/${todosetId}/todolists.json?status=${status}`);
+      const r = await this.request<{ id: number; name: string }[]>(
+        'GET',
+        `/buckets/${projectId}/todosets/${todosetId}/todolists.json?status=${status}`,
+      );
       out.push(...r.map((l) => ({ id: l.id, name: l.name })));
     }
     return out;
@@ -134,22 +153,43 @@ export class BasecampClient {
   }
 
   async createGroup(projectId: number, todolistId: number, name: string): Promise<{ id: number; name: string }> {
-    const r = await this.request<{ id: number; name: string }>('POST', `/buckets/${projectId}/todolists/${todolistId}/groups.json`, { name });
+    const r = await this.request<{ id: number; name: string }>('POST', `/buckets/${projectId}/todolists/${todolistId}/groups.json`, {
+      name,
+    });
     return { id: r.id, name: r.name };
   }
 
-  async createMessage(projectId: number, boardId: number, input: { subject: string; content: string }): Promise<{ id: number; app_url: string }> {
-    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/message_boards/${boardId}/messages.json`, { ...input, status: 'active' });
+  async createMessage(
+    projectId: number,
+    boardId: number,
+    input: { subject: string; content: string },
+  ): Promise<{ id: number; app_url: string }> {
+    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/message_boards/${boardId}/messages.json`, {
+      ...input,
+      status: 'active',
+    });
     return { id: r.id, app_url: r.app_url };
   }
 
   async createTodolist(projectId: number, todosetId: number, input: { name: string; description?: string }): Promise<BcTodolistRef> {
-    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/todosets/${todosetId}/todolists.json`, input);
+    const r = await this.request<{ id: number; app_url: string }>(
+      'POST',
+      `/buckets/${projectId}/todosets/${todosetId}/todolists.json`,
+      input,
+    );
     return { id: r.id, app_url: r.app_url };
   }
 
-  async createTodo(projectId: number, todolistId: number, input: { content: string; due_on?: string | null; assignee_ids?: number[]; completion_subscriber_ids?: number[] }): Promise<BcTodoRef> {
-    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/todolists/${todolistId}/todos.json`, input);
+  async createTodo(
+    projectId: number,
+    todolistId: number,
+    input: { content: string; due_on?: string | null; assignee_ids?: number[]; completion_subscriber_ids?: number[] },
+  ): Promise<BcTodoRef> {
+    const r = await this.request<{ id: number; app_url: string }>(
+      'POST',
+      `/buckets/${projectId}/todolists/${todolistId}/todos.json`,
+      input,
+    );
     return { id: r.id, app_url: r.app_url };
   }
 
@@ -158,12 +198,24 @@ export class BasecampClient {
    * `assignee_ids`, `content`, `description`, etc., los borra. Por eso se lee el to-do vivo y se
    * reenvían esos campos tal cual (sin leer ni guardar descripción: solo se reenvía la que ya está allá).
    */
-  async updateTodo(projectId: number, todoId: number, input: { due_on?: string | null; assignee_ids?: number[]; content?: string }): Promise<void> {
-    const vivo = await this.request<{ content?: string; description?: string; due_on?: string | null; starts_on?: string | null; assignees?: { id: number }[]; completion_subscribers?: { id: number }[]; notify?: boolean }>('GET', `/buckets/${projectId}/todos/${todoId}.json`);
+  async updateTodo(
+    projectId: number,
+    todoId: number,
+    input: { due_on?: string | null; assignee_ids?: number[]; content?: string },
+  ): Promise<void> {
+    const vivo = await this.request<{
+      content?: string;
+      description?: string;
+      due_on?: string | null;
+      starts_on?: string | null;
+      assignees?: { id: number }[];
+      completion_subscribers?: { id: number }[];
+      notify?: boolean;
+    }>('GET', `/buckets/${projectId}/todos/${todoId}.json`);
     const cuerpo = {
       content: input.content ?? vivo.content,
       description: descripcionParaGuardar(vivo.description ?? ''),
-      due_on: input.due_on !== undefined ? input.due_on : vivo.due_on ?? null,
+      due_on: input.due_on !== undefined ? input.due_on : (vivo.due_on ?? null),
       starts_on: vivo.starts_on ?? null,
       assignee_ids: input.assignee_ids ?? (vivo.assignees ?? []).map((a) => a.id),
       completion_subscriber_ids: (vivo.completion_subscribers ?? []).map((a) => a.id),
@@ -179,10 +231,26 @@ export class BasecampClient {
 
   /** GET paginado (Link: rel="next"). Devuelve la unión de páginas. */
   /** Personas de la cuenta Basecamp: solo id, nombre y email (para enlazar usuarios). */
-  async listPeopleSafe(): Promise<{ id: number; nombre: string; email: string | null; admin: boolean; avatar_url: string | null; sgid: string | null }[]> {
-    const raw = await this.requestAll<{ id: number; name: string; email_address?: string | null; admin?: boolean; avatar_url?: string | null; attachable_sgid?: string | null }>('/people.json');
+  async listPeopleSafe(): Promise<
+    { id: number; nombre: string; email: string | null; admin: boolean; avatar_url: string | null; sgid: string | null }[]
+  > {
+    const raw = await this.requestAll<{
+      id: number;
+      name: string;
+      email_address?: string | null;
+      admin?: boolean;
+      avatar_url?: string | null;
+      attachable_sgid?: string | null;
+    }>('/people.json');
     // attachable_sgid: identificador para @mencionar a la persona en mensajes (bc-attachment). Sin él no hay etiqueta.
-    return raw.map((p) => ({ id: p.id, nombre: p.name, email: p.email_address ? p.email_address.toLowerCase() : null, admin: Boolean(p.admin), avatar_url: typeof p.avatar_url === 'string' ? p.avatar_url : null, sgid: typeof p.attachable_sgid === 'string' ? p.attachable_sgid : null }));
+    return raw.map((p) => ({
+      id: p.id,
+      nombre: p.name,
+      email: p.email_address ? p.email_address.toLowerCase() : null,
+      admin: Boolean(p.admin),
+      avatar_url: typeof p.avatar_url === 'string' ? p.avatar_url : null,
+      sgid: typeof p.attachable_sgid === 'string' ? p.attachable_sgid : null,
+    }));
   }
 
   async requestAll<T>(path: string, maxPages = 20): Promise<T[]> {
@@ -191,7 +259,9 @@ export class BasecampClient {
     for (let i = 0; i < maxPages && url; i++) {
       await this.refreshIfNeeded();
       await this.throttle();
-      const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${this.tokens.access_token}`, 'User-Agent': env().BASECAMP_USER_AGENT } });
+      const res: Response = await fetch(url, {
+        headers: { Authorization: `Bearer ${this.tokens.access_token}`, 'User-Agent': env().BASECAMP_USER_AGENT },
+      });
       if (!res.ok) throw new Error(`Basecamp ${res.status} GET ${url}: ${await res.text()}`);
       const page = (await res.json()) as T[];
       out.push(...(Array.isArray(page) ? page : []));
@@ -206,23 +276,58 @@ export class BasecampClient {
    * To-dos de una lista o grupo. SOLO campos permitidos (docs/02 + excepción D1 para el título):
    * id, title, due_on, completed, completed_at, assignee ids, creator id/name, app_url. Nunca description ni comments.
    */
-  async listTodosSafe(projectId: number, todolistId: number, incluirCompletados = true): Promise<{ id: number; titulo: string; due_on: string | null; completed: boolean; completed_at: string | null; assignee_ids: number[]; creator_id: number | null; creator_nombre: string | null; app_url: string | null; created_at: string | null }[]> {
-    type Raw = { id: number; title?: string; content?: string; due_on?: string | null; completed?: boolean; completed_at?: string | null; assignees?: { id: number }[]; creator?: { id: number; name?: string }; app_url?: string; created_at?: string };
+  async listTodosSafe(
+    projectId: number,
+    todolistId: number,
+    incluirCompletados = true,
+  ): Promise<
+    {
+      id: number;
+      titulo: string;
+      due_on: string | null;
+      completed: boolean;
+      completed_at: string | null;
+      assignee_ids: number[];
+      creator_id: number | null;
+      creator_nombre: string | null;
+      app_url: string | null;
+      created_at: string | null;
+    }[]
+  > {
+    type Raw = {
+      id: number;
+      title?: string;
+      content?: string;
+      due_on?: string | null;
+      completed?: boolean;
+      completed_at?: string | null;
+      assignees?: { id: number }[];
+      creator?: { id: number; name?: string };
+      app_url?: string;
+      created_at?: string;
+    };
     const activos = await this.requestAll<Raw>(`/buckets/${projectId}/todolists/${todolistId}/todos.json`);
-    const done = incluirCompletados ? await this.requestAll<Raw>(`/buckets/${projectId}/todolists/${todolistId}/todos.json?completed=true`) : [];
+    const done = incluirCompletados
+      ? await this.requestAll<Raw>(`/buckets/${projectId}/todolists/${todolistId}/todos.json?completed=true`)
+      : [];
     const vistos = new Set<number>();
-    return [...activos, ...done].filter((t) => (vistos.has(t.id) ? false : (vistos.add(t.id), true))).map((t) => ({
-      id: t.id,
-      titulo: String(t.title ?? t.content ?? '').replace(/<[^>]+>/g, '').trim().slice(0, 200),
-      due_on: t.due_on ?? null,
-      completed: t.completed === true,
-      completed_at: t.completed_at ?? null,
-      assignee_ids: (t.assignees ?? []).map((a) => a.id),
-      creator_id: t.creator?.id ?? null,
-      creator_nombre: t.creator?.name ?? null,
-      app_url: t.app_url ?? null,
-      created_at: t.created_at ?? null,
-    }));
+    return [...activos, ...done]
+      .filter((t) => (vistos.has(t.id) ? false : (vistos.add(t.id), true)))
+      .map((t) => ({
+        id: t.id,
+        titulo: String(t.title ?? t.content ?? '')
+          .replace(/<[^>]+>/g, '')
+          .trim()
+          .slice(0, 200),
+        due_on: t.due_on ?? null,
+        completed: t.completed === true,
+        completed_at: t.completed_at ?? null,
+        assignee_ids: (t.assignees ?? []).map((a) => a.id),
+        creator_id: t.creator?.id ?? null,
+        creator_nombre: t.creator?.name ?? null,
+        app_url: t.app_url ?? null,
+        created_at: t.created_at ?? null,
+      }));
   }
 
   /**
@@ -231,13 +336,41 @@ export class BasecampClient {
    * propio proyecto (bucket_id). SOLO: id, date, hours, person id, parent id/type, bucket id.
    * La description de cada entrada es texto de Basecamp y se descarta aquí mismo.
    */
-  async timesheetSafe(desde: string, hasta: string): Promise<{ id: number; fecha: string; horas: number; person_id: number | null; parent_id: number | null; parent_type: string | null; bucket_id: number | null }[]> {
-    type Raw = { id: number; date?: string; hours?: number | string; person?: { id: number }; parent?: { id: number; type?: string }; bucket?: { id: number } };
+  async timesheetSafe(
+    desde: string,
+    hasta: string,
+  ): Promise<
+    {
+      id: number;
+      fecha: string;
+      horas: number;
+      person_id: number | null;
+      parent_id: number | null;
+      parent_type: string | null;
+      bucket_id: number | null;
+    }[]
+  > {
+    type Raw = {
+      id: number;
+      date?: string;
+      hours?: number | string;
+      person?: { id: number };
+      parent?: { id: number; type?: string };
+      bucket?: { id: number };
+    };
     const raw = await this.requestAll<Raw>(`/reports/timesheet.json?start_date=${desde}&end_date=${hasta}`, 50);
     const vistos = new Set<number>();
     return raw
       .filter((e) => typeof e.id === 'number' && e.date && !vistos.has(e.id) && vistos.add(e.id))
-      .map((e) => ({ id: e.id, fecha: String(e.date).slice(0, 10), horas: parseHoras(e.hours), person_id: e.person?.id ?? null, parent_id: e.parent?.id ?? null, parent_type: e.parent?.type ?? null, bucket_id: e.bucket?.id ?? null }));
+      .map((e) => ({
+        id: e.id,
+        fecha: String(e.date).slice(0, 10),
+        horas: parseHoras(e.hours),
+        person_id: e.person?.id ?? null,
+        parent_id: e.parent?.id ?? null,
+        parent_type: e.parent?.type ?? null,
+        bucket_id: e.bucket?.id ?? null,
+      }));
   }
 
   /** Polling de reconciliación: devuelve el to-do crudo; el llamador DEBE pasar por extractSafeTodo. */
@@ -245,14 +378,28 @@ export class BasecampClient {
     return this.request<unknown>('GET', `/buckets/${projectId}/todos/${todoId}.json`);
   }
 
-  async createDocument(projectId: number, vaultId: number, input: { title: string; content: string; status?: 'active' | 'drafted' }): Promise<{ id: number; app_url: string }> {
-    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/vaults/${vaultId}/documents.json`, { status: 'active', ...input });
+  async createDocument(
+    projectId: number,
+    vaultId: number,
+    input: { title: string; content: string; status?: 'active' | 'drafted' },
+  ): Promise<{ id: number; app_url: string }> {
+    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/vaults/${vaultId}/documents.json`, {
+      status: 'active',
+      ...input,
+    });
     return { id: r.id, app_url: r.app_url };
   }
 
   /** Diagnóstico: solo metadatos de entregas (fecha y código HTTP). NUNCA el body (contiene texto de Basecamp). */
-  async getWebhookDeliveries(projectId: number, webhookId: number): Promise<{ activo: boolean; payload_url: string; entregas: { at: string; status: number | null }[] }> {
-    const r = await this.request<{ active: boolean; payload_url: string; recent_deliveries?: { created_at: string; response?: { code?: number } }[] }>('GET', `/buckets/${projectId}/webhooks/${webhookId}.json`);
+  async getWebhookDeliveries(
+    projectId: number,
+    webhookId: number,
+  ): Promise<{ activo: boolean; payload_url: string; entregas: { at: string; status: number | null }[] }> {
+    const r = await this.request<{
+      active: boolean;
+      payload_url: string;
+      recent_deliveries?: { created_at: string; response?: { code?: number } }[];
+    }>('GET', `/buckets/${projectId}/webhooks/${webhookId}.json`);
     return {
       activo: r.active,
       payload_url: r.payload_url,
@@ -269,7 +416,11 @@ export class BasecampClient {
 
   /** Cambia la URL de un webhook ya registrado (rotación del secreto). */
   async updateWebhook(projectId: number, webhookId: number, payloadUrl: string): Promise<void> {
-    await this.request('PUT', `/buckets/${projectId}/webhooks/${webhookId}.json`, { payload_url: payloadUrl, types: ['Todo'], active: true });
+    await this.request('PUT', `/buckets/${projectId}/webhooks/${webhookId}.json`, {
+      payload_url: payloadUrl,
+      types: ['Todo'],
+      active: true,
+    });
   }
 }
 

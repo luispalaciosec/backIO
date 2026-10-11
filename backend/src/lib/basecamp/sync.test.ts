@@ -36,7 +36,15 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
     expect(dump).not.toContain('no sabe lo que quiere');
     expect(dump).not.toContain('horrible.png');
     expect(dump).not.toContain('Elías');
-    expect(Object.keys(safe!).sort()).toEqual(['assignee_ids', 'bucket_id', 'completed', 'completed_at', 'due_on', 'todo_id', 'updated_at']);
+    expect(Object.keys(safe!).sort()).toEqual([
+      'assignee_ids',
+      'bucket_id',
+      'completed',
+      'completed_at',
+      'due_on',
+      'todo_id',
+      'updated_at',
+    ]);
   });
 
   it('ignora eventos que no son de to-do', () => {
@@ -60,13 +68,17 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
   it('nunca persiste texto proveniente de Basecamp', async () => {
     const escrituras: unknown[] = [];
     vi.spyOn(reqs, 'findByBasecampTodo').mockResolvedValue({
-      id: 'r1', tenant_id: 't1', estado_operativo: 'en_ejecucion',
+      id: 'r1',
+      tenant_id: 't1',
+      estado_operativo: 'en_ejecucion',
     } as never);
     vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, patch) => {
       escrituras.push(patch);
       return {} as never;
     });
-    vi.spyOn(auditMod, 'audit').mockImplementation(async (_c, e) => { escrituras.push(e); });
+    vi.spyOn(auditMod, 'audit').mockImplementation(async (_c, e) => {
+      escrituras.push(e);
+    });
 
     const safe = extractSafePayload({ kind: 'todo_completed', recording: mockTodo() })!;
     const ctx = { db: {} as never, tenantId: 't1', usuarioId: null, origen: 'webhook:basecamp' as const };
@@ -82,7 +94,10 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
   it('reabre a en_ejecucion, no a backlog', async () => {
     let patch: unknown;
     vi.spyOn(reqs, 'findByBasecampTodo').mockResolvedValue({ id: 'r1', tenant_id: 't1', estado_operativo: 'completado' } as never);
-    vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, p) => { patch = p; return {} as never; });
+    vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, p) => {
+      patch = p;
+      return {} as never;
+    });
     vi.spyOn(auditMod, 'audit').mockResolvedValue();
     const safe = extractSafePayload({ kind: 'todo_uncompleted', recording: mockTodo({ completed: false, completed_at: null }) })!;
     await applyBasecampUpdate({ db: {} as never, tenantId: 't1', usuarioId: null, origen: 'webhook:basecamp' }, safe);

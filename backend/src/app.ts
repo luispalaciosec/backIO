@@ -22,13 +22,34 @@ export function createApp(): Hono {
   app.use('*', secureHeaders({ contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } }));
   if (env().NODE_ENV !== 'test') app.use('*', logPeticiones);
   // Tamaño máximo del cuerpo (punto 14): 1 MB en general, 2 MB para la importación CSV.
-  const limiteGeneral = bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json({ error: 'El cuerpo de la petición es demasiado grande' }, 413) });
-  const limiteBulk = bodyLimit({ maxSize: 2 * 1024 * 1024, onError: (c) => c.json({ error: 'El CSV es demasiado grande (máximo 2 MB)' }, 413) });
+  const limiteGeneral = bodyLimit({
+    maxSize: 1024 * 1024,
+    onError: (c) => c.json({ error: 'El cuerpo de la petición es demasiado grande' }, 413),
+  });
+  const limiteBulk = bodyLimit({
+    maxSize: 2 * 1024 * 1024,
+    onError: (c) => c.json({ error: 'El CSV es demasiado grande (máximo 2 MB)' }, 413),
+  });
   app.use('*', (c, next) => (/\/requerimientos\/bulk(\/preview)?$/.test(c.req.path) ? limiteBulk : limiteGeneral)(c, next));
   app.use('/.well-known/*', cors({ origin: '*' }));
   app.use('/oauth/*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'OPTIONS'] }));
-  app.use('/mcp', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version'], allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], exposeHeaders: ['Mcp-Session-Id'] }));
-  app.use('/api/*', cors({ origin: frontendOrigins(), allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'], allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] }));
+  app.use(
+    '/mcp',
+    cors({
+      origin: '*',
+      allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version'],
+      allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+      exposeHeaders: ['Mcp-Session-Id'],
+    }),
+  );
+  app.use(
+    '/api/*',
+    cors({
+      origin: frontendOrigins(),
+      allowHeaders: ['Authorization', 'Content-Type', 'X-Portal-Pin'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    }),
+  );
 
   app.get('/health', (c) => c.json({ ok: true, servicio: 'backio-backend', ts: new Date().toISOString() }));
   app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /api/portal/\n'));
@@ -53,7 +74,10 @@ export function createApp(): Hono {
       if (err.status >= 500) console.error(`[${c.req.method} ${c.req.path}] ${err.message}`, err.detalle ?? '');
       // En producción un 5xx no devuelve el texto de Postgres (nombres de tablas, constraints…).
       const prod = env().NODE_ENV === 'production';
-      return c.json({ error: prod && err.status >= 500 ? 'Error interno' : err.message, detalle: prod ? undefined : err.detalle }, err.status as 400);
+      return c.json(
+        { error: prod && err.status >= 500 ? 'Error interno' : err.message, detalle: prod ? undefined : err.detalle },
+        err.status as 400,
+      );
     }
     console.error(`[${c.req.method} ${c.req.path}]`, err);
     return c.json({ error: env().NODE_ENV === 'production' ? 'Error interno' : err.message }, 500);

@@ -21,9 +21,17 @@ basecampOAuth.get('/oauth/callback', async (c) => {
     const tokens = await exchangeCode(code);
     const info = await authorizationInfo(tokens.access_token);
     const esperado = env().BASECAMP_ACCOUNT_ID ? Number(env().BASECAMP_ACCOUNT_ID) : null;
-    const cuenta = info.accounts.find((a) => a.product === 'bc3' && (esperado === null || a.id === esperado)) ?? info.accounts.find((a) => a.product === 'bc3') ?? null;
+    const cuenta =
+      info.accounts.find((a) => a.product === 'bc3' && (esperado === null || a.id === esperado)) ??
+      info.accounts.find((a) => a.product === 'bc3') ??
+      null;
     if (esperado !== null && cuenta?.id !== esperado) {
-      return c.redirect(volverAlFrontend({ basecamp: 'error', motivo: `La cuenta autorizada no es la ${esperado}. Cuentas disponibles: ${info.accounts.map((a) => `${a.name} (${a.id})`).join(', ')}` }));
+      return c.redirect(
+        volverAlFrontend({
+          basecamp: 'error',
+          motivo: `La cuenta autorizada no es la ${esperado}. Cuentas disponibles: ${info.accounts.map((a) => `${a.name} (${a.id})`).join(', ')}`,
+        }),
+      );
     }
     await saveTokens(ctx.tenantId, tokens, {
       cuenta_id: cuenta?.id ?? null,
@@ -31,10 +39,15 @@ basecampOAuth.get('/oauth/callback', async (c) => {
       autorizado_por: info.identity.email_address,
       conectado_at: new Date().toISOString(),
     });
-    await audit({ db: serviceClient(), tenantId: ctx.tenantId, usuarioId: ctx.usuarioId, origen: 'ui' }, {
-      accion: 'basecamp_conectado', entidad: 'tenant', entidad_id: ctx.tenantId,
-      detalle: { cuenta_id: cuenta?.id ?? null, autorizado_por: info.identity.email_address },
-    });
+    await audit(
+      { db: serviceClient(), tenantId: ctx.tenantId, usuarioId: ctx.usuarioId, origen: 'ui' },
+      {
+        accion: 'basecamp_conectado',
+        entidad: 'tenant',
+        entidad_id: ctx.tenantId,
+        detalle: { cuenta_id: cuenta?.id ?? null, autorizado_por: info.identity.email_address },
+      },
+    );
     return c.redirect(volverAlFrontend({ basecamp: 'ok' }));
   } catch (err) {
     return c.redirect(volverAlFrontend({ basecamp: 'error', motivo: err instanceof Error ? err.message : 'error desconocido' }));

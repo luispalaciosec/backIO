@@ -31,30 +31,86 @@ export function periodoSiguiente(periodo: string): string {
 export function nombreDelPeriodo(patron: string, periodo: string): string {
   const { mes, anio } = rangoPeriodo(periodo);
   const Mes = mes.charAt(0).toUpperCase() + mes.slice(1);
-  return patron.replace(/\{mes\}/gi, Mes).replace(/\{a[ñn]o\}|\{anio\}|\{yyyy\}/gi, String(anio)).replace(/\{MES\}/g, Mes.toUpperCase());
+  return patron
+    .replace(/\{mes\}/gi, Mes)
+    .replace(/\{a[ñn]o\}|\{anio\}|\{yyyy\}/gi, String(anio))
+    .replace(/\{MES\}/g, Mes.toUpperCase());
 }
 
 export async function listRecurrencias(ctx: DbCtx): Promise<Recurrencia[]> {
-  const { data, error } = await ctx.db.from('recurrencias').select('*').eq('tenant_id', ctx.tenantId).order('created_at', { ascending: false });
-  throwIf(error); return (data ?? []) as Recurrencia[];
+  const { data, error } = await ctx.db
+    .from('recurrencias')
+    .select('*')
+    .eq('tenant_id', ctx.tenantId)
+    .order('created_at', { ascending: false });
+  throwIf(error);
+  return (data ?? []) as Recurrencia[];
 }
 export async function getRecurrencia(ctx: DbCtx, id: string): Promise<Recurrencia | null> {
   const { data, error } = await ctx.db.from('recurrencias').select('*').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
-  throwIf(error); return (data as Recurrencia) ?? null;
+  throwIf(error);
+  return (data as Recurrencia) ?? null;
 }
 
-export async function upsertRecurrencia(ctx: DbCtx, r: { cliente_id: string; plantilla_id: string; nombre_patron: string; brief: unknown; bloques: BloqueAlcanceInput[]; owner_ejecutiva: string | null; dia_generacion?: number; proyecto_origen_id?: string | null; ultimo_mes_generado?: string | null; ultimo_proyecto_id?: string | null }): Promise<Recurrencia> {
-  const { data, error } = await ctx.db.from('recurrencias').upsert({
-    tenant_id: ctx.tenantId, cliente_id: r.cliente_id, plantilla_id: r.plantilla_id, nombre_patron: r.nombre_patron, brief: r.brief, bloques: r.bloques,
-    owner_ejecutiva: r.owner_ejecutiva, dia_generacion: r.dia_generacion ?? 25, activa: true, proyecto_origen_id: r.proyecto_origen_id ?? null,
-    ultimo_mes_generado: r.ultimo_mes_generado ?? null, ultimo_proyecto_id: r.ultimo_proyecto_id ?? null, created_by: ctx.usuarioId, updated_at: new Date().toISOString(),
-  }, { onConflict: 'tenant_id,cliente_id,plantilla_id' }).select().single();
+export async function upsertRecurrencia(
+  ctx: DbCtx,
+  r: {
+    cliente_id: string;
+    plantilla_id: string;
+    nombre_patron: string;
+    brief: unknown;
+    bloques: BloqueAlcanceInput[];
+    owner_ejecutiva: string | null;
+    dia_generacion?: number;
+    proyecto_origen_id?: string | null;
+    ultimo_mes_generado?: string | null;
+    ultimo_proyecto_id?: string | null;
+  },
+): Promise<Recurrencia> {
+  const { data, error } = await ctx.db
+    .from('recurrencias')
+    .upsert(
+      {
+        tenant_id: ctx.tenantId,
+        cliente_id: r.cliente_id,
+        plantilla_id: r.plantilla_id,
+        nombre_patron: r.nombre_patron,
+        brief: r.brief,
+        bloques: r.bloques,
+        owner_ejecutiva: r.owner_ejecutiva,
+        dia_generacion: r.dia_generacion ?? 25,
+        activa: true,
+        proyecto_origen_id: r.proyecto_origen_id ?? null,
+        ultimo_mes_generado: r.ultimo_mes_generado ?? null,
+        ultimo_proyecto_id: r.ultimo_proyecto_id ?? null,
+        created_by: ctx.usuarioId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tenant_id,cliente_id,plantilla_id' },
+    )
+    .select()
+    .single();
   throwIf(error);
-  await audit(ctx, { accion: 'recurrencia_guardar', entidad: 'recurrencia', entidad_id: (data as Recurrencia).id, detalle: { cliente_id: r.cliente_id, plantilla_id: r.plantilla_id } });
+  await audit(ctx, {
+    accion: 'recurrencia_guardar',
+    entidad: 'recurrencia',
+    entidad_id: (data as Recurrencia).id,
+    detalle: { cliente_id: r.cliente_id, plantilla_id: r.plantilla_id },
+  });
   return data as Recurrencia;
 }
-export async function updateRecurrencia(ctx: DbCtx, id: string, patch: Partial<Pick<Recurrencia, 'activa' | 'dia_generacion' | 'nombre_patron' | 'owner_ejecutiva' | 'bloques' | 'brief'>>): Promise<Recurrencia> {
-  const { data, error } = await ctx.db.from('recurrencias').update({ ...patch, updated_at: new Date().toISOString() }).eq('tenant_id', ctx.tenantId).eq('id', id).select().single();
+export async function updateRecurrencia(
+  ctx: DbCtx,
+  id: string,
+  patch: Partial<Pick<Recurrencia, 'activa' | 'dia_generacion' | 'nombre_patron' | 'owner_ejecutiva' | 'bloques' | 'brief'>>,
+): Promise<Recurrencia> {
+  const { data, error } = await ctx.db
+    .from('recurrencias')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', id)
+    .select()
+    .single();
   throwIf(error);
   await audit(ctx, { accion: 'recurrencia_actualizar', entidad: 'recurrencia', entidad_id: id, detalle: patch });
   return data as Recurrencia;
@@ -70,45 +126,107 @@ export async function recurrenciaDesdeProyecto(ctx: DbCtx, proyectoId: string, d
   const bloques: BloqueAlcanceInput[] = plantilla.bloques.map((b) => {
     const reqs = det.requerimientos.filter((r) => r.bloque_nombre === b.nombre);
     const owners = reqs.flatMap((r) => r.owner_agencia);
-    const owner = owners.length ? [...owners].sort((a, c) => owners.filter((x) => x === c).length - owners.filter((x) => x === a).length)[0]! : null;
+    const owner = owners.length
+      ? [...owners].sort((a, c) => owners.filter((x) => x === c).length - owners.filter((x) => x === a).length)[0]!
+      : null;
     const piezasPorTipo: Record<string, number> = {};
-    for (const r of reqs) if (r.tipo_pieza_id && r.piezas) piezasPorTipo[r.tipo_pieza_id] = Math.max(piezasPorTipo[r.tipo_pieza_id] ?? 0, r.piezas);
-    return { bloque_id: b.id, activo: reqs.length > 0 || !b.opcional, owner_id: owner, piezas_por_canal: {}, piezas_por_tipo: piezasPorTipo };
+    for (const r of reqs)
+      if (r.tipo_pieza_id && r.piezas) piezasPorTipo[r.tipo_pieza_id] = Math.max(piezasPorTipo[r.tipo_pieza_id] ?? 0, r.piezas);
+    return {
+      bloque_id: b.id,
+      activo: reqs.length > 0 || !b.opcional,
+      owner_id: owner,
+      piezas_por_canal: {},
+      piezas_por_tipo: piezasPorTipo,
+    };
   });
   const brief = (det.brief as { actual?: Partial<BriefProyecto> }).actual ?? {};
   const patron = plantilla.patron_nombre ?? `${plantilla.nombre} - {mes} {año}`;
-  return upsertRecurrencia(ctx, { cliente_id: det.cliente_id, plantilla_id: det.plantilla_id, nombre_patron: patron, brief, bloques, owner_ejecutiva: det.owner_ejecutiva, dia_generacion: dia, proyecto_origen_id: det.id, ultimo_mes_generado: det.periodo ?? det.fecha_entrega.slice(0, 7), ultimo_proyecto_id: det.id });
+  return upsertRecurrencia(ctx, {
+    cliente_id: det.cliente_id,
+    plantilla_id: det.plantilla_id,
+    nombre_patron: patron,
+    brief,
+    bloques,
+    owner_ejecutiva: det.owner_ejecutiva,
+    dia_generacion: dia,
+    proyecto_origen_id: det.id,
+    ultimo_mes_generado: det.periodo ?? det.fecha_entrega.slice(0, 7),
+    ultimo_proyecto_id: det.id,
+  });
 }
 
 /** Genera el proyecto de un periodo concreto. Idempotente: si ya existe un proyecto de esa recurrencia y periodo, lo devuelve. */
-export async function generarPeriodo(ctx: DbCtx, rec: Recurrencia, periodo: string): Promise<{ proyecto_id: string; creado: boolean; nombre: string; basecamp?: unknown }> {
-  const { data: existente } = await ctx.db.from('proyectos').select('id, nombre').eq('tenant_id', ctx.tenantId).eq('recurrencia_id', rec.id).eq('periodo', periodo).is('deleted_at', null).maybeSingle();
+export async function generarPeriodo(
+  ctx: DbCtx,
+  rec: Recurrencia,
+  periodo: string,
+): Promise<{ proyecto_id: string; creado: boolean; nombre: string; basecamp?: unknown }> {
+  const { data: existente } = await ctx.db
+    .from('proyectos')
+    .select('id, nombre')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('recurrencia_id', rec.id)
+    .eq('periodo', periodo)
+    .is('deleted_at', null)
+    .maybeSingle();
   if (existente) return { proyecto_id: (existente as { id: string }).id, creado: false, nombre: (existente as { nombre: string }).nombre };
   const { inicio, fin } = rangoPeriodo(periodo);
   const nombre = nombreDelPeriodo(rec.nombre_patron, periodo);
   const brief = rec.brief as CrearProyectoInput['brief'];
   const input: CrearProyectoInput = {
-    cliente_id: rec.cliente_id, plantilla_id: rec.plantilla_id, nombre,
-    brief: { objetivo_negocio: brief.objetivo_negocio ?? `Fee mensual · ${nombre}`, publico_objetivo: brief.publico_objetivo ?? '', canales: brief.canales ?? [], mandatorios_marca: brief.mandatorios_marca, presupuesto_aprobado: brief.presupuesto_aprobado ?? null },
-    fecha_inicio: inicio, fecha_entrega: fin, bloques: rec.bloques as BloqueAlcanceInput[], owner_ejecutiva: rec.owner_ejecutiva, periodo,
+    cliente_id: rec.cliente_id,
+    plantilla_id: rec.plantilla_id,
+    nombre,
+    brief: {
+      objetivo_negocio: brief.objetivo_negocio ?? `Fee mensual · ${nombre}`,
+      publico_objetivo: brief.publico_objetivo ?? '',
+      canales: brief.canales ?? [],
+      mandatorios_marca: brief.mandatorios_marca,
+      presupuesto_aprobado: brief.presupuesto_aprobado ?? null,
+    },
+    fecha_inicio: inicio,
+    fecha_entrega: fin,
+    bloques: rec.bloques as BloqueAlcanceInput[],
+    owner_ejecutiva: rec.owner_ejecutiva,
+    periodo,
   };
   const r: ResultadoCreacion = await crearProyectoDesdePlantilla(ctx, input);
   await updateProyecto(ctx, r.proyecto.id, { recurrencia_id: rec.id, periodo });
-  const { error } = await ctx.db.from('recurrencias').update({ ultimo_mes_generado: periodo, ultimo_proyecto_id: r.proyecto.id, updated_at: new Date().toISOString() }).eq('id', rec.id);
+  const { error } = await ctx.db
+    .from('recurrencias')
+    .update({ ultimo_mes_generado: periodo, ultimo_proyecto_id: r.proyecto.id, updated_at: new Date().toISOString() })
+    .eq('id', rec.id);
   throwIf(error);
-  await audit(ctx, { accion: 'recurrencia_generar', entidad: 'proyecto', entidad_id: r.proyecto.id, detalle: { recurrencia_id: rec.id, periodo, requerimientos: r.requerimientos.length } });
-  const destino = rec.owner_ejecutiva ? { usuarioIds: [rec.owner_ejecutiva], roles: ['operaciones' as const] } : { roles: ['operaciones' as const, 'ejecutiva' as const] };
-  void notificar(ctx, {
-    tipo: 'recurrencia_generada',
-    titulo: `Listo el fee de ${periodo}: ${nombre}`,
-    cuerpo: `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas y lo envió a Basecamp. Revisa fechas, piezas y responsables antes de que arranque el mes.`,
-    ruta: `/proyectos/${r.proyecto.id}`, entidad_tipo: 'proyecto', entidad_id: r.proyecto.id,
-  }, destino).catch(() => undefined);
+  await audit(ctx, {
+    accion: 'recurrencia_generar',
+    entidad: 'proyecto',
+    entidad_id: r.proyecto.id,
+    detalle: { recurrencia_id: rec.id, periodo, requerimientos: r.requerimientos.length },
+  });
+  const destino = rec.owner_ejecutiva
+    ? { usuarioIds: [rec.owner_ejecutiva], roles: ['operaciones' as const] }
+    : { roles: ['operaciones' as const, 'ejecutiva' as const] };
+  void notificar(
+    ctx,
+    {
+      tipo: 'recurrencia_generada',
+      titulo: `Listo el fee de ${periodo}: ${nombre}`,
+      cuerpo: `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas y lo envió a Basecamp. Revisa fechas, piezas y responsables antes de que arranque el mes.`,
+      ruta: `/proyectos/${r.proyecto.id}`,
+      entidad_tipo: 'proyecto',
+      entidad_id: r.proyecto.id,
+    },
+    destino,
+  ).catch(() => undefined);
   return { proyecto_id: r.proyecto.id, creado: true, nombre, basecamp: r.basecamp };
 }
 
 /** Corre a diario: genera el mes siguiente para cada recurrencia activa cuyo día ya llegó. */
-export async function procesarRecurrencias(ctx: DbCtx, hoy = hoyLocal()): Promise<{ revisadas: number; generadas: { nombre: string; periodo: string }[]; errores: string[] }> {
+export async function procesarRecurrencias(
+  ctx: DbCtx,
+  hoy = hoyLocal(),
+): Promise<{ revisadas: number; generadas: { nombre: string; periodo: string }[]; errores: string[] }> {
   const recs = (await listRecurrencias(ctx)).filter((r) => r.activa);
   const dia = Number(hoy.slice(8, 10));
   const periodoActual = hoy.slice(0, 7);

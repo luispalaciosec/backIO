@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { cuerpoDaily, porPersonaDaily, type DailyItem } from '../lib/mcp/publish';
 
-const it1: DailyItem = { cliente: 'Board A', titulo: 'Tarea 1', owner: 'Ana', owners: ['Ana', 'Beto'], fecha: '2026-09-22', url: 'https://bc/1' };
+const it1: DailyItem = {
+  cliente: 'Board A',
+  titulo: 'Tarea 1',
+  owner: 'Ana',
+  owners: ['Ana', 'Beto'],
+  fecha: '2026-09-22',
+  url: 'https://bc/1',
+};
 const it2: DailyItem = { cliente: 'Board B', titulo: 'Tarea 2', owner: 'Ana', owners: ['Ana'], fecha: null, url: null };
 
 describe('daily · bloque por persona', () => {
@@ -25,8 +32,19 @@ describe('daily · bloque por persona', () => {
 
 describe('daily · narrativa con formato', () => {
   it('convierte negritas, viñetas y líneas en blanco en HTML con saltos visibles', () => {
-    const narrativa = '**🎯 Foco del día**\nCerrar AB-Inbev.\n\n**📋 En la mesa hoy**\n- **DIVERTRON**: Marcos Poveda\n- **CORONA CERO**: Marcos Poveda';
-    const html = cuerpoDaily({ tipo: 'apertura', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [], narrativa });
+    const narrativa =
+      '**🎯 Foco del día**\nCerrar AB-Inbev.\n\n**📋 En la mesa hoy**\n- **DIVERTRON**: Marcos Poveda\n- **CORONA CERO**: Marcos Poveda';
+    const html = cuerpoDaily({
+      tipo: 'apertura',
+      responsable: 'Luis',
+      fecha: '2026-09-22',
+      notas: [],
+      hoy: [],
+      vencen: [],
+      bloqueos: [],
+      cambios: [],
+      narrativa,
+    });
     expect(html).toContain('<strong>🎯 Foco del día</strong>');
     expect(html).toContain('<li><strong>DIVERTRON</strong>: Marcos Poveda</li>');
     expect(html).toContain('<div><br></div>');
@@ -53,24 +71,79 @@ describe('daily · @menciones', () => {
   it('nombres con sgid salen como bc-attachment en secciones y narrativa; sin sgid, como texto', async () => {
     const { mencionarEnHtml } = await import('../lib/mcp/publish');
     const men = new Map([['Ana', 'SGID_ANA']]);
-    const html = cuerpoDaily({ tipo: 'apertura', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [it1], vencen: [], bloqueos: [], cambios: [], narrativa: 'Hoy **Ana** cierra y Beto apoya.' }, men);
+    const html = cuerpoDaily(
+      {
+        tipo: 'apertura',
+        responsable: 'Luis',
+        fecha: '2026-09-22',
+        notas: [],
+        hoy: [it1],
+        vencen: [],
+        bloqueos: [],
+        cambios: [],
+        narrativa: 'Hoy **Ana** cierra y Beto apoya.',
+      },
+      men,
+    );
     expect((html.match(/sgid="SGID_ANA"/g) ?? []).length).toBeGreaterThanOrEqual(3);
     expect(html).toContain('Beto');
     expect(html).not.toContain('sgid="SGID_BETO"');
-    expect(mencionarEnHtml('<a href="x/Ana">Ana</a>', men)).toBe('<a href="x/Ana"><bc-attachment sgid="SGID_ANA" content-type="application/vnd.basecamp.mention"></bc-attachment></a>');
+    expect(mencionarEnHtml('<a href="x/Ana">Ana</a>', men)).toBe(
+      '<a href="x/Ana"><bc-attachment sgid="SGID_ANA" content-type="application/vnd.basecamp.mention"></bc-attachment></a>',
+    );
   });
 });
 
 describe('daily · métricas del cierre', () => {
   it('muestra cumplimiento, entradas fuera de plan, reprocesos y detalle por persona', () => {
-    const kpis = { planificadas: 7, cerradas_planificadas: 5, cumplimiento_pct: 71, cerradas_fuera: 3, cerradas_total: 8, nuevas_hoy: 4, nuevas_no_planificadas: 1, nuevas_urgentes: 1, reprocesos_hoy: 1, reprogramaciones_24h: 4, bloqueos_nuevos: 0, vencidas_abiertas: 6, por_persona: [{ nombre: 'Ana', planificadas: 4, cerradas: 3, fuera: 1 }] };
-    const html = cuerpoDaily({ tipo: 'cierre', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [], completadas: [], completadas_fuera: [], kpis }, new Map([['Ana', 'SGID_ANA']]));
+    const kpis = {
+      planificadas: 7,
+      cerradas_planificadas: 5,
+      cumplimiento_pct: 71,
+      cerradas_fuera: 3,
+      cerradas_total: 8,
+      nuevas_hoy: 4,
+      nuevas_no_planificadas: 1,
+      nuevas_urgentes: 1,
+      reprocesos_hoy: 1,
+      reprogramaciones_24h: 4,
+      bloqueos_nuevos: 0,
+      vencidas_abiertas: 6,
+      por_persona: [{ nombre: 'Ana', planificadas: 4, cerradas: 3, fuera: 1 }],
+    };
+    const html = cuerpoDaily(
+      {
+        tipo: 'cierre',
+        responsable: 'Luis',
+        fecha: '2026-09-22',
+        notas: [],
+        hoy: [],
+        vencen: [],
+        bloqueos: [],
+        cambios: [],
+        completadas: [],
+        completadas_fuera: [],
+        kpis,
+      },
+      new Map([['Ana', 'SGID_ANA']]),
+    );
     expect(html.indexOf('Métricas del día')).toBeLessThan(html.indexOf('Completado hoy'));
     expect(html).toContain('5 de 7 · <span style="color:#b9770e">71%</span>');
     expect(html).toContain('2 de 4 nuevas (1 urgente)');
     expect(html).toContain('Reprocesos abiertos hoy: <strong>1</strong>');
     expect(html).toContain('sgid="SGID_ANA"');
     expect(html).toContain('<strong>3 / 4</strong> · 75% · +1 fuera del daily');
-    expect(cuerpoDaily({ tipo: 'apertura', responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [] })).not.toContain('Métricas del día');
+    expect(
+      cuerpoDaily({
+        tipo: 'apertura',
+        responsable: 'Luis',
+        fecha: '2026-09-22',
+        notas: [],
+        hoy: [],
+        vencen: [],
+        bloqueos: [],
+        cambios: [],
+      }),
+    ).not.toContain('Métricas del día');
   });
 });

@@ -14,27 +14,57 @@ import { notificar } from '../notificaciones';
 import { BasecampClient } from './client';
 
 export interface Huerfano {
-  id: string; cliente_id: string; basecamp_project_id: number; basecamp_todolist_id: number | null; basecamp_todo_id: number;
-  titulo: string; creador_nombre: string | null; creador_basecamp_id: number | null; due_on: string | null; completed: boolean; app_url: string | null; detectado_at: string; resuelto_at: string | null; resolucion: string | null;
+  id: string;
+  cliente_id: string;
+  basecamp_project_id: number;
+  basecamp_todolist_id: number | null;
+  basecamp_todo_id: number;
+  titulo: string;
+  creador_nombre: string | null;
+  creador_basecamp_id: number | null;
+  due_on: string | null;
+  completed: boolean;
+  app_url: string | null;
+  detectado_at: string;
+  resuelto_at: string | null;
+  resolucion: string | null;
 }
 
-export async function detectarHuerfanos(ctx: DbCtx, opts: { notificar?: boolean } = {}): Promise<{ clientes: number; nuevos: number; pendientes: number }> {
+export async function detectarHuerfanos(
+  ctx: DbCtx,
+  opts: { notificar?: boolean } = {},
+): Promise<{ clientes: number; nuevos: number; pendientes: number }> {
   const clientes = (await listClientes(ctx)).filter((c) => c.basecamp_project_id && c.basecamp_importado_at);
   if (clientes.length === 0) return { clientes: 0, nuevos: 0, pendientes: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   // Paginado: PostgREST corta en 1000 filas y, con más tareas enlazadas, los to-dos ya conocidos salían como huérfanos.
   const conocidos = new Set<number>();
   for (let from = 0; ; from += 1000) {
-    const { data: enlazados, error: eEnl } = await ctx.db.from('requerimientos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId).not('basecamp_todo_id', 'is', null).order('id').range(from, from + 999);
+    const { data: enlazados, error: eEnl } = await ctx.db
+      .from('requerimientos')
+      .select('basecamp_todo_id')
+      .eq('tenant_id', ctx.tenantId)
+      .not('basecamp_todo_id', 'is', null)
+      .order('id')
+      .range(from, from + 999);
     throwIf(eEnl);
     const filas = (enlazados ?? []) as { basecamp_todo_id: number }[];
     for (const r of filas) conocidos.add(r.basecamp_todo_id);
     if (filas.length < 1000) break;
   }
   // Huérfanos pendientes cuyo to-do ya está enlazado (falsos positivos): se cierran solos.
-  { const { data: pend } = await ctx.db.from('basecamp_huerfanos').select('id, basecamp_todo_id').eq('tenant_id', ctx.tenantId).is('resuelto_at', null);
-    const falsos = ((pend ?? []) as { id: string; basecamp_todo_id: number }[]).filter((h) => conocidos.has(h.basecamp_todo_id)).map((h) => h.id);
-    if (falsos.length) await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' }).in('id', falsos); }
+  {
+    const { data: pend } = await ctx.db
+      .from('basecamp_huerfanos')
+      .select('id, basecamp_todo_id')
+      .eq('tenant_id', ctx.tenantId)
+      .is('resuelto_at', null);
+    const falsos = ((pend ?? []) as { id: string; basecamp_todo_id: number }[])
+      .filter((h) => conocidos.has(h.basecamp_todo_id))
+      .map((h) => h.id);
+    if (falsos.length)
+      await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' }).in('id', falsos);
+  }
   const { data: previos } = await ctx.db.from('basecamp_huerfanos').select('basecamp_todo_id').eq('tenant_id', ctx.tenantId);
   const yaRegistrados = new Set(((previos ?? []) as { basecamp_todo_id: number }[]).map((h) => h.basecamp_todo_id));
 
@@ -50,10 +80,21 @@ export async function detectarHuerfanos(ctx: DbCtx, opts: { notificar?: boolean 
           const todos = await bc.listTodosSafe(pid, f.id, false);
           const huerfanos = todos.filter((t) => !conocidos.has(t.id) && !yaRegistrados.has(t.id));
           if (!huerfanos.length) continue;
-          const { error } = await ctx.db.from('basecamp_huerfanos').insert(huerfanos.map((t) => ({
-            tenant_id: ctx.tenantId, cliente_id: c.id, basecamp_project_id: pid, basecamp_todolist_id: f.id, basecamp_todo_id: t.id,
-            titulo: t.titulo || `To-do ${t.id}`, creador_basecamp_id: t.creator_id, creador_nombre: t.creator_nombre, due_on: t.due_on, completed: t.completed, app_url: t.app_url,
-          })));
+          const { error } = await ctx.db.from('basecamp_huerfanos').insert(
+            huerfanos.map((t) => ({
+              tenant_id: ctx.tenantId,
+              cliente_id: c.id,
+              basecamp_project_id: pid,
+              basecamp_todolist_id: f.id,
+              basecamp_todo_id: t.id,
+              titulo: t.titulo || `To-do ${t.id}`,
+              creador_basecamp_id: t.creator_id,
+              creador_nombre: t.creator_nombre,
+              due_on: t.due_on,
+              completed: t.completed,
+              app_url: t.app_url,
+            })),
+          );
           throwIf(error);
           huerfanos.forEach((t) => yaRegistrados.add(t.id));
           nuevos += huerfanos.length;
@@ -63,15 +104,29 @@ export async function detectarHuerfanos(ctx: DbCtx, opts: { notificar?: boolean 
       console.error('[huerfanos] cliente', c.nombre, err instanceof Error ? err.message : err);
     }
   }
-  const { count } = await ctx.db.from('basecamp_huerfanos').select('id', { count: 'exact', head: true }).eq('tenant_id', ctx.tenantId).is('resuelto_at', null);
+  const { count } = await ctx.db
+    .from('basecamp_huerfanos')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', ctx.tenantId)
+    .is('resuelto_at', null);
   if (nuevos > 0 && opts.notificar !== false) {
-    await notificar(ctx, {
-      tipo: 'huerfanos', titulo: `${nuevos} to-do${nuevos === 1 ? '' : 's'} creado${nuevos === 1 ? '' : 's'} fuera de BackIO`,
-      cuerpo: `Se detectaron ${nuevos} to-dos nuevos en Basecamp que no pasaron por BackIO. Pendientes de resolver: ${count ?? 0}. Adóptalos o ignóralos desde la pantalla Huérfanos.`,
-      ruta: '/huerfanos',
-    }, { roles: ['operaciones'] });
+    await notificar(
+      ctx,
+      {
+        tipo: 'huerfanos',
+        titulo: `${nuevos} to-do${nuevos === 1 ? '' : 's'} creado${nuevos === 1 ? '' : 's'} fuera de BackIO`,
+        cuerpo: `Se detectaron ${nuevos} to-dos nuevos en Basecamp que no pasaron por BackIO. Pendientes de resolver: ${count ?? 0}. Adóptalos o ignóralos desde la pantalla Huérfanos.`,
+        ruta: '/huerfanos',
+      },
+      { roles: ['operaciones'] },
+    );
   }
-  await audit(ctx, { accion: 'detectar_huerfanos', entidad: 'tenant', entidad_id: ctx.tenantId, detalle: { clientes: clientes.length, nuevos, pendientes: count ?? 0 } });
+  await audit(ctx, {
+    accion: 'detectar_huerfanos',
+    entidad: 'tenant',
+    entidad_id: ctx.tenantId,
+    detalle: { clientes: clientes.length, nuevos, pendientes: count ?? 0 },
+  });
   return { clientes: clientes.length, nuevos, pendientes: count ?? 0 };
 }
 
@@ -89,40 +144,93 @@ export async function adoptarHuerfano(ctx: DbCtx, id: string, proyectoId?: strin
   throwIf(error);
   const h = data as Huerfano;
   // Si el to-do ya tiene requerimiento (vivo o eliminado), no se crea otro: se reutiliza.
-  const { data: exist } = await ctx.db.from('requerimientos').select('id, deleted_at').eq('tenant_id', ctx.tenantId).eq('basecamp_todo_id', h.basecamp_todo_id).maybeSingle();
+  const { data: exist } = await ctx.db
+    .from('requerimientos')
+    .select('id, deleted_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('basecamp_todo_id', h.basecamp_todo_id)
+    .maybeSingle();
   if (exist) {
     const ex = exist as { id: string; deleted_at: string | null };
     if (ex.deleted_at) await ctx.db.from('requerimientos').update({ deleted_at: null }).eq('id', ex.id);
-    await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: ex.id }).eq('id', id);
-    await audit(ctx, { accion: 'adoptar_huerfano', entidad: 'requerimiento', entidad_id: ex.id, detalle: { todo_id: h.basecamp_todo_id, reutilizado: true, restaurado: !!ex.deleted_at } });
+    await ctx.db
+      .from('basecamp_huerfanos')
+      .update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: ex.id })
+      .eq('id', id);
+    await audit(ctx, {
+      accion: 'adoptar_huerfano',
+      entidad: 'requerimiento',
+      entidad_id: ex.id,
+      detalle: { todo_id: h.basecamp_todo_id, reutilizado: true, restaurado: !!ex.deleted_at },
+    });
     return { requerimiento_id: ex.id };
   }
   let pid = proyectoId ?? null;
   if (!pid && h.basecamp_todolist_id) {
-    const { data: pg } = await ctx.db.from('proyectos').select('id, basecamp_todolist_id, basecamp_grupos').eq('tenant_id', ctx.tenantId).eq('cliente_id', h.cliente_id).is('deleted_at', null);
+    const { data: pg } = await ctx.db
+      .from('proyectos')
+      .select('id, basecamp_todolist_id, basecamp_grupos')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('cliente_id', h.cliente_id)
+      .is('deleted_at', null);
     const lista = h.basecamp_todolist_id;
-    pid = ((pg ?? []) as { id: string; basecamp_todolist_id: number | null; basecamp_grupos: Record<string, number> }[])
-      .find((x) => x.basecamp_todolist_id === lista || Object.values(x.basecamp_grupos ?? {}).includes(lista))?.id ?? null;
+    pid =
+      ((pg ?? []) as { id: string; basecamp_todolist_id: number | null; basecamp_grupos: Record<string, number> }[]).find(
+        (x) => x.basecamp_todolist_id === lista || Object.values(x.basecamp_grupos ?? {}).includes(lista),
+      )?.id ?? null;
   }
   const proyecto = pid ? await getProyecto(ctx, pid) : null;
   const usuarios = await listUsuarios(ctx);
-  const bloque = proyecto ? Object.entries(proyecto.basecamp_grupos ?? {}).find(([, gid]) => gid === h.basecamp_todolist_id)?.[0] ?? null : null;
-  const [req] = await insertRequerimientos(ctx, [{
-    cliente_id: h.cliente_id, proyecto_id: proyecto?.id ?? null, bloque_nombre: bloque, titulo_interno: h.titulo, etiqueta_cliente: null, visible_cliente: false,
-    tipo_trabajo: 'fee', estado_operativo: h.completed ? 'completado' : (h.due_on ? 'priorizado' : 'backlog'), prioridad: 'media', peso: 1, fecha_entrega: h.due_on,
-    owner_agencia: usuarios.filter((u) => u.basecamp_user_id === h.creador_basecamp_id).map((u) => u.id), piezas: 0,
-  }]);
+  const bloque = proyecto
+    ? (Object.entries(proyecto.basecamp_grupos ?? {}).find(([, gid]) => gid === h.basecamp_todolist_id)?.[0] ?? null)
+    : null;
+  const [req] = await insertRequerimientos(ctx, [
+    {
+      cliente_id: h.cliente_id,
+      proyecto_id: proyecto?.id ?? null,
+      bloque_nombre: bloque,
+      titulo_interno: h.titulo,
+      etiqueta_cliente: null,
+      visible_cliente: false,
+      tipo_trabajo: 'fee',
+      estado_operativo: h.completed ? 'completado' : h.due_on ? 'priorizado' : 'backlog',
+      prioridad: 'media',
+      peso: 1,
+      fecha_entrega: h.due_on,
+      owner_agencia: usuarios.filter((u) => u.basecamp_user_id === h.creador_basecamp_id).map((u) => u.id),
+      piezas: 0,
+    },
+  ]);
   if (!req) throw new Error('No se pudo crear el requerimiento');
   // Enlace al to-do: si falla, mejor abortar que dejar un requerimiento suelto que la importación duplicará.
-  const { error: eEnlace } = await ctx.db.from('requerimientos').update({ basecamp_todo_id: h.basecamp_todo_id, basecamp_todolist_id: h.basecamp_todolist_id, basecamp_url: h.app_url }).eq('tenant_id', ctx.tenantId).eq('id', req.id);
-  if (eEnlace) { await ctx.db.from('requerimientos').update({ deleted_at: new Date().toISOString() }).eq('id', req.id); throw new Error(`No se pudo enlazar el to-do ${h.basecamp_todo_id}: ${eEnlace.message}`); }
-  await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: req.id }).eq('id', id);
-  await audit(ctx, { accion: 'adoptar_huerfano', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: h.basecamp_todo_id, proyecto_id: proyecto?.id ?? null } });
+  const { error: eEnlace } = await ctx.db
+    .from('requerimientos')
+    .update({ basecamp_todo_id: h.basecamp_todo_id, basecamp_todolist_id: h.basecamp_todolist_id, basecamp_url: h.app_url })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', req.id);
+  if (eEnlace) {
+    await ctx.db.from('requerimientos').update({ deleted_at: new Date().toISOString() }).eq('id', req.id);
+    throw new Error(`No se pudo enlazar el to-do ${h.basecamp_todo_id}: ${eEnlace.message}`);
+  }
+  await ctx.db
+    .from('basecamp_huerfanos')
+    .update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: req.id })
+    .eq('id', id);
+  await audit(ctx, {
+    accion: 'adoptar_huerfano',
+    entidad: 'requerimiento',
+    entidad_id: req.id,
+    detalle: { todo_id: h.basecamp_todo_id, proyecto_id: proyecto?.id ?? null },
+  });
   return { requerimiento_id: req.id };
 }
 
 export async function ignorarHuerfano(ctx: DbCtx, id: string): Promise<void> {
-  const { error } = await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'ignorado' }).eq('tenant_id', ctx.tenantId).eq('id', id);
+  const { error } = await ctx.db
+    .from('basecamp_huerfanos')
+    .update({ resuelto_at: new Date().toISOString(), resolucion: 'ignorado' })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', id);
   throwIf(error);
   await audit(ctx, { accion: 'ignorar_huerfano', entidad: 'huerfano', entidad_id: id });
 }

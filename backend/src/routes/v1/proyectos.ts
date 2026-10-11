@@ -35,12 +35,19 @@ const crearSchema = z.object({
     archivos_referencia: z.array(z.string()).optional(),
   }),
   fecha_entrega: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  fecha_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  fecha_inicio: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   prometio_cotizacion_id: z.string().uuid().nullable().optional(),
   bloques: z.array(bloqueSchema).default([]),
   owner_ejecutiva: z.string().uuid().nullable().optional(),
   repetir_mensual: z.boolean().optional(),
-  periodo: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
+  periodo: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .nullable()
+    .optional(),
 });
 
 /** Borradores creados por PrometIO (cotización aprobada) pendientes de convertir en proyecto. */
@@ -58,7 +65,11 @@ proyectos.get('/borradores', requireScope('read:proyectos'), async (c) => {
 
 proyectos.post('/borradores/:id/descartar', requireScope('write:proyectos'), async (c) => {
   const ctx = ctxOf(c);
-  const { error } = await ctx.db.from('proyecto_borradores').update({ estado: 'descartado' }).eq('tenant_id', ctx.tenantId).eq('id', c.req.param('id'));
+  const { error } = await ctx.db
+    .from('proyecto_borradores')
+    .update({ estado: 'descartado' })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', c.req.param('id'));
   if (error) throw new DbError(error.message, 500);
   await audit(ctx, { accion: 'descartar_borrador', entidad: 'proyecto_borrador', entidad_id: c.req.param('id') });
   return c.body(null, 204);
@@ -93,8 +104,15 @@ proyectos.post('/', requireScope('write:proyectos'), zValidator('json', crearSch
     const periodo = input.periodo ?? input.fecha_entrega.slice(0, 7);
     await updateProyecto(ctx, r.proyecto.id, { periodo });
     const rec = await upsertRecurrencia(ctx, {
-      cliente_id: input.cliente_id, plantilla_id: input.plantilla_id, nombre_patron: plantilla?.patron_nombre ?? `${plantilla?.nombre ?? input.nombre} - {mes} {año}`,
-      brief: input.brief, bloques: input.bloques, owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId, proyecto_origen_id: r.proyecto.id, ultimo_mes_generado: periodo, ultimo_proyecto_id: r.proyecto.id,
+      cliente_id: input.cliente_id,
+      plantilla_id: input.plantilla_id,
+      nombre_patron: plantilla?.patron_nombre ?? `${plantilla?.nombre ?? input.nombre} - {mes} {año}`,
+      brief: input.brief,
+      bloques: input.bloques,
+      owner_ejecutiva: input.owner_ejecutiva ?? ctx.usuarioId,
+      proyecto_origen_id: r.proyecto.id,
+      ultimo_mes_generado: periodo,
+      ultimo_proyecto_id: r.proyecto.id,
     });
     await updateProyecto(ctx, r.proyecto.id, { recurrencia_id: rec.id });
     recurrencia = rec;
@@ -117,8 +135,13 @@ proyectos.post('/:id/basecamp/reintentar', requireScope('write:proyectos'), asyn
 
 const patchSchema = z.object({
   nombre: unaLinea(3, 120).optional(),
-  estado: z.enum(['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'reprogramado', 'bloqueado', 'completado', 'cancelado']).optional(),
-  fecha_entrega: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  estado: z
+    .enum(['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'reprogramado', 'bloqueado', 'completado', 'cancelado'])
+    .optional(),
+  fecha_entrega: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   owner_ejecutiva: z.string().uuid().nullable().optional(),
   portal_activo: z.boolean().optional(),
   mesa_id: z.string().uuid().nullable().optional(),

@@ -4,14 +4,45 @@ import type { RequerimientoMetricas } from '@backio/shared';
 
 function req(p: Partial<RequerimientoMetricas>): RequerimientoMetricas {
   return {
-    id: crypto.randomUUID(), tenant_id: 't', cliente_id: 'c1', proyecto_id: null, bloque_nombre: null, plantilla_tarea_id: null,
-    titulo_interno: 'Tarea', etiqueta_cliente: null, visible_cliente: false, tipo_trabajo: 'fee',
-    estado_operativo: 'priorizado', estado_aprobacion: 'no_aplica', prioridad: 'media', peso: 1,
-    fecha_pedido: null, fecha_entrega: '2026-08-12', fecha_entrega_original: '2026-08-12', veces_reprogramado: 0, veces_reproceso: 0, planificacion: 'planificado', daily_fecha: null,
-    owner_agencia: ['u1'], owner_cliente: null, piezas: 0, tipo_pieza_id: null, brief_url: null, entregable_urls: null,
-    basecamp_todo_id: null, basecamp_todolist_id: null, basecamp_url: null,
-    ultima_actualizacion: '2026-08-09T00:00:00Z', completado_at: null, created_at: '', updated_at: '', created_by: null, deleted_at: null,
-    dias_atraso: 0, dias_sin_movimiento: 0, peso_completado: 0,
+    id: crypto.randomUUID(),
+    tenant_id: 't',
+    cliente_id: 'c1',
+    proyecto_id: null,
+    bloque_nombre: null,
+    plantilla_tarea_id: null,
+    titulo_interno: 'Tarea',
+    etiqueta_cliente: null,
+    visible_cliente: false,
+    tipo_trabajo: 'fee',
+    estado_operativo: 'priorizado',
+    estado_aprobacion: 'no_aplica',
+    prioridad: 'media',
+    peso: 1,
+    fecha_pedido: null,
+    fecha_entrega: '2026-08-12',
+    fecha_entrega_original: '2026-08-12',
+    veces_reprogramado: 0,
+    veces_reproceso: 0,
+    planificacion: 'planificado',
+    daily_fecha: null,
+    owner_agencia: ['u1'],
+    owner_cliente: null,
+    piezas: 0,
+    tipo_pieza_id: null,
+    brief_url: null,
+    entregable_urls: null,
+    basecamp_todo_id: null,
+    basecamp_todolist_id: null,
+    basecamp_url: null,
+    ultima_actualizacion: '2026-08-09T00:00:00Z',
+    completado_at: null,
+    created_at: '',
+    updated_at: '',
+    created_by: null,
+    deleted_at: null,
+    dias_atraso: 0,
+    dias_sin_movimiento: 0,
+    peso_completado: 0,
     ...p,
   };
 }
@@ -22,18 +53,45 @@ const base: WeekContext = {
   activos: [],
   completadosRecientes: [],
   usuarios: [
-    { id: 'u1', tenant_id: 't', nombre: 'Elías', email: 'e@g.ec', rol: 'colaborador', avatar_url: null, basecamp_user_id: null, capacidad_semanal: 40, activo: true },
-    { id: 'u2', tenant_id: 't', nombre: 'Ana', email: 'a@g.ec', rol: 'colaborador', avatar_url: null, basecamp_user_id: null, capacidad_semanal: 40, activo: true },
+    {
+      id: 'u1',
+      tenant_id: 't',
+      nombre: 'Elías',
+      email: 'e@g.ec',
+      rol: 'colaborador',
+      avatar_url: null,
+      basecamp_user_id: null,
+      capacidad_semanal: 40,
+      activo: true,
+    },
+    {
+      id: 'u2',
+      tenant_id: 't',
+      nombre: 'Ana',
+      email: 'a@g.ec',
+      rol: 'colaborador',
+      avatar_url: null,
+      basecamp_user_id: null,
+      capacidad_semanal: 40,
+      activo: true,
+    },
   ],
-  clientes: [{ id: 'c1', nombre: 'Banco Amazonas', activo: true }, { id: 'c2', nombre: 'Torres & Torres', activo: true }],
+  clientes: [
+    { id: 'c1', nombre: 'Banco Amazonas', activo: true },
+    { id: 'c2', nombre: 'Torres & Torres', activo: true },
+  ],
   acuerdosAbiertos: [],
 };
 
 describe('motor de señales', () => {
   it('semana del 03/08: Elías en 9 de 21 tareas → concentracion_carga 43%', () => {
     const activos = [
-      ...Array(9).fill(0).map(() => req({ owner_agencia: ['u1'] })),
-      ...Array(12).fill(0).map((_, i) => req({ owner_agencia: [`x${i}`] })),
+      ...Array(9)
+        .fill(0)
+        .map(() => req({ owner_agencia: ['u1'] })),
+      ...Array(12)
+        .fill(0)
+        .map((_, i) => req({ owner_agencia: [`x${i}`] })),
     ];
     const s = calcularSenales({ ...base, activos }).filter((x) => x.tipo === 'concentracion_carga');
     expect(s).toHaveLength(1);
@@ -71,8 +129,28 @@ describe('motor de señales', () => {
     const s = calcularSenales({
       ...base,
       acuerdosAbiertos: [
-        { id: 'a1', tenant_id: 't', semana_id: 's', descripcion: 'Investigación comercial Foligain', responsable_id: 'u1', fecha_compromiso: '2026-08-07', estado: 'pendiente', cerrado_at: null, created_at: '' },
-        { id: 'a2', tenant_id: 't', semana_id: 's', descripcion: 'Otro', responsable_id: 'u2', fecha_compromiso: '2026-08-20', estado: 'pendiente', cerrado_at: null, created_at: '' },
+        {
+          id: 'a1',
+          tenant_id: 't',
+          semana_id: 's',
+          descripcion: 'Investigación comercial Foligain',
+          responsable_id: 'u1',
+          fecha_compromiso: '2026-08-07',
+          estado: 'pendiente',
+          cerrado_at: null,
+          created_at: '',
+        },
+        {
+          id: 'a2',
+          tenant_id: 't',
+          semana_id: 's',
+          descripcion: 'Otro',
+          responsable_id: 'u2',
+          fecha_compromiso: '2026-08-20',
+          estado: 'pendiente',
+          cerrado_at: null,
+          created_at: '',
+        },
       ],
     }).filter((x) => x.tipo === 'compromiso_vencido');
     expect(s).toHaveLength(1);
@@ -80,7 +158,9 @@ describe('motor de señales', () => {
   });
 
   it('sobrecarga_proyectada usa capacidad declarada', () => {
-    const activos = Array(11).fill(0).map(() => req({ owner_agencia: ['u1'] })); // 44h > 40h
+    const activos = Array(11)
+      .fill(0)
+      .map(() => req({ owner_agencia: ['u1'] })); // 44h > 40h
     const s = calcularSenales({ ...base, activos }).filter((x) => x.tipo === 'sobrecarga_proyectada');
     expect(s.map((x) => x.entidad_id)).toEqual(['u1']);
   });

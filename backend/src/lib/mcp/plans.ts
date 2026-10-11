@@ -23,7 +23,16 @@ export interface AgentPlan<P = unknown, R = unknown> {
 export async function guardarPlan<P, R>(ctx: DbCtx, tool: string, parametros: P, plan: R): Promise<{ plan_id: string; expira_en: string }> {
   const id = `plan_${randomBytes(6).toString('hex')}`;
   const expira = new Date(Date.now() + PLAN_TTL_MS).toISOString();
-  const { error } = await ctx.db.from('agent_plans').insert({ id, tenant_id: ctx.tenantId, api_key_id: ctx.apiKeyId ?? null, usuario_id: ctx.usuarioId ?? null, tool, parametros, plan, expira_at: expira });
+  const { error } = await ctx.db.from('agent_plans').insert({
+    id,
+    tenant_id: ctx.tenantId,
+    api_key_id: ctx.apiKeyId ?? null,
+    usuario_id: ctx.usuarioId ?? null,
+    tool,
+    parametros,
+    plan,
+    expira_at: expira,
+  });
   throwIf(error);
   return { plan_id: id, expira_en: expira };
 }
@@ -43,7 +52,12 @@ export async function tomarPlan<P = unknown, R = unknown>(ctx: DbCtx, planId: st
   if (p.ejecutado_at) throw new DbError('Este plan ya fue ejecutado (un solo uso)', 409);
   if (new Date(p.expira_at).getTime() < Date.now()) throw new DbError('El plan expiró (15 minutos). Genera uno nuevo.', 410);
   // Marca atómica de ejecución: si dos confirmaciones compiten, solo una pasa.
-  const { data: marcado, error: e2 } = await ctx.db.from('agent_plans').update({ ejecutado_at: new Date().toISOString() }).eq('id', planId).is('ejecutado_at', null).select('id');
+  const { data: marcado, error: e2 } = await ctx.db
+    .from('agent_plans')
+    .update({ ejecutado_at: new Date().toISOString() })
+    .eq('id', planId)
+    .is('ejecutado_at', null)
+    .select('id');
   throwIf(e2);
   if (!marcado || marcado.length === 0) throw new DbError('Este plan ya fue ejecutado (un solo uso)', 409);
   return p;

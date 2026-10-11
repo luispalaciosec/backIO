@@ -25,10 +25,22 @@ vi.mock('../lib/db/client', async (orig) => {
     from(tabla: string) {
       let upd: Record<string, unknown> | null = null;
       const b = {
-        select: () => b, eq: () => b, is: () => b, lt: () => b, order: () => b, limit: () => b, in: () => b,
-        update: (o: Record<string, unknown>) => { upd = o; return b; },
+        select: () => b,
+        eq: () => b,
+        is: () => b,
+        lt: () => b,
+        order: () => b,
+        limit: () => b,
+        in: () => b,
+        update: (o: Record<string, unknown>) => {
+          upd = o;
+          return b;
+        },
         then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => {
-          if (upd) { updates.push(upd); return Promise.resolve({ error: null }).then(res, rej); }
+          if (upd) {
+            updates.push(upd);
+            return Promise.resolve({ error: null }).then(res, rej);
+          }
           return Promise.resolve({ data: tabla === 'usuarios' ? USUARIOS : FILAS, error: null }).then(res, rej);
         },
       };
@@ -40,13 +52,28 @@ vi.mock('../lib/db/client', async (orig) => {
 vi.mock('../lib/notificaciones/email', () => ({
   emailHabilitado: () => true,
   plantillaHtml: (t: string) => t,
-  sendEmail: async (m: { to: string }) => { enviados.push(m.to); return { id: 'x' }; },
+  sendEmail: async (m: { to: string }) => {
+    enviados.push(m.to);
+    return { id: 'x' };
+  },
 }));
 
-const fila = (p: Record<string, unknown>) => ({ id: 'n1', tenant_id: T, usuario_id: 'u1', email_destino: 'ana@geeks.com.ec', titulo: 'Hola', cuerpo: 'c', intentos: 0, ...p });
+const fila = (p: Record<string, unknown>) => ({
+  id: 'n1',
+  tenant_id: T,
+  usuario_id: 'u1',
+  email_destino: 'ana@geeks.com.ec',
+  titulo: 'Hola',
+  cuerpo: 'c',
+  intentos: 0,
+  ...p,
+});
 
 describe('procesarPendientes: destinatario', () => {
-  beforeEach(() => { enviados.length = 0; updates.length = 0; });
+  beforeEach(() => {
+    enviados.length = 0;
+    updates.length = 0;
+  });
 
   it('control: una notificación normal llega al usuario', async () => {
     FILAS = [fila({})];
@@ -64,7 +91,11 @@ describe('procesarPendientes: destinatario', () => {
   });
 
   it('no envía si la fila no tiene usuario, si el usuario está inactivo o es de otro tenant', async () => {
-    FILAS = [fila({ id: 'a', usuario_id: null, email_destino: 'x@externo.com' }), fila({ id: 'b', usuario_id: 'u2' }), fila({ id: 'c', usuario_id: 'u3', email_destino: 'otra@tenant2.com' })];
+    FILAS = [
+      fila({ id: 'a', usuario_id: null, email_destino: 'x@externo.com' }),
+      fila({ id: 'b', usuario_id: 'u2' }),
+      fila({ id: 'c', usuario_id: 'u3', email_destino: 'otra@tenant2.com' }),
+    ];
     const { procesarPendientes } = await import('../lib/notificaciones');
     await procesarPendientes();
     expect(enviados).toEqual([]);

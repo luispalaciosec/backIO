@@ -28,63 +28,106 @@ admin.post('/usuarios/basecamp/vincular', async (c) => {
   const sinCoincidencia: string[] = [];
   for (const u of usuarios) {
     const p = porEmail.get(u.email.toLowerCase());
-    if (!p) { sinCoincidencia.push(`${u.nombre} <${u.email}>`); continue; }
+    if (!p) {
+      sinCoincidencia.push(`${u.nombre} <${u.email}>`);
+      continue;
+    }
     if (u.basecamp_user_id === p.id && (u.avatar_url || !p.avatar_url)) continue;
-    const { error } = await serviceClient().from('usuarios').update({ basecamp_user_id: p.id, ...(p.avatar_url ? { avatar_url: p.avatar_url } : {}) }).eq('tenant_id', ctx.tenantId).eq('id', u.id);
+    const { error } = await serviceClient()
+      .from('usuarios')
+      .update({ basecamp_user_id: p.id, ...(p.avatar_url ? { avatar_url: p.avatar_url } : {}) })
+      .eq('tenant_id', ctx.tenantId)
+      .eq('id', u.id);
     throwIf(error);
     vinculados.push({ usuario: u.nombre, basecamp_user_id: p.id });
   }
-  await audit(ctx, { accion: 'vincular_basecamp_usuarios', entidad: 'usuario', entidad_id: null, detalle: { vinculados: vinculados.length, sin_coincidencia: sinCoincidencia.length } });
+  await audit(ctx, {
+    accion: 'vincular_basecamp_usuarios',
+    entidad: 'usuario',
+    entidad_id: null,
+    detalle: { vinculados: vinculados.length, sin_coincidencia: sinCoincidencia.length },
+  });
   const emailsBackio = new Set(usuarios.map((u) => u.email.toLowerCase()));
-  return c.json({ personas_basecamp: personas.length, vinculados, sin_coincidencia: sinCoincidencia, solo_en_basecamp: personas.filter((p) => p.email && !emailsBackio.has(p.email)).map((p) => `${p.nombre} <${p.email}>`) });
+  return c.json({
+    personas_basecamp: personas.length,
+    vinculados,
+    sin_coincidencia: sinCoincidencia,
+    solo_en_basecamp: personas.filter((p) => p.email && !emailsBackio.has(p.email)).map((p) => `${p.nombre} <${p.email}>`),
+  });
 });
 
-admin.patch('/usuarios/:id', zValidator('json', z.object({
-  rol: z.enum(ROLES).optional(),
-  capacidad_semanal: z.number().int().min(1).max(80).optional(),
-  basecamp_user_id: z.number().int().nullable().optional(),
-  activo: z.boolean().optional(),
-  nombre: z.string().min(2).optional(),
-  area: z.enum(['cuentas', 'produccion', 'diseno', 'creatividad', 'content']).nullable().optional(),
-})), async (c) => {
-  const ctx = ctxOf(c);
-  const id = c.req.param('id');
-  const patch = c.req.valid('json');
-  if (id === ctx.usuarioId && (patch.rol && patch.rol !== 'admin' || patch.activo === false)) {
-    return c.json({ error: 'No puedes quitarte el rol admin ni desactivarte a ti mismo' }, 422);
-  }
-  const { data, error } = await ctx.db.from('usuarios').update(patch).eq('tenant_id', ctx.tenantId).eq('id', id).select().single();
-  throwIf(error);
-  await audit(ctx, { accion: 'actualizar_usuario', entidad: 'usuario', entidad_id: id, detalle: patch });
-  return c.json(data);
-});
+admin.patch(
+  '/usuarios/:id',
+  zValidator(
+    'json',
+    z.object({
+      rol: z.enum(ROLES).optional(),
+      capacidad_semanal: z.number().int().min(1).max(80).optional(),
+      basecamp_user_id: z.number().int().nullable().optional(),
+      activo: z.boolean().optional(),
+      nombre: z.string().min(2).optional(),
+      area: z.enum(['cuentas', 'produccion', 'diseno', 'creatividad', 'content']).nullable().optional(),
+    }),
+  ),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const id = c.req.param('id');
+    const patch = c.req.valid('json');
+    if (id === ctx.usuarioId && ((patch.rol && patch.rol !== 'admin') || patch.activo === false)) {
+      return c.json({ error: 'No puedes quitarte el rol admin ni desactivarte a ti mismo' }, 422);
+    }
+    const { data, error } = await ctx.db.from('usuarios').update(patch).eq('tenant_id', ctx.tenantId).eq('id', id).select().single();
+    throwIf(error);
+    await audit(ctx, { accion: 'actualizar_usuario', entidad: 'usuario', entidad_id: id, detalle: patch });
+    return c.json(data);
+  },
+);
 
 // ---------------- invitaciones
 admin.get('/invitaciones', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await ctx.db.from('invitaciones').select('*').eq('tenant_id', ctx.tenantId).order('created_at', { ascending: false });
+  const { data, error } = await ctx.db
+    .from('invitaciones')
+    .select('*')
+    .eq('tenant_id', ctx.tenantId)
+    .order('created_at', { ascending: false });
   throwIf(error);
   return c.json({ items: data ?? [] });
 });
 
-admin.post('/invitaciones', zValidator('json', z.object({
-  email: z.string().email(),
-  nombre: z.string().min(2),
-  rol: z.enum(ROLES).default('colaborador'),
-  capacidad_semanal: z.number().int().min(1).max(80).default(40),
-})), async (c) => {
-  const ctx = ctxOf(c);
-  const body = c.req.valid('json');
-  const { data, error } = await ctx.db
-    .from('invitaciones')
-    .upsert({ ...body, email: body.email.toLowerCase(), tenant_id: ctx.tenantId, created_by: ctx.usuarioId }, { onConflict: 'tenant_id,email' })
-    .select()
-    .single();
-  throwIf(error);
-  await audit(ctx, { accion: 'crear_invitacion', entidad: 'invitacion', entidad_id: (data as { id: string }).id, detalle: { email: body.email, rol: body.rol } });
-  const envio = await enviarInvitacion(body.email.toLowerCase(), body.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
-  return c.json({ ...(data as object), envio }, 201);
-});
+admin.post(
+  '/invitaciones',
+  zValidator(
+    'json',
+    z.object({
+      email: z.string().email(),
+      nombre: z.string().min(2),
+      rol: z.enum(ROLES).default('colaborador'),
+      capacidad_semanal: z.number().int().min(1).max(80).default(40),
+    }),
+  ),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const body = c.req.valid('json');
+    const { data, error } = await ctx.db
+      .from('invitaciones')
+      .upsert(
+        { ...body, email: body.email.toLowerCase(), tenant_id: ctx.tenantId, created_by: ctx.usuarioId },
+        { onConflict: 'tenant_id,email' },
+      )
+      .select()
+      .single();
+    throwIf(error);
+    await audit(ctx, {
+      accion: 'crear_invitacion',
+      entidad: 'invitacion',
+      entidad_id: (data as { id: string }).id,
+      detalle: { email: body.email, rol: body.rol },
+    });
+    const envio = await enviarInvitacion(body.email.toLowerCase(), body.nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
+    return c.json({ ...(data as object), envio }, 201);
+  },
+);
 
 /**
  * Crea (o reutiliza) la cuenta en Supabase Auth y envía el enlace de invitación por Resend.
@@ -97,7 +140,11 @@ async function enviarInvitacion(email: string, nombre: string): Promise<{ enviad
   // No usamos action_link (pasa por /auth/v1/verify y vuelve con tokens en el hash, que el cliente PKCE
   // del frontend rechaza como "enlace inválido"). Mandamos el token_hash y la página lo canjea con verifyOtp.
   const enlace = (hashedToken: string, tipo: 'invite' | 'recovery') => `${base}?token_hash=${encodeURIComponent(hashedToken)}&type=${tipo}`;
-  const { data, error } = await sb.auth.admin.generateLink({ type: 'invite', email, options: { redirectTo: base, data: { name: nombre } } });
+  const { data, error } = await sb.auth.admin.generateLink({
+    type: 'invite',
+    email,
+    options: { redirectTo: base, data: { name: nombre } },
+  });
   if (error) {
     // Usuario ya existente: enviar enlace de recuperación para que fije su clave.
     if (/already|exists|registered/i.test(error.message)) {
@@ -110,7 +157,12 @@ async function enviarInvitacion(email: string, nombre: string): Promise<{ enviad
   return mandar(email, nombre, enlace(data.properties.hashed_token, 'invite'), false);
 }
 
-async function mandar(email: string, nombre: string, link: string, existente: boolean): Promise<{ enviado: boolean; error?: string; url?: string }> {
+async function mandar(
+  email: string,
+  nombre: string,
+  link: string,
+  existente: boolean,
+): Promise<{ enviado: boolean; error?: string; url?: string }> {
   if (!emailHabilitado()) return { enviado: false, error: 'RESEND_API_KEY no configurada; comparte el enlace manualmente', url: link };
   const titulo = existente ? 'Restablece tu acceso a BackIO' : 'Te invitaron a BackIO';
   const cuerpo = existente
@@ -122,7 +174,12 @@ async function mandar(email: string, nombre: string, link: string, existente: bo
 
 admin.post('/invitaciones/:id/reenviar', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await ctx.db.from('invitaciones').select('email, nombre').eq('tenant_id', ctx.tenantId).eq('id', c.req.param('id')).maybeSingle();
+  const { data, error } = await ctx.db
+    .from('invitaciones')
+    .select('email, nombre')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', c.req.param('id'))
+    .maybeSingle();
   throwIf(error);
   if (!data) return c.json({ error: 'Invitación no encontrada' }, 404);
   const inv = data as { email: string; nombre: string };
@@ -140,55 +197,107 @@ admin.delete('/invitaciones/:id', async (c) => {
 });
 
 // ---------------- api keys
-const SCOPES = ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos', 'write:proyectos', 'write:actas', 'admin'] as const;
+const SCOPES = [
+  'read:backlog',
+  'read:proyectos',
+  'read:senales',
+  'read:capacidad',
+  'write:requerimientos',
+  'write:proyectos',
+  'write:actas',
+  'admin',
+] as const;
 const PERFILES: Record<string, readonly (typeof SCOPES)[number][]> = {
   gerencial: ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad'],
   ejecutiva: ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos'],
-  operaciones: ['read:backlog', 'read:proyectos', 'read:senales', 'read:capacidad', 'write:requerimientos', 'write:proyectos', 'write:actas'],
+  operaciones: [
+    'read:backlog',
+    'read:proyectos',
+    'read:senales',
+    'read:capacidad',
+    'write:requerimientos',
+    'write:proyectos',
+    'write:actas',
+  ],
   prometio: ['read:proyectos', 'write:proyectos'],
   cliente: ['read:proyectos'],
 };
 
 admin.get('/api-keys', async (c) => {
   const ctx = ctxOf(c);
-  const { data, error } = await serviceClient().from('api_keys').select('id, nombre, prefijo, scopes, perfil, ultimo_uso_at, revocada_at, created_at').eq('tenant_id', ctx.tenantId).order('created_at', { ascending: false });
+  const { data, error } = await serviceClient()
+    .from('api_keys')
+    .select('id, nombre, prefijo, scopes, perfil, ultimo_uso_at, revocada_at, created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .order('created_at', { ascending: false });
   throwIf(error);
   return c.json({ items: data ?? [], perfiles: PERFILES });
 });
 
 /** La key completa se devuelve UNA sola vez. Solo se guarda el hash. */
-admin.post('/api-keys', zValidator('json', z.object({
-  nombre: z.string().min(2),
-  perfil: z.enum(['gerencial', 'ejecutiva', 'operaciones', 'prometio', 'cliente', 'custom']),
-  scopes: z.array(z.enum(SCOPES)).optional(),
-  cliente_id: z.string().uuid().optional(),
-})), async (c) => {
-  const ctx = ctxOf(c);
-  // Solo una persona admin crea keys: una key creada por otra key quedaba sin dueño (creado_por null) y
-  // sobrevivía a «Quitar acceso» de quien la originó (auditoría run-1).
-  if (c.get('auth').tipo !== 'usuario' || !ctx.usuarioId) return c.json({ error: 'Las API keys solo las crea un administrador desde BackIO' }, 403);
-  const body = c.req.valid('json');
-  // Una key de perfil cliente lee solo los proyectos de UN cliente (S11): el cliente es obligatorio y debe ser del tenant.
-  if (body.perfil === 'cliente') {
-    if (!body.cliente_id) return c.json({ error: 'Una key de perfil cliente necesita el cliente al que pertenece' }, 400);
-    const { data: cl } = await serviceClient().from('clientes').select('id').eq('id', body.cliente_id).eq('tenant_id', ctx.tenantId).maybeSingle();
-    if (!cl) return c.json({ error: 'Cliente no encontrado' }, 404);
-  }
-  const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : PERFILES[body.perfil]!;
-  const key = `bk_live_${randomBytes(24).toString('base64url')}`;
-  const { data, error } = await serviceClient()
-    .from('api_keys')
-    .insert({ tenant_id: ctx.tenantId, nombre: body.nombre, prefijo: key.slice(0, 12), key_hash: hashApiKey(key), scopes, perfil: body.perfil, cliente_id: body.perfil === 'cliente' ? body.cliente_id : null, creado_por: ctx.usuarioId })
-    .select('id, nombre, prefijo, scopes, perfil, created_at')
-    .single();
-  throwIf(error);
-  await audit(ctx, { accion: 'crear_api_key', entidad: 'api_key', entidad_id: (data as { id: string }).id, detalle: { nombre: body.nombre, scopes } });
-  return c.json({ ...(data as object), key }, 201);
-});
+admin.post(
+  '/api-keys',
+  zValidator(
+    'json',
+    z.object({
+      nombre: z.string().min(2),
+      perfil: z.enum(['gerencial', 'ejecutiva', 'operaciones', 'prometio', 'cliente', 'custom']),
+      scopes: z.array(z.enum(SCOPES)).optional(),
+      cliente_id: z.string().uuid().optional(),
+    }),
+  ),
+  async (c) => {
+    const ctx = ctxOf(c);
+    // Solo una persona admin crea keys: una key creada por otra key quedaba sin dueño (creado_por null) y
+    // sobrevivía a «Quitar acceso» de quien la originó (auditoría run-1).
+    if (c.get('auth').tipo !== 'usuario' || !ctx.usuarioId)
+      return c.json({ error: 'Las API keys solo las crea un administrador desde BackIO' }, 403);
+    const body = c.req.valid('json');
+    // Una key de perfil cliente lee solo los proyectos de UN cliente (S11): el cliente es obligatorio y debe ser del tenant.
+    if (body.perfil === 'cliente') {
+      if (!body.cliente_id) return c.json({ error: 'Una key de perfil cliente necesita el cliente al que pertenece' }, 400);
+      const { data: cl } = await serviceClient()
+        .from('clientes')
+        .select('id')
+        .eq('id', body.cliente_id)
+        .eq('tenant_id', ctx.tenantId)
+        .maybeSingle();
+      if (!cl) return c.json({ error: 'Cliente no encontrado' }, 404);
+    }
+    const scopes = body.perfil === 'custom' ? (body.scopes ?? []) : PERFILES[body.perfil]!;
+    const key = `bk_live_${randomBytes(24).toString('base64url')}`;
+    const { data, error } = await serviceClient()
+      .from('api_keys')
+      .insert({
+        tenant_id: ctx.tenantId,
+        nombre: body.nombre,
+        prefijo: key.slice(0, 12),
+        key_hash: hashApiKey(key),
+        scopes,
+        perfil: body.perfil,
+        cliente_id: body.perfil === 'cliente' ? body.cliente_id : null,
+        creado_por: ctx.usuarioId,
+      })
+      .select('id, nombre, prefijo, scopes, perfil, created_at')
+      .single();
+    throwIf(error);
+    await audit(ctx, {
+      accion: 'crear_api_key',
+      entidad: 'api_key',
+      entidad_id: (data as { id: string }).id,
+      detalle: { nombre: body.nombre, scopes },
+    });
+    return c.json({ ...(data as object), key }, 201);
+  },
+);
 
 admin.post('/api-keys/:id/revocar', async (c) => {
   const ctx = ctxOf(c);
-  const { error } = await serviceClient().from('api_keys').update({ revocada_at: new Date().toISOString() }).eq('tenant_id', ctx.tenantId).eq('id', c.req.param('id'));
+  const { error } = await serviceClient()
+    .from('api_keys')
+    .update({ revocada_at: new Date().toISOString() })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', c.req.param('id'));
   throwIf(error);
   await audit(ctx, { accion: 'revocar_api_key', entidad: 'api_key', entidad_id: c.req.param('id') });
   return c.body(null, 204);
@@ -215,10 +324,16 @@ admin.get('/audit', async (c) => {
   const [lista, total, errores] = await Promise.all([
     aplicar(db.from('audit_log').select('*')).order('created_at', { ascending: false }).limit(limit),
     aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })),
-    aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })).or('accion.ilike.%rechaz%,accion.ilike.%fall%,accion.ilike.%error%,accion.ilike.%invalid%,detalle->>error.not.is.null'),
+    aplicar(db.from('audit_log').select('id', { count: 'exact', head: true })).or(
+      'accion.ilike.%rechaz%,accion.ilike.%fall%,accion.ilike.%error%,accion.ilike.%invalid%,detalle->>error.not.is.null',
+    ),
   ]);
   throwIf(lista.error as never);
-  return c.json({ items: (lista.data as unknown[]) ?? [], total: (total.count as number | null) ?? 0, con_error: (errores.count as number | null) ?? 0 });
+  return c.json({
+    items: (lista.data as unknown[]) ?? [],
+    total: (total.count as number | null) ?? 0,
+    con_error: (errores.count as number | null) ?? 0,
+  });
 });
 
 // ---------------- salud del sistema
@@ -229,36 +344,84 @@ admin.get('/salud', async (c) => c.json(await verificarSalud(ctxOf(c).tenantId))
  * Quitar acceso: desactiva al usuario, cierra sus sesiones y le bloquea el login en Supabase Auth,
  * revoca sus API keys y tokens OAuth, y reasigna (o desasigna) sus tareas abiertas.
  */
-admin.post('/usuarios/:id/quitar-acceso', zValidator('json', z.object({ reasignar_a: z.string().uuid().nullable().optional(), motivo: z.string().max(300).optional() })), async (c) => {
-  const ctx = ctxOf(c);
-  const id = c.req.param('id');
-  const b = c.req.valid('json');
-  if (id === ctx.usuarioId) return c.json({ error: 'No puedes quitarte el acceso a ti mismo' }, 422);
-  const db = serviceClient();
-  const { data: u } = await db.from('usuarios').select('id, nombre, email, activo').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
-  if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
-  // 1) BackIO: inactivo (el middleware rechaza a inactivos aunque tengan sesión).
-  const { error: e1 } = await db.from('usuarios').update({ activo: false }).eq('id', id); throwIf(e1);
-  // 2) Supabase Auth: bloquear login y cerrar sesiones.
-  let auth = 'ok';
-  try { const r = await db.auth.admin.updateUserById(id, { ban_duration: '876600h' }); if (r.error) auth = r.error.message; await db.auth.admin.signOut(id, 'global').catch(() => undefined); } catch (err) { auth = err instanceof Error ? err.message : 'error'; }
-  // 3) Credenciales de agente creadas por la persona.
-  const ahora = new Date().toISOString();
-  await db.from('api_keys').update({ revocada_at: ahora }).eq('tenant_id', ctx.tenantId).eq('creado_por', id).is('revocada_at', null);
-  await db.from('oauth_tokens').delete().eq('usuario_id', id).then(() => undefined, () => undefined);
-  // 4) Tareas abiertas: reasignar o desasignar.
-  const { data: tareas } = await db.from('requerimientos').select('id, owner_agencia').eq('tenant_id', ctx.tenantId).is('deleted_at', null).not('estado_operativo', 'in', '("completado","cancelado")').contains('owner_agencia', [id]);
-  let reasignadas = 0;
-  for (const t of (tareas ?? []) as { id: string; owner_agencia: string[] }[]) {
-    const nuevos = t.owner_agencia.filter((x) => x !== id);
-    if (b.reasignar_a && !nuevos.includes(b.reasignar_a)) nuevos.push(b.reasignar_a);
-    const { error } = await db.from('requerimientos').update({ owner_agencia: nuevos, updated_by: ctx.usuarioId }).eq('id', t.id);
-    if (!error) reasignadas += 1;
-  }
-  await db.from('recurrencias').update({ owner_ejecutiva: b.reasignar_a ?? null }).eq('tenant_id', ctx.tenantId).eq('owner_ejecutiva', id).then(() => undefined, () => undefined);
-  await audit(ctx, { accion: 'quitar_acceso', entidad: 'usuario', entidad_id: id, detalle: { email: (u as { email: string }).email, reasignar_a: b.reasignar_a ?? null, tareas_reasignadas: reasignadas, auth, motivo: b.motivo ?? null } });
-  return c.json({ ok: true, tareas_reasignadas: reasignadas, auth_bloqueado: auth === 'ok' });
-});
+admin.post(
+  '/usuarios/:id/quitar-acceso',
+  zValidator('json', z.object({ reasignar_a: z.string().uuid().nullable().optional(), motivo: z.string().max(300).optional() })),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const id = c.req.param('id');
+    const b = c.req.valid('json');
+    if (id === ctx.usuarioId) return c.json({ error: 'No puedes quitarte el acceso a ti mismo' }, 422);
+    const db = serviceClient();
+    const { data: u } = await db
+      .from('usuarios')
+      .select('id, nombre, email, activo')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
+    // 1) BackIO: inactivo (el middleware rechaza a inactivos aunque tengan sesión).
+    const { error: e1 } = await db.from('usuarios').update({ activo: false }).eq('id', id);
+    throwIf(e1);
+    // 2) Supabase Auth: bloquear login y cerrar sesiones.
+    let auth = 'ok';
+    try {
+      const r = await db.auth.admin.updateUserById(id, { ban_duration: '876600h' });
+      if (r.error) auth = r.error.message;
+      await db.auth.admin.signOut(id, 'global').catch(() => undefined);
+    } catch (err) {
+      auth = err instanceof Error ? err.message : 'error';
+    }
+    // 3) Credenciales de agente creadas por la persona.
+    const ahora = new Date().toISOString();
+    await db.from('api_keys').update({ revocada_at: ahora }).eq('tenant_id', ctx.tenantId).eq('creado_por', id).is('revocada_at', null);
+    await db
+      .from('oauth_tokens')
+      .delete()
+      .eq('usuario_id', id)
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+    // 4) Tareas abiertas: reasignar o desasignar.
+    const { data: tareas } = await db
+      .from('requerimientos')
+      .select('id, owner_agencia')
+      .eq('tenant_id', ctx.tenantId)
+      .is('deleted_at', null)
+      .not('estado_operativo', 'in', '("completado","cancelado")')
+      .contains('owner_agencia', [id]);
+    let reasignadas = 0;
+    for (const t of (tareas ?? []) as { id: string; owner_agencia: string[] }[]) {
+      const nuevos = t.owner_agencia.filter((x) => x !== id);
+      if (b.reasignar_a && !nuevos.includes(b.reasignar_a)) nuevos.push(b.reasignar_a);
+      const { error } = await db.from('requerimientos').update({ owner_agencia: nuevos, updated_by: ctx.usuarioId }).eq('id', t.id);
+      if (!error) reasignadas += 1;
+    }
+    await db
+      .from('recurrencias')
+      .update({ owner_ejecutiva: b.reasignar_a ?? null })
+      .eq('tenant_id', ctx.tenantId)
+      .eq('owner_ejecutiva', id)
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+    await audit(ctx, {
+      accion: 'quitar_acceso',
+      entidad: 'usuario',
+      entidad_id: id,
+      detalle: {
+        email: (u as { email: string }).email,
+        reasignar_a: b.reasignar_a ?? null,
+        tareas_reasignadas: reasignadas,
+        auth,
+        motivo: b.motivo ?? null,
+      },
+    });
+    return c.json({ ok: true, tareas_reasignadas: reasignadas, auth_bloqueado: auth === 'ok' });
+  },
+);
 
 /** Restaurar acceso: reactiva, desbloquea en Auth y manda un enlace para definir contraseña nueva. */
 admin.post('/usuarios/:id/restaurar-acceso', async (c) => {
@@ -267,10 +430,23 @@ admin.post('/usuarios/:id/restaurar-acceso', async (c) => {
   const db = serviceClient();
   const { data: u } = await db.from('usuarios').select('id, nombre, email').eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle();
   if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
-  const { error } = await db.from('usuarios').update({ activo: true }).eq('id', id); throwIf(error);
-  try { await db.auth.admin.updateUserById(id, { ban_duration: 'none' }); } catch { /* si no existe en auth, la invitación lo crea */ }
-  const envio = await enviarInvitacion((u as { email: string }).email, (u as { nombre: string }).nombre).catch((e: Error) => ({ enviado: false, error: e.message }));
+  const { error } = await db.from('usuarios').update({ activo: true }).eq('id', id);
+  throwIf(error);
+  try {
+    await db.auth.admin.updateUserById(id, { ban_duration: 'none' });
+  } catch {
+    /* si no existe en auth, la invitación lo crea */
+  }
+  const envio = await enviarInvitacion((u as { email: string }).email, (u as { nombre: string }).nombre).catch((e: Error) => ({
+    enviado: false,
+    error: e.message,
+  }));
   const { url: _url, ...sinEnlace } = envio as { url?: string; enviado: boolean; error?: string };
-  await audit(ctx, { accion: 'restaurar_acceso', entidad: 'usuario', entidad_id: id, detalle: { email: (u as { email: string }).email, envio: sinEnlace } });
+  await audit(ctx, {
+    accion: 'restaurar_acceso',
+    entidad: 'usuario',
+    entidad_id: id,
+    detalle: { email: (u as { email: string }).email, envio: sinEnlace },
+  });
   return c.json({ ok: true, envio });
 });

@@ -15,7 +15,10 @@ const schema = z.object({
   basecamp_board_daily_id: z.number().int().nullable().optional(),
   basecamp_board_weekly_id: z.number().int().nullable().optional(),
   lider_id: z.string().uuid().nullable().optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
   activa: z.boolean().optional(),
 });
 
@@ -41,7 +44,11 @@ mesas.post('/:id/basecamp/detectar-boards', requireScope('admin'), async (c) => 
   if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
   try {
     const r = await detectarBoardsMesa(ctx, mesa);
-    if (r.daily || r.weekly) await updateMesa(ctx, mesa.id, { basecamp_board_daily_id: r.daily ?? mesa.basecamp_board_daily_id, basecamp_board_weekly_id: r.weekly ?? mesa.basecamp_board_weekly_id });
+    if (r.daily || r.weekly)
+      await updateMesa(ctx, mesa.id, {
+        basecamp_board_daily_id: r.daily ?? mesa.basecamp_board_daily_id,
+        basecamp_board_weekly_id: r.weekly ?? mesa.basecamp_board_weekly_id,
+      });
     await audit(ctx, { accion: 'mesa_detectar_boards', entidad: 'mesa', entidad_id: mesa.id, detalle: r });
     return c.json(r);
   } catch (err) {

@@ -25,7 +25,18 @@ export interface BasecampSyncPayload {
   eliminado?: boolean;
 }
 
-const EVENTOS_TODO = new Set(['todo_completed', 'todo_uncompleted', 'todo_changed', 'todo_created', 'todo_assignment_changed', 'todo_due_on_changed', 'todo_unarchived', 'todo_untrashed', 'todo_trashed', 'todo_archived']);
+const EVENTOS_TODO = new Set([
+  'todo_completed',
+  'todo_uncompleted',
+  'todo_changed',
+  'todo_created',
+  'todo_assignment_changed',
+  'todo_due_on_changed',
+  'todo_unarchived',
+  'todo_untrashed',
+  'todo_trashed',
+  'todo_archived',
+]);
 const EVENTOS_ELIMINADO = new Set(['todo_trashed', 'todo_archived']);
 const EVENTOS_RESTAURADO = new Set(['todo_untrashed', 'todo_unarchived']);
 
@@ -43,11 +54,12 @@ export function extractSafePayload(evento: unknown): BasecampSyncPayload | null 
   if (!base) return null;
   const rec = e.recording as Record<string, unknown>;
   const completed =
-    e.kind === 'todo_completed' ? true
-    : e.kind === 'todo_uncompleted' ? false
-    : typeof rec.completed === 'boolean' ? rec.completed
-    : null;
-  return { ...base, completed, ...(EVENTOS_ELIMINADO.has(e.kind) ? { eliminado: true } : EVENTOS_RESTAURADO.has(e.kind) ? { eliminado: false } : {}) };
+    e.kind === 'todo_completed' ? true : e.kind === 'todo_uncompleted' ? false : typeof rec.completed === 'boolean' ? rec.completed : null;
+  return {
+    ...base,
+    completed,
+    ...(EVENTOS_ELIMINADO.has(e.kind) ? { eliminado: true } : EVENTOS_RESTAURADO.has(e.kind) ? { eliminado: false } : {}),
+  };
 }
 
 /** Extrae el payload seguro de un objeto to-do (webhook o polling). */
@@ -89,17 +101,29 @@ export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload)
   const tenantCtx0: DbCtx = { ...ctx, tenantId: req.tenant_id };
   // Eliminado o archivado en Basecamp → cancelado en BackIO. Restaurado → vuelve a En proceso.
   if (safe.eliminado === true) {
-    if (req.estado_operativo === 'cancelado' || req.estado_operativo === 'completado') return { aplicado: false, requerimiento_id: req.id, motivo: 'ya cerrado' };
+    if (req.estado_operativo === 'cancelado' || req.estado_operativo === 'completado')
+      return { aplicado: false, requerimiento_id: req.id, motivo: 'ya cerrado' };
     await updateRequerimiento(tenantCtx0, req.id, { estado_operativo: 'cancelado', daily_fecha: null });
-    await audit(tenantCtx0, { accion: 'basecamp_eliminado', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: safe.todo_id } });
+    await audit(tenantCtx0, {
+      accion: 'basecamp_eliminado',
+      entidad: 'requerimiento',
+      entidad_id: req.id,
+      detalle: { todo_id: safe.todo_id },
+    });
     return { aplicado: true, requerimiento_id: req.id, motivo: 'eliminado en Basecamp' };
   }
   if (safe.eliminado === false && req.estado_operativo === 'cancelado') {
     await updateRequerimiento(tenantCtx0, req.id, { estado_operativo: reabrirEstado(req) });
-    await audit(tenantCtx0, { accion: 'basecamp_restaurado', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: safe.todo_id } });
+    await audit(tenantCtx0, {
+      accion: 'basecamp_restaurado',
+      entidad: 'requerimiento',
+      entidad_id: req.id,
+      detalle: { todo_id: safe.todo_id },
+    });
     return { aplicado: true, requerimiento_id: req.id, motivo: 'restaurado en Basecamp' };
   }
-  if (safe.completed === null) return { aplicado: false, requerimiento_id: req.id, motivo: 'evento sin estado; requiere consulta al to-do vivo' };
+  if (safe.completed === null)
+    return { aplicado: false, requerimiento_id: req.id, motivo: 'evento sin estado; requiere consulta al to-do vivo' };
 
   const yaCompletado = req.estado_operativo === 'completado';
   const cancelado = req.estado_operativo === 'cancelado';
@@ -109,7 +133,7 @@ export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload)
   const tenantCtx: DbCtx = { ...ctx, tenantId: req.tenant_id };
   await updateRequerimiento(tenantCtx, req.id, {
     estado_operativo: safe.completed ? 'completado' : reabrirEstado(req),
-    completado_at: safe.completed ? safe.completed_at ?? new Date().toISOString() : null,
+    completado_at: safe.completed ? (safe.completed_at ?? new Date().toISOString()) : null,
     ultima_actualizacion: new Date().toISOString(),
   });
   await audit(tenantCtx, {
@@ -120,7 +144,9 @@ export async function applyBasecampUpdate(ctx: DbCtx, safe: BasecampSyncPayload)
   });
   if (!safe.completed && yaCompletado) {
     // Un to-do completado que se desmarca en Basecamp es un reproceso (sin causa hasta que la mesa la complete).
-    await registrarReproceso(tenantCtx, req.id, { origen: 'basecamp', motivo: null, reabrir_basecamp: false }).catch((err) => console.error('[sync] reproceso no registrado', err instanceof Error ? err.message : err));
+    await registrarReproceso(tenantCtx, req.id, { origen: 'basecamp', motivo: null, reabrir_basecamp: false }).catch((err) =>
+      console.error('[sync] reproceso no registrado', err instanceof Error ? err.message : err),
+    );
   }
   if (safe.completed) {
     await cerrarReproceso(tenantCtx, req.id).catch(() => undefined);

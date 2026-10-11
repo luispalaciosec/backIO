@@ -11,13 +11,23 @@ import type { BasecampConfig } from './oauth';
 const TABLA = 'integracion_credenciales';
 
 export async function leerCredencialesBasecamp(tenantId: string): Promise<Partial<BasecampConfig> | null> {
-  const { data, error } = await serviceClient().from(TABLA).select('datos').eq('tenant_id', tenantId).eq('proveedor', 'basecamp').maybeSingle();
+  const { data, error } = await serviceClient()
+    .from(TABLA)
+    .select('datos')
+    .eq('tenant_id', tenantId)
+    .eq('proveedor', 'basecamp')
+    .maybeSingle();
   throwIf(error);
   return data ? (data as { datos: Partial<BasecampConfig> }).datos : null;
 }
 
 export async function guardarCredencialesBasecamp(tenantId: string, datos: Partial<BasecampConfig>): Promise<void> {
-  const { error } = await serviceClient().from(TABLA).upsert({ tenant_id: tenantId, proveedor: 'basecamp', datos, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,proveedor' });
+  const { error } = await serviceClient()
+    .from(TABLA)
+    .upsert(
+      { tenant_id: tenantId, proveedor: 'basecamp', datos, updated_at: new Date().toISOString() },
+      { onConflict: 'tenant_id,proveedor' },
+    );
   throwIf(error);
 }
 

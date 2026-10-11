@@ -10,7 +10,6 @@ import { sumarIntento } from '../lib/limite';
 
 export const mcp = new Hono();
 
-
 mcp.use('*', requireAuth);
 
 mcp.all('/', async (c) => {

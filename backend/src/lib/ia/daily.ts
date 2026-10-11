@@ -14,51 +14,112 @@ import { hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
 
 /** El daily no se arma ni se publica con tareas sin responsable: nadie sabría a quién preguntar. */
 export class DailySinResponsable extends Error {
-  constructor(public tareas: string[]) { super(`El daily tiene ${tareas.length} tarea${tareas.length === 1 ? '' : 's'} sin responsable. Asigna a alguien antes de publicar: ${tareas.slice(0, 5).join('; ')}${tareas.length > 5 ? '…' : ''}`); }
+  constructor(public tareas: string[]) {
+    super(
+      `El daily tiene ${tareas.length} tarea${tareas.length === 1 ? '' : 's'} sin responsable. Asigna a alguien antes de publicar: ${tareas.slice(0, 5).join('; ')}${tareas.length > 5 ? '…' : ''}`,
+    );
+  }
 }
 
-export async function armarDailyMensaje(ctx: DbCtx, mesa: Mesa, tipo: 'apertura' | 'cierre', notas: string[], responsable: string): Promise<DailyMensaje> {
-  const [alcance, usuarios, clientes] = await Promise.all([alcanceMesa(ctx, mesa.id), listUsuarios(ctx), listClientes(ctx, { incluirInactivos: true })]);
+export async function armarDailyMensaje(
+  ctx: DbCtx,
+  mesa: Mesa,
+  tipo: 'apertura' | 'cierre',
+  notas: string[],
+  responsable: string,
+): Promise<DailyMensaje> {
+  const [alcance, usuarios, clientes] = await Promise.all([
+    alcanceMesa(ctx, mesa.id),
+    listUsuarios(ctx),
+    listClientes(ctx, { incluirInactivos: true }),
+  ]);
   const activos = await listBacklog(ctx, { solo_activos: true, mesa: alcance });
   const hoy = hoyLocal();
   const mananaIso = sumarDias(hoy, 1);
   const hace24h = new Date(Date.now() - 86_400_000).toISOString();
   const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? 'sin asignar';
   const cliente = (id: string) => clientes.find((x) => x.id === id)?.nombre ?? '';
-  const linea = (r: { titulo_interno: string; cliente_id: string; owner_agencia: string[]; fecha_entrega: string | null; basecamp_url: string | null; dias_atraso: number }): DailyItem => ({
-    cliente: cliente(r.cliente_id), titulo: r.titulo_interno, owner: nombre(r.owner_agencia[0]), owners: r.owner_agencia.map(nombre), fecha: r.fecha_entrega, url: r.basecamp_url, atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
+  const linea = (r: {
+    titulo_interno: string;
+    cliente_id: string;
+    owner_agencia: string[];
+    fecha_entrega: string | null;
+    basecamp_url: string | null;
+    dias_atraso: number;
+  }): DailyItem => ({
+    cliente: cliente(r.cliente_id),
+    titulo: r.titulo_interno,
+    owner: nombre(r.owner_agencia[0]),
+    owners: r.owner_agencia.map(nombre),
+    fecha: r.fecha_entrega,
+    url: r.basecamp_url,
+    atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
   });
-  const sinResp = activos.filter((r) => r.owner_agencia.length === 0 && (r.daily_fecha === hoy || (r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado') || (r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h) || (r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h)));
+  const sinResp = activos.filter(
+    (r) =>
+      r.owner_agencia.length === 0 &&
+      (r.daily_fecha === hoy ||
+        (r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado') ||
+        (r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h) ||
+        (r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h)),
+  );
   if (sinResp.length) throw new DailySinResponsable(sinResp.map((r) => `${r.titulo_interno} (${cliente(r.cliente_id)})`));
   // Cierre: qué se completó hoy (completado_at desde las 00:00 de Guayaquil), separando lo que estaba en el daily de lo que no.
-  let completadas: DailyItem[] = [], completadasFuera: DailyItem[] = [], kpis: DailyKpis | undefined;
+  let completadas: DailyItem[] = [],
+    completadasFuera: DailyItem[] = [],
+    kpis: DailyKpis | undefined;
   if (tipo === 'cierre') {
     const inicioDia = inicioDiaLocal(hoy);
-    const hechas = (await listBacklog(ctx, { estado: 'completado', mesa: alcance })).filter((r) => r.completado_at && r.completado_at >= inicioDia);
+    const hechas = (await listBacklog(ctx, { estado: 'completado', mesa: alcance })).filter(
+      (r) => r.completado_at && r.completado_at >= inicioDia,
+    );
     completadas = hechas.filter((r) => r.daily_fecha === hoy).map(linea);
     completadasFuera = hechas.filter((r) => r.daily_fecha !== hoy).map(linea);
     // Métricas del día: plan (daily_fecha = hoy) vs cerradas, entradas fuera de planificación, reprocesos, etc.
     const todas = [...activos, ...hechas];
     const planificadas = todas.filter((r) => r.daily_fecha === hoy);
     const nuevas = todas.filter((r) => r.created_at >= inicioDia);
-    const { data: rep } = await ctx.db.from('reprocesos').select('id').eq('tenant_id', ctx.tenantId).gte('abierto_at', inicioDia).in('requerimiento_id', todas.map((r) => r.id).slice(0, 1000));
+    const { data: rep } = await ctx.db
+      .from('reprocesos')
+      .select('id')
+      .eq('tenant_id', ctx.tenantId)
+      .gte('abierto_at', inicioDia)
+      .in('requerimiento_id', todas.map((r) => r.id).slice(0, 1000));
     const porPersona = new Map<string, { nombre: string; planificadas: number; cerradas: number; fuera: number }>();
-    const pp = (id: string) => { const n = nombre(id); if (!porPersona.has(n)) porPersona.set(n, { nombre: n, planificadas: 0, cerradas: 0, fuera: 0 }); return porPersona.get(n)!; };
-    for (const r of planificadas) for (const o of r.owner_agencia) { const x = pp(o); x.planificadas += 1; if (r.estado_operativo === 'completado') x.cerradas += 1; }
+    const pp = (id: string) => {
+      const n = nombre(id);
+      if (!porPersona.has(n)) porPersona.set(n, { nombre: n, planificadas: 0, cerradas: 0, fuera: 0 });
+      return porPersona.get(n)!;
+    };
+    for (const r of planificadas)
+      for (const o of r.owner_agencia) {
+        const x = pp(o);
+        x.planificadas += 1;
+        if (r.estado_operativo === 'completado') x.cerradas += 1;
+      }
     for (const r of hechas.filter((r) => r.daily_fecha !== hoy)) for (const o of r.owner_agencia) pp(o).fuera += 1;
     const cerradasPlan = planificadas.filter((r) => r.estado_operativo === 'completado').length;
     kpis = {
-      planificadas: planificadas.length, cerradas_planificadas: cerradasPlan, cumplimiento_pct: planificadas.length ? Math.round((cerradasPlan / planificadas.length) * 100) : null,
-      cerradas_fuera: completadasFuera.length, cerradas_total: hechas.length,
-      nuevas_hoy: nuevas.length, nuevas_no_planificadas: nuevas.filter((r) => r.planificacion === 'no_planificado').length, nuevas_urgentes: nuevas.filter((r) => r.planificacion === 'urgente').length,
-      reprocesos_hoy: (rep ?? []).length, reprogramaciones_24h: activos.filter((r) => r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h).length,
+      planificadas: planificadas.length,
+      cerradas_planificadas: cerradasPlan,
+      cumplimiento_pct: planificadas.length ? Math.round((cerradasPlan / planificadas.length) * 100) : null,
+      cerradas_fuera: completadasFuera.length,
+      cerradas_total: hechas.length,
+      nuevas_hoy: nuevas.length,
+      nuevas_no_planificadas: nuevas.filter((r) => r.planificacion === 'no_planificado').length,
+      nuevas_urgentes: nuevas.filter((r) => r.planificacion === 'urgente').length,
+      reprocesos_hoy: (rep ?? []).length,
+      reprogramaciones_24h: activos.filter((r) => r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h).length,
       bloqueos_nuevos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).length,
       vencidas_abiertas: activos.filter((r) => r.dias_atraso > 0).length,
       por_persona: [...porPersona.values()].sort((a, b) => b.planificadas - a.planificadas || a.nombre.localeCompare(b.nombre, 'es')),
     };
   }
   return {
-    tipo, responsable, fecha: hoy, notas,
+    tipo,
+    responsable,
+    fecha: hoy,
+    notas,
     ...(tipo === 'cierre' ? { completadas, completadas_fuera: completadasFuera, kpis } : {}),
     hoy: activos.filter((r) => r.daily_fecha === hoy).map(linea),
     vencen: activos.filter((r) => r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado').map(linea),
@@ -79,7 +140,30 @@ En un cierre: kpis trae los indicadores del día (cumplimiento del plan, entrada
 Tono de compañero de mesa, no de jefe.`;
 
 export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<string> {
-  const payload = { mesa: mesa.nombre, tipo: m.tipo, fecha: m.fecha, notas_del_responsable: m.notas, ...(m.tipo === 'cierre' ? { kpis: m.kpis, completadas_hoy: (m.completadas ?? []).map(dailyItemTexto), completadas_fuera_del_daily: (m.completadas_fuera ?? []).map(dailyItemTexto) } : {}), hoy_se_trabaja: m.hoy.map(dailyItemTexto), vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto), bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto), fechas_cambiadas_24h: m.cambios.map(dailyItemTexto) };
-  const g = await generarTexto(ctx, { tipo: 'daily', entidad: { tipo: 'mesa', id: mesa.id }, payload, system: SYSTEM_DAILY.replace('{TIPO}', m.tipo), maxTokens: 900, cacheMs: 5 * 60_000 });
+  const payload = {
+    mesa: mesa.nombre,
+    tipo: m.tipo,
+    fecha: m.fecha,
+    notas_del_responsable: m.notas,
+    ...(m.tipo === 'cierre'
+      ? {
+          kpis: m.kpis,
+          completadas_hoy: (m.completadas ?? []).map(dailyItemTexto),
+          completadas_fuera_del_daily: (m.completadas_fuera ?? []).map(dailyItemTexto),
+        }
+      : {}),
+    hoy_se_trabaja: m.hoy.map(dailyItemTexto),
+    vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto),
+    bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto),
+    fechas_cambiadas_24h: m.cambios.map(dailyItemTexto),
+  };
+  const g = await generarTexto(ctx, {
+    tipo: 'daily',
+    entidad: { tipo: 'mesa', id: mesa.id },
+    payload,
+    system: SYSTEM_DAILY.replace('{TIPO}', m.tipo),
+    maxTokens: 900,
+    cacheMs: 5 * 60_000,
+  });
   return g.texto;
 }

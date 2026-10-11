@@ -21,24 +21,34 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
     if (arr.length === 21) {
       console.warn(`[alerta] API key ${ctx.apiKeyId} superó 20 escrituras en 5 minutos`);
       // Antes era un insert sin await (el builder es perezoso: nunca salía) y con usuario_id null (no se despachaba).
-      void notificar(ctx, { tipo: 'alerta_api_key', titulo: 'API key con escritura masiva', cuerpo: `La key ${ctx.apiKeyId} ejecutó más de 20 escrituras en 5 minutos. Revisa Admin → API keys.`, ruta: '/admin/api-keys' }, { roles: ['admin', 'operaciones'] })
-        .catch((err) => console.error('[alerta] no se pudo notificar', err instanceof Error ? err.message : err));
+      void notificar(
+        ctx,
+        {
+          tipo: 'alerta_api_key',
+          titulo: 'API key con escritura masiva',
+          cuerpo: `La key ${ctx.apiKeyId} ejecutó más de 20 escrituras en 5 minutos. Revisa Admin → API keys.`,
+          ruta: '/admin/api-keys',
+        },
+        { roles: ['admin', 'operaciones'] },
+      ).catch((err) => console.error('[alerta] no se pudo notificar', err instanceof Error ? err.message : err));
     }
   }
   // La auditoría nunca debe romper la operación principal.
   // Se escribe SIEMPRE con service role: audit_log no tiene política de INSERT para sesiones de usuario
   // (solo lectura para admin), y con el cliente del usuario el insert se rechazaba en silencio.
   try {
-    const { error } = await serviceClient().from('audit_log').insert({
-      tenant_id: ctx.tenantId,
-      usuario_id: ctx.usuarioId,
-      api_key_id: ctx.apiKeyId ?? null,
-      origen: ctx.origen,
-      accion: e.accion,
-      entidad: e.entidad,
-      entidad_id: e.entidad_id ?? null,
-      detalle: e.detalle ?? null,
-    });
+    const { error } = await serviceClient()
+      .from('audit_log')
+      .insert({
+        tenant_id: ctx.tenantId,
+        usuario_id: ctx.usuarioId,
+        api_key_id: ctx.apiKeyId ?? null,
+        origen: ctx.origen,
+        accion: e.accion,
+        entidad: e.entidad,
+        entidad_id: e.entidad_id ?? null,
+        detalle: e.detalle ?? null,
+      });
     if (error) console.error('[audit] insert rechazado', e.accion, error.message);
   } catch (err) {
     console.error('[audit] fallo al registrar', err);

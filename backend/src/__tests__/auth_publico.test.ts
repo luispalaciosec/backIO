@@ -13,16 +13,27 @@ vi.mock('../lib/db/client', async (orig) => {
 });
 
 let app: import('hono').Hono;
-beforeAll(async () => { const { createApp } = await import('../app'); app = createApp(); });
+beforeAll(async () => {
+  const { createApp } = await import('../app');
+  app = createApp();
+});
 
 describe('recuperación de contraseña', () => {
   it('responde 200 sin sesión y sin revelar existencia', async () => {
-    const res = await app.request('/api/v1/auth/recuperar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'nadie@geeks.com.ec' }) });
+    const res = await app.request('/api/v1/auth/recuperar', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'nadie@geeks.com.ec' }),
+    });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
   });
   it('rechaza correos inválidos', async () => {
-    const res = await app.request('/api/v1/auth/recuperar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'x' }) });
+    const res = await app.request('/api/v1/auth/recuperar', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'x' }),
+    });
     expect(res.status).toBe(400);
   });
 });

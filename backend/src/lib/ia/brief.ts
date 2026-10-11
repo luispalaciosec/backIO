@@ -38,7 +38,14 @@ export async function briefDesdeTexto(ctx: DbCtx, texto: string, clienteId?: str
     hoy: hoyLocal(),
     texto_del_cliente: texto.slice(0, 12_000),
     canales_validos: CANALES,
-    plantillas: plantillas.map((p) => ({ id: p.id, nombre: p.nombre, pilar: p.pilar, familia: p.familia, recurrente: p.recurrente, descripcion: p.descripcion })),
+    plantillas: plantillas.map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      pilar: p.pilar,
+      familia: p.familia,
+      recurrente: p.recurrente,
+      descripcion: p.descripcion,
+    })),
     tipos_pieza: tipos.map((t) => ({ id: t.id, nombre: t.nombre })),
   };
   const out = await generarJson<BriefIA>(ctx, { tipo: 'brief', payload, system: SYSTEM_BRIEF, maxTokens: 2500, cacheMs: 0 });
@@ -54,7 +61,11 @@ export async function briefDesdeTexto(ctx: DbCtx, texto: string, clienteId?: str
     presupuesto_aprobado: typeof out.presupuesto_aprobado === 'number' ? out.presupuesto_aprobado : null,
     plantilla_sugerida_id: pl?.id ?? null,
     plantilla_sugerida_nombre: pl?.nombre ?? null,
-    piezas_por_tipo: Object.fromEntries(Object.entries(out.piezas_por_tipo ?? {}).filter(([k, v]) => tiposIds.has(k) && Number(v) > 0).map(([k, v]) => [k, Number(v)])),
+    piezas_por_tipo: Object.fromEntries(
+      Object.entries(out.piezas_por_tipo ?? {})
+        .filter(([k, v]) => tiposIds.has(k) && Number(v) > 0)
+        .map(([k, v]) => [k, Number(v)]),
+    ),
     dudas: (out.dudas ?? []).slice(0, 5),
   };
 }

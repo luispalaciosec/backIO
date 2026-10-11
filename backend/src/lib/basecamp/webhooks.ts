@@ -26,7 +26,12 @@ export async function registrarWebhookCliente(ctx: DbCtx, clienteId: string): Pr
   // Solo el id: la URL lleva el secreto del webhook y clientes.config era legible por todos los usuarios.
   const { basecamp_webhook_url: _u, ...restoConfig } = cliente.config as Record<string, unknown>;
   await updateClienteConfig(ctx, clienteId, { config: { ...restoConfig, basecamp_webhook_id: wh.id } });
-  await audit(ctx, { accion: 'basecamp_registrar_webhook', entidad: 'cliente', entidad_id: clienteId, detalle: { webhook_id: wh.id, project: cliente.basecamp_project_id } });
+  await audit(ctx, {
+    accion: 'basecamp_registrar_webhook',
+    entidad: 'cliente',
+    entidad_id: clienteId,
+    detalle: { webhook_id: wh.id, project: cliente.basecamp_project_id },
+  });
   return { webhook_id: wh.id, payload_url: enmascararPayloadUrl(url) };
 }
 
@@ -34,10 +39,18 @@ export async function registrarWebhookCliente(ctx: DbCtx, clienteId: string): Pr
  * Rotación del secreto: reescribe la URL del webhook de cada cliente activo con la URL actual
  * (BASECAMP_WEBHOOK_SECRET vigente). Los que no tienen webhook se registran. Idempotente.
  */
-export async function actualizarWebhooksTenant(ctx: DbCtx): Promise<{ actualizados: string[]; registrados: string[]; errores: { cliente: string; error: string }[] }> {
+export async function actualizarWebhooksTenant(
+  ctx: DbCtx,
+): Promise<{ actualizados: string[]; registrados: string[]; errores: { cliente: string; error: string }[] }> {
   const url = webhookUrl();
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const { data } = await ctx.db.from('clientes').select('id, nombre, basecamp_project_id, config').eq('tenant_id', ctx.tenantId).eq('activo', true).is('deleted_at', null).not('basecamp_project_id', 'is', null);
+  const { data } = await ctx.db
+    .from('clientes')
+    .select('id, nombre, basecamp_project_id, config')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('activo', true)
+    .is('deleted_at', null)
+    .not('basecamp_project_id', 'is', null);
   const out = { actualizados: [] as string[], registrados: [] as string[], errores: [] as { cliente: string; error: string }[] };
   for (const c of (data ?? []) as { id: string; nombre: string; basecamp_project_id: number; config: Record<string, unknown> }[]) {
     try {
@@ -51,9 +64,16 @@ export async function actualizarWebhooksTenant(ctx: DbCtx): Promise<{ actualizad
         await registrarWebhookCliente(ctx, c.id);
         out.registrados.push(c.nombre);
       }
-    } catch (err) { out.errores.push({ cliente: c.nombre, error: err instanceof Error ? err.message.slice(0, 120) : String(err) }); }
+    } catch (err) {
+      out.errores.push({ cliente: c.nombre, error: err instanceof Error ? err.message.slice(0, 120) : String(err) });
+    }
   }
-  await audit(ctx, { accion: 'basecamp_actualizar_webhooks', entidad: 'tenant', entidad_id: ctx.tenantId, detalle: { actualizados: out.actualizados.length, registrados: out.registrados.length, errores: out.errores.length } });
+  await audit(ctx, {
+    accion: 'basecamp_actualizar_webhooks',
+    entidad: 'tenant',
+    entidad_id: ctx.tenantId,
+    detalle: { actualizados: out.actualizados.length, registrados: out.registrados.length, errores: out.errores.length },
+  });
   return out;
 }
 
@@ -65,5 +85,11 @@ export async function diagnosticoWebhookCliente(ctx: DbCtx, clienteId: string) {
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const d = await bc.getWebhookDeliveries(cliente.basecamp_project_id, id);
   // Se enmascara el token de la URL.
-  return { webhook_id: id, activo: d.activo, payload_url: enmascararPayloadUrl(d.payload_url), url_coincide: d.payload_url === webhookUrl(), entregas: d.entregas };
+  return {
+    webhook_id: id,
+    activo: d.activo,
+    payload_url: enmascararPayloadUrl(d.payload_url),
+    url_coincide: d.payload_url === webhookUrl(),
+    entregas: d.entregas,
+  };
 }

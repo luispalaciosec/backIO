@@ -22,11 +22,23 @@ export interface PreviewProyecto {
   plan: PlanProyecto;
   vista_cliente: ClientSafeProject;
   alertas: (AlertaCapacidad & { nombre: string })[];
-  resumen: { requerimientos_a_crear: number; visibles_al_cliente: number; todos_basecamp_a_crear: number; piezas: number; cliente: string; plantilla: string };
+  resumen: {
+    requerimientos_a_crear: number;
+    visibles_al_cliente: number;
+    todos_basecamp_a_crear: number;
+    piezas: number;
+    cliente: string;
+    plantilla: string;
+  };
 }
 
 export async function previewProyecto(ctx: DbCtx, input: CrearProyectoInput): Promise<PreviewProyecto> {
-  const [plantilla, cliente, usuarios, tiposPieza] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id), listUsuarios(ctx), listTiposPieza(ctx)]);
+  const [plantilla, cliente, usuarios, tiposPieza] = await Promise.all([
+    getPlantillaArbol(ctx, input.plantilla_id),
+    getCliente(ctx, input.cliente_id),
+    listUsuarios(ctx),
+    listTiposPieza(ctx),
+  ]);
   if (!plantilla) throw new DbError('Plantilla no encontrada', 404);
   if (!cliente) throw new DbError('Cliente no encontrado', 404);
   const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [], tiposPieza });
@@ -34,8 +46,14 @@ export async function previewProyecto(ctx: DbCtx, input: CrearProyectoInput): Pr
   const vista_cliente = sanitizeForClient(
     { nombre: input.nombre, fecha_entrega: input.fecha_entrega },
     plan.tareas.map((t, i) => ({
-      id: `preview-${i}`, etiqueta_cliente: t.etiqueta_cliente, visible_cliente: t.visible_cliente, peso: t.peso,
-      estado_operativo: 'backlog', estado_aprobacion: 'no_aplica', fecha_entrega: t.fecha_entrega, ultima_actualizacion: ahora,
+      id: `preview-${i}`,
+      etiqueta_cliente: t.etiqueta_cliente,
+      visible_cliente: t.visible_cliente,
+      peso: t.peso,
+      estado_operativo: 'backlog',
+      estado_aprobacion: 'no_aplica',
+      fecha_entrega: t.fecha_entrega,
+      ultima_actualizacion: ahora,
     })),
   );
   return {
@@ -61,7 +79,11 @@ export interface ResultadoCreacion {
 }
 
 export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyectoInput): Promise<ResultadoCreacion> {
-  const [plantilla, cliente, tiposPieza] = await Promise.all([getPlantillaArbol(ctx, input.plantilla_id), getCliente(ctx, input.cliente_id), listTiposPieza(ctx)]);
+  const [plantilla, cliente, tiposPieza] = await Promise.all([
+    getPlantillaArbol(ctx, input.plantilla_id),
+    getCliente(ctx, input.cliente_id),
+    listTiposPieza(ctx),
+  ]);
   if (!plantilla) throw new DbError('Plantilla no encontrada', 404);
   if (!cliente) throw new DbError('Cliente no encontrado', 404);
 
@@ -85,32 +107,58 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   const requerimientos = await insertRequerimientos(
     ctx,
     plan.tareas.map((t) => ({
-      cliente_id: input.cliente_id, proyecto_id: proyecto.id, bloque_nombre: t.bloque_nombre, plantilla_tarea_id: t.plantilla_tarea_id || null,
+      cliente_id: input.cliente_id,
+      proyecto_id: proyecto.id,
+      bloque_nombre: t.bloque_nombre,
+      plantilla_tarea_id: t.plantilla_tarea_id || null,
       tipo_pieza_id: t.tipo_pieza_id ?? null,
-      titulo_interno: t.titulo_interno, etiqueta_cliente: t.etiqueta_cliente, visible_cliente: t.visible_cliente,
-      tipo_trabajo: plantilla.tipo === 'fee_mensual' ? 'fee' : 'proyecto', estado_operativo: 'priorizado', peso: t.peso, fecha_pedido: fecha_inicio, fecha_entrega: t.fecha_entrega,
-      owner_agencia: t.owner_agencia, piezas: t.piezas,
+      titulo_interno: t.titulo_interno,
+      etiqueta_cliente: t.etiqueta_cliente,
+      visible_cliente: t.visible_cliente,
+      tipo_trabajo: plantilla.tipo === 'fee_mensual' ? 'fee' : 'proyecto',
+      estado_operativo: 'priorizado',
+      peso: t.peso,
+      fecha_pedido: fecha_inicio,
+      fecha_entrega: t.fecha_entrega,
+      owner_agencia: t.owner_agencia,
+      piezas: t.piezas,
     })),
   );
 
-  await audit(ctx, { accion: 'crear_proyecto', entidad: 'proyecto', entidad_id: proyecto.id, detalle: { requerimientos: requerimientos.length, visibles: plan.visibles, alertas: plan.alertas, origen: ctx.origen } });
+  await audit(ctx, {
+    accion: 'crear_proyecto',
+    entidad: 'proyecto',
+    entidad_id: proyecto.id,
+    detalle: { requerimientos: requerimientos.length, visibles: plan.visibles, alertas: plan.alertas, origen: ctx.origen },
+  });
 
   // Si nació de una cotización de PrometIO, el borrador queda convertido.
   if (input.prometio_cotizacion_id) {
-    const { data: b } = await ctx.db.from('proyecto_borradores').update({ estado: 'convertido', proyecto_id: proyecto.id })
-      .eq('tenant_id', ctx.tenantId).eq('prometio_cotizacion_id', input.prometio_cotizacion_id).select('payload').maybeSingle();
+    const { data: b } = await ctx.db
+      .from('proyecto_borradores')
+      .update({ estado: 'convertido', proyecto_id: proyecto.id })
+      .eq('tenant_id', ctx.tenantId)
+      .eq('prometio_cotizacion_id', input.prometio_cotizacion_id)
+      .select('payload')
+      .maybeSingle();
     const valor = (b as { payload?: { valor?: number | null } } | null)?.payload?.valor;
     if (typeof valor === 'number') await updateProyecto(ctx, proyecto.id, { valor_cotizado: valor });
   }
 
   const owners = [...new Set(plan.tareas.flatMap((t) => t.owner_agencia))].filter((id) => id !== ctx.usuarioId);
   if (owners.length) {
-    void notificar(ctx, {
-      tipo: 'proyecto_asignado',
-      titulo: `Nuevo proyecto: ${proyecto.nombre} (${cliente.nombre})`,
-      cuerpo: `Se te asignaron tareas en el proyecto "${proyecto.nombre}" de ${cliente.nombre}. Entrega final: ${input.fecha_entrega}.`,
-      ruta: `/proyectos/${proyecto.id}`, entidad_tipo: 'proyecto', entidad_id: proyecto.id,
-    }, { usuarioIds: owners }).catch((e) => console.error('[notificar] proyecto', e));
+    void notificar(
+      ctx,
+      {
+        tipo: 'proyecto_asignado',
+        titulo: `Nuevo proyecto: ${proyecto.nombre} (${cliente.nombre})`,
+        cuerpo: `Se te asignaron tareas en el proyecto "${proyecto.nombre}" de ${cliente.nombre}. Entrega final: ${input.fecha_entrega}.`,
+        ruta: `/proyectos/${proyecto.id}`,
+        entidad_tipo: 'proyecto',
+        entidad_id: proyecto.id,
+      },
+      { usuarioIds: owners },
+    ).catch((e) => console.error('[notificar] proyecto', e));
   }
 
   let basecamp: unknown = { omitido: true, motivo: 'cliente sin basecamp_project_id' };

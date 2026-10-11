@@ -31,10 +31,14 @@ const MAX_POR_TOKEN = 30;
 const huella = (token: string) => createHash('sha256').update(token).digest('hex').slice(0, 24);
 
 /** Credencial del portal: el hash de `portal_pines` o, solo mientras no se migre, el PIN en claro de config. */
-interface PinCliente { hash: string | null; claro: string | null }
+interface PinCliente {
+  hash: string | null;
+  claro: string | null;
+}
 function coincide(dado: string, pin: PinCliente): boolean {
   if (pin.hash) return pinCoincide(dado, pin.hash);
-  const a = Buffer.from(dado), b = Buffer.from(pin.claro ?? '');
+  const a = Buffer.from(dado),
+    b = Buffer.from(pin.claro ?? '');
   return a.length === b.length && timingSafeEqual(a, b);
 }
 async function pinDe(r: { proyecto: { cliente_id: string }; cliente: { config?: Record<string, unknown> | null } }): Promise<PinCliente> {
@@ -47,9 +51,15 @@ async function verificarPin(c: Context, token: string, pin: PinCliente): Promise
   const kIp = `pin:${huella(token)}:${ipCliente(c)}`;
   const kToken = `pin:${huella(token)}:*`;
   // Bloqueado si ya acumuló el máximo de fallos (por IP o por token) en la ventana.
-  const [eIp, eToken] = await Promise.all([estadoLimite(kIp, MAX_POR_IP - 1, VENTANA_SEG), estadoLimite(kToken, MAX_POR_TOKEN - 1, VENTANA_SEG)]);
+  const [eIp, eToken] = await Promise.all([
+    estadoLimite(kIp, MAX_POR_IP - 1, VENTANA_SEG),
+    estadoLimite(kToken, MAX_POR_TOKEN - 1, VENTANA_SEG),
+  ]);
   if (eIp.excedido || eToken.excedido) return c.json({ error: 'Demasiados intentos. Espera 15 minutos.', requiere_pin: true }, 429);
-  if (coincide((c.req.header('x-portal-pin') ?? '').slice(0, 20), pin)) { await limpiarLimite(kIp); return null; }
+  if (coincide((c.req.header('x-portal-pin') ?? '').slice(0, 20), pin)) {
+    await limpiarLimite(kIp);
+    return null;
+  }
   await Promise.all([sumarIntento(kIp, MAX_POR_IP, VENTANA_SEG), sumarIntento(kToken, MAX_POR_TOKEN, VENTANA_SEG)]);
   return c.json({ error: 'PIN requerido', requiere_pin: true }, 401);
 }
@@ -78,18 +88,22 @@ portal.get('/:token', async (c) => {
 });
 
 // El resumen llama a la IA (costo): 10 por hora por enlace, además de la caché de 6 h (auditoría 10/10, punto 11).
-portal.post('/:token/resumen', limitar('portal_resumen', 10, 3600, (c) => huella(c.req.param('token') ?? '')), async (c) => {
-  const r = await cargar(c.req.param('token'));
-  if (!r) return c.json({ error: 'Portal no disponible' }, 404);
-  const bloqueo = await verificarPin(c, c.req.param('token'), await pinDe(r));
-  if (bloqueo) return bloqueo;
-  const safe = sanitizeForClient(r.proyecto, r.requerimientos);
-  try {
-    const resumen = await generarResumen(r.proyecto.id, r.proyecto.tenant_id, safe, r.cliente.nombre);
-    return c.json({ resumen });
-  } catch (err) {
-    // El detalle (configuración, errores del proveedor de IA o de la base) va al log, nunca al visitante anónimo.
-    console.error('[portal] resumen', r.proyecto.id, err instanceof Error ? err.message : err);
-    return c.json({ error: 'El resumen no está disponible en este momento. Intenta más tarde.' }, 503);
-  }
-});
+portal.post(
+  '/:token/resumen',
+  limitar('portal_resumen', 10, 3600, (c) => huella(c.req.param('token') ?? '')),
+  async (c) => {
+    const r = await cargar(c.req.param('token'));
+    if (!r) return c.json({ error: 'Portal no disponible' }, 404);
+    const bloqueo = await verificarPin(c, c.req.param('token'), await pinDe(r));
+    if (bloqueo) return bloqueo;
+    const safe = sanitizeForClient(r.proyecto, r.requerimientos);
+    try {
+      const resumen = await generarResumen(r.proyecto.id, r.proyecto.tenant_id, safe, r.cliente.nombre);
+      return c.json({ resumen });
+    } catch (err) {
+      // El detalle (configuración, errores del proveedor de IA o de la base) va al log, nunca al visitante anónimo.
+      console.error('[portal] resumen', r.proyecto.id, err instanceof Error ? err.message : err);
+      return c.json({ error: 'El resumen no está disponible en este momento. Intenta más tarde.' }, 503);
+    }
+  },
+);

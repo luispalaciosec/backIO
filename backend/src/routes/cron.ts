@@ -57,20 +57,33 @@ cron.post('/basecamp/estructura', async (c) => {
   const out: Record<string, unknown> = {};
   for (const t of await tenants()) {
     const ctx = { db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' as const };
-    const { data } = await serviceClient().from('clientes').select('id, nombre').eq('tenant_id', t).eq('activo', true).not('basecamp_project_id', 'is', null).not('basecamp_importado_at', 'is', null);
-    for (const cl of (data ?? []) as { id: string; nombre: string }[]) out[cl.nombre] = await importarBasecampCliente(ctx, cl.id, { soloActualizar: true }).catch((e: Error) => ({ error: e.message }));
+    const { data } = await serviceClient()
+      .from('clientes')
+      .select('id, nombre')
+      .eq('tenant_id', t)
+      .eq('activo', true)
+      .not('basecamp_project_id', 'is', null)
+      .not('basecamp_importado_at', 'is', null);
+    for (const cl of (data ?? []) as { id: string; nombre: string }[])
+      out[cl.nombre] = await importarBasecampCliente(ctx, cl.id, { soloActualizar: true }).catch((e: Error) => ({ error: e.message }));
   }
   return c.json(out);
 });
 /** Diario: recurrencias de fees. */
 cron.post('/recurrencias', async (c) => {
   const out: Record<string, unknown> = {};
-  for (const t of await tenants()) out[t] = await procesarRecurrencias({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({ error: e.message }));
+  for (const t of await tenants())
+    out[t] = await procesarRecurrencias({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({
+      error: e.message,
+    }));
   return c.json(out);
 });
 /** Cada 6 h: horas. */
 cron.post('/horas', async (c) => {
   const out: Record<string, unknown> = {};
-  for (const t of await tenants()) out[t] = await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({ error: e.message }));
+  for (const t of await tenants())
+    out[t] = await sincronizarHoras({ db: serviceClient(), tenantId: t, usuarioId: null, origen: 'cron' }).catch((e: Error) => ({
+      error: e.message,
+    }));
   return c.json(out);
 });

@@ -39,11 +39,23 @@ export interface GenerarOpts {
   cacheMs?: number;
 }
 
-export interface Generado { texto: string; desde_cache: boolean; modelo: string }
+export interface Generado {
+  texto: string;
+  desde_cache: boolean;
+  modelo: string;
+}
 
 async function leerCache(ctx: DbCtx, tipo: string, hash: string, cacheMs: number): Promise<string | null> {
   if (!cacheMs) return null;
-  const { data } = await serviceClient().from('ia_generaciones').select('texto, created_at').eq('tenant_id', ctx.tenantId).eq('tipo', tipo).eq('payload_hash', hash).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const { data } = await serviceClient()
+    .from('ia_generaciones')
+    .select('texto, created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('tipo', tipo)
+    .eq('payload_hash', hash)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const row = data as { texto: string; created_at: string } | null;
   if (!row) return null;
   return Date.now() - new Date(row.created_at).getTime() < cacheMs ? row.texto : null;
@@ -73,17 +85,40 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
   } catch (err) {
     throw traducirErrorIA(err);
   }
-  const texto = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('\n').trim();
+  const texto = res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n')
+    .trim();
   if (!texto) {
-    console.error('[ia] respuesta sin texto', { tipo: o.tipo, stop_reason: res.stop_reason, bloques: res.content.map((b) => b.type), usage: res.usage });
-    const motivo = res.stop_reason === 'max_tokens' ? 'se agotó el límite de tokens antes de escribir' : (res.stop_reason as string) === 'refusal' ? 'el modelo rechazó la solicitud' : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
+    console.error('[ia] respuesta sin texto', {
+      tipo: o.tipo,
+      stop_reason: res.stop_reason,
+      bloques: res.content.map((b) => b.type),
+      usage: res.usage,
+    });
+    const motivo =
+      res.stop_reason === 'max_tokens'
+        ? 'se agotó el límite de tokens antes de escribir'
+        : (res.stop_reason as string) === 'refusal'
+          ? 'el modelo rechazó la solicitud'
+          : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
     throw new DbError(`La IA no devolvió texto: ${motivo}. Vuelve a intentar; si persiste, avisa a Luis.`, 502);
   }
-  const { error } = await serviceClient().from('ia_generaciones').insert({
-    tenant_id: ctx.tenantId, tipo: o.tipo, entidad_tipo: o.entidad?.tipo ?? null, entidad_id: o.entidad?.id ?? null,
-    payload_hash: hash, texto, modelo: MODELO_IA, tokens_entrada: res.usage?.input_tokens ?? null, tokens_salida: res.usage?.output_tokens ?? null,
-    creado_por: ctx.usuarioId,
-  });
+  const { error } = await serviceClient()
+    .from('ia_generaciones')
+    .insert({
+      tenant_id: ctx.tenantId,
+      tipo: o.tipo,
+      entidad_tipo: o.entidad?.tipo ?? null,
+      entidad_id: o.entidad?.id ?? null,
+      payload_hash: hash,
+      texto,
+      modelo: MODELO_IA,
+      tokens_entrada: res.usage?.input_tokens ?? null,
+      tokens_salida: res.usage?.output_tokens ?? null,
+      creado_por: ctx.usuarioId,
+    });
   throwIf(error);
   return { texto, desde_cache: false, modelo: MODELO_IA };
 }
@@ -94,22 +129,38 @@ export function traducirErrorIA(err: unknown): DbError {
   const msg = (e.error?.error?.message ?? e.message ?? '').toString();
   const status = e.status ?? 0;
   console.error('[ia] error de la API', { status, msg });
-  if (status === 401 || /invalid x-api-key|authentication/i.test(msg)) return new DbError('La clave de IA no es válida o fue revocada (ANTHROPIC_API_KEY). Avisa a Luis.', 502);
-  if (status === 402 || /credit balance|billing|insufficient/i.test(msg)) return new DbError('La cuenta de IA no tiene saldo. Hay que recargar créditos en Anthropic.', 502);
+  if (status === 401 || /invalid x-api-key|authentication/i.test(msg))
+    return new DbError('La clave de IA no es válida o fue revocada (ANTHROPIC_API_KEY). Avisa a Luis.', 502);
+  if (status === 402 || /credit balance|billing|insufficient/i.test(msg))
+    return new DbError('La cuenta de IA no tiene saldo. Hay que recargar créditos en Anthropic.', 502);
   if (status === 429) return new DbError('La IA está al límite de uso por ahora. Espera un minuto y vuelve a intentar.', 503);
-  if (status === 529 || /overloaded/i.test(msg)) return new DbError('El servicio de IA está saturado en este momento. Vuelve a intentar en unos minutos.', 503);
-  if (status === 404 || /model/i.test(msg) && /not found|does not exist/i.test(msg)) return new DbError(`El modelo de IA (${MODELO_IA}) no está disponible para esta clave. Avisa a Luis.`, 502);
-  if (/timeout|timed out|ECONNRESET|fetch failed/i.test(msg)) return new DbError('La IA tardó demasiado en responder. Vuelve a intentar.', 504);
+  if (status === 529 || /overloaded/i.test(msg))
+    return new DbError('El servicio de IA está saturado en este momento. Vuelve a intentar en unos minutos.', 503);
+  if (status === 404 || (/model/i.test(msg) && /not found|does not exist/i.test(msg)))
+    return new DbError(`El modelo de IA (${MODELO_IA}) no está disponible para esta clave. Avisa a Luis.`, 502);
+  if (/timeout|timed out|ECONNRESET|fetch failed/i.test(msg))
+    return new DbError('La IA tardó demasiado en responder. Vuelve a intentar.', 504);
   return new DbError(`Error de la IA: ${msg || 'desconocido'}`, 502);
 }
 
 /** Igual que generarTexto pero exige JSON y lo parsea (tolera fences ```json). */
 export async function generarJson<T>(ctx: DbCtx, o: GenerarOpts): Promise<T> {
-  const g = await generarTexto(ctx, { ...o, system: `${o.system}\n\nResponde ÚNICAMENTE con JSON válido, sin comentarios ni texto alrededor.` });
+  const g = await generarTexto(ctx, {
+    ...o,
+    system: `${o.system}\n\nResponde ÚNICAMENTE con JSON válido, sin comentarios ni texto alrededor.`,
+  });
   // Tolera fences y texto alrededor: se queda con el primer '{' y el último '}'.
-  const sinFences = g.texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  const a = sinFences.indexOf('{'); const b = sinFences.lastIndexOf('}');
+  const sinFences = g.texto
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+  const a = sinFences.indexOf('{');
+  const b = sinFences.lastIndexOf('}');
   const limpio = a >= 0 && b > a ? sinFences.slice(a, b + 1) : sinFences;
-  try { return JSON.parse(limpio) as T; }
-  catch { console.error('[ia] JSON inválido', { tipo: o.tipo, longitud: limpio.length, inicio: limpio.slice(0, 200), fin: limpio.slice(-200) }); throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502); }
+  try {
+    return JSON.parse(limpio) as T;
+  } catch {
+    console.error('[ia] JSON inválido', { tipo: o.tipo, longitud: limpio.length, inicio: limpio.slice(0, 200), fin: limpio.slice(-200) });
+    throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502);
+  }
 }

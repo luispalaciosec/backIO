@@ -22,9 +22,7 @@ export async function getDaily(ctx: DbCtx, opts: { mesaId?: string } = {}): Prom
     vencen_hoy_o_manana_sin_iniciar: activos
       .filter((r) => r.fecha_entrega && r.fecha_entrega <= manana && r.estado_operativo === 'priorizado')
       .map(strip),
-    bloqueos_nuevos: activos
-      .filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h)
-      .map(strip),
+    bloqueos_nuevos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).map(strip),
     fechas_cambiadas: activos.filter((r) => cambiados.has(r.id)).map(strip),
   };
 }

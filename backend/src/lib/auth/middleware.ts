@@ -52,7 +52,14 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
   if (!data || (data as { revocada_at: string | null }).revocada_at) return null;
   const row = data as { id: string; tenant_id: string; nombre: string; scopes: Scope[]; perfil: string | null; cliente_id: string | null };
   // El builder de PostgREST es perezoso: sin then/await la petición nunca salía y ultimo_uso_at quedaba muerto.
-  void db.from('api_keys').update({ ultimo_uso_at: new Date().toISOString() }).eq('id', row.id).then(() => undefined, () => undefined);
+  void db
+    .from('api_keys')
+    .update({ ultimo_uso_at: new Date().toISOString() })
+    .eq('id', row.id)
+    .then(
+      () => undefined,
+      () => undefined,
+    );
   return {
     tipo: 'api_key',
     ctx: { db, tenantId: row.tenant_id, usuarioId: null, origen: 'api', apiKeyId: row.id },
@@ -85,7 +92,12 @@ async function resolveOAuth(token: string): Promise<AuthInfo | null> {
   const t = await resolverAccessToken(token);
   if (!t) return null;
   const db = serviceClient();
-  const { data: u } = await db.from('usuarios').select('rol, nombre, activo').eq('id', t.usuario_id).eq('tenant_id', t.tenant_id).maybeSingle();
+  const { data: u } = await db
+    .from('usuarios')
+    .select('rol, nombre, activo')
+    .eq('id', t.usuario_id)
+    .eq('tenant_id', t.tenant_id)
+    .maybeSingle();
   const usuario = u as { rol: Rol; nombre: string; activo: boolean } | null;
   if (!usuario?.activo) return null;
   return {
@@ -109,7 +121,11 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
   if (scheme?.toLowerCase() !== 'bearer' || !token) {
     return c.json({ error: 'No autenticado' }, 401, wwwAuthenticate());
   }
-  const info = token.startsWith('bk_') ? await resolveApiKey(token) : token.startsWith('bko_') ? await resolveOAuth(token) : await resolveJwt(token);
+  const info = token.startsWith('bk_')
+    ? await resolveApiKey(token)
+    : token.startsWith('bko_')
+      ? await resolveOAuth(token)
+      : await resolveJwt(token);
   if (!info) return c.json({ error: 'Credenciales inválidas' }, 401, wwwAuthenticate());
   c.set('auth', info);
   await next();

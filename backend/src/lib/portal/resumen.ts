@@ -78,7 +78,11 @@ export async function generarResumen(proyectoId: string, tenantId: string, safe:
     .trim();
 
   const { error } = await db.from('portal_resumenes').upsert({
-    proyecto_id: proyectoId, tenant_id: tenantId, payload_hash: hash, resumen: texto, generado_at: new Date().toISOString(),
+    proyecto_id: proyectoId,
+    tenant_id: tenantId,
+    payload_hash: hash,
+    resumen: texto,
+    generado_at: new Date().toISOString(),
   });
   throwIf(error);
   return texto;

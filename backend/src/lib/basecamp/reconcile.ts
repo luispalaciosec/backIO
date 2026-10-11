@@ -19,7 +19,8 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
   if (activos.length === 0) return { revisados: 0, aplicados: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
   const proyectosPorCliente = new Map<string, number | null>();
-  let aplicados = 0, fechas = 0;
+  let aplicados = 0,
+    fechas = 0;
   for (const r of activos) {
     if (!proyectosPorCliente.has(r.cliente_id)) {
       proyectosPorCliente.set(r.cliente_id, (await getCliente(ctx, r.cliente_id))?.basecamp_project_id ?? null);
@@ -35,8 +36,15 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
         fechas += 1;
         try {
           await pushDueDate(ctx, r, bc);
-          await audit(ctx, { accion: 'basecamp_fecha_reenviada', entidad: 'requerimiento', entidad_id: r.id, detalle: { todo_id: r.basecamp_todo_id, basecamp: safe.due_on, backio: r.fecha_entrega } });
-        } catch (e) { console.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e); }
+          await audit(ctx, {
+            accion: 'basecamp_fecha_reenviada',
+            entidad: 'requerimiento',
+            entidad_id: r.id,
+            detalle: { todo_id: r.basecamp_todo_id, basecamp: safe.due_on, backio: r.fecha_entrega },
+          });
+        } catch (e) {
+          console.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e);
+        }
       }
     } catch (err) {
       console.error('[reconcile] fallo en to-do', r.basecamp_todo_id, err);

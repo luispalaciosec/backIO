@@ -29,7 +29,10 @@ export type Env = z.infer<typeof schema>;
 let cached: Env | null = null;
 
 export function frontendOrigins(): string[] {
-  return env().FRONTEND_URL.split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean);
+  return env()
+    .FRONTEND_URL.split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
 }
 
 export function env(): Env {
@@ -52,6 +55,8 @@ function revisarHttps(e: Env): void {
   if (e.NODE_ENV !== 'production') return;
   const publicas = [e.FRONTEND_URL.split(',')[0]?.trim() ?? '', process.env.BACKEND_PUBLIC_URL ?? ''].filter(Boolean);
   for (const u of publicas) if (!u.startsWith('https://')) console.error(`[env] URL pública sin https en producción: ${u}`);
-  const locales = e.FRONTEND_URL.split(',').map((s) => s.trim()).filter((s) => /^http:\/\/(localhost|127\.0\.0\.1)/.test(s));
+  const locales = e.FRONTEND_URL.split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^http:\/\/(localhost|127\.0\.0\.1)/.test(s));
   if (locales.length) console.warn(`[env] FRONTEND_URL incluye orígenes locales en producción (CORS): ${locales.join(', ')}`);
 }

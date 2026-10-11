@@ -50,7 +50,10 @@ export interface CrearRequerimientoInput {
   planificacion?: 'planificado' | 'no_planificado' | 'urgente';
 }
 
-export type ActualizarRequerimientoInput = { motivo_reprogramacion?: import('./types').MotivoReprogramacion | null; observacion_reprogramacion?: string | null } & Partial<
+export type ActualizarRequerimientoInput = {
+  motivo_reprogramacion?: import('./types').MotivoReprogramacion | null;
+  observacion_reprogramacion?: string | null;
+} & Partial<
   Pick<
     Requerimiento,
     | 'titulo_interno'

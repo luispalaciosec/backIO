@@ -19,28 +19,58 @@ const aplicados: Record<string, unknown>[] = [];
 vi.mock('../lib/db/client', async (orig) => {
   const mod = await orig<typeof import('../lib/db/client')>();
   const q = {
-    from: () => q, select: () => q, eq: () => q, is: () => q,
+    from: () => q,
+    select: () => q,
+    eq: () => q,
+    is: () => q,
     maybeSingle: async () => ({ data: { basecamp_project_id: 100 }, error: null }),
     single: async () => ({ data: { tenant_id: 't1' }, error: null }),
   };
   return { ...mod, serviceClient: () => q as never };
 });
 vi.mock('../lib/db/audit', () => ({ audit: async () => undefined }));
-vi.mock('../lib/db/requerimientos', async (orig) => ({ ...(await orig<object>()), findByBasecampTodo: async (_c: unknown, id: number) => (id === 42 ? REQ : null) }));
+vi.mock('../lib/db/requerimientos', async (orig) => ({
+  ...(await orig<object>()),
+  findByBasecampTodo: async (_c: unknown, id: number) => (id === 42 ? REQ : null),
+}));
 vi.mock('../lib/basecamp/importar', () => ({ importarBasecampCliente: async () => ({}) }));
 vi.mock('../lib/basecamp/client', () => ({
-  BasecampClient: { forTenant: async () => ({ getTodoRaw: async (p: number, t: number) => { consultas.push([p, t]); if (vivo instanceof Error) throw vivo; return vivo; } }) },
+  BasecampClient: {
+    forTenant: async () => ({
+      getTodoRaw: async (p: number, t: number) => {
+        consultas.push([p, t]);
+        if (vivo instanceof Error) throw vivo;
+        return vivo;
+      },
+    }),
+  },
 }));
 vi.mock('../lib/basecamp/sync', async (orig) => {
   const mod = await orig<typeof import('../lib/basecamp/sync')>();
-  return { ...mod, applyBasecampUpdate: async (_c: unknown, safe: Record<string, unknown>) => { aplicados.push(safe); return { aplicado: true, requerimiento_id: 'r1' }; } };
+  return {
+    ...mod,
+    applyBasecampUpdate: async (_c: unknown, safe: Record<string, unknown>) => {
+      aplicados.push(safe);
+      return { aplicado: true, requerimiento_id: 'r1' };
+    },
+  };
 });
 
 let app: import('hono').Hono;
-beforeAll(async () => { const { createApp } = await import('../app'); app = createApp(); });
-beforeEach(() => { consultas.length = 0; aplicados.length = 0; });
+beforeAll(async () => {
+  const { createApp } = await import('../app');
+  app = createApp();
+});
+beforeEach(() => {
+  consultas.length = 0;
+  aplicados.length = 0;
+});
 
-const evento = (kind: string, bucket = 100) => app.request('/api/webhooks/basecamp/s3cret', { method: 'POST', body: JSON.stringify({ kind, recording: { id: 42, bucket: { id: bucket } } }) });
+const evento = (kind: string, bucket = 100) =>
+  app.request('/api/webhooks/basecamp/s3cret', {
+    method: 'POST',
+    body: JSON.stringify({ kind, recording: { id: 42, bucket: { id: bucket } } }),
+  });
 const todoVivo = (p: Record<string, unknown>) => ({ id: 42, bucket: { id: 100 }, completed: false, status: 'active', ...p });
 
 describe('webhook de Basecamp: el estado sale del to-do vivo', () => {

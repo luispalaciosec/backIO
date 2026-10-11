@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  sanitizeForClient,
-  assertClientSafe,
-  mapEstadoCliente,
-  type SanitizableRequirement,
-} from '../visibility/sanitize';
+import { sanitizeForClient, assertClientSafe, mapEstadoCliente, type SanitizableRequirement } from '../visibility/sanitize';
 
 let seq = 0;
 const proyecto = { nombre: 'Campaña Navidad 2026', fecha_entrega: '2026-12-15' };

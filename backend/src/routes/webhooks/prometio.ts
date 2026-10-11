@@ -15,7 +15,13 @@ import { notificar } from '../../lib/notificaciones';
 
 export const prometioWebhook = new Hono();
 
-const empresa = z.object({ id: z.string().uuid(), nombre: z.string(), activo: z.boolean().default(true), ruc: z.string().nullable().optional(), logo_url: z.string().nullable().optional() });
+const empresa = z.object({
+  id: z.string().uuid(),
+  nombre: z.string(),
+  activo: z.boolean().default(true),
+  ruc: z.string().nullable().optional(),
+  logo_url: z.string().nullable().optional(),
+});
 
 const envelope = z.object({
   evento: z.string(),
@@ -56,27 +62,45 @@ prometioWebhook.post('/', async (c) => {
   if (!verify(raw, sig)) {
     // Rastro diagnosticable sin exponer el cuerpo: solo evento y si venía firma.
     let evento = 'desconocido';
-    try { evento = String((JSON.parse(raw) as { evento?: string }).evento ?? 'desconocido'); } catch { /* ignore */ }
+    try {
+      evento = String((JSON.parse(raw) as { evento?: string }).evento ?? 'desconocido');
+    } catch {
+      /* ignore */
+    }
     const tenantId = await tenantDefault().catch(() => null);
-    if (tenantId) await audit({ db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' }, { accion: 'webhook_rechazado', entidad: 'webhook', detalle: { evento, con_firma: !!sig, motivo: env().PROMETIO_WEBHOOK_SECRET ? 'firma inválida' : 'secreto no configurado' } });
+    if (tenantId)
+      await audit(
+        { db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' },
+        {
+          accion: 'webhook_rechazado',
+          entidad: 'webhook',
+          detalle: { evento, con_firma: !!sig, motivo: env().PROMETIO_WEBHOOK_SECRET ? 'firma inválida' : 'secreto no configurado' },
+        },
+      );
     return c.text('unauthorized', 401);
   }
   // Anti-replay: si viene X-Prometio-Timestamp debe estar dentro de ±5 min, y un mismo cuerpo no se procesa dos veces en 10 min.
   const ts = Number(c.req.header('x-prometio-timestamp'));
-  if (Number.isFinite(ts) && ts > 0 && Math.abs(Date.now() / 1000 - (ts > 1e12 ? ts / 1000 : ts)) > 300) return c.json({ error: 'timestamp fuera de ventana' }, 401);
+  if (Number.isFinite(ts) && ts > 0 && Math.abs(Date.now() / 1000 - (ts > 1e12 ? ts / 1000 : ts)) > 300)
+    return c.json({ error: 'timestamp fuera de ventana' }, 401);
   const huella = createHash('sha256').update(raw).digest('hex');
   const ahora = Date.now();
   for (const [k, v] of vistos) if (v < ahora - 10 * 60_000) vistos.delete(k);
   if (vistos.has(huella)) return c.json({ ok: true, duplicado: true });
   vistos.set(huella, ahora);
   let parsedRaw: unknown;
-  try { parsedRaw = JSON.parse(raw); } catch { return c.json({ error: 'bad json' }, 400); }
+  try {
+    parsedRaw = JSON.parse(raw);
+  } catch {
+    return c.json({ error: 'bad json' }, 400);
+  }
   const env1 = envelope.safeParse(parsedRaw);
   // Anti-replay con el timestamp FIRMADO del cuerpo (PrometIO siempre lo envía): el header es opcional y no va en
   // la firma, y el caché de duplicados vive solo 10 min en memoria, así que un envío capturado se podía repetir
   // más tarde (auditoría run-1). Ventana de 5 min: los reintentos de PrometIO llegan dentro de ~35 s.
   const enviado = env1.success && env1.data.timestamp ? Date.parse(env1.data.timestamp) : NaN;
-  if (!Number.isFinite(enviado) || Math.abs(Date.now() - enviado) > 5 * 60_000) return c.json({ error: 'timestamp ausente o fuera de ventana' }, 401);
+  if (!Number.isFinite(enviado) || Math.abs(Date.now() - enviado) > 5 * 60_000)
+    return c.json({ error: 'timestamp ausente o fuera de ventana' }, 401);
   const tenantId = await tenantDefault();
   const ctx = { db: serviceClient(), tenantId, usuarioId: null, origen: 'webhook:prometio' as const };
   const invalido = async (evento: string, issues: unknown) => {
@@ -100,27 +124,52 @@ prometioWebhook.post('/', async (c) => {
     if (!p.success) return invalido(evento, p.error.issues);
     const cot = p.data;
     // Garantiza que el cliente exista (mismo id que PrometIO).
-    const cliente = (await getCliente(ctx, cot.empresa.id)) ?? (await upsertClienteDesdePrometio(ctx, { id: cot.empresa.id, nombre: cot.empresa.nombre, activo: cot.empresa.activo }));
+    const cliente =
+      (await getCliente(ctx, cot.empresa.id)) ??
+      (await upsertClienteDesdePrometio(ctx, { id: cot.empresa.id, nombre: cot.empresa.nombre, activo: cot.empresa.activo }));
     const principal = cot.lineas[0]?.servicio;
     const { data: mapeo } = principal
-      ? await ctx.db.from('mapeo_servicios').select('plantilla_id').eq('tenant_id', tenantId).ilike('servicio_prometio', principal).maybeSingle()
+      ? await ctx.db
+          .from('mapeo_servicios')
+          .select('plantilla_id')
+          .eq('tenant_id', tenantId)
+          .ilike('servicio_prometio', principal)
+          .maybeSingle()
       : { data: null };
     const { data: fila, error } = await ctx.db
       .from('proyecto_borradores')
-      .upsert({
-        tenant_id: tenantId, cliente_id: cliente.id, prometio_cotizacion_id: cot.cotizacion_id,
-        plantilla_sugerida_id: (mapeo as { plantilla_id: string } | null)?.plantilla_id ?? null, payload: cot,
-      }, { onConflict: 'tenant_id,prometio_cotizacion_id' })
-      .select().single();
+      .upsert(
+        {
+          tenant_id: tenantId,
+          cliente_id: cliente.id,
+          prometio_cotizacion_id: cot.cotizacion_id,
+          plantilla_sugerida_id: (mapeo as { plantilla_id: string } | null)?.plantilla_id ?? null,
+          payload: cot,
+        },
+        { onConflict: 'tenant_id,prometio_cotizacion_id' },
+      )
+      .select()
+      .single();
     throwIf(error);
     const borrador = fila as { id: string };
-    await audit(ctx, { accion: 'cotizacion_ganada', entidad: 'proyecto_borrador', entidad_id: borrador.id, detalle: { cliente_id: cliente.id, cotizacion: cot.numero ?? cot.cotizacion_id } });
-    await notificar(ctx, {
-      tipo: 'borrador_proyecto',
-      titulo: `Cotización ganada: ${cliente.nombre}${cot.numero ? ` (${cot.numero})` : ''}`,
-      cuerpo: `PrometIO reporta una cotización aprobada${cot.valor ? ` por USD ${cot.valor}` : ''}.\nLíneas: ${cot.lineas.map((l) => `${l.servicio} ×${l.cantidad}`).join(', ') || 'sin detalle'}.\nHay un borrador de proyecto listo para revisar y confirmar en el Builder.`,
-      ruta: '/proyectos/nuevo', entidad_tipo: 'proyecto_borrador', entidad_id: borrador.id,
-    }, { roles: ['ejecutiva', 'operaciones'] });
+    await audit(ctx, {
+      accion: 'cotizacion_ganada',
+      entidad: 'proyecto_borrador',
+      entidad_id: borrador.id,
+      detalle: { cliente_id: cliente.id, cotizacion: cot.numero ?? cot.cotizacion_id },
+    });
+    await notificar(
+      ctx,
+      {
+        tipo: 'borrador_proyecto',
+        titulo: `Cotización ganada: ${cliente.nombre}${cot.numero ? ` (${cot.numero})` : ''}`,
+        cuerpo: `PrometIO reporta una cotización aprobada${cot.valor ? ` por USD ${cot.valor}` : ''}.\nLíneas: ${cot.lineas.map((l) => `${l.servicio} ×${l.cantidad}`).join(', ') || 'sin detalle'}.\nHay un borrador de proyecto listo para revisar y confirmar en el Builder.`,
+        ruta: '/proyectos/nuevo',
+        entidad_tipo: 'proyecto_borrador',
+        entidad_id: borrador.id,
+      },
+      { roles: ['ejecutiva', 'operaciones'] },
+    );
     return c.json({ ok: true, borrador_id: borrador.id });
   }
 

@@ -41,10 +41,7 @@ export async function upsertClienteDesdePrometio(
   const slug = c.slug ?? slugify(c.nombre);
   const { data, error } = await ctx.db
     .from('clientes')
-    .upsert(
-      { id: c.id, tenant_id: ctx.tenantId, nombre: c.nombre, slug, activo: c.activo },
-      { onConflict: 'id' },
-    )
+    .upsert({ id: c.id, tenant_id: ctx.tenantId, nombre: c.nombre, slug, activo: c.activo }, { onConflict: 'id' })
     .select()
     .single();
   throwIf(error);

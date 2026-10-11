@@ -6,7 +6,10 @@ export interface FiltroProyectos {
   estado?: EstadoOperativo;
 }
 
-export async function listProyectos(ctx: DbCtx, f: FiltroProyectos = {}): Promise<(Proyecto & { avance: number; cliente_nombre: string })[]> {
+export async function listProyectos(
+  ctx: DbCtx,
+  f: FiltroProyectos = {},
+): Promise<(Proyecto & { avance: number; cliente_nombre: string })[]> {
   let q = ctx.db
     .from('proyectos')
     .select('*, clientes!inner(nombre)')
@@ -67,7 +70,14 @@ export async function getProyectoDetalle(ctx: DbCtx, id: string): Promise<Proyec
 }
 
 /** Portal: busca por token. Usa service role; el llamador DEBE sanitizar. */
-export async function getProyectoByPortalToken(ctx: DbCtx, token: string): Promise<{ proyecto: Proyecto; requerimientos: Requerimiento[]; cliente: { nombre: string; logo_url: string | null; color_primario: string | null; config: Record<string, unknown> } } | null> {
+export async function getProyectoByPortalToken(
+  ctx: DbCtx,
+  token: string,
+): Promise<{
+  proyecto: Proyecto;
+  requerimientos: Requerimiento[];
+  cliente: { nombre: string; logo_url: string | null; color_primario: string | null; config: Record<string, unknown> };
+} | null> {
   const { data: p, error } = await ctx.db
     .from('proyectos')
     .select('*')
@@ -117,7 +127,27 @@ export async function insertProyecto(ctx: DbCtx, p: InsertProyecto): Promise<Pro
 export async function updateProyecto(
   ctx: DbCtx,
   id: string,
-  patch: Partial<Pick<Proyecto, 'nombre' | 'estado' | 'fecha_entrega' | 'owner_ejecutiva' | 'portal_activo' | 'portal_token' | 'sync_estado' | 'basecamp_todolist_id' | 'brief' | 'deleted_at' | 'mesa_id' | 'basecamp_grupos' | 'basecamp_todoset_id' | 'valor_cotizado' | 'recurrencia_id' | 'periodo'>>,
+  patch: Partial<
+    Pick<
+      Proyecto,
+      | 'nombre'
+      | 'estado'
+      | 'fecha_entrega'
+      | 'owner_ejecutiva'
+      | 'portal_activo'
+      | 'portal_token'
+      | 'sync_estado'
+      | 'basecamp_todolist_id'
+      | 'brief'
+      | 'deleted_at'
+      | 'mesa_id'
+      | 'basecamp_grupos'
+      | 'basecamp_todoset_id'
+      | 'valor_cotizado'
+      | 'recurrencia_id'
+      | 'periodo'
+    >
+  >,
 ): Promise<Proyecto> {
   const { data, error } = await ctx.db
     .from('proyectos')

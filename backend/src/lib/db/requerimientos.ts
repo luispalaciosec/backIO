@@ -54,7 +54,7 @@ export async function getRequerimiento(ctx: DbCtx, id: string): Promise<Requerim
     .is('deleted_at', null)
     .maybeSingle();
   throwIf(error);
-  return data ? ({ ...(data as Requerimiento), peso: Number((data as Requerimiento).peso) }) : null;
+  return data ? { ...(data as Requerimiento), peso: Number((data as Requerimiento).peso) } : null;
 }
 
 export async function findByBasecampTodo(ctx: DbCtx, todoId: number): Promise<Requerimiento | null> {
@@ -94,7 +94,13 @@ export async function insertRequerimientos(ctx: DbCtx, rows: InsertRequerimiento
 export async function updateRequerimiento(
   ctx: DbCtx,
   id: string,
-  patch: ActualizarRequerimientoInput & Partial<Pick<Requerimiento, 'basecamp_todo_id' | 'basecamp_todolist_id' | 'basecamp_url' | 'completado_at' | 'ultima_actualizacion' | 'deleted_at'>>,
+  patch: ActualizarRequerimientoInput &
+    Partial<
+      Pick<
+        Requerimiento,
+        'basecamp_todo_id' | 'basecamp_todolist_id' | 'basecamp_url' | 'completado_at' | 'ultima_actualizacion' | 'deleted_at'
+      >
+    >,
 ): Promise<Requerimiento> {
   const { data, error } = await ctx.db
     .from('requerimientos')

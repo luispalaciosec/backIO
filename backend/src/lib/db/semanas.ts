@@ -4,7 +4,11 @@ import { type DbCtx, throwIf } from './client';
 export async function ensureSemana(ctx: DbCtx, fecha: string): Promise<Semana> {
   const { data: id, error } = await ctx.db.rpc('ensure_semana', { p_tenant: ctx.tenantId, p_fecha: fecha });
   throwIf(error);
-  const { data, error: e2 } = await ctx.db.from('semanas').select('*').eq('id', id as string).single();
+  const { data, error: e2 } = await ctx.db
+    .from('semanas')
+    .select('*')
+    .eq('id', id as string)
+    .single();
   throwIf(e2);
   return data as Semana;
 }
@@ -24,7 +28,11 @@ export async function listSenales(ctx: DbCtx, semanaId: string, tipos?: string[]
   return ((data ?? []) as Senal[]).sort((a, b) => orden[a.severidad] - orden[b.severidad]);
 }
 
-export async function replaceSenales(ctx: DbCtx, semanaId: string, senales: Omit<Senal, 'id' | 'tenant_id' | 'semana_id' | 'created_at' | 'atendida'>[]): Promise<Senal[]> {
+export async function replaceSenales(
+  ctx: DbCtx,
+  semanaId: string,
+  senales: Omit<Senal, 'id' | 'tenant_id' | 'semana_id' | 'created_at' | 'atendida'>[],
+): Promise<Senal[]> {
   // Se recalculan completas cada corrida; las atendidas se conservan por (tipo, entidad_id).
   const { data: previas } = await ctx.db
     .from('senales')
@@ -39,7 +47,9 @@ export async function replaceSenales(ctx: DbCtx, semanaId: string, senales: Omit
   if (senales.length === 0) return [];
   const { data, error } = await ctx.db
     .from('senales')
-    .insert(senales.map((s) => ({ ...s, tenant_id: ctx.tenantId, semana_id: semanaId, atendida: atendidas.has(`${s.tipo}:${s.entidad_id}`) })))
+    .insert(
+      senales.map((s) => ({ ...s, tenant_id: ctx.tenantId, semana_id: semanaId, atendida: atendidas.has(`${s.tipo}:${s.entidad_id}`) })),
+    )
     .select();
   throwIf(error);
   return (data ?? []) as Senal[];
@@ -62,12 +72,20 @@ export async function listAcuerdosAbiertos(ctx: DbCtx): Promise<Acuerdo[]> {
 }
 
 export async function listAcuerdosSemana(ctx: DbCtx, semanaId: string): Promise<Acuerdo[]> {
-  const { data, error } = await ctx.db.from('acuerdos').select('*').eq('tenant_id', ctx.tenantId).eq('semana_id', semanaId).order('fecha_compromiso');
+  const { data, error } = await ctx.db
+    .from('acuerdos')
+    .select('*')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('semana_id', semanaId)
+    .order('fecha_compromiso');
   throwIf(error);
   return (data ?? []) as Acuerdo[];
 }
 
-export async function insertAcuerdo(ctx: DbCtx, a: { semana_id: string; descripcion: string; responsable_id: string; fecha_compromiso: string }): Promise<Acuerdo> {
+export async function insertAcuerdo(
+  ctx: DbCtx,
+  a: { semana_id: string; descripcion: string; responsable_id: string; fecha_compromiso: string },
+): Promise<Acuerdo> {
   const { data, error } = await ctx.db
     .from('acuerdos')
     .insert({ ...a, tenant_id: ctx.tenantId, created_by: ctx.usuarioId })
@@ -86,8 +104,15 @@ export async function cerrarAcuerdo(ctx: DbCtx, id: string, estado: 'cumplido' |
   throwIf(error);
 }
 
-export async function insertActa(ctx: DbCtx, a: { semana_id: string; tipo: Acta['tipo']; mesa_id?: string | null; contenido: unknown; markdown: string }): Promise<Acta> {
-  const { data, error } = await ctx.db.from('actas').insert({ ...a, tenant_id: ctx.tenantId }).select().single();
+export async function insertActa(
+  ctx: DbCtx,
+  a: { semana_id: string; tipo: Acta['tipo']; mesa_id?: string | null; contenido: unknown; markdown: string },
+): Promise<Acta> {
+  const { data, error } = await ctx.db
+    .from('actas')
+    .insert({ ...a, tenant_id: ctx.tenantId })
+    .select()
+    .single();
   throwIf(error);
   return data as Acta;
 }

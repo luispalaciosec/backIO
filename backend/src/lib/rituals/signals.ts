@@ -144,9 +144,7 @@ export const REGLAS: SignalRule[] = [
     detectar: (ctx, u) => {
       const limite = new Date(`${ctx.hoy}T00:00:00Z`).getTime() - u.cuenta_silenciosa_dias * 86_400_000;
       const conMovimiento = new Set(
-        ctx.completadosRecientes
-          .filter((r) => r.completado_at && new Date(r.completado_at).getTime() >= limite)
-          .map((r) => r.cliente_id),
+        ctx.completadosRecientes.filter((r) => r.completado_at && new Date(r.completado_at).getTime() >= limite).map((r) => r.cliente_id),
       );
       const conActivos = new Set(ctx.activos.map((r) => r.cliente_id));
       return ctx.clientes
@@ -228,7 +226,10 @@ const REGLAS_CUMPLIMIENTO: SignalRule[] = [
       ctx.activos
         .filter((r) => (r.veces_reproceso ?? 0) >= 2)
         .map((r) => ({
-          tipo: 'reproceso_reincidente', severidad: 'critica', entidad_tipo: 'requerimiento', entidad_id: r.id,
+          tipo: 'reproceso_reincidente',
+          severidad: 'critica',
+          entidad_tipo: 'requerimiento',
+          entidad_id: r.id,
           titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" lleva ${r.veces_reproceso} reprocesos (${nombreDe(ctx, r.owner_agencia[0] ?? '')})`,
           detalle: { veces_reproceso: r.veces_reproceso, owner: r.owner_agencia[0] ?? null },
         })),
@@ -239,11 +240,16 @@ const REGLAS_CUMPLIMIENTO: SignalRule[] = [
     tema_agenda: 'Completar la causa de la reprogramación',
     detectar: (ctx) => {
       const ids = new Set((ctx.sinMotivo?.reprogramaciones ?? []).map((x) => x.requerimiento_id));
-      return ctx.activos.filter((r) => ids.has(r.id)).map((r) => ({
-        tipo: 'reprogramacion_sin_motivo', severidad: 'media', entidad_tipo: 'requerimiento', entidad_id: r.id,
-        titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" se reprogramó sin causa registrada`,
-        detalle: { owner: r.owner_agencia[0] ?? null },
-      }));
+      return ctx.activos
+        .filter((r) => ids.has(r.id))
+        .map((r) => ({
+          tipo: 'reprogramacion_sin_motivo',
+          severidad: 'media',
+          entidad_tipo: 'requerimiento',
+          entidad_id: r.id,
+          titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" se reprogramó sin causa registrada`,
+          detalle: { owner: r.owner_agencia[0] ?? null },
+        }));
     },
   },
   {
@@ -252,11 +258,16 @@ const REGLAS_CUMPLIMIENTO: SignalRule[] = [
     tema_agenda: 'Completar la causa del reproceso',
     detectar: (ctx) => {
       const por = new Map((ctx.sinMotivo?.reprocesos ?? []).map((x) => [x.requerimiento_id, x.origen]));
-      return ctx.activos.filter((r) => por.has(r.id)).map((r) => ({
-        tipo: 'reproceso_sin_motivo', severidad: 'media', entidad_tipo: 'requerimiento', entidad_id: r.id,
-        titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" volvió al equipo (${por.get(r.id) === 'basecamp' ? 'desmarcado en Basecamp' : por.get(r.id)}) sin causa registrada`,
-        detalle: { origen: por.get(r.id) ?? null, owner: r.owner_agencia[0] ?? null },
-      }));
+      return ctx.activos
+        .filter((r) => por.has(r.id))
+        .map((r) => ({
+          tipo: 'reproceso_sin_motivo',
+          severidad: 'media',
+          entidad_tipo: 'requerimiento',
+          entidad_id: r.id,
+          titulo: `${clienteDe(ctx, r.cliente_id)} · "${r.titulo_interno}" volvió al equipo (${por.get(r.id) === 'basecamp' ? 'desmarcado en Basecamp' : por.get(r.id)}) sin causa registrada`,
+          detalle: { origen: por.get(r.id) ?? null, owner: r.owner_agencia[0] ?? null },
+        }));
     },
   },
 ];

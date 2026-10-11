@@ -18,7 +18,7 @@ import { hoyLocal } from '@backio/shared';
 async function umbrales(ctx: DbCtx): Promise<Partial<SignalThresholds>> {
   const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
   throwIf(error);
-  return ((data as { config: { signal_thresholds?: Partial<SignalThresholds> } }).config.signal_thresholds) ?? {};
+  return (data as { config: { signal_thresholds?: Partial<SignalThresholds> } }).config.signal_thresholds ?? {};
 }
 
 export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<Senal[]> {
@@ -88,8 +88,23 @@ export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?
     listAcuerdosAbiertos(ctx),
     listSenales(ctx, semanaId, ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga']),
   ]);
-  const data = { semana, mesa: mesa?.nombre ?? null, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos, pendientes_anteriores: pendientes, usuarios, clientes };
-  return insertActa(ctx, { semana_id: semanaId, tipo: 'plan_operativo', mesa_id: mesa?.id ?? null, contenido: data, markdown: conNarrativa(renderPlanOperativo(data), narrativa) });
+  const data = {
+    semana,
+    mesa: mesa?.nombre ?? null,
+    capacidad: calcularCapacidad(prioridades, usuarios),
+    prioridades,
+    riesgos,
+    pendientes_anteriores: pendientes,
+    usuarios,
+    clientes,
+  };
+  return insertActa(ctx, {
+    semana_id: semanaId,
+    tipo: 'plan_operativo',
+    mesa_id: mesa?.id ?? null,
+    contenido: data,
+    markdown: conNarrativa(renderPlanOperativo(data), narrativa),
+  });
 }
 
 export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: string | null, narrativa?: string): Promise<Acta> {
@@ -104,6 +119,23 @@ export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: s
     listSenales(ctx, semanaId),
     listAcuerdosSemana(ctx, semanaId),
   ]);
-  const data = { semana, mesa: mesa?.nombre ?? null, capacidad: calcularCapacidad(prioridades, usuarios), prioridades, riesgos: [], pendientes_anteriores: pendientes, usuarios, clientes, senales, acuerdos_semana: acuerdos };
-  return insertActa(ctx, { semana_id: semanaId, tipo: 'cierre', mesa_id: mesa?.id ?? null, contenido: data, markdown: conNarrativa(renderActaCierre(data), narrativa) });
+  const data = {
+    semana,
+    mesa: mesa?.nombre ?? null,
+    capacidad: calcularCapacidad(prioridades, usuarios),
+    prioridades,
+    riesgos: [],
+    pendientes_anteriores: pendientes,
+    usuarios,
+    clientes,
+    senales,
+    acuerdos_semana: acuerdos,
+  };
+  return insertActa(ctx, {
+    semana_id: semanaId,
+    tipo: 'cierre',
+    mesa_id: mesa?.id ?? null,
+    contenido: data,
+    markdown: conNarrativa(renderActaCierre(data), narrativa),
+  });
 }
