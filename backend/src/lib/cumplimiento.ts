@@ -20,6 +20,7 @@ import { insertReproceso, reprocesoAbierto, updateReproceso } from './db/histori
 import { audit } from './db/audit';
 import { throwIf } from './db/client';
 import { reabrirTodo } from './basecamp/write';
+import { log } from './logger';
 
 // «A tiempo» compara el día de cierre en hora de Guayaquil (B4: antes se tomaba el día UTC).
 const dia = diaLocal;
@@ -173,7 +174,7 @@ export async function registrarReproceso(
     detalle: { reproceso_id: rp.id, origen: o.origen, motivo: o.motivo, paso_retorno: o.paso_retorno ?? null },
   });
   if (o.reabrir_basecamp && req.basecamp_todo_id && req.estado_operativo === 'completado') {
-    reabrirTodo(ctx, req).catch((err) => console.error('[basecamp] no se pudo reabrir el to-do', err instanceof Error ? err.message : err));
+    reabrirTodo(ctx, req).catch((err) => log.error('[basecamp] no se pudo reabrir el to-do', err instanceof Error ? err.message : err));
   }
   return rp;
 }

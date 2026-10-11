@@ -1,3 +1,4 @@
+import { log } from './logger';
 /**
  * Cloudflare Turnstile (auditoría 10/10, punto 12). Activo solo si existe TURNSTILE_SECRET_KEY: sin la clave no se
  * exige nada (así el código puede desplegarse antes de crear el sitio en Cloudflare).
@@ -16,7 +17,7 @@ export async function verificarTurnstile(token: string | undefined | null, ip?: 
     const d = (await r.json()) as { success?: boolean };
     return d.success === true;
   } catch (err) {
-    console.error('[turnstile] no se pudo verificar', err instanceof Error ? err.message : err);
+    log.error('[turnstile] no se pudo verificar', err instanceof Error ? err.message : err);
     return false;
   }
 }

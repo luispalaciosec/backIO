@@ -9,6 +9,7 @@ import { listUsuarios } from './db/usuarios';
 import { audit } from './db/audit';
 import { BasecampClient } from './basecamp/client';
 import { hoyLocal, sumarDias } from '@backio/shared';
+import { log } from './logger';
 
 export async function sincronizarHoras(
   ctx: DbCtx,
@@ -81,7 +82,7 @@ export async function sincronizarHoras(
       guardadas += (data ?? []).length;
     }
   } catch (err) {
-    console.error('[horas]', err instanceof Error ? err.message : err);
+    log.error('[horas]', err instanceof Error ? err.message : err);
     throw err;
   }
   await audit(ctx, {

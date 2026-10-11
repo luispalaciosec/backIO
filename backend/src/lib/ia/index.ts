@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../config/env';
 import { serviceClient, throwIf, DbError, type DbCtx } from '../db/client';
+import { log } from '../logger';
 
 export const MODELO_IA = 'claude-sonnet-5';
 
@@ -91,7 +92,7 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
     .join('\n')
     .trim();
   if (!texto) {
-    console.error('[ia] respuesta sin texto', {
+    log.error('[ia] respuesta sin texto', {
       tipo: o.tipo,
       stop_reason: res.stop_reason,
       bloques: res.content.map((b) => b.type),
@@ -128,7 +129,7 @@ export function traducirErrorIA(err: unknown): DbError {
   const e = err as { status?: number; message?: string; error?: { error?: { type?: string; message?: string } } };
   const msg = (e.error?.error?.message ?? e.message ?? '').toString();
   const status = e.status ?? 0;
-  console.error('[ia] error de la API', { status, msg });
+  log.error('[ia] error de la API', { status, msg });
   if (status === 401 || /invalid x-api-key|authentication/i.test(msg))
     return new DbError('La clave de IA no es válida o fue revocada (ANTHROPIC_API_KEY). Avisa al administrador de BackIO.', 502);
   if (status === 402 || /credit balance|billing|insufficient/i.test(msg))
@@ -160,7 +161,7 @@ export async function generarJson<T>(ctx: DbCtx, o: GenerarOpts): Promise<T> {
   try {
     return JSON.parse(limpio) as T;
   } catch {
-    console.error('[ia] JSON inválido', { tipo: o.tipo, longitud: limpio.length, inicio: limpio.slice(0, 200), fin: limpio.slice(-200) });
+    log.error('[ia] JSON inválido', { tipo: o.tipo, longitud: limpio.length, inicio: limpio.slice(0, 200), fin: limpio.slice(-200) });
     throw new DbError('La IA devolvió una respuesta mal formada. Vuelve a intentar.', 502);
   }
 }

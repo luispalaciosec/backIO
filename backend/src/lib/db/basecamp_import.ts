@@ -3,6 +3,7 @@ import type { Requerimiento } from '@backio/shared';
 import { type DbCtx, type FilaUpdate, serviceClient, throwIf } from './client';
 import { paginar } from './paginar';
 import type { Enlazado, FilaDesdeTodo } from '../basecamp/decisiones';
+import { log } from '../logger';
 
 export interface ProyectoEnlazado {
   id: string;
@@ -80,7 +81,7 @@ export async function marcarHuerfanosAdoptados(ctx: DbCtx, todoIds: number[]): P
     .is('resuelto_at', null)
     .in('basecamp_todo_id', todoIds);
   // No detiene la importación: las tareas ya quedaron creadas; la bandeja de huérfanos se corrige en la siguiente.
-  if (error) console.error('[importar] huérfanos adoptados', error.message);
+  if (error) log.error('[importar] huérfanos adoptados', error.message);
 }
 
 /** Marca del sistema: con service role, porque con la migración 27 solo admin escribe en clientes con su sesión. */
@@ -90,5 +91,5 @@ export async function marcarClienteImportado(ctx: DbCtx, clienteId: string): Pro
     .update({ basecamp_importado_at: new Date().toISOString() })
     .eq('id', clienteId)
     .eq('tenant_id', ctx.tenantId);
-  if (error) console.error('[importar] marca de importado', clienteId, error.message);
+  if (error) log.error('[importar] marca de importado', clienteId, error.message);
 }

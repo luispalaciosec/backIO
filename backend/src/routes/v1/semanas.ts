@@ -23,6 +23,7 @@ import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 import { fotoDaily } from '../../lib/evolutivo';
 import { serviceClient } from '../../lib/db/client';
 import { hoyLocal } from '@backio/shared';
+import { log } from '../../lib/logger';
 
 export const semanas = new Hono();
 
@@ -165,7 +166,7 @@ semanas.post(
       // Evolutivo: el cierre publicado deja la foto del día (no bloquea la respuesta si falla).
       if (b.tipo === 'cierre')
         await fotoDaily({ ...ctx, db: serviceClient() }, mesa, undefined, 'cierre').catch((e: Error) =>
-          console.error('[evolutivo] foto del cierre', e.message),
+          log.error('[evolutivo] foto del cierre', e.message),
         );
       return c.json({
         ...r,

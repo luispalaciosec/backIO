@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logPeticiones } from './lib/log';
+import { logPeticiones, redactarRuta } from './lib/log';
 import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import { env, frontendOrigins } from './config/env';
@@ -15,6 +15,7 @@ import { basecampOAuth } from './routes/basecamp';
 import { mcp } from './routes/mcp';
 import { oauth, wellKnown } from './routes/oauth';
 import { openapi } from './routes/openapi';
+import { log } from './lib/logger';
 
 export function createApp(): Hono {
   const app = new Hono();
@@ -71,7 +72,8 @@ export function createApp(): Hono {
   app.onError((err, c) => {
     if (err instanceof DbError) {
       // Siempre al log (con detalle) para poder diagnosticar en Railway; al cliente solo el mensaje.
-      if (err.status >= 500) console.error(`[${c.req.method} ${c.req.path}] ${err.message}`, err.detalle ?? '');
+      // La ruta va redactada: en el portal y en el webhook de Basecamp lleva el token o el secreto.
+      if (err.status >= 500) log.error(`[${c.req.method} ${redactarRuta(c.req.path)}] ${err.message}`, err.detalle ?? '');
       // En producción un 5xx no devuelve el texto de Postgres (nombres de tablas, constraints…).
       const prod = env().NODE_ENV === 'production';
       return c.json(
@@ -79,7 +81,7 @@ export function createApp(): Hono {
         err.status as 400,
       );
     }
-    console.error(`[${c.req.method} ${c.req.path}]`, err);
+    log.error(`[${c.req.method} ${redactarRuta(c.req.path)}]`, err);
     return c.json({ error: env().NODE_ENV === 'production' ? 'Error interno' : err.message }, 500);
   });
   return app;

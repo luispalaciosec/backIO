@@ -1,5 +1,6 @@
 import { serviceClient, throwIf, type DbCtx } from './client';
 import { notificar } from '../notificaciones';
+import { log } from '../logger';
 
 export interface AuditEntry {
   accion: string;
@@ -19,7 +20,7 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
     arr.push(ahora);
     ESCRITURAS.set(ctx.apiKeyId, arr);
     if (arr.length === 21) {
-      console.warn(`[alerta] API key ${ctx.apiKeyId} superó 20 escrituras en 5 minutos`);
+      log.warn(`[alerta] API key ${ctx.apiKeyId} superó 20 escrituras en 5 minutos`);
       // Antes era un insert sin await (el builder es perezoso: nunca salía) y con usuario_id null (no se despachaba).
       void notificar(
         ctx,
@@ -30,7 +31,7 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
           ruta: '/admin/api-keys',
         },
         { roles: ['admin', 'operaciones'] },
-      ).catch((err) => console.error('[alerta] no se pudo notificar', err instanceof Error ? err.message : err));
+      ).catch((err) => log.error('[alerta] no se pudo notificar', err instanceof Error ? err.message : err));
     }
   }
   // La auditoría nunca debe romper la operación principal.
@@ -49,9 +50,9 @@ export async function audit(ctx: DbCtx, e: AuditEntry): Promise<void> {
         entidad_id: e.entidad_id ?? null,
         detalle: e.detalle ?? null,
       });
-    if (error) console.error('[audit] insert rechazado', e.accion, error.message);
+    if (error) log.error('[audit] insert rechazado', e.accion, error.message);
   } catch (err) {
-    console.error('[audit] fallo al registrar', err);
+    log.error('[audit] fallo al registrar', err);
   }
 }
 

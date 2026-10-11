@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { log } from '../lib/logger';
 
 // Carga backend/.env en desarrollo (Node >= 21). En producción las variables vienen de la plataforma.
 try {
@@ -21,6 +22,7 @@ const schema = z.object({
   BASECAMP_USER_AGENT: z.string().default('BackIO Geeks (luis@geeks.ec)'),
   BASECAMP_WEBHOOK_SECRET: z.string().optional(),
   PROMETIO_WEBHOOK_SECRET: z.string().optional(),
+  SENTRY_DSN: z.string().url().optional(), // sin DSN no se envía nada a Sentry
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 
@@ -54,9 +56,9 @@ export function env(): Env {
 function revisarHttps(e: Env): void {
   if (e.NODE_ENV !== 'production') return;
   const publicas = [e.FRONTEND_URL.split(',')[0]?.trim() ?? '', process.env.BACKEND_PUBLIC_URL ?? ''].filter(Boolean);
-  for (const u of publicas) if (!u.startsWith('https://')) console.error(`[env] URL pública sin https en producción: ${u}`);
+  for (const u of publicas) if (!u.startsWith('https://')) log.error(`[env] URL pública sin https en producción: ${u}`);
   const locales = e.FRONTEND_URL.split(',')
     .map((s) => s.trim())
     .filter((s) => /^http:\/\/(localhost|127\.0\.0\.1)/.test(s));
-  if (locales.length) console.warn(`[env] FRONTEND_URL incluye orígenes locales en producción (CORS): ${locales.join(', ')}`);
+  if (locales.length) log.warn(`[env] FRONTEND_URL incluye orígenes locales en producción (CORS): ${locales.join(', ')}`);
 }

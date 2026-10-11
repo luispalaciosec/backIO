@@ -5,6 +5,7 @@
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import { serviceClient } from './db/client';
+import { log } from './logger';
 
 export interface EstadoLimite {
   n: number;
@@ -36,7 +37,7 @@ async function rpc(fn: 'limite_sumar' | 'limite_estado', clave: string, max: num
   } catch (err) {
     if (!avisado) {
       avisado = true;
-      console.warn('[limite] usando contador en memoria:', err instanceof Error ? err.message : err);
+      log.warn('[limite] usando contador en memoria:', err instanceof Error ? err.message : err);
     }
     return enMemoria(clave, max, ventanaSeg, fn === 'limite_sumar');
   }

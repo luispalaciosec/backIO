@@ -14,6 +14,7 @@ import { notificar } from '../notificaciones';
 import { BasecampClient } from './client';
 import { recorrerTodos } from './recorrer';
 import { paginar } from '../db/paginar';
+import { log } from '../logger';
 
 export interface Huerfano {
   id: string;
@@ -96,7 +97,7 @@ export async function detectarHuerfanos(
         nuevos += huerfanos.length;
       }
     } catch (err) {
-      console.error('[huerfanos] cliente', c.nombre, err instanceof Error ? err.message : err);
+      log.error('[huerfanos] cliente', c.nombre, err instanceof Error ? err.message : err);
     }
   }
   const { count } = await ctx.db

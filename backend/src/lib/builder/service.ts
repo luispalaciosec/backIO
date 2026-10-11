@@ -17,6 +17,7 @@ import { createProjectStructure } from '../basecamp/write';
 import { generarPortalToken } from '../portal/token';
 import { planificarProyecto, restarDias, type PlanProyecto, type AlertaCapacidad } from './plan';
 import { crearLote } from '../db/lote';
+import { log } from '../logger';
 
 export interface PreviewProyecto {
   plan: PlanProyecto;
@@ -164,7 +165,7 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
         entidad_id: proyecto.id,
       },
       { usuarioIds: owners },
-    ).catch((e) => console.error('[notificar] proyecto', e));
+    ).catch((e) => log.error('[notificar] proyecto', e));
   }
 
   let basecamp: unknown = { omitido: true, motivo: 'cliente sin basecamp_project_id' };

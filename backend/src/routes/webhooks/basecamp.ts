@@ -14,6 +14,7 @@ import { BasecampClient } from '../../lib/basecamp/client';
 import { importarBasecampCliente } from '../../lib/basecamp/importar';
 import { clientePorProyectoBasecamp, proyectoBasecampDeCliente } from '../../lib/db/clientes';
 import { tenantDeRequerimiento } from '../../lib/db/requerimientos';
+import { log } from '../../lib/logger';
 
 export const basecampWebhook = new Hono();
 
@@ -37,13 +38,13 @@ async function programarImportacion(bucketId: number): Promise<void> {
           cl.id,
         );
         if (r.requerimientos_creados || r.proyectos_creados)
-          console.log(
+          log.info(
             '[webhook basecamp] estructura',
             cl.nombre,
             JSON.stringify({ tareas: r.requerimientos_creados, proyectos: r.proyectos_creados }),
           );
       } catch (err) {
-        console.error('[webhook basecamp] importación', cl.nombre, err instanceof Error ? err.message : err);
+        log.error('[webhook basecamp] importación', cl.nombre, err instanceof Error ? err.message : err);
       }
     }, 20_000),
   );
@@ -115,7 +116,7 @@ async function handle(raw: string) {
       if (!vivo) return { status: 200 as const, body: JSON.stringify({ aplicado: false, motivo: 'evento no verificado contra Basecamp' }) };
       safe = vivo;
     } catch (err) {
-      console.error('[webhook basecamp] no se pudo consultar el to-do vivo', err instanceof Error ? err.message : err);
+      log.error('[webhook basecamp] no se pudo consultar el to-do vivo', err instanceof Error ? err.message : err);
       return { status: 503 as const, body: 'reintentar' }; // Basecamp reintenta la entrega
     }
   }

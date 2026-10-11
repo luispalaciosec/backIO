@@ -1,5 +1,6 @@
 /** Registro de ejecuciones de jobs programados (migración 28, B10) y lista de tenants activos para los jobs. */
 import { serviceClient, throwIf } from './client';
+import { log } from '../logger';
 
 export async function tenantsActivos(): Promise<string[]> {
   const { data, error } = await serviceClient().from('tenants').select('id').eq('activo', true);
@@ -16,7 +17,7 @@ export async function reclamarVentana(job: string, ventana: string): Promise<boo
   const { error } = await serviceClient().from('cron_runs').insert({ job, ventana });
   if (!error) return true;
   if (error.code === '23505') return false;
-  console.error('[jobs] cron_runs no disponible; se ejecuta sin registro', job, error.message);
+  log.error('[jobs] cron_runs no disponible; se ejecuta sin registro', job, error.message);
   return true;
 }
 
@@ -26,7 +27,7 @@ export async function cerrarVentana(job: string, ventana: string, ok: boolean, d
     .update({ fin_at: new Date().toISOString(), ok, detalle: detalle.slice(0, 2000) })
     .eq('job', job)
     .eq('ventana', ventana);
-  if (error) console.error('[jobs] no se pudo cerrar la ventana', job, ventana, error.message);
+  if (error) log.error('[jobs] no se pudo cerrar la ventana', job, ventana, error.message);
 }
 
 /** Borra el registro de más de 60 días. */
@@ -35,7 +36,7 @@ export async function limpiarCronRuns(): Promise<void> {
     .from('cron_runs')
     .delete()
     .lt('inicio_at', new Date(Date.now() - 60 * 86_400_000).toISOString());
-  if (error) console.error('[jobs] limpieza de cron_runs', error.message);
+  if (error) log.error('[jobs] limpieza de cron_runs', error.message);
 }
 
 export async function clientesConBasecamp(tenantId: string): Promise<{ id: string; nombre: string }[]> {

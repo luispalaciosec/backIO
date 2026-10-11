@@ -11,6 +11,7 @@ import { BasecampClient } from '../basecamp/client';
 import { getMesa } from '../db/mesas';
 import { getSemana } from '../db/semanas';
 import { listUsuarios } from '../db/usuarios';
+import { log } from '../logger';
 
 const fmtFecha = (iso: string) => iso.slice(0, 10);
 const fmtCorta = (iso: string) => {
@@ -279,7 +280,7 @@ export async function mencionesDailyBasecamp(ctx: DbCtx, bc: BasecampClient): Pr
       if (sgid) men.set(u.nombre, sgid);
     }
   } catch (err) {
-    console.error('[daily] menciones', err instanceof Error ? err.message : err);
+    log.error('[daily] menciones', err instanceof Error ? err.message : err);
   }
   return men;
 }

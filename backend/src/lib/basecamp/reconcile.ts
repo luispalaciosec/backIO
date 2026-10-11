@@ -10,6 +10,7 @@ import { pushDueDate } from './write';
 import { BasecampClient } from './client';
 import { applyBasecampUpdate, extractSafeTodo } from './sync';
 import { audit } from '../db/audit';
+import { log } from '../logger';
 
 /** Tope de fechas reenviadas a Basecamp por corrida: un desfase masivo no se propaga entero de una vez (M14). */
 const MAX_FECHAS_POR_CORRIDA = 25;
@@ -43,11 +44,11 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
             detalle: { todo_id: r.basecamp_todo_id, basecamp: safe.due_on, backio: r.fecha_entrega },
           });
         } catch (e) {
-          console.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e);
+          log.error('[reconcile] due_on', r.basecamp_todo_id, e instanceof Error ? e.message : e);
         }
       }
     } catch (err) {
-      console.error('[reconcile] fallo en to-do', r.basecamp_todo_id, err);
+      log.error('[reconcile] fallo en to-do', r.basecamp_todo_id, err);
     }
   }
   return { revisados: activos.length, aplicados };

@@ -14,6 +14,7 @@ import { limitar, sumarIntento } from '../lib/limite';
 import { verificarTurnstile } from '../lib/turnstile';
 import { usuarioPorEmailSinSesion } from '../lib/db/usuarios';
 import { audit } from '../lib/db/audit';
+import { log } from '../lib/logger';
 
 export const authPublico = new Hono();
 // 10 por IP cada 15 min y 1 por correo por minuto, persistentes (auditoría 10/10, punto 11); captcha si está activo.
@@ -33,12 +34,12 @@ authPublico.post(
       const base = `${frontendOrigins()[0] ?? 'http://localhost:3000'}/auth/establecer-clave`;
       const { data, error } = await sb.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: base } });
       if (error || !data) {
-        console.error('[recuperar] generateLink', error?.message);
+        log.error('[recuperar] generateLink', error?.message);
         return c.json({ ok: true });
       }
       const link = `${base}?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
       if (!emailHabilitado()) {
-        console.warn('[recuperar] RESEND no configurado; enlace no enviado');
+        log.warn('[recuperar] RESEND no configurado; enlace no enviado');
         return c.json({ ok: true });
       }
       const cuerpo = `Hola ${usuario.nombre}. Recibimos una solicitud para restablecer tu contraseña de BackIO. Usa el botón para definir una nueva. El enlace vence en 24 horas.\nSi no fuiste tú, ignora este correo: tu contraseña actual sigue igual.`;
@@ -53,7 +54,7 @@ authPublico.post(
         { accion: 'recuperar_contrasena', entidad: 'usuario', entidad_id: usuario.id, detalle: {} },
       );
     } catch (err) {
-      console.error('[recuperar]', err instanceof Error ? err.message : err);
+      log.error('[recuperar]', err instanceof Error ? err.message : err);
     }
     return c.json({ ok: true });
   },

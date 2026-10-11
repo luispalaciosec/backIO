@@ -11,6 +11,7 @@ import { generarResumen } from '../lib/portal/resumen';
 import { leerHashPin, pinCoincide } from '../lib/portal/pin';
 import { ipCliente } from '../lib/ip';
 import { estadoLimite, sumarIntento, limpiarLimite, limitar } from '../lib/limite';
+import { log } from '../lib/logger';
 
 export const portal = new Hono();
 
@@ -102,7 +103,7 @@ portal.post(
       return c.json({ resumen });
     } catch (err) {
       // El detalle (configuración, errores del proveedor de IA o de la base) va al log, nunca al visitante anónimo.
-      console.error('[portal] resumen', r.proyecto.id, err instanceof Error ? err.message : err);
+      log.error('[portal] resumen', r.proyecto.id, err instanceof Error ? err.message : err);
       return c.json({ error: 'El resumen no está disponible en este momento. Intenta más tarde.' }, 503);
     }
   },

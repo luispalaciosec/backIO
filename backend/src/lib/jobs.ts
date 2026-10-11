@@ -22,6 +22,7 @@ import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
 import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
+import { log } from './logger';
 
 /** Instante en hora de Guayaquil. dia: 0 domingo … 6 sábado. clave: YYYY-MM-DD. */
 export interface Momento {
@@ -275,12 +276,12 @@ export async function ejecutarJob(
     if (job.registrar !== false) {
       const r = resumir(resultado);
       await cerrarVentana(job.nombre, ventana, r.ok, r.detalle);
-      if (!r.ok) console.error(`[jobs] ${job.nombre} ${ventana} con errores`, r.detalle.slice(0, 500));
+      if (!r.ok) log.error(`[jobs] ${job.nombre} ${ventana} con errores`, r.detalle.slice(0, 500));
     }
     return { ventana, resultado };
   } catch (err) {
     const mensaje = err instanceof Error ? err.message : String(err);
-    console.error(`[jobs] ${job.nombre} ${ventana} falló`, mensaje);
+    log.error(`[jobs] ${job.nombre} ${ventana} falló`, mensaje);
     if (job.registrar !== false) await cerrarVentana(job.nombre, ventana, false, mensaje);
     return { ventana, resultado: { error: mensaje } };
   }

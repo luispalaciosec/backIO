@@ -11,6 +11,7 @@ import { audit, getRequerimiento, updateRequerimiento } from '../db';
 import { completarUltimaReprogramacion } from '../db/historial';
 import { cerrarReproceso, registrarReproceso } from '../cumplimiento';
 import { pushDueDate } from '../basecamp/write';
+import { log } from '../logger';
 
 export class ReglaError extends Error {
   constructor(
@@ -97,7 +98,7 @@ export async function actualizarRequerimiento(
     await registrarReproceso(ctx, id, { origen: 'interno', motivo: null, reabrir_basecamp: true });
   }
   if (patch.estado_operativo === 'completado' && previo.estado_operativo !== 'completado')
-    await cerrarReproceso(ctx, id).catch((e) => console.error('[requerimientos] cerrar reproceso', id, e));
+    await cerrarReproceso(ctx, id).catch((e) => log.error('[requerimientos] cerrar reproceso', id, e));
 
   await audit(ctx, {
     accion: reprogramado ? 'reprogramar' : 'actualizar',
@@ -114,7 +115,7 @@ export async function actualizarRequerimiento(
       basecamp_due_on = 'ok';
     } catch (err) {
       basecamp_due_on = 'error';
-      console.error('[basecamp] due_on no sincronizado', err);
+      log.error('[basecamp] due_on no sincronizado', err);
       await audit(ctx, {
         accion: 'basecamp_due_on_error',
         entidad: 'requerimiento',

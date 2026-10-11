@@ -7,6 +7,7 @@ import type { Rol } from '@backio/shared';
 import { serviceClient, throwIf, type DbCtx } from '../db/client';
 import { frontendOrigins } from '../../config/env';
 import { emailHabilitado, plantillaHtml, sendEmail } from './email';
+import { log } from '../logger';
 
 export interface Notificacion {
   tipo: string;
@@ -142,7 +143,7 @@ export async function procesarPendientes(tenantId?: string): Promise<{ enviadas:
       continue;
     }
     if (f.email_destino && f.email_destino.trim().toLowerCase() !== destino.trim().toLowerCase())
-      console.warn('[notificaciones] email_destino no coincide con el usuario; se envía al correo del usuario', f.id);
+      log.warn('[notificaciones] email_destino no coincide con el usuario; se envía al correo del usuario', f.id);
     const { cuerpo, ruta } = separarRuta(f.cuerpo);
     try {
       await sendEmail({

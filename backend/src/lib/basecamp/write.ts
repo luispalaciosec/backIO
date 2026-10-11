@@ -19,6 +19,7 @@ import { updateRequerimiento } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
 import { audit } from '../db/audit';
 import { BasecampClient } from './client';
+import { log } from '../logger';
 
 export const LIMITE_TODOS_POR_OPERACION = 50; // decidido por Luis el 2026-09-03 (doc 04 decía 60)
 
@@ -114,7 +115,7 @@ export async function createProjectStructure(
       creados += 1;
     } catch (err) {
       fallidos += 1;
-      console.error(`[basecamp/write] fallo creando to-do para ${req.id}`, err);
+      log.error(`[basecamp/write] fallo creando to-do para ${req.id}`, err);
     }
   }
 

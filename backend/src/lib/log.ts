@@ -4,6 +4,7 @@
  * (el token del cliente). Las query strings tampoco se registran (p. ej. ?code=&state= del callback OAuth).
  */
 import type { MiddlewareHandler } from 'hono';
+import { log } from './logger';
 
 const SECRETOS_EN_RUTA: [RegExp, string][] = [
   [/^(\/api\/webhooks\/basecamp\/)[^/]+/, '$1[redactado]'],
@@ -18,5 +19,5 @@ export function redactarRuta(path: string): string {
 export const logPeticiones: MiddlewareHandler = async (c, next) => {
   const inicio = Date.now();
   await next();
-  console.log(`${c.req.method} ${redactarRuta(c.req.path)} ${c.res.status} ${Date.now() - inicio}ms`);
+  log.info(`${c.req.method} ${redactarRuta(c.req.path)} ${c.res.status} ${Date.now() - inicio}ms`);
 };
