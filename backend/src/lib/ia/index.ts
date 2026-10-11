@@ -10,7 +10,8 @@
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../config/env';
-import { serviceClient, throwIf, DbError, type DbCtx } from '../db/client';
+import { DbError, type DbCtx } from '../db/client';
+import { insertarGeneracionIa, ultimaGeneracionIa } from '../db/ia';
 import { log } from '../logger';
 
 export const MODELO_IA = 'claude-sonnet-5';
@@ -48,16 +49,7 @@ export interface Generado {
 
 async function leerCache(ctx: DbCtx, tipo: string, hash: string, cacheMs: number): Promise<string | null> {
   if (!cacheMs) return null;
-  const { data } = await serviceClient()
-    .from('ia_generaciones')
-    .select('texto, created_at')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('tipo', tipo)
-    .eq('payload_hash', hash)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const row = data as { texto: string; created_at: string } | null;
+  const row = await ultimaGeneracionIa(ctx, tipo, hash);
   if (!row) return null;
   return Date.now() - new Date(row.created_at).getTime() < cacheMs ? row.texto : null;
 }
@@ -106,21 +98,18 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
           : `respuesta vacía (${res.stop_reason ?? 'sin motivo'})`;
     throw new DbError(`La IA no devolvió texto: ${motivo}. Vuelve a intentar; si persiste, avisa al administrador de BackIO.`, 502);
   }
-  const { error } = await serviceClient()
-    .from('ia_generaciones')
-    .insert({
-      tenant_id: ctx.tenantId,
-      tipo: o.tipo,
-      entidad_tipo: o.entidad?.tipo ?? null,
-      entidad_id: o.entidad?.id ?? null,
-      payload_hash: hash,
-      texto,
-      modelo: MODELO_IA,
-      tokens_entrada: res.usage?.input_tokens ?? null,
-      tokens_salida: res.usage?.output_tokens ?? null,
-      creado_por: ctx.usuarioId,
-    });
-  throwIf(error);
+  await insertarGeneracionIa({
+    tenant_id: ctx.tenantId,
+    tipo: o.tipo,
+    entidad_tipo: o.entidad?.tipo ?? null,
+    entidad_id: o.entidad?.id ?? null,
+    payload_hash: hash,
+    texto,
+    modelo: MODELO_IA,
+    tokens_entrada: res.usage?.input_tokens ?? null,
+    tokens_salida: res.usage?.output_tokens ?? null,
+    creado_por: ctx.usuarioId,
+  });
   return { texto, desde_cache: false, modelo: MODELO_IA };
 }
 

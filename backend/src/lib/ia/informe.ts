@@ -2,9 +2,9 @@
  * Informe ejecutivo mensual por mesa: números del mes (entregas, piezas, horas, cotizado, señales,
  * arrastre) + narrativa de la IA. Se guarda como acta tipo informe_mensual y se publica en el board Weekly.
  */
-import type { Acta, RequerimientoMetricas } from '@backio/shared';
+import type { Acta } from '@backio/shared';
 import type { DbCtx } from '../db/client';
-import { throwIf } from '../db/client';
+import { listCompletadosEntre, listCotizadoProyectosActivos, listSenalesEntre } from '../db/informes';
 import { getMesa, alcanceMesa } from '../db/mesas';
 import { ensureSemana, insertActa } from '../db/semanas';
 import { listClientes } from '../db/clientes';
@@ -47,41 +47,17 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
     resumenHoras(ctx, inicioDiaLocal(desde), { clienteIds: alcance.clienteIds }),
   ]);
-  let q = ctx.db
-    .from('v_requerimientos_metricas')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('estado_operativo', 'completado')
-    .gte('completado_at', inicioDiaLocal(desde))
-    .lte('completado_at', finDiaLocal(hasta));
-  const partes: string[] = [];
-  if (alcance.clienteIds.length) partes.push(`cliente_id.in.(${alcance.clienteIds.join(',')})`);
-  if (alcance.proyectoIds.length) partes.push(`proyecto_id.in.(${alcance.proyectoIds.join(',')})`);
-  if (partes.length) q = q.or(partes.join(','));
-  const { data: comp, error } = await q;
-  throwIf(error);
-  const completados = (comp ?? []) as RequerimientoMetricas[];
+  const completados = await listCompletadosEntre(ctx, inicioDiaLocal(desde), finDiaLocal(hasta), alcance);
   const cumpl = await listCumplimientoDesde(ctx, inicioDiaLocal(desde));
   const reprogsMes = cumpl.reprogramaciones.filter((x) => x.created_at <= finDiaLocal(hasta));
   const reprocsMes = cumpl.reprocesos.filter((x) => x.abierto_at <= finDiaLocal(hasta));
-  const { data: sen } = await ctx.db
-    .from('senales')
-    .select('tipo, severidad, semanas!inner(fecha_inicio)')
-    .eq('tenant_id', ctx.tenantId)
-    .gte('semanas.fecha_inicio', desde)
-    .lte('semanas.fecha_inicio', hasta);
-  const senales = (sen ?? []) as { tipo: string; severidad: string }[];
+  const sen = await listSenalesEntre(ctx, desde, hasta);
+  const senales = sen as { tipo: string; severidad: string }[];
   // Proyectos activos, igual que el dashboard. Antes filtraba por un estado «cerrado» que no existe: la consulta
   // fallaba sin revisar el error y el valor cotizado del informe salía siempre en 0 (lo destapó el tipado de la Ola 6).
-  const { data: proys, error: eProys } = await ctx.db
-    .from('proyectos')
-    .select('cliente_id, valor_cotizado')
-    .eq('tenant_id', ctx.tenantId)
-    .is('deleted_at', null)
-    .not('estado', 'in', '(completado,cancelado)');
-  throwIf(eProys);
+  const proys = await listCotizadoProyectosActivos(ctx);
   const cotizado = new Map<string, number>();
-  for (const p of (proys ?? []) as { cliente_id: string; valor_cotizado: number | null }[])
+  for (const p of proys as { cliente_id: string; valor_cotizado: number | null }[])
     cotizado.set(p.cliente_id, (cotizado.get(p.cliente_id) ?? 0) + Number(p.valor_cotizado ?? 0));
 
   const nombreC = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? id;

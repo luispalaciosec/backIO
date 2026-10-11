@@ -9,17 +9,11 @@ import { listClientes } from '../db/clientes';
 import { getMesa, alcanceMesa } from '../db/mesas';
 import { ensureSemana, getSemana, listAcuerdosAbiertos, listAcuerdosSemana, listSenales, replaceSenales, insertActa } from '../db/semanas';
 import { listSinMotivo } from '../db/historial';
-import { calcularSenales, type SignalThresholds } from './signals';
+import { calcularSenales } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
-import { throwIf } from '../db/client';
+import { getUmbralesSenales, listCompletadosRecientes } from '../db/rituales';
 import type { Senal, Acta, CapacidadPersona } from '@backio/shared';
 import { hoyLocal } from '@backio/shared';
-
-async function umbrales(ctx: DbCtx): Promise<Partial<SignalThresholds>> {
-  const { data, error } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
-  throwIf(error);
-  return (data as { config: { signal_thresholds?: Partial<SignalThresholds> } }).config.signal_thresholds ?? {};
-}
 
 export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<Senal[]> {
   const hoy = hoyLocal();
@@ -30,20 +24,15 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
     listUsuarios(ctx),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
-    umbrales(ctx),
+    getUmbralesSenales(ctx),
     listSinMotivo(ctx, 45),
   ]);
-  const { data: completados } = await ctx.db
-    .from('requerimientos')
-    .select('cliente_id, completado_at')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('estado_operativo', 'completado')
-    .gte('completado_at', new Date(Date.now() - 30 * 86_400_000).toISOString());
+  const completados = await listCompletadosRecientes(ctx, new Date(Date.now() - 30 * 86_400_000).toISOString());
   const senales = calcularSenales({
     hoy,
     semana: { fecha_inicio: semana.fecha_inicio, fecha_fin: semana.fecha_fin },
     activos,
-    completadosRecientes: (completados ?? []) as { cliente_id: string; completado_at: string | null }[],
+    completadosRecientes: completados as { cliente_id: string; completado_at: string | null }[],
     usuarios,
     clientes,
     acuerdosAbiertos,

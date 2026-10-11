@@ -5,11 +5,25 @@
  */
 import type { Mesa } from '@backio/shared';
 import { MOTIVOS_REPROGRAMACION, diaLocal, hoyLocal, inicioDiaLocal, porcentaje, sumarDias, cerradaATiempo } from '@backio/shared';
-import { type DbCtx, serviceClient, throwIf } from './db/client';
+import type { DbCtx } from './db/client';
 import { alcanceMesa, listMesas } from './db/mesas';
 import { listUsuarios } from './db/usuarios';
 import { ensureSemana } from './db/semanas';
-import { paginar } from './db/paginar';
+import {
+  datosSemanaMesa,
+  getDailySnapshot,
+  getWeeklySnapshot,
+  guardarDailySnapshot,
+  guardarWeeklySnapshot,
+  listDailySnapshots,
+  listEventosBloqueo,
+  listEventosDailyFecha,
+  listPublicacionesDaily,
+  listReprocesosDesde,
+  listReprogramacionesDesde,
+  listTareasEvolutivo,
+  listWeeklySnapshots,
+} from './db/evolutivo';
 
 // ---------------------------------------------------------------- tipos
 export interface TareaEvo {
@@ -252,81 +266,19 @@ interface DatosMesa {
 }
 
 export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Promise<DatosMesa> {
-  const db = serviceClient();
-  const T = ctx.tenantId;
   const alc = await alcanceMesa(ctx, mesa.id);
   const partes = [
     ...(alc.clienteIds.length ? [`cliente_id.in.(${alc.clienteIds.join(',')})`] : []),
     ...(alc.proyectoIds.length ? [`proyecto_id.in.(${alc.proyectoIds.join(',')})`] : []),
   ];
-  const tareas = partes.length
-    ? await paginar<TareaEvo>((a, b) =>
-        db
-          .from('requerimientos')
-          .select(
-            'id, owner_agencia, estado_operativo, completado_at, created_at, planificacion, fecha_entrega, fecha_entrega_original, daily_fecha, fecha_pedido',
-          )
-          .eq('tenant_id', T)
-          .is('deleted_at', null)
-          .or(partes.join(','))
-          .order('id')
-          .range(a, b),
-      )
-    : [];
+  const tareas = partes.length ? await listTareasEvolutivo(ctx, partes) : [];
   const ids = new Set(tareas.map((t) => t.id));
   const [rp, rg, ev, bl, pub, usuarios] = await Promise.all([
-    paginar<{ requerimiento_id: string; abierto_at: string }>((a, b) =>
-      db
-        .from('reprocesos')
-        .select('requerimiento_id, abierto_at')
-        .eq('tenant_id', T)
-        .gte('abierto_at', desdeIso)
-        .order('abierto_at')
-        .range(a, b),
-    ),
-    paginar<{ requerimiento_id: string; created_at: string; motivo: string | null }>((a, b) =>
-      db
-        .from('reprogramaciones')
-        .select('requerimiento_id, created_at, motivo')
-        .eq('tenant_id', T)
-        .gte('created_at', desdeIso)
-        .order('created_at')
-        .range(a, b),
-    ),
-    paginar<{ entidad_id: string; created_at: string; detalle: { daily_fecha: string | null } }>((a, b) =>
-      db
-        .from('audit_log')
-        .select('entidad_id, created_at, detalle')
-        .eq('tenant_id', T)
-        .eq('entidad', 'requerimiento')
-        .in('accion', ['actualizar', 'reprogramar'])
-        .not('detalle->daily_fecha', 'is', null)
-        .gte('created_at', desdeIso)
-        .order('created_at')
-        .range(a, b),
-    ),
-    paginar<{ entidad_id: string; created_at: string }>((a, b) =>
-      db
-        .from('audit_log')
-        .select('entidad_id, created_at')
-        .eq('tenant_id', T)
-        .eq('entidad', 'requerimiento')
-        .eq('detalle->>estado_operativo', 'bloqueado')
-        .gte('created_at', desdeIso)
-        .order('created_at')
-        .range(a, b),
-    ),
-    paginar<{ accion: string; created_at: string; detalle: { message_id?: number } }>((a, b) =>
-      db
-        .from('audit_log')
-        .select('accion, created_at, detalle')
-        .eq('tenant_id', T)
-        .eq('entidad_id', mesa.id)
-        .in('accion', ['publicar_daily_apertura', 'publicar_daily_cierre'])
-        .gte('created_at', desdeIso)
-        .order('created_at')
-        .range(a, b),
-    ),
+    listReprocesosDesde(ctx, desdeIso),
+    listReprogramacionesDesde(ctx, desdeIso),
+    listEventosDailyFecha(ctx, desdeIso),
+    listEventosBloqueo(ctx, desdeIso),
+    listPublicacionesDaily(ctx, mesa.id, desdeIso),
     listUsuarios(ctx),
   ]);
   return {
@@ -385,7 +337,6 @@ async function guardarDia(
   f: ReturnType<typeof fotoDeDia>,
   origen: 'cierre' | 'cron' | 'reconstruido',
 ) {
-  const db = serviceClient();
   const fila = {
     tenant_id: ctx.tenantId,
     mesa_id: mesaId,
@@ -397,23 +348,10 @@ async function guardarDia(
     apertura_publicada: f.apertura_publicada,
     message_id: f.message_id,
   };
-  const { data: ex } = await db
-    .from('daily_snapshots')
-    .select('id, origen')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('mesa_id', mesaId)
-    .eq('fecha', dia)
-    .maybeSingle();
-  const e = ex as { id: string; origen: string } | null;
+  const e = await getDailySnapshot(ctx, mesaId, dia);
   // Una foto tomada en vivo (cierre/cron) no se reemplaza por una reconstruida.
   if (e && origen === 'reconstruido' && e.origen !== 'reconstruido') return;
-  const { error } = e
-    ? await db
-        .from('daily_snapshots')
-        .update({ ...fila, origen: f.publicado && origen !== 'reconstruido' ? 'cierre' : origen })
-        .eq('id', e.id)
-    : await db.from('daily_snapshots').insert({ ...fila, origen: f.publicado && origen !== 'reconstruido' ? 'cierre' : origen });
-  throwIf(error);
+  await guardarDailySnapshot(e?.id ?? null, { ...fila, origen: f.publicado && origen !== 'reconstruido' ? 'cierre' : origen });
 }
 
 /** Foto del día (cierre publicado o cron de las 19:30). */
@@ -437,25 +375,11 @@ export async function calcularSemana(
   inicio: string,
   fin: string,
 ): Promise<{ semana_id: string; metricas: MetricasSemana }> {
-  const db = serviceClient();
   const semana = await ensureSemana(ctx, inicio);
   const ids = new Set(d.tareas.map((t) => t.id));
   const alc = await alcanceMesa(ctx, d.mesa.id);
   const clientes = new Set(alc.clienteIds);
-  const [{ data: sen }, { data: acu }, { data: acta }] = await Promise.all([
-    db.from('senales').select('severidad, atendida, entidad_tipo, entidad_id').eq('tenant_id', ctx.tenantId).eq('semana_id', semana.id),
-    db.from('acuerdos').select('estado, fecha_compromiso, cerrado_at').eq('tenant_id', ctx.tenantId).eq('semana_id', semana.id),
-    db
-      .from('actas')
-      .select('contenido')
-      .eq('tenant_id', ctx.tenantId)
-      .eq('semana_id', semana.id)
-      .eq('mesa_id', d.mesa.id)
-      .eq('tipo', 'plan_operativo')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const { senales: sen, acuerdos: acu, acta } = await datosSemanaMesa(ctx, semana.id, d.mesa.id);
   const senales = ((sen ?? []) as { severidad: string; atendida: boolean; entidad_tipo: string; entidad_id: string }[]).filter(
     (s) => (s.entidad_tipo === 'requerimiento' && ids.has(s.entidad_id)) || (s.entidad_tipo === 'cliente' && clientes.has(s.entidad_id)),
   );
@@ -486,15 +410,7 @@ async function guardarSemana(
   s: { semana_id: string; metricas: MetricasSemana },
   origen: 'cron' | 'reconstruido',
 ) {
-  const db = serviceClient();
-  const { data: ex } = await db
-    .from('weekly_snapshots')
-    .select('id, origen')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('mesa_id', mesaId)
-    .eq('semana_id', s.semana_id)
-    .maybeSingle();
-  const e = ex as { id: string; origen: string } | null;
+  const e = await getWeeklySnapshot(ctx, mesaId, s.semana_id);
   if (e && origen === 'reconstruido' && e.origen !== 'reconstruido') return;
   const fila = {
     tenant_id: ctx.tenantId,
@@ -505,8 +421,7 @@ async function guardarSemana(
     metricas: s.metricas,
     origen,
   };
-  const { error } = e ? await db.from('weekly_snapshots').update(fila).eq('id', e.id) : await db.from('weekly_snapshots').insert(fila);
-  throwIf(error);
+  await guardarWeeklySnapshot(e?.id ?? null, fila);
 }
 
 /** Foto de la semana que cierra (domingo) para cada mesa activa. */
@@ -591,33 +506,13 @@ export function resumir(dias: { metricas: MetricasDia; publicado: boolean }[]): 
 }
 
 export async function evolutivoMes(ctx: DbCtx, mesa: Mesa, mes: string): Promise<EvolutivoMes> {
-  const db = serviceClient();
   const ini = `${mes}-01`;
   const finMes = sumarDias(`${new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 1)).toISOString().slice(0, 10)}`, -1);
   const antIni = new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
-  const [{ data: ds, error: e1 }, { data: ws, error: e2 }] = await Promise.all([
-    db
-      .from('daily_snapshots')
-      .select('fecha, metricas, por_persona, origen, publicado, apertura_publicada')
-      .eq('tenant_id', ctx.tenantId)
-      .eq('mesa_id', mesa.id)
-      .gte('fecha', antIni)
-      .lte('fecha', finMes)
-      .order('fecha'),
-    db
-      .from('weekly_snapshots')
-      .select('fecha_inicio, fecha_fin, metricas, origen')
-      .eq('tenant_id', ctx.tenantId)
-      .eq('mesa_id', mesa.id)
-      .lte('fecha_inicio', finMes)
-      .gte('fecha_fin', ini)
-      .order('fecha_inicio'),
-  ]);
-  throwIf(e1);
-  throwIf(e2);
-  const todos = (ds ?? []) as EvolutivoMes['dias'];
+  const [ds, ws] = await Promise.all([listDailySnapshots(ctx, mesa.id, antIni, finMes), listWeeklySnapshots(ctx, mesa.id, ini, finMes)]);
+  const todos = ds as EvolutivoMes['dias'];
   const dias = todos.filter((x) => x.fecha >= ini);
-  const semanas = (ws ?? []) as EvolutivoMes['semanas'];
+  const semanas = ws as EvolutivoMes['semanas'];
   // Hoy y la semana en curso: en vivo (aún no hay foto).
   const hoy = hoyLocal();
   if (hoy >= ini && hoy <= finMes) {

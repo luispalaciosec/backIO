@@ -4,7 +4,7 @@
  * de reprogramaciones y reprocesos, que sí registraban a la persona.
  */
 import type { DbCtx } from './db/client';
-import { serviceClient, throwIf } from './db/client';
+import { listAuditDelDia, listCambiosConPersona, nombresActividad } from './db/actividad';
 import {
   ESTADO_APROBACION_LABEL,
   ESTADO_OPERATIVO_LABEL,
@@ -113,21 +113,9 @@ export async function actividadDelDia(
   eventos: EventoActividad[];
   por_persona: { usuario_id: string; nombre: string; avatar_url: string | null; acciones: number; primera: string; ultima: string }[];
 }> {
-  const db = serviceClient();
   const desde = inicioDiaLocal(fecha);
   const hasta = finDiaLocal(fecha);
-  let q = db
-    .from('audit_log')
-    .select('id, usuario_id, origen, accion, entidad, entidad_id, detalle, created_at')
-    .eq('tenant_id', ctx.tenantId)
-    .not('usuario_id', 'is', null)
-    .gte('created_at', desde)
-    .lte('created_at', hasta)
-    .order('created_at', { ascending: false })
-    .limit(1000);
-  if (usuarioId) q = q.eq('usuario_id', usuarioId);
-  const { data: au, error } = await q;
-  throwIf(error);
+  const au = await listAuditDelDia(ctx, desde, hasta, usuarioId);
   type A = {
     id: number;
     usuario_id: string;
@@ -147,30 +135,12 @@ export async function actividadDelDia(
     entidad_id: string | null;
     detalle: Record<string, unknown>;
     created_at: string;
-  }[] = ((au ?? []) as A[]).map((a) => ({ ...a, id: `a${a.id}`, detalle: a.detalle ?? {} }));
+  }[] = (au as A[]).map((a) => ({ ...a, id: `a${a.id}`, detalle: a.detalle ?? {} }));
 
   // Antes del arreglo de auditoría: reconstruir desde reprogramaciones y reprocesos.
   if (desde < FIX_AUDITORIA) {
-    let r1 = db
-      .from('reprogramaciones')
-      .select('id, requerimiento_id, fecha_anterior, fecha_nueva, motivo, usuario_id, created_at')
-      .eq('tenant_id', ctx.tenantId)
-      .not('usuario_id', 'is', null)
-      .gte('created_at', desde)
-      .lte('created_at', hasta);
-    let r2 = db
-      .from('reprocesos')
-      .select('id, requerimiento_id, origen, motivo, usuario_id, abierto_at')
-      .eq('tenant_id', ctx.tenantId)
-      .not('usuario_id', 'is', null)
-      .gte('abierto_at', desde)
-      .lte('abierto_at', hasta);
-    if (usuarioId) {
-      r1 = r1.eq('usuario_id', usuarioId);
-      r2 = r2.eq('usuario_id', usuarioId);
-    }
-    const [a, b] = await Promise.all([r1, r2]);
-    for (const x of (a.data ?? []) as {
+    const { reprogramaciones, reprocesos } = await listCambiosConPersona(ctx, desde, hasta, usuarioId);
+    for (const x of reprogramaciones as {
       id: string;
       requerimiento_id: string;
       fecha_anterior: string | null;
@@ -189,7 +159,7 @@ export async function actividadDelDia(
         detalle: { de: x.fecha_anterior, a: x.fecha_nueva, motivo_reprogramacion: x.motivo },
         created_at: x.created_at,
       });
-    for (const x of (b.data ?? []) as {
+    for (const x of reprocesos as {
       id: string;
       requerimiento_id: string;
       origen: string;
@@ -211,22 +181,18 @@ export async function actividadDelDia(
   crudos.sort((x, y) => y.created_at.localeCompare(x.created_at));
 
   const ids = (ent: string) => [...new Set(crudos.filter((c) => c.entidad === ent && c.entidad_id).map((c) => c.entidad_id as string))];
-  const [us, rq, pr, cl] = await Promise.all([
-    db.from('usuarios').select('id, nombre, avatar_url, rol').eq('tenant_id', ctx.tenantId),
-    ids('requerimiento').length
-      ? db.from('requerimientos').select('id, titulo_interno, cliente_id, proyecto_id').in('id', ids('requerimiento'))
-      : Promise.resolve({ data: [] }),
-    ids('proyecto').length
-      ? db.from('proyectos').select('id, nombre, cliente_id').in('id', ids('proyecto'))
-      : Promise.resolve({ data: [] }),
-    db.from('clientes').select('id, nombre').eq('tenant_id', ctx.tenantId),
-  ]);
-  const U = new Map(((us.data ?? []) as { id: string; nombre: string; avatar_url: string | null; rol: string }[]).map((u) => [u.id, u]));
+  const {
+    usuarios: us,
+    requerimientos: rq,
+    proyectos: pr,
+    clientes: cl,
+  } = await nombresActividad(ctx, ids('requerimiento'), ids('proyecto'));
+  const U = new Map((us as { id: string; nombre: string; avatar_url: string | null; rol: string }[]).map((u) => [u.id, u]));
   const RQ = new Map(
-    ((rq.data ?? []) as { id: string; titulo_interno: string; cliente_id: string; proyecto_id: string | null }[]).map((r) => [r.id, r]),
+    (rq as { id: string; titulo_interno: string; cliente_id: string; proyecto_id: string | null }[]).map((r) => [r.id, r]),
   );
-  const PR = new Map(((pr.data ?? []) as { id: string; nombre: string; cliente_id: string }[]).map((p) => [p.id, p]));
-  const CL = new Map(((cl.data ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]));
+  const PR = new Map((pr as { id: string; nombre: string; cliente_id: string }[]).map((p) => [p.id, p]));
+  const CL = new Map((cl as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]));
 
   const eventos: EventoActividad[] = crudos.map((c) => {
     const u = U.get(c.usuario_id);

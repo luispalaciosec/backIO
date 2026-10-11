@@ -4,7 +4,7 @@
  * `config.grupo` o por lista explícita de ids. Solo cuenta lo registrado en BackIO desde `desde`.
  */
 import type { DbCtx } from './db/client';
-import { throwIf } from './db/client';
+import { getConfigTenantInformes, listClientesActivosConfig, listClientesCanal, listRequerimientosCanal } from './db/informes';
 import { diaLocal, lunesDe } from '@backio/shared';
 
 export interface CanalSerie {
@@ -83,13 +83,8 @@ export async function informeCanal(
   ctx: DbCtx,
   o: { clienteIds: string[]; desde: string; hasta: string; titulo?: string },
 ): Promise<InformeCanal> {
-  const { data: cls, error: e1 } = await ctx.db
-    .from('clientes')
-    .select('id, nombre, color_primario, config')
-    .eq('tenant_id', ctx.tenantId)
-    .in('id', o.clienteIds);
-  throwIf(e1);
-  const clientes = ((cls ?? []) as { id: string; nombre: string; color_primario: string | null; config: Record<string, unknown> }[]).sort(
+  const cls = await listClientesCanal(ctx, o.clienteIds);
+  const clientes = (cls as { id: string; nombre: string; color_primario: string | null; config: Record<string, unknown> }[]).sort(
     (a, b) => o.clienteIds.indexOf(a.id) - o.clienteIds.indexOf(b.id),
   );
   const canales: CanalSerie[] = clientes.map((c, i) => ({
@@ -114,22 +109,7 @@ export async function informeCanal(
     created_at: string;
     completado_at: string | null;
   };
-  const filas: R[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await ctx.db
-      .from('requerimientos')
-      .select('cliente_id, piezas, estado_operativo, estado_aprobacion, prioridad, fecha_pedido, created_at, completado_at')
-      .eq('tenant_id', ctx.tenantId)
-      .in('cliente_id', o.clienteIds)
-      .is('deleted_at', null)
-      .neq('estado_operativo', 'cancelado')
-      .order('id')
-      .range(from, from + 999);
-    throwIf(error);
-    const r = (data ?? []) as R[];
-    filas.push(...r);
-    if (r.length < 1000) break;
-  }
+  const filas = await listRequerimientosCanal<R>(ctx, o.clienteIds);
   const fechaGen = (r: R) => r.fecha_pedido ?? diaLocal(r.created_at);
   const enRango = filas.filter((r) => {
     const f = fechaGen(r);
@@ -194,15 +174,14 @@ export async function informeCanal(
 
 /** Grupos de clientes por config.grupo (p. ej. "AB-Inbev") + presets guardados en tenants.config.informes_canal. */
 export async function gruposInforme(ctx: DbCtx): Promise<{ id: string; nombre: string; cliente_ids: string[] }[]> {
-  const { data: cls } = await ctx.db.from('clientes').select('id, nombre, config').eq('tenant_id', ctx.tenantId).eq('activo', true);
-  const clientes = (cls ?? []) as { id: string; nombre: string; config: Record<string, unknown> }[];
+  const clientes = (await listClientesActivosConfig(ctx)) as { id: string; nombre: string; config: Record<string, unknown> }[];
   const porGrupo = new Map<string, string[]>();
   for (const c of clientes) {
     const g = (c.config as { grupo?: string })?.grupo;
     if (g) porGrupo.set(g, [...(porGrupo.get(g) ?? []), c.id]);
   }
   const out = [...porGrupo.entries()].map(([g, ids]) => ({ id: `grupo:${g}`, nombre: `${g} (todas las ramas)`, cliente_ids: ids }));
-  const { data: t } = await ctx.db.from('tenants').select('config').eq('id', ctx.tenantId).single();
+  const t = await getConfigTenantInformes(ctx);
   const presets =
     (t as { config?: { informes_canal?: { id: string; nombre: string; cliente_ids: string[] }[] } } | null)?.config?.informes_canal ?? [];
   // Además, cada cliente activo como opción propia: el informe sirve para cualquier cuenta, no solo grupos.

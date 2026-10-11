@@ -8,6 +8,7 @@ import { listBacklog } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
 import { listClientes } from '../db/clientes';
 import { alcanceMesa } from '../db/mesas';
+import { listReprocesosDelDia } from '../db/ia';
 import { dailyItemTexto, type DailyItem, type DailyMensaje, type DailyKpis } from '../mcp/publish';
 import { generarTexto } from './index';
 import { hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
@@ -79,12 +80,11 @@ export async function armarDailyMensaje(
     const todas = [...activos, ...hechas];
     const planificadas = todas.filter((r) => r.daily_fecha === hoy);
     const nuevas = todas.filter((r) => r.created_at >= inicioDia);
-    const { data: rep } = await ctx.db
-      .from('reprocesos')
-      .select('id')
-      .eq('tenant_id', ctx.tenantId)
-      .gte('abierto_at', inicioDia)
-      .in('requerimiento_id', todas.map((r) => r.id).slice(0, 1000));
+    const rep = await listReprocesosDelDia(
+      ctx,
+      inicioDia,
+      todas.map((r) => r.id),
+    );
     const porPersona = new Map<string, { nombre: string; planificadas: number; cerradas: number; fuera: number }>();
     const pp = (id: string) => {
       const n = nombre(id);
@@ -108,7 +108,7 @@ export async function armarDailyMensaje(
       nuevas_hoy: nuevas.length,
       nuevas_no_planificadas: nuevas.filter((r) => r.planificacion === 'no_planificado').length,
       nuevas_urgentes: nuevas.filter((r) => r.planificacion === 'urgente').length,
-      reprocesos_hoy: (rep ?? []).length,
+      reprocesos_hoy: rep.length,
       reprogramaciones_24h: activos.filter((r) => r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h).length,
       bloqueos_nuevos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).length,
       vencidas_abiertas: activos.filter((r) => r.dias_atraso > 0).length,

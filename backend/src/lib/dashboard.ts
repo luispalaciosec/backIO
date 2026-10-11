@@ -2,9 +2,9 @@
  * Fase 4 · Dashboards. Agregados calculados sobre la vista de métricas; sin tablas nuevas.
  * Todo por tenant, con filtro opcional por mesa. Nunca texto de Basecamp (no existe en la base).
  */
-import type { RequerimientoMetricas, Proyecto, Usuario, Cliente, Mesa, Semana } from '@backio/shared';
+import type { Proyecto, Usuario, Cliente, Mesa, Semana } from '@backio/shared';
 import type { DbCtx } from './db/client';
-import { throwIf } from './db/client';
+import { contarHuerfanosPendientes, listCompletadosDesde } from './db/dashboard';
 import { listBacklog } from './db/requerimientos';
 import { listProyectos } from './db/proyectos';
 import { listUsuarios } from './db/usuarios';
@@ -115,29 +115,6 @@ export interface Dashboard {
 const dias = (a: string, b: string) =>
   Math.round((new Date(`${b}T12:00:00Z`).getTime() - new Date(`${a}T12:00:00Z`).getTime()) / 86_400_000);
 
-async function completadosDesde(
-  ctx: DbCtx,
-  desdeIso: string,
-  mesa?: { clienteIds: string[]; proyectoIds: string[] },
-): Promise<RequerimientoMetricas[]> {
-  let q = ctx.db
-    .from('v_requerimientos_metricas')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('estado_operativo', 'completado')
-    .gte('completado_at', desdeIso);
-  if (mesa) {
-    const partes: string[] = [];
-    if (mesa.clienteIds.length) partes.push(`cliente_id.in.(${mesa.clienteIds.join(',')})`);
-    if (mesa.proyectoIds.length) partes.push(`proyecto_id.in.(${mesa.proyectoIds.join(',')})`);
-    if (!partes.length) return [];
-    q = q.or(partes.join(','));
-  }
-  const { data, error } = await q;
-  throwIf(error);
-  return ((data ?? []) as RequerimientoMetricas[]).map((r) => ({ ...r, peso: Number(r.peso) }));
-}
-
 export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promise<Dashboard> {
   const hoy = hoyLocal();
   const lunes = lunesDe(hoy);
@@ -154,15 +131,11 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   const alcance = mesa ? await alcanceMesa(ctx, mesa.id) : undefined;
   const [activos, completados56, horas, cumpl] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
-    completadosDesde(ctx, hace56, alcance),
+    listCompletadosDesde(ctx, hace56, alcance),
     resumenHoras(ctx, hace30, alcance ? { clienteIds: alcance.clienteIds } : {}),
     listCumplimientoDesde(ctx, hace30),
   ]);
-  const { count: huerfanosPend } = await ctx.db
-    .from('basecamp_huerfanos')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', ctx.tenantId)
-    .is('resuelto_at', null);
+  const huerfanosPend = await contarHuerfanosPendientes(ctx);
   const completados30 = completados56.filter((r) => r.completado_at && r.completado_at >= hace30);
   // Reprogramaciones/reprocesos 30d acotados al alcance (por requerimiento visible en activos o completados).
   const reqIdsAlcance = new Set([...activos, ...completados56].map((r) => r.id));

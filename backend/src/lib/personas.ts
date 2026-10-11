@@ -2,9 +2,9 @@
  * Personas: rendimiento por integrante en un periodo (día, semana, mes) + serie de 30 días.
  * Todo sale de datos estructurados: requerimientos, horas del timesheet, reprogramaciones y reprocesos.
  */
-import type { RequerimientoMetricas, Usuario } from '@backio/shared';
+import type { Usuario } from '@backio/shared';
 import type { DbCtx } from './db/client';
-import { throwIf } from './db/client';
+import { listCompletadosDesde, listHorasDesde } from './db/dashboard';
 import { listUsuarios } from './db/usuarios';
 import { listClientes } from './db/clientes';
 import { listBacklog } from './db/requerimientos';
@@ -80,21 +80,9 @@ export async function resumenPersonas(
     listBacklog(ctx, { solo_activos: true }),
     listCumplimientoDesde(ctx, desdeIso),
   ]);
-  const { data: comp, error } = await ctx.db
-    .from('v_requerimientos_metricas')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('estado_operativo', 'completado')
-    .gte('completado_at', inicioDiaLocal(desde30 < desde ? desde30 : desde));
-  throwIf(error);
-  const completados = ((comp ?? []) as RequerimientoMetricas[]).map((r) => ({ ...r, peso: Number(r.peso) }));
-  const { data: hrs, error: eh } = await ctx.db
-    .from('horas')
-    .select('usuario_id, fecha, horas')
-    .eq('tenant_id', ctx.tenantId)
-    .gte('fecha', desde30 < desde ? desde30 : desde);
-  throwIf(eh);
-  const horas = (hrs ?? []) as { usuario_id: string | null; fecha: string; horas: number }[];
+  const completados = await listCompletadosDesde(ctx, inicioDiaLocal(desde30 < desde ? desde30 : desde));
+  const hrs = await listHorasDesde(ctx, desde30 < desde ? desde30 : desde);
+  const horas = hrs as { usuario_id: string | null; fecha: string; horas: number }[];
   const nombreC = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '—';
   const reqPorId = new Map([...activos, ...completados].map((r) => [r.id, r]));
   const enPeriodo = (iso: string | null) => !!iso && iso >= desdeIso && iso <= hastaIso;
