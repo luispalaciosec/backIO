@@ -10,7 +10,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:push": "supabase db push",
-    "db:seed": "supabase db reset --linked"
+    "db:seed": "supabase db reset --linked",
+    "lint": "eslint src && prettier --check src",
+    "format": "prettier --write src"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

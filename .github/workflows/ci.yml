@@ -17,6 +17,7 @@ jobs:
       # Falla si hay vulnerabilidades altas o críticas en dependencias de producción (checklist, punto 20).
       - run: pnpm audit --prod --audit-level=high
       - run: pnpm typecheck
+      - run: pnpm lint
       - run: pnpm test
       - run: pnpm --filter @backio/frontend build
         env:

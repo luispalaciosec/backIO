@@ -35,7 +35,7 @@ evolutivo.get('/export', soloGestion, async (c) => {
   const e = await evolutivoMes(ctx, mesa, mesValido(c.req.query('mes')));
   const cols = ['planificadas', 'cerradas_planificadas', 'cumplimiento_pct', 'cerradas_fuera', 'cerradas_total', 'nuevas_hoy', 'nuevas_no_planificadas', 'nuevas_urgentes', 'reprocesos_hoy', 'reprogramaciones_24h', 'bloqueos_nuevos', 'vencidas_abiertas'] as const;
   const filas = [['fecha', ...cols, 'cierre_publicado', 'origen'].join(','), ...e.dias.map((d) => [d.fecha, ...cols.map((k) => d.metricas[k] ?? ''), d.publicado ? 'si' : 'no', d.origen].join(','))];
-  return c.body(`﻿${filas.join('\n')}`, 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="evolutivo-${mesa.slug ?? mesa.id}-${e.mes}.csv"` });
+  return c.body(`\uFEFF${filas.join('\n')}`, 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="evolutivo-${mesa.slug ?? mesa.id}-${e.mes}.csv"` });
 });
 
 /** Rehace días y semanas desde una fecha (por defecto 21/09/2026, desde cuando la auditoría es confiable). */

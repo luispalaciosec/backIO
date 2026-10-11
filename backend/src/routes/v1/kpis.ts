@@ -71,7 +71,7 @@ kpis.get('/export', verKpis, async (c) => {
   const hasta = mesValido(c.req.query('hasta'));
   const n = Math.min(12, Math.max(1, Number(c.req.query('meses') ?? 1) || 1));
   const csv = await exportarCsv(ctxOf(c), periodosAnteriores(hasta, n));
-  return c.body(`﻿${csv}`, 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="kpis-${hasta}.csv"` });
+  return c.body(`\uFEFF${csv}`, 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="kpis-${hasta}.csv"` });
 });
 
 /** Detalle: gestión ve cualquiera; el resto solo su propio detalle (usuario = uno mismo). */
