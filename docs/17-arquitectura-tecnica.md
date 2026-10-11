@@ -253,15 +253,21 @@ entorno** para hablar con Basecamp.
 
 ## 8. Deuda técnica conocida (priorizada)
 
-1. **Sin CI.** Nada corre `typecheck` y `test` antes de desplegar. Acción: GitHub Actions en cada push.
-2. **Sin staging.** Todo cambio va a producción. Acción: rama de Supabase + proyecto Basecamp sandbox
+Actualizada el 11/10/2026, al cerrar la auditoría externa (ver `HARDENING-CHANGELOG.md`).
+
+1. **Sin staging.** Todo cambio va a producción. Acción: rama de Supabase + proyecto Basecamp sandbox
    (ya existe el cliente de pruebas "Acme EC S.A.S", proyecto 48775530).
-3. **Sin alertas de crons.** Acción: correo a operaciones si un cron falla o no corre en su ventana.
-4. **Tests de integración con Basecamp** sobre el sandbox: actualizar fecha sin perder asignados,
+2. **Alertas de jobs.** `cron_runs` registra cada corrida con `ok` y Sentry recibe los errores del logger (con
+   `SENTRY_DSN` cargado); falta un aviso a operaciones si un job no corre en su ventana.
+3. **Tests de integración con Basecamp** sobre el sandbox: actualizar fecha sin perder asignados,
    timesheet, importación, papelera.
-5. **Reparaciones de datos por script local.** Acción: convertir las recurrentes en endpoints de admin.
+4. **Reparaciones de datos por script local.** Acción: convertir las recurrentes en endpoints de admin.
+5. **Consultas fuera de `lib/db`** en el resto de `lib` (115, aviso de lint); en las rutas ya es error.
 6. **Portal:** mostrar notas de bitácora `visible_cliente` (toca `lib/visibility/`, revisión humana).
 7. **Deploy manual del frontend.** Acción: plan Pro de Vercel o GitHub Action que ejecute `vercel deploy`.
+
+Resuelto en la auditoría del 10/10: CI en cada push (typecheck, lint, tests, build y `pnpm audit`), tipos generados de
+Supabase (`pnpm --filter @backio/backend db:types`), jobs en una sola tabla con registro.
 
 ---
 

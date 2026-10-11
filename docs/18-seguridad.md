@@ -103,3 +103,23 @@ migraciones 24, 25 y 26 aplicadas y verificadas en producción el 30/09.
 Quedaron fuera de cobertura (perfil quick) y conviene empezar por ahí una corrida `standard`: las rutas que crean
 tareas o plantillas y fijan `visible_cliente` al insertar (incluido el CSV masivo), y 8 routers de `/api/v1`
 (proyectos, plantillas, huérfanos, horas, usuarios, personas, dashboard, tipos-pieza).
+
+## Auditoría externa (10/10/2026) y endurecimiento por olas
+
+Auditoría externa sobre el commit `f2e30e2`: veredicto «apto con correcciones», sin críticos ni altos de seguridad, pero con
+dos bugs altos en producción y deuda estructural. Documentos en `~/claude-projects/auditorias/2026-10-10/`. El detalle,
+hallazgo por hallazgo, con archivos y cómo se verificó, está en [`HARDENING-CHANGELOG.md`](../HARDENING-CHANGELOG.md).
+
+| Frente | Qué cambió |
+|---|---|
+| Secretos en logs | El log de peticiones y el de errores redactan la ruta del webhook de Basecamp y la del portal, y no registran query strings (S1; el log de errores se corrigió en la Ola 7) |
+| Datos expuestos | Clientes y mesas solo los escribe admin (S2); colaborador ve solo su fila en Personas y Horas (S3); credenciales de Basecamp solo en `integracion_credenciales`, sin fallback (S4); PIN del portal con scrypt en `portal_pines` (M3) |
+| Agentes y OAuth | Consentimiento con datos del servidor (S6); refresh atómico con revocación de la familia (S8); `confirm_plan` verifica scope y autor antes de consumir (S9); API keys de cliente atadas a su cliente (S11); claim atómico al publicar actas (S7) |
+| Entradas | Títulos de una línea (S5); `bodyLimit`; errores de validación legibles (B3); CSP con nonce en el frontend y `default-src 'none'` en el backend |
+| Abuso | Límite de peticiones persistente en Postgres (`limites`); Turnstile en login y recuperar; signup público apagado en Supabase |
+| Dependencias | `pnpm audit --prod --audit-level=high` en CI (de 34 vulnerabilidades a 0); Next 15 + React 19; Dependabot |
+| Transacciones | Import CSV y Builder en `crear_lote` (B7); «quitar acceso» en `quitar_acceso`, credenciales primero (B8) — migración 29 |
+| Operación | Jobs con ventana y registro en `cron_runs` (B10); logger JSON con niveles; Sentry opcional sin datos personales |
+
+Migraciones de esta ronda: 27 (seguridad), 28 (límites y `cron_runs`) y 29 (transacciones), aplicadas y verificadas
+por Luis entre el 10 y el 11/10.
