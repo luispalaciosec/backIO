@@ -138,3 +138,9 @@ una acción de Luis) · **pendiente** (ola futura).
 | Documentación | hecho | `docs/README.md` (índice: qué responde cada documento), `docs/18-seguridad.md` (resumen de esta ronda), `docs/17` §8 (deuda actualizada), `README.md` (migraciones 01–29) | `docs/manual/` (9,5 MB) se queda donde está; si crece, conviene Git LFS |
 | Páginas-dios del frontend | hecho (lo que pasaba el umbral) | `components/kpis/Kpis.tsx` (293 líneas, 5 componentes) → `comun.tsx`, `VistaEquipo.tsx`, `FichaPersona.tsx`, `DetalleKpi.tsx`, `useTableroKpis.ts` (Kpis.tsx reexporta: los importadores no cambian); backlog → `useCatalogosBacklog.ts` y `useFiltrosBacklog.ts` | Movimientos sin cambios de lógica: typecheck con `--noUnusedLocals`, `next lint` y build. Dashboard (158 líneas) y Nuevo proyecto (150) quedaron como están: ya cargan con `useAvisosCarga` y partirlos no reduce riesgo. **[PENDIENTE-HUMANO]** recorrer backlog (filtros en la URL, vista kanban) y KPIs en producción |
 | Sentry activo en producción (11/10) | hecho | DSN cargados por Luis: `SENTRY_DSN` en Railway, `NEXT_PUBLIC_SENTRY_DSN` en Vercel (frontend redesplegado) | Evento de prueba del backend enviado con las variables de producción; desde el navegador, el envío a `…/api/4512234550657024/envelope/` respondió 200; la CSP de producción admite el host de ingesta. Los dos eventos de prueba se pueden resolver en Sentry |
+
+## Ola 8 · Tests que faltan
+
+| Hallazgo | Estado | Archivos | Verificación |
+|---|---|---|---|
+| Encabezados del daily escritos por la IA (podían variar) | hecho | `backend/src/lib/ia/daily.ts` (`SECCIONES_DAILY`, `armarDaily`) | Decisión de Luis (11/10): los emojis se quedan. La IA marca cada sección con `[[clave]]` y el código pone el título fijo, en orden, sin secciones vacías; si la IA no marca, se publica su texto. `daily_formato.test.ts` (5) |

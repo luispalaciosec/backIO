@@ -128,14 +128,66 @@ export async function armarDailyMensaje(
   };
 }
 
+/**
+ * Secciones del daily, en su orden y con su título fijo. Los títulos con emoji son el formato del equipo en Basecamp
+ * (decisión de Luis, 11/10): los pone el código, no la IA, para que no varíen de un día a otro.
+ */
+export const SECCIONES_DAILY: Record<'apertura' | 'cierre', [clave: string, titulo: string][]> = {
+  apertura: [
+    ['foco', '🎯 Foco del día'],
+    ['mesa', '📋 En la mesa hoy'],
+    ['vence', '⏰ Vence hoy o mañana'],
+    ['bloqueos', '⛔ Bloqueos'],
+    ['cambios', '📅 Cambios de fecha'],
+  ],
+  cierre: [
+    ['balance', '🎯 Balance del día'],
+    ['completado', '✅ Completado hoy'],
+    ['fuera', '➕ Completadas fuera del daily'],
+    ['abierto', '⏳ Quedó abierto'],
+    ['bloqueos', '⛔ Bloqueos'],
+    ['manana', '➡️ Para mañana'],
+  ],
+};
+
+/**
+ * Arma el mensaje con los títulos fijos a partir del texto de la IA, que marca cada sección con `[[clave]]`.
+ * Respeta el orden canónico, omite secciones vacías o desconocidas y las que no corresponden al tipo. Si la IA no
+ * usó ninguna marca, devuelve su texto tal cual (mejor publicar algo que fallar).
+ */
+export function armarDaily(tipo: 'apertura' | 'cierre', texto: string): string {
+  const partes = new Map<string, string[]>();
+  let actual: string | null = null;
+  for (const linea of texto.split('\n')) {
+    const m = /^\s*\[\[([a-z_]+)\]\]\s*$/.exec(linea);
+    if (m) {
+      actual = m[1]!;
+      if (!partes.has(actual)) partes.set(actual, []);
+      continue;
+    }
+    if (actual) partes.get(actual)!.push(linea);
+  }
+  if (!partes.size) return texto.trim();
+  return SECCIONES_DAILY[tipo]
+    .map(([clave, titulo]) => {
+      const cuerpo = (partes.get(clave) ?? []).join('\n').trim();
+      return cuerpo ? `**${titulo}**\n${cuerpo}` : null;
+    })
+    .filter((x): x is string => x !== null)
+    .join('\n\n');
+}
+
+const claves = (tipo: 'apertura' | 'cierre') => SECCIONES_DAILY[tipo].map(([c]) => `[[${c}]]`).join(', ');
+
 const SYSTEM_DAILY = `Redacta el mensaje de {TIPO} de mesa para el board Daily de Basecamp que lee el equipo de producción.
 Formato OBLIGATORIO (markdown simple, se convierte a HTML):
-- Bloques separados por una línea en blanco.
-- Cada bloque empieza con un título en negrita con emoji, en su propia línea. En una apertura: **🎯 Foco del día**, **📋 En la mesa hoy**, **⏰ Vence hoy o mañana**, **⛔ Bloqueos**, **📅 Cambios de fecha**. En un cierre: **🎯 Balance del día** (una frase que lea el cumplimiento del plan y lo que entró sin planificar), **✅ Completado hoy** (viñetas por persona con sus tareas), **➕ Completadas fuera del daily** (lo que se cerró sin estar en la selección del día, por persona), **⏳ Quedó abierto** (lo de hoy que no se cerró, por persona), **⛔ Bloqueos**, **➡️ Para mañana**.
-- Debajo de cada título, viñetas con "- " (una idea por viñeta, máximo 4 por bloque). El foco del día es una sola frase sin viñeta.
-- Nombres de tareas en negrita (**así**) y el responsable después de dos puntos. Omite un bloque si no hay nada que decir en él.
-- Fechas como día/mes (22/09), nunca 2026-09-22. Sin títulos con #, sin tablas, sin saludos ni despedidas. El bloque **➡️ Para mañana** solo existe en un cierre; en una apertura no lo pongas.
-Contenido: el foco del día en una frase; qué se trabaja hoy (la selección de la mesa) agrupado por persona; qué vence y quién lo tiene; bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos); cambios de fecha.
+- Cada sección empieza con una línea que contiene SOLO su marca, sin título: {CLAVES}. El sistema pone los títulos.
+  En una apertura: foco (una sola frase sin viñeta), mesa (lo que se trabaja hoy, por persona), vence (qué vence y quién lo tiene), bloqueos, cambios (fechas movidas).
+  En un cierre: balance (una frase que lea el cumplimiento del plan y lo que entró sin planificar), completado (por persona), fuera (lo cerrado sin estar en la selección del día, por persona), abierto (lo de hoy que no se cerró, por persona), bloqueos, manana (qué sigue mañana).
+- Debajo de cada marca, viñetas con "- " (una idea por viñeta, máximo 4). Omite la sección entera si no hay nada que decir.
+- Nombres de tareas en negrita (**así**) y el responsable después de dos puntos.
+- Fechas como día/mes (22/09), nunca 2026-09-22. Sin títulos propios, sin #, sin tablas, sin emojis, sin saludos ni despedidas.
+Contenido: bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos).
 En un cierre: kpis trae los indicadores del día (cumplimiento del plan, entradas fuera de planificación, reprocesos, vencidas abiertas); úsalos en el balance con sus números, sin inventar otros. completadas_hoy y completadas_fuera_del_daily son lo que sí se cerró (dilo por persona, reconociendo el trabajo sin exagerar); hoy_se_trabaja es lo que quedó abierto de la selección del día.
 Tono de compañero de mesa, no de jefe.`;
 
@@ -161,9 +213,9 @@ export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Prom
     tipo: 'daily',
     entidad: { tipo: 'mesa', id: mesa.id },
     payload,
-    system: SYSTEM_DAILY.replace('{TIPO}', m.tipo),
+    system: SYSTEM_DAILY.replace('{TIPO}', m.tipo).replace('{CLAVES}', claves(m.tipo)),
     maxTokens: 900,
     cacheMs: 5 * 60_000,
   });
-  return g.texto;
+  return armarDaily(m.tipo, g.texto);
 }
