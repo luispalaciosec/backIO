@@ -4,5 +4,4 @@
  * preview del Builder (frontend) y el portal (backend) usen LA MISMA función.
  * Este módulo solo la re-exporta y añade el guard del endpoint público.
  */
-export { sanitizeForClient, assertClientSafe, mapEstadoCliente, CAMPOS_PROHIBIDOS_CLIENTE } from '@backio/shared';
-export type { ClientSafeProject, ClientSafeRequirement } from '@backio/shared';
+export { sanitizeForClient, assertClientSafe } from '@backio/shared';

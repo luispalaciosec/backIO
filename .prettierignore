@@ -6,8 +6,3 @@ backend/scripts
 backend/supabase
 docs
 *.md
-# Zonas de revisión humana (CLAUDE.md): se formatean solo con visto bueno de Luis.
-backend/src/lib/visibility
-shared/src/visibility
-backend/src/lib/basecamp/write.ts
-backend/src/lib/mcp/tools

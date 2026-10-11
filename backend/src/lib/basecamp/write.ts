@@ -77,7 +77,10 @@ export async function createProjectStructure(
     if (match) {
       todolistId = match.id;
     } else {
-      const tl = await bc.createTodolist(bcProjectId, todosetId, { name: proyecto.nombre, description: `Gestionado desde BackIO. Entrega: ${proyecto.fecha_entrega}` });
+      const tl = await bc.createTodolist(bcProjectId, todosetId, {
+        name: proyecto.nombre,
+        description: `Gestionado desde BackIO. Entrega: ${proyecto.fecha_entrega}`,
+      });
       todolistId = tl.id;
     }
     await updateProyecto(ctx, proyecto.id, { basecamp_todolist_id: todolistId });
@@ -118,7 +121,9 @@ export async function createProjectStructure(
   const sync_estado = fallidos === 0 ? 'ok' : 'incompleto';
   await updateProyecto(ctx, proyecto.id, { sync_estado });
   await audit(ctx, {
-    accion: 'basecamp_crear_estructura', entidad: 'proyecto', entidad_id: proyecto.id,
+    accion: 'basecamp_crear_estructura',
+    entidad: 'proyecto',
+    entidad_id: proyecto.id,
     detalle: { todolist_id: todolistId, grupos, creados, fallidos, omitidos: reqs.length - pendientes.length },
   });
   return { todolist_id: todolistId, creados, omitidos: reqs.length - pendientes.length, fallidos, sync_estado };
@@ -137,14 +142,18 @@ export async function pushRequerimiento(ctx: DbCtx, proyecto: Proyecto, req: Req
     if (!grupos[req.bloque_nombre]) {
       const existentes = await bc.listGroups(cliente.basecamp_project_id, proyecto.basecamp_todolist_id);
       const match = existentes.find((g) => g.name.trim().toLowerCase() === req.bloque_nombre!.trim().toLowerCase());
-      grupos[req.bloque_nombre] = match ? match.id : (await bc.createGroup(cliente.basecamp_project_id, proyecto.basecamp_todolist_id, req.bloque_nombre)).id;
+      grupos[req.bloque_nombre] = match
+        ? match.id
+        : (await bc.createGroup(cliente.basecamp_project_id, proyecto.basecamp_todolist_id, req.bloque_nombre)).id;
       await updateProyecto(ctx, proyecto.id, { basecamp_grupos: grupos });
     }
     destino = grupos[req.bloque_nombre]!;
   }
   const todo = await bc.createTodo(cliente.basecamp_project_id, destino, {
-    content: req.titulo_interno, due_on: req.fecha_entrega,
-    assignee_ids: mapUsuariosABasecamp(req.owner_agencia, usuarios), completion_subscriber_ids: completionSubscribers(proyecto, usuarios),
+    content: req.titulo_interno,
+    due_on: req.fecha_entrega,
+    assignee_ids: mapUsuariosABasecamp(req.owner_agencia, usuarios),
+    completion_subscriber_ids: completionSubscribers(proyecto, usuarios),
   });
   await updateRequerimiento(ctx, req.id, { basecamp_todo_id: todo.id, basecamp_todolist_id: destino, basecamp_url: todo.app_url });
   await audit(ctx, { accion: 'basecamp_crear_todo', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: todo.id } });
@@ -170,5 +179,10 @@ export async function reabrirTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
   if (!cliente?.basecamp_project_id) return;
   const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
   await client.uncompleteTodo(cliente.basecamp_project_id, req.basecamp_todo_id);
-  await audit(ctx, { accion: 'basecamp_reabrir_todo', entidad: 'requerimiento', entidad_id: req.id, detalle: { todo_id: req.basecamp_todo_id } });
+  await audit(ctx, {
+    accion: 'basecamp_reabrir_todo',
+    entidad: 'requerimiento',
+    entidad_id: req.id,
+    detalle: { todo_id: req.basecamp_todo_id },
+  });
 }

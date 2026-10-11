@@ -71,11 +71,7 @@ export function diasDesde(iso: string, ahora: Date = new Date()): number {
   return Math.max(0, Math.floor((ahora.getTime() - t) / 86_400_000));
 }
 
-export function sanitizeForClient(
-  p: SanitizableProject,
-  reqs: SanitizableRequirement[],
-  ahora: Date = new Date(),
-): ClientSafeProject {
+export function sanitizeForClient(p: SanitizableProject, reqs: SanitizableRequirement[], ahora: Date = new Date()): ClientSafeProject {
   // Doble filtro: visible_cliente === true Y etiqueta_cliente presente.
   // El constraint SQL ya lo garantiza, pero esta función no confía en nadie.
   const visibles = reqs.filter(
@@ -83,9 +79,7 @@ export function sanitizeForClient(
   );
 
   const pesoTotal = visibles.reduce((s, r) => s + Number(r.peso), 0);
-  const pesoHecho = visibles
-    .filter((r) => r.estado_operativo === 'completado')
-    .reduce((s, r) => s + Number(r.peso), 0);
+  const pesoHecho = visibles.filter((r) => r.estado_operativo === 'completado').reduce((s, r) => s + Number(r.peso), 0);
 
   const esperando = visibles.filter((r) => r.estado_aprobacion === 'pendiente_cliente');
 
