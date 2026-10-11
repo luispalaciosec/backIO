@@ -4,7 +4,7 @@
  * la evolución del mes. Lo anterior al despliegue se reconstruye desde la auditoría (origen «reconstruido»).
  */
 import type { Mesa } from '@backio/shared';
-import { MOTIVOS_REPROGRAMACION, diaLocal, hoyLocal, inicioDiaLocal, porcentaje, sumarDias } from '@backio/shared';
+import { MOTIVOS_REPROGRAMACION, diaLocal, hoyLocal, inicioDiaLocal, porcentaje, sumarDias, cerradaATiempo } from '@backio/shared';
 import { type DbCtx, serviceClient, throwIf } from './db/client';
 import { alcanceMesa, listMesas } from './db/mesas';
 import { listUsuarios } from './db/usuarios';
@@ -197,7 +197,7 @@ export function metricasSemana(p: {
       t.fecha_entrega_original >= p.inicio &&
       t.fecha_entrega_original <= p.fin,
   );
-  const hechaAntes = (t: TareaEvo, fecha: string | null) => !!t.completado_at && !!fecha && diaLocal(t.completado_at) <= fecha;
+  const hechaAntes = (t: TareaEvo, fecha: string | null) => cerradaATiempo(t.completado_at, fecha) === true;
   const aOrig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega_original)).length;
   const aVig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega)).length;
   const porId = new Map(p.tareas.map((t) => [t.id, t]));

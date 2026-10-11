@@ -13,7 +13,7 @@ import type {
   MotivoReproceso,
   OrigenReproceso,
 } from '@backio/shared';
-import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, diaLocal, porcentaje } from '@backio/shared';
+import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, cerradaATiempo, diaLocal, porcentaje } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { getRequerimiento, updateRequerimiento } from './db/requerimientos';
 import { insertReproceso, reprocesoAbierto, updateReproceso } from './db/historial';
@@ -26,14 +26,10 @@ import { log } from './logger';
 const dia = diaLocal;
 
 export function aTiempoOriginal(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original'>): boolean | null {
-  const c = dia(r.completado_at);
-  const f = r.fecha_entrega_original;
-  return c && f ? c <= f : null;
+  return cerradaATiempo(r.completado_at, r.fecha_entrega_original);
 }
 export function aTiempoVigente(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega'>): boolean | null {
-  const c = dia(r.completado_at);
-  const f = r.fecha_entrega;
-  return c && f ? c <= f : null;
+  return cerradaATiempo(r.completado_at, r.fecha_entrega);
 }
 /** Días entre la fecha original y la entrega real (positivo = tarde). */
 export function desvioDias(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original'>): number | null {

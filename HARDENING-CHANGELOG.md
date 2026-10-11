@@ -144,3 +144,5 @@ una acción de Luis) · **pendiente** (ola futura).
 | Hallazgo | Estado | Archivos | Verificación |
 |---|---|---|---|
 | Encabezados del daily escritos por la IA (podían variar) | hecho | `backend/src/lib/ia/daily.ts` (`SECCIONES_DAILY`, `armarDaily`) | Decisión de Luis (11/10): los emojis se quedan. La IA marca cada sección con `[[clave]]` y el código pone el título fijo, en orden, sin secciones vacías; si la IA no marca, se publica su texto. `daily_formato.test.ts` (5) |
+| Reconciliación con Basecamp sin tests | hecho | `__tests__/reconcile.test.ts` (5) | Aplica `completed` de Basecamp; reenvía la fecha de BackIO si quedó desfasada y lo audita (regla 3); tope de 25 por corrida (M14); un to-do que falla no detiene al resto; cliente consultado una vez |
+| Coherencia de «a tiempo» entre módulos | hecho | `shared/src/metricas.ts` (`cerradaATiempo`, única definición), usada por `cumplimiento.ts`, `kpis.ts` y `evolutivo.ts` (que aún comparaban por su cuenta) | `a_tiempo_coherente.test.ts`: cierre a las 19:30 del día de entrega es a tiempo y a las 00:30 del día siguiente es tarde, igual en cumplimiento (dashboard, personas, informes), evolutivo y KPIs |
