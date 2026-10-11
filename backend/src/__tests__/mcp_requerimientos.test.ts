@@ -49,7 +49,7 @@ async function cliente() {
   await c.connect(b);
   return c;
 }
-const texto = (r: { content: unknown }) => JSON.parse((r.content as { text: string }[])[0]!.text) as Record<string, unknown>;
+const texto = (r: unknown) => JSON.parse((r as { content: { text: string }[] }).content[0]!.text) as Record<string, unknown>;
 
 beforeEach(() => {
   m.req = {
