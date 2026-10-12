@@ -34,6 +34,7 @@ export default withMermaid(
             { text: 'Rituales: weekly, daily, señales', link: '/05-rituales' },
             { text: 'Cumplimiento: reprogramaciones y reprocesos', link: '/16-cumplimiento' },
             { text: 'KPIs por persona y equipo', link: '/19-kpis' },
+            { text: 'Cuando alguien se va', link: '/20-salida' },
             { text: 'Builder de proyectos', link: '/03-builder' },
             { text: 'Portal del cliente', link: '/06-portal-cliente' },
             { text: 'Capa de IA', link: '/15-ia' },

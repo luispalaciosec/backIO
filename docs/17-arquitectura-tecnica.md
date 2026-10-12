@@ -144,7 +144,8 @@ Triggers relevantes:
   `handle_new_auth_user` (alta solo con correo confirmado desde la migración 26).
 
 Funciones RPC transaccionales (migración 29): `crear_lote` (proyectos y tareas del Builder y del import CSV en una sola
-transacción) y `quitar_acceso` (revoca credenciales, desactiva y reasigna en una sola operación). Límites de
+transacción) y `quitar_acceso`, que la migración 30 reemplazó por `salida_colaborador` (reparte por tarea,
+proyecto, mesa, acuerdo y recurrencia; ver [Cuando alguien se va](./20-salida.md)). Límites de
 peticiones: `limite_sumar`, `limite_estado`, `limites_limpiar` (migración 28).
 
 Migraciones en `backend/supabase/migrations/`, numeradas `YYYYMMDD0000NN_nombre.sql` (hoy 01–29).

@@ -8,7 +8,6 @@ const m = vi.hoisted(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
   return {
     actualizar: vi.fn(),
-    quitar: vi.fn(),
     usuario: vi.fn(),
     ban: vi.fn(),
     salir: vi.fn(),
@@ -16,7 +15,6 @@ const m = vi.hoisted(() => {
   };
 });
 vi.mock('../lib/requerimientos/actualizar', async (orig) => ({ ...(await orig<object>()), actualizarRequerimiento: m.actualizar }));
-vi.mock('../lib/db/lote', async (orig) => ({ ...(await orig<object>()), quitarAcceso: m.quitar }));
 vi.mock('../lib/db/admin', async (orig) => ({ ...(await orig<object>()), usuarioDelTenant: m.usuario }));
 vi.mock('../lib/db/audit', () => ({ audit: m.audit }));
 vi.mock('../lib/db/client', async (orig) => ({
@@ -46,13 +44,6 @@ beforeEach(() => {
   Object.values(m).forEach((f) => f.mockReset());
   m.actualizar.mockResolvedValue({ requerimiento: { id: ID }, basecamp_due_on: 'sin_todo' });
   m.usuario.mockResolvedValue({ id: 'u9', nombre: 'Ana', email: 'ana@geeks.ec' });
-  m.quitar.mockResolvedValue({
-    api_keys_revocadas: 1,
-    tokens_oauth_borrados: 2,
-    codigos_oauth_borrados: 0,
-    tareas_reasignadas: 3,
-    recurrencias_reasignadas: 0,
-  });
   m.ban.mockResolvedValue({ error: null });
   m.salir.mockResolvedValue({ error: null });
 });
@@ -81,49 +72,10 @@ describe('PATCH /requerimientos/:id', () => {
   });
 });
 
-// B8: «quitar acceso» llama a la transacción y después a Supabase Auth; informa ambos resultados.
-describe('POST /admin/usuarios/:id/quitar-acceso', () => {
-  const quitar = (a: AuthInfo, id: string, body: unknown = {}) => app(a).request(`/admin/usuarios/${id}/quitar-acceso`, json('POST', body));
-
-  it('nadie se quita el acceso a sí mismo', async () => {
-    expect((await quitar(sesion('admin', 'u9'), 'u9')).status).toBe(422);
-    expect(m.quitar).not.toHaveBeenCalled();
-  });
-  it('solo admin', async () => {
-    expect((await quitar(sesion('operaciones'), 'u9')).status).toBe(403);
-  });
-  it('transacción primero, luego Auth; devuelve lo que se hizo', async () => {
-    const res = await quitar(sesion('admin'), 'u9', { reasignar_a: '00000000-0000-4000-8000-0000000000bb' });
-    expect(await res.json()).toMatchObject({
-      ok: true,
-      tareas_reasignadas: 3,
-      api_keys_revocadas: 1,
-      auth_bloqueado: true,
-      auth_error: null,
-    });
-    expect(m.quitar).toHaveBeenCalledWith(expect.anything(), 'u9', '00000000-0000-4000-8000-0000000000bb');
-    expect(m.quitar.mock.invocationCallOrder[0]!).toBeLessThan(m.ban.mock.invocationCallOrder[0]!);
-    expect(m.audit).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        accion: 'quitar_acceso',
-        detalle: expect.objectContaining({ email: 'ana@geeks.ec', tareas_reasignadas: 3 }),
-      }),
-    );
-  });
-  it('si Supabase Auth falla, la respuesta lo dice (la persona ya quedó inactiva)', async () => {
-    m.ban.mockResolvedValueOnce({ error: { message: 'Auth caído' } });
-    expect(await (await quitar(sesion('admin'), 'u9')).json()).toMatchObject({ ok: true, auth_bloqueado: false, auth_error: 'Auth caído' });
-  });
-  it('si la transacción falla, no se toca Auth', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined); // Hono registra el error no manejado
-    m.quitar.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 422 }));
-    const res = await quitar(sesion('admin'), 'u9');
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(m.ban).not.toHaveBeenCalled();
-  });
-  it('usuario de otro tenant o inexistente: 404', async () => {
-    m.usuario.mockResolvedValueOnce(null);
-    expect((await quitar(sesion('admin'), 'u-x')).status).toBe(404);
+// Desactivar ya no es un PATCH: pasa por la salida, que reparte lo abierto y deja rastro (docs/20-salida.md).
+describe('PATCH /admin/usuarios/:id', () => {
+  it('no desactiva a nadie (eso es la salida)', async () => {
+    const res = await app(sesion('admin')).request('/admin/usuarios/u9', json('PATCH', { activo: false }));
+    expect(res.status).toBe(400);
   });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 const rpcService = vi.hoisted(() => vi.fn());
 vi.mock('../lib/db/client', async (orig) => ({ ...(await orig<object>()), serviceClient: () => ({ rpc: rpcService }) }));
 
-import { crearLote, quitarAcceso } from '../lib/db/lote';
+import { crearLote } from '../lib/db/lote';
 
 // B7 y B8: las RPC de la migración 29 hacen la transacción; aquí se prueba lo que les manda el backend.
 describe('crearLote', () => {
@@ -38,25 +38,5 @@ describe('crearLote', () => {
       'etiqueta_cliente',
     );
     expect(rpc).not.toHaveBeenCalled();
-  });
-});
-
-describe('quitarAcceso', () => {
-  const ctx = { tenantId: 't1', usuarioId: 'admin', origen: 'ui' } as never;
-  it('errores de la función como respuestas claras', async () => {
-    rpcService.mockResolvedValueOnce({ data: null, error: { code: 'P0002', message: 'x' } });
-    await expect(quitarAcceso(ctx, 'u9', null)).rejects.toMatchObject({ status: 404 });
-    rpcService.mockResolvedValueOnce({ data: null, error: { code: '22023', message: 'x' } });
-    await expect(quitarAcceso(ctx, 'u9', 'u8')).rejects.toMatchObject({ status: 422 });
-  });
-  it('pasa tenant y actor', async () => {
-    rpcService.mockResolvedValueOnce({ data: { tareas_reasignadas: 3 }, error: null });
-    expect(await quitarAcceso(ctx, 'u9', 'u8')).toEqual({ tareas_reasignadas: 3 });
-    expect(rpcService).toHaveBeenLastCalledWith('quitar_acceso', {
-      p_tenant: 't1',
-      p_usuario: 'u9',
-      p_reasignar_a: 'u8',
-      p_actor: 'admin',
-    });
   });
 });

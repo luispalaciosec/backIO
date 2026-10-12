@@ -137,9 +137,11 @@ pnpm --filter @backio/backend db:types
 
 - **Alta:** Admin → Usuarios → invitar. Le llega un correo para definir su contraseña. La cuenta se crea recién cuando
   confirma.
-- **Baja:** Admin → Usuarios → «Quitar acceso». En una sola operación revoca sus API keys y tokens de agentes, la
-  desactiva y reasigna sus tareas abiertas (y sus fees) a quien elijas. Después bloquea su login. Si algo falla, no
-  cambia nada y la pantalla muestra el error.
+- **Baja:** Admin → Usuarios → «Registrar salida». La pantalla muestra todo lo que la persona tiene abierto (tareas
+  por cliente, proyectos, mesas, acuerdos y recurrencias) con un destino propuesto. Al confirmar, en una sola
+  operación reparte todo eso, revoca sus API keys y tokens de agentes y la desactiva; después bloquea su login y
+  cambia al responsable en Basecamp. Si la transacción falla, no cambia nada. Detalle en
+  [Cuando alguien se va](./20-salida.md).
 
 ### Crear una API key para una integración
 

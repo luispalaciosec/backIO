@@ -17,6 +17,7 @@ vi.mock('../lib/db/mantenimiento', () => ({
     { id: 'c2', nombre: 'Cliente Inactivo', activo: false, basecamp_project_id: 20 },
   ],
   idsBasecampDeUsuarios: async () => new Map([['u1', 501]]),
+  idsBasecampInactivos: async () => new Set([999]),
   huerfanosAdoptados: async () => [],
   darDeBajaRequerimientos: e.bajas,
   enlazarConTodo: e.enlazar,
@@ -164,6 +165,10 @@ describe('aplicar', () => {
     e.vivos.set(1, { assignees: [] });
     e.vivos.set(2, { assignees: [{ id: 501 }] });
     expect((await revisar(ctx, 'asignados_basecamp')).map((a) => a.id)).toEqual([vacio.id]);
+    // Asignada en Basecamp a alguien que ya no tiene acceso (999): también se repara.
+    e.vivos.set(2, { assignees: [{ id: 999 }] });
+    expect((await revisar(ctx, 'asignados_basecamp')).map((a) => a.id)).toEqual([vacio.id, conResp.id]);
+    e.vivos.set(2, { assignees: [{ id: 501 }] });
     const r = await aplicar(ctx, 'asignados_basecamp', [vacio.id, conResp.id]);
     expect(r).toMatchObject({ aplicadas: 1, omitidas: 1 });
     expect(e.updateTodo).toHaveBeenCalledWith(10, 1, { assignee_ids: [501] });

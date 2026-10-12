@@ -57,7 +57,7 @@ Estas reglas viven en la base (triggers y funciones), así que valen aunque la p
 Funciones que el backend llama directamente:
 
 - `crear_lote` (proyectos y tareas en una transacción).
-- `quitar_acceso` (revoca credenciales, desactiva y reasigna, todo o nada).
+- `salida_colaborador` (reparte lo abierto de quien se va, revoca credenciales y desactiva, todo o nada; migración 30, ver [Cuando alguien se va](./20-salida.md)). Reemplaza a `quitar_acceso`, que queda sin uso.
 - `ensure_semana`.
 - `limite_sumar`, `limite_estado` y `limites_limpiar` (límite de peticiones).
 

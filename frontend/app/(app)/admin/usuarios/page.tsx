@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { Usuario, Rol } from '@backio/shared';
 import { AREAS, AREA_LABEL } from '@backio/shared';
@@ -29,8 +30,6 @@ export default function AdminUsuariosPage() {
   const [ok, setOk] = useState<string | null>(null);
   const [vinculando, setVinculando] = useState(false);
   const [vinculo, setVinculo] = useState<Vinculo | null>(null);
-  const [quitar, setQuitar] = useState<Usuario | null>(null);
-  const [reasignarA, setReasignarA] = useState('');
   const [busyAcceso, setBusyAcceso] = useState(false);
   const [inv, setInv] = useState({ email: '', nombre: '', rol: 'colaborador' as Rol, capacidad_semanal: 40 });
 
@@ -81,8 +80,8 @@ export default function AdminUsuariosPage() {
         <div>
           <h1 className="text-2xl font-bold">Usuarios</h1>
           <p className="text-sm text-gray-500">
-            Dar acceso: invita con correo y rol (abajo). Quitar acceso: botón en la fila; cierra sesión, bloquea el ingreso y reasigna sus
-            tareas. Un correo @geeks sin invitación entra como colaborador.
+            Dar acceso: invita con correo y rol (abajo). Cuando alguien se va: «Registrar salida» en su fila reparte lo que tenía abierto y
+            cierra su acceso. Un correo @geeks sin invitación entra como colaborador.
           </p>
         </div>
         <button
@@ -107,61 +106,6 @@ export default function AdminUsuariosPage() {
       </header>
       {error && <Alert tipo="error">{error}</Alert>}
       {ok && <Alert tipo="ok">{ok}</Alert>}
-      {quitar && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setQuitar(null)}>
-          <div className="card w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div>
-              <div className="font-semibold">Quitar acceso a {quitar.nombre}</div>
-              <p className="text-sm text-gray-600 mt-1">
-                Se cierra su sesión, se bloquea el ingreso, se revocan sus API keys y tokens, y queda inactivo en BackIO. Sus tareas
-                abiertas se reasignan a quien elijas o quedan sin responsable. Su historial (tareas, horas, auditoría) se conserva.
-              </p>
-            </div>
-            <div>
-              <label className="label">Reasignar sus tareas abiertas a</label>
-              <select className="input" value={reasignarA} onChange={(e) => setReasignarA(e.target.value)}>
-                <option value="">Nadie (quedan sin responsable)</option>
-                {usuarios
-                  .filter((x) => x.activo && x.id !== quitar.id)
-                  .map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.nombre}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button className="btn-ghost" onClick={() => setQuitar(null)}>
-                Cancelar
-              </button>
-              <button
-                className="btn-danger"
-                disabled={busyAcceso}
-                onClick={async () => {
-                  setBusyAcceso(true);
-                  setError(null);
-                  try {
-                    const r = await api<{ tareas_reasignadas: number; auth_bloqueado: boolean }>(
-                      `/admin/usuarios/${quitar.id}/quitar-acceso`,
-                      { method: 'POST', json: { reasignar_a: reasignarA || null } },
-                    );
-                    setOk(
-                      `${quitar.nombre} ya no tiene acceso. ${r.tareas_reasignadas} tareas ${reasignarA ? 'reasignadas' : 'sin responsable'}.${r.auth_bloqueado ? '' : ' Aviso: no se pudo bloquear en Auth; revisa en Supabase.'}`,
-                    );
-                    setQuitar(null);
-                    await cargar();
-                  } catch (e) {
-                    setError(e instanceof ApiError ? e.message : 'Error');
-                  }
-                  setBusyAcceso(false);
-                }}
-              >
-                {busyAcceso ? 'Quitando…' : 'Quitar acceso'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {vinculo && (
         <Alert tipo={vinculo.sin_coincidencia.length ? 'warn' : 'ok'}>
           <div>
@@ -247,16 +191,9 @@ export default function AdminUsuariosPage() {
                     {u.activo ? (
                       <span className="inline-flex items-center gap-2">
                         <span className="rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs font-semibold">activo</span>
-                        <button
-                          type="button"
-                          className="link-danger text-xs"
-                          onClick={() => {
-                            setQuitar(u);
-                            setReasignarA('');
-                          }}
-                        >
-                          Quitar acceso
-                        </button>
+                        <Link href={`/admin/usuarios/${u.id}/salida`} className="link-danger text-xs">
+                          Registrar salida
+                        </Link>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-2">

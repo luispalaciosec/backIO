@@ -74,6 +74,9 @@ mezcle datos entre organizaciones.
 | — | En el portal, las tareas canceladas **no cuentan en el avance** del proyecto (siguen en la lista como «En proceso») | — | 11/10/2026 · Luis |
 | — | **Ninguna tarea entra al daily sin responsable** | En el daily nadie sabría a quién preguntar | 22/09/2026 |
 | — | **Basecamp es un origen aceptado**: lo que el equipo crea allí entra solo a BackIO | Tras una semana de uso real, producción seguía creando to-dos en Basecamp y las ejecutivas gastaban su tiempo adoptando huérfanos ([Basecamp](./04-basecamp.md#basecamp-como-origen-aceptado-23-09-2026)) | 23/09/2026 · Luis |
+| — | Cuando alguien se va, una tarea reasignada **cuenta para quien la cierra**; si la recibió con menos de 3 días hábiles para la entrega (o vencida) queda «heredada» y su atraso no cuenta para nadie | — | 11/10/2026 · Luis. Ver [Cuando alguien se va](./20-salida.md) |
+| — | Las tareas de quien se va se reparten **por cliente, con vista previa**: por defecto al líder de la mesa, con cambio por grupo o por tarea | — | 11/10/2026 · Luis |
+| — | En una salida, BackIO **cambia también al responsable en Basecamp**, de a 50 to-dos | — | 11/10/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 
 ## Decisiones técnicas

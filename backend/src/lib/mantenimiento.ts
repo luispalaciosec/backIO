@@ -15,6 +15,7 @@ import {
   enlazarConTodo,
   huerfanosAdoptados,
   idsBasecampDeUsuarios,
+  idsBasecampInactivos,
   requerimientosVivos,
   type ClienteMantenimiento,
   type HuerfanoAdoptado,
@@ -45,7 +46,7 @@ export const TAREAS = {
   asignados_basecamp: {
     titulo: 'Responsables perdidos en Basecamp',
     descripcion:
-      'To-dos abiertos que en Basecamp quedaron sin responsables aunque en BackIO los tienen. Se reenvían los responsables de BackIO. Lee cada to-do en Basecamp, así que la revisión tarda.',
+      'To-dos abiertos que en Basecamp quedaron sin responsables, o asignados a alguien que ya no tiene acceso, cuando en BackIO tienen responsables. Se reenvían los responsables de BackIO. Lee cada to-do en Basecamp, así que la revisión tarda.',
     escribe: 'Basecamp',
   },
 } as const;
@@ -190,10 +191,11 @@ export function candidatasAsignados(
 
 /** `solo`: al aplicar, se vuelven a leer en Basecamp únicamente los to-dos confirmados. */
 async function revisarAsignados(ctx: DbCtx, solo?: Set<string>): Promise<Accion[]> {
-  const [reqs, clientes, bcDe] = await Promise.all([
+  const [reqs, clientes, bcDe, inactivos] = await Promise.all([
     requerimientosVivos(ctx.tenantId),
     clientesMantenimiento(ctx.tenantId),
     idsBasecampDeUsuarios(ctx.tenantId),
+    idsBasecampInactivos(ctx.tenantId),
   ]);
   const candidatas = candidatasAsignados(reqs, clientes, bcDe).filter((c) => !solo || solo.has(c.req.id));
   if (!candidatas.length) return [];
@@ -208,13 +210,18 @@ async function revisarAsignados(ctx: DbCtx, solo?: Set<string>): Promise<Accion[
             'GET',
             `/buckets/${c.proyecto}/todos/${c.req.basecamp_todo_id}.json`,
           );
-          if ((vivo.assignees ?? []).length) return;
+          const asignados = (vivo.assignees ?? []).map((a) => a.id);
+          // Quedó vacío (incidente 22/09) o con alguien que se fue y que la salida no alcanzó a cambiar.
+          const conInactivo = asignados.some((id) => inactivos.has(id));
+          if (asignados.length && !conInactivo) return;
           out.push({
             id: c.req.id,
             tipo: 'reenviar_responsables',
             cliente: c.cliente,
             titulo: c.req.titulo_interno,
-            motivo: `Sin responsables en Basecamp; BackIO tiene ${c.ids.length}`,
+            motivo: conInactivo
+              ? 'En Basecamp sigue asignada a alguien que ya no tiene acceso'
+              : `Sin responsables en Basecamp; BackIO tiene ${c.ids.length}`,
             datos: { proyecto: c.proyecto, todo: c.req.basecamp_todo_id, assignee_ids: c.ids },
           });
         } catch (e) {

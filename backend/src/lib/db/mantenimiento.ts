@@ -64,6 +64,18 @@ export async function idsBasecampDeUsuarios(tenantId: string): Promise<Map<strin
   return new Map((data ?? []).flatMap((u) => (u.basecamp_user_id ? [[u.id, u.basecamp_user_id] as [string, number]] : [])));
 }
 
+/** Ids de Basecamp de quienes ya no tienen acceso: un to-do abierto asignado a ellos quedó desactualizado. */
+export async function idsBasecampInactivos(tenantId: string): Promise<Set<number>> {
+  const { data, error } = await serviceClient()
+    .from('usuarios')
+    .select('basecamp_user_id')
+    .eq('tenant_id', tenantId)
+    .eq('activo', false)
+    .not('basecamp_user_id', 'is', null);
+  throwIf(error);
+  return new Set((data ?? []).flatMap((u) => (u.basecamp_user_id ? [u.basecamp_user_id] : [])));
+}
+
 export async function huerfanosAdoptados(tenantId: string): Promise<HuerfanoAdoptado[]> {
   const { data, error } = await serviceClient()
     .from('basecamp_huerfanos')

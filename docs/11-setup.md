@@ -124,7 +124,7 @@ Sin invitación, un correo confirmado de un dominio en `tenants.dominios_auto` (
 `colaborador`. Cualquier otro dominio no recibe acceso. El registro público está apagado en Supabase Auth.
 
 Roles: `admin`, `gerencia`, `operaciones`, `ejecutiva`, `lider`, `colaborador`. El rol se cambia en Admin → Usuarios.
-Para dar de baja a alguien: «Quitar acceso» en la misma pantalla (ver [Operación](./operacion.md#dar-de-alta-o-quitar-a-una-persona)).
+Para dar de baja a alguien: «Registrar salida» en la misma pantalla (ver [Operación](./operacion.md#dar-de-alta-o-quitar-a-una-persona)).
 
 ## API keys
 

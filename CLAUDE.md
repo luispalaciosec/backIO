@@ -94,9 +94,10 @@ En estas zonas: generar, detener, pedir revisión. No hacer commit automático.
 14. `docs/17-arquitectura-tecnica.md` — cómo está armado el código: rutas, auth, db, crons, deuda técnica
 15. `docs/18-seguridad.md` — revisiones de seguridad (23/09, run-1 del 30/09 y auditoría externa del 10/10): hallazgos y estado
 16. `docs/19-kpis.md` — KPIs por persona y equipo: cálculos, datos que los alimentan, permisos
-17. `docs/operacion.md` — tareas programadas, qué hacer cuando algo falla, rutinas (migraciones, altas, bajas)
-18. `docs/decisiones.md` — registro de decisiones con su porqué
-19. `docs/esquema.md` y `docs/referencia-api.md` — generados desde el código (`db:types`, `docs:api`); no se editan a mano
+17. `docs/20-salida.md` — cuando alguien se va: reparto de lo abierto, Basecamp, tareas heredadas, historia
+18. `docs/operacion.md` — tareas programadas, qué hacer cuando algo falla, rutinas (migraciones, altas, bajas)
+19. `docs/decisiones.md` — registro de decisiones con su porqué
+20. `docs/esquema.md` y `docs/referencia-api.md` — generados desde el código (`db:types`, `docs:api`); no se editan a mano
 
 La documentación es un sitio VitePress publicado en `backio.vercel.app/docs`, que se compila con el frontend (local:
 `pnpm --filter @backio/docs dev`). Es pública: no escribir en `docs/` secretos, credenciales ni vulnerabilidades abiertas. Si cambias un comportamiento

@@ -2,7 +2,7 @@
  * Escrituras de varios pasos en una sola transacción de Postgres (migración 29, auditoría 10/10 B7 y B8).
  */
 import type { Proyecto, Requerimiento } from '@backio/shared';
-import { type DbCtx, DbError, serviceClient, throwIf } from './client';
+import { type DbCtx, DbError, throwIf } from './client';
 import type { InsertProyecto } from './proyectos';
 import type { InsertRequerimiento } from './requerimientos';
 
@@ -33,26 +33,4 @@ export async function crearLote(
   });
   throwIf(error);
   return data as { proyectos: Record<string, Proyecto>; requerimientos: Requerimiento[] };
-}
-
-export interface ResultadoQuitarAcceso {
-  api_keys_revocadas: number;
-  tokens_oauth_borrados: number;
-  codigos_oauth_borrados: number;
-  tareas_reasignadas: number;
-  recurrencias_reasignadas: number;
-}
-
-/** Credenciales, usuario, tareas y recurrencias en una transacción. El bloqueo en Supabase Auth va aparte. */
-export async function quitarAcceso(ctx: DbCtx, usuarioId: string, reasignarA: string | null): Promise<ResultadoQuitarAcceso> {
-  const { data, error } = await serviceClient().rpc('quitar_acceso', {
-    p_tenant: ctx.tenantId,
-    p_usuario: usuarioId,
-    p_reasignar_a: reasignarA,
-    p_actor: ctx.usuarioId,
-  });
-  if (error?.code === 'P0002') throw new DbError('Usuario no encontrado', 404);
-  if (error?.code === '22023') throw new DbError('La persona a quien reasignas no está activa', 422);
-  throwIf(error);
-  return data as ResultadoQuitarAcceso;
 }

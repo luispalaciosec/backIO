@@ -8,7 +8,7 @@ import { frontendOrigins } from '../../config/env';
 import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
-import { quitarAcceso } from '../../lib/db/lote';
+import { aplicarSalida, inventarioSalida } from '../../lib/salida';
 import { aplicar, revisar, TAREAS, TopeExcedido, type Tarea } from '../../lib/mantenimiento';
 import {
   actualizarUsuario,
@@ -76,7 +76,8 @@ admin.patch(
       rol: z.enum(ROLES).optional(),
       capacidad_semanal: z.number().int().min(1).max(80).optional(),
       basecamp_user_id: z.number().int().nullable().optional(),
-      activo: z.boolean().optional(),
+      // Solo para reactivar: desactivar es la salida (/usuarios/:id/salida), que reparte lo abierto y deja rastro.
+      activo: z.literal(true).optional(),
       nombre: z.string().min(2).optional(),
       area: z.enum(['cuentas', 'produccion', 'diseno', 'creatividad', 'content']).nullable().optional(),
     }),
@@ -85,8 +86,8 @@ admin.patch(
     const ctx = ctxOf(c);
     const id = c.req.param('id');
     const patch = c.req.valid('json');
-    if (id === ctx.usuarioId && ((patch.rol && patch.rol !== 'admin') || patch.activo === false)) {
-      return c.json({ error: 'No puedes quitarte el rol admin ni desactivarte a ti mismo' }, 422);
+    if (id === ctx.usuarioId && patch.rol && patch.rol !== 'admin') {
+      return c.json({ error: 'No puedes quitarte el rol admin' }, 422);
     }
     const data = await actualizarUsuario(ctx, id, patch);
     await audit(ctx, { accion: 'actualizar_usuario', entidad: 'usuario', entidad_id: id, detalle: patch });
@@ -307,50 +308,32 @@ admin.post(
   },
 );
 
-// ---------------- accesos: quitar (renuncia) y restaurar
+// ---------------- accesos: salida (docs/20-salida.md) y restaurar
+/** Todo lo que la persona tiene abierto, con el destino propuesto. No escribe. */
+admin.get('/usuarios/:id/salida', async (c) => c.json(await inventarioSalida(ctxOf(c), c.req.param('id'))));
+
+const destino = z.string().uuid().nullable();
+const asignacion = z.array(z.object({ id: z.string().uuid(), a: destino })).max(5000);
+
 /**
- * Quitar acceso: desactiva al usuario, cierra sus sesiones y le bloquea el login en Supabase Auth,
- * revoca sus API keys y tokens OAuth, y reasigna (o desasigna) sus tareas abiertas.
+ * Registra la salida con el plan confirmado: reparte lo abierto, revoca credenciales y desactiva (una transacción);
+ * después bloquea el ingreso en Supabase Auth y cambia al responsable en Basecamp.
  */
 admin.post(
-  '/usuarios/:id/quitar-acceso',
-  zValidator('json', z.object({ reasignar_a: z.string().uuid().nullable().optional(), motivo: z.string().max(300).optional() })),
-  async (c) => {
-    const ctx = ctxOf(c);
-    const id = c.req.param('id');
-    const b = c.req.valid('json');
-    if (id === ctx.usuarioId) return c.json({ error: 'No puedes quitarte el acceso a ti mismo' }, 422);
-    const db = serviceClient();
-    const u = await usuarioDelTenant(ctx, id);
-    if (!u) return c.json({ error: 'Usuario no encontrado' }, 404);
-    // 1) En una transacción (B8): credenciales primero, luego usuario, tareas y recurrencias. Si falla, nada cambió
-    //    y el error llega a la pantalla (antes los pasos sueltos tragaban errores y respondían ok).
-    const r = await quitarAcceso(ctx, id, b.reasignar_a ?? null);
-    // 2) Supabase Auth (API externa, después del commit): bloquear login y cerrar sesiones. Si falla, la persona ya
-    //    está inactiva en BackIO (el middleware la rechaza) y la respuesta lo dice.
-    let auth = 'ok';
-    try {
-      const ban = await db.auth.admin.updateUserById(id, { ban_duration: '876600h' });
-      if (ban.error) auth = ban.error.message;
-      const salida = await db.auth.admin.signOut(id, 'global');
-      if (salida.error && auth === 'ok') auth = `sesiones: ${salida.error.message}`;
-    } catch (err) {
-      auth = err instanceof Error ? err.message : 'error';
-    }
-    await audit(ctx, {
-      accion: 'quitar_acceso',
-      entidad: 'usuario',
-      entidad_id: id,
-      detalle: {
-        email: u.email,
-        reasignar_a: b.reasignar_a ?? null,
-        ...r,
-        auth,
-        motivo: b.motivo ?? null,
-      },
-    });
-    return c.json({ ok: true, ...r, auth_bloqueado: auth === 'ok', auth_error: auth === 'ok' ? null : auth });
-  },
+  '/usuarios/:id/salida',
+  zValidator(
+    'json',
+    z.object({
+      fecha_salida: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      motivo: z.string().max(300).nullable().optional(),
+      tareas: asignacion,
+      proyectos: asignacion,
+      mesas: asignacion,
+      acuerdos: z.array(z.object({ id: z.string().uuid(), a: z.string().uuid() })).max(500),
+      recurrencias: asignacion,
+    }),
+  ),
+  async (c) => c.json(await aplicarSalida(ctxOf(c), c.req.param('id'), c.req.valid('json'))),
 );
 
 /** Restaurar acceso: reactiva, desbloquea en Auth y manda un enlace para definir contraseña nueva. */

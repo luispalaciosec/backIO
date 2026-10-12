@@ -187,3 +187,49 @@ export async function reabrirTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
     detalle: { todo_id: req.basecamp_todo_id },
   });
 }
+
+export interface CambioResponsableBasecamp {
+  requerimientoId: string;
+  projectId: number;
+  todoId: number;
+  /** Persona de Basecamp que sale del to-do. */
+  sale: number;
+  /** Persona de Basecamp que entra, o null si la tarea queda sin reemplazo. */
+  entra: number | null;
+}
+
+/**
+ * Salida de un colaborador: en cada to-do abierto, saca a quien se va y pone a quien lo reemplaza, sin tocar a los
+ * demás asignados. Lee los asignados vivos del to-do (no los de BackIO) y escribe con updateTodo, que reenvía el
+ * to-do completo (incidente 22/09). Tope de LIMITE_TODOS_POR_OPERACION por llamada: quien llama parte en lotes.
+ * Un to-do que falla no detiene al resto; se devuelve para reintentarlo (Admin → Mantenimiento).
+ */
+export async function reemplazarResponsableEnTodos(
+  ctx: DbCtx,
+  cambios: CambioResponsableBasecamp[],
+  bc?: BasecampClient,
+): Promise<{ actualizados: number; sin_cambios: number; errores: { requerimientoId: string; error: string }[] }> {
+  if (cambios.length > LIMITE_TODOS_POR_OPERACION) {
+    throw new Error(`Como máximo ${LIMITE_TODOS_POR_OPERACION} to-dos por operación`);
+  }
+  const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
+  const r = { actualizados: 0, sin_cambios: 0, errores: [] as { requerimientoId: string; error: string }[] };
+  for (const c of cambios) {
+    try {
+      const vivo = await client.request<{ assignees?: { id: number }[] }>('GET', `/buckets/${c.projectId}/todos/${c.todoId}.json`);
+      const actuales = (vivo.assignees ?? []).map((a) => a.id);
+      const nuevos = [...new Set([...actuales.filter((id) => id !== c.sale), ...(c.entra ? [c.entra] : [])])];
+      if (nuevos.length === actuales.length && nuevos.every((id) => actuales.includes(id))) {
+        r.sin_cambios += 1;
+        continue;
+      }
+      await client.updateTodo(c.projectId, c.todoId, { assignee_ids: nuevos });
+      r.actualizados += 1;
+    } catch (e) {
+      const error = e instanceof Error ? e.message : 'error';
+      log.warn('[basecamp] no se pudo cambiar el responsable', c.todoId, error);
+      r.errores.push({ requerimientoId: c.requerimientoId, error });
+    }
+  }
+  return r;
+}
