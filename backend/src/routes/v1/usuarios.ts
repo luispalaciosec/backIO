@@ -4,8 +4,9 @@ import { listUsuarios } from '../../lib/db';
 
 export const usuarios = new Hono();
 
+/** `?incluir=inactivos` suma a quienes ya no tienen acceso (con `activo: false`), para mostrar nombres en la historia. */
 usuarios.get('/', requireScope('read:capacidad'), async (c) => {
-  const items = await listUsuarios(ctxOf(c));
+  const items = await listUsuarios(ctxOf(c), { incluirInactivos: c.req.query('incluir') === 'inactivos' });
   return c.json({ items: items.map(({ email: _e, ...u }) => u), total: items.length });
 });
 

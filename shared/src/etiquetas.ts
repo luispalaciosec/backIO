@@ -37,3 +37,8 @@ export const CAMPOS_COLABORADOR = [
   'daily_fecha',
   'piezas',
 ] as const;
+
+/** Nombre para mostrar: quien ya no tiene acceso conserva su nombre en la historia, con la marca «(ex)». */
+export function nombrePersona(u: { nombre: string; activo: boolean }): string {
+  return u.activo ? u.nombre : `${u.nombre} (ex)`;
+}

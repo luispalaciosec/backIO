@@ -1,8 +1,14 @@
 import type { Usuario } from '@backio/shared';
 import { type DbCtx, serviceClient, throwIf } from './client';
 
-export async function listUsuarios(ctx: DbCtx): Promise<Usuario[]> {
-  const { data, error } = await ctx.db.from('usuarios').select('*').eq('tenant_id', ctx.tenantId).eq('activo', true).order('nombre');
+/**
+ * Personas del tenant. Por defecto solo las activas: son las que se pueden elegir y asignar.
+ * `incluirInactivos` es para mostrar nombres e historia: quien se fue sigue siendo autor de lo que hizo.
+ */
+export async function listUsuarios(ctx: DbCtx, opts: { incluirInactivos?: boolean } = {}): Promise<Usuario[]> {
+  let q = ctx.db.from('usuarios').select('*').eq('tenant_id', ctx.tenantId);
+  if (!opts.incluirInactivos) q = q.eq('activo', true);
+  const { data, error } = await q.order('nombre');
   throwIf(error);
   return (data ?? []) as Usuario[];
 }
