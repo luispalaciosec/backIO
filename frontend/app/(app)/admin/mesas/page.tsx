@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { Mesa, Usuario, Cliente } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona, elegibles } from '@/lib/personas';
 
 export default function AdminMesasPage() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
@@ -15,11 +16,11 @@ export default function AdminMesasPage() {
     try {
       const [m, u, c] = await Promise.all([
         api<{ items: Mesa[] }>('/mesas'),
-        api<{ items: Usuario[] }>('/usuarios'),
+        api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
         api<{ items: Cliente[] }>('/clientes?todos=1'),
       ]);
       setMesas(m.items);
-      setUsuarios(u.items);
+      setUsuarios(conNombrePersona(u.items));
       setClientes(c.items);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Error');
@@ -110,7 +111,7 @@ export default function AdminMesasPage() {
                       onChange={(e) => patchMesa(m.id, { lider_id: e.target.value || null })}
                     >
                       <option value="">—</option>
-                      {usuarios.map((u) => (
+                      {elegibles(usuarios, [m.lider_id]).map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.nombre}
                         </option>

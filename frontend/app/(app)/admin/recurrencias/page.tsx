@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Recurrencia, Cliente, Plantilla, Usuario } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona, elegibles } from '@/lib/personas';
 
 type Fila = Recurrencia & { proximo_periodo: string; proximo_nombre: string; pendiente: boolean };
 
@@ -20,13 +21,13 @@ export default function RecurrenciasPage() {
       api<{ items: Fila[] }>('/recurrencias'),
       api<{ items: Cliente[] }>('/clientes?todos=1'),
       api<{ items: Plantilla[] }>('/plantillas?todas=1'),
-      api<{ items: Usuario[] }>('/usuarios'),
+      api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     ])
       .then(([r, c, p, u]) => {
         setItems(r.items);
         setClientes(c.items);
         setPlantillas(p.items);
-        setUsuarios(u.items);
+        setUsuarios(conNombrePersona(u.items));
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
   useEffect(() => {
@@ -113,13 +114,11 @@ export default function RecurrenciasPage() {
                     onChange={(e) => patch(r.id, { owner_ejecutiva: e.target.value || null })}
                   >
                     <option value="">—</option>
-                    {usuarios
-                      .filter((u) => u.activo)
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.nombre}
-                        </option>
-                      ))}
+                    {elegibles(usuarios, [r.owner_ejecutiva]).map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre}
+                      </option>
+                    ))}
                   </select>
                 </td>
                 <td className="td">

@@ -6,6 +6,7 @@ import { AREA_LABEL, ATRIBUIBLE_LABEL, CALCULO_KPI_LABEL } from '@backio/shared'
 import { api, ApiError } from '@/lib/api';
 import { fecha, diaLocal } from '@/lib/format';
 import { hrefExterno } from '@/lib/url';
+import { elegibles } from '@/lib/personas';
 import { pct, nombreMes, EstadoKpi, Origen, type Seleccion } from './comun';
 
 export function DetalleKpi({
@@ -291,7 +292,7 @@ export function DetalleKpi({
                 <label className="label">Responsable</label>
                 <select className="input" value={f.responsable_id} onChange={(e) => setF({ ...f, responsable_id: e.target.value })}>
                   <option value="">—</option>
-                  {usuarios.map((u) => (
+                  {elegibles(usuarios, [f.responsable_id]).map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.nombre}
                     </option>

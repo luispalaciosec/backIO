@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Cliente, Usuario, Mesa, Bitacora } from '@backio/shared';
 import { api } from '@/lib/api';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 
 export type ProyectoDeCliente = { id: string; nombre: string; basecamp: boolean; completado: boolean };
 
@@ -21,8 +22,9 @@ export function useCatalogosBacklog(avisar: (que: string) => (e: unknown) => voi
     api<{ items: Cliente[] }>('/clientes')
       .then((r) => setClientes(r.items))
       .catch(avisar('los clientes'));
-    api<{ items: Usuario[] }>('/usuarios')
-      .then((r) => setUsuarios(r.items))
+    // Con inactivos y «(ex)»: la historia conserva el nombre; los selectores filtran por `activo`.
+    api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS)
+      .then((r) => setUsuarios(conNombrePersona(r.items)))
       .catch(avisar('las personas'));
     api<{
       items: {

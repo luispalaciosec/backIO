@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import type { Cliente, Usuario, RequerimientoMetricas, Bitacora } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { fecha, fechaCorta, diaLocal, APROBACION_LABEL } from '@/lib/format';
 import { hoyLocal, lunesDe, sumarDias } from '@backio/shared';
@@ -37,12 +38,12 @@ function Estatus() {
   useEffect(() => {
     Promise.all([
       api<{ items: Cliente[] }>('/clientes'),
-      api<{ items: Usuario[] }>('/usuarios'),
+      api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
       api<{ items: { id: string; nombre: string }[] }>('/proyectos'),
     ])
       .then(([c, u, p]) => {
         setClientes(c.items);
-        setUsuarios(u.items);
+        setUsuarios(conNombrePersona(u.items));
         setProyectos(Object.fromEntries(p.items.map((x) => [x.id, x.nombre])));
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));

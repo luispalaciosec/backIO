@@ -17,6 +17,7 @@ import {
 } from '@/components/kpis/Kpis';
 import { useAvisosCarga } from '@/lib/useAvisosCarga';
 import { AvisoCarga } from '@/components/ui/AvisoCarga';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 
 export default function KpisPage() {
   return (
@@ -39,8 +40,8 @@ function Kpis() {
   const { fallos, avisar } = useAvisosCarga();
   const [sel, setSel] = useState<Seleccion | null>(null);
   useEffect(() => {
-    api<{ items: Usuario[] }>('/usuarios')
-      .then((r) => setUsuarios(r.items))
+    api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS)
+      .then((r) => setUsuarios(conNombrePersona(r.items)))
       .catch(avisar('las personas'));
   }, [avisar]);
   const ir = (p: Record<string, string | null>) => {

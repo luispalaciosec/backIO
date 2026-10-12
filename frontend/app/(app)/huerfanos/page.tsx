@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Cliente, Usuario, RequerimientoMetricas } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { CeldaSelect, CeldaOwners } from '@/components/backlog/Celdas';
 import { COLOR_PRIORIDAD, COLOR_TIPO, COLOR_APROBACION } from '@/components/backlog/colores';
 import { PRIORIDAD_LABEL, TIPO_LABEL, APROBACION_LABEL, fecha, haceCuanto } from '@/lib/format';
@@ -44,12 +45,12 @@ export default function EntradasBasecampPage() {
     Promise.all([
       api<{ items: Entrada[] }>('/huerfanos/entradas?dias=14'),
       api<{ items: Cliente[] }>('/clientes?todos=1'),
-      api<{ items: Usuario[] }>('/usuarios'),
+      api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     ])
       .then(([e, c, u]) => {
         setItems(e.items);
         setClientes(c.items);
-        setUsuarios(u.items);
+        setUsuarios(conNombrePersona(u.items));
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error'))
       .finally(() => setCargando(false));

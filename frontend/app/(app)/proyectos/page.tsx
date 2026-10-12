@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { AvanceBar } from '@/components/ui/AvanceBar';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { Alert } from '@/components/ui/Alert';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { fecha, ESTADO_LABEL } from '@/lib/format';
 import { hoyLocal } from '@backio/shared';
 
@@ -49,13 +50,13 @@ export default function ProyectosPage() {
       api<{ items: Fila[] }>('/proyectos'),
       api<{ items: Cliente[] }>('/clientes?todos=1'),
       api<{ items: Mesa[] }>('/mesas'),
-      api<{ items: Usuario[] }>('/usuarios'),
+      api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     ])
       .then(([p, c, m, u]) => {
         setItems(p.items);
         setClientes(c.items);
         setMesas(m.items);
-        setUsuarios(u.items);
+        setUsuarios(conNombrePersona(u.items));
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error cargando proyectos'))
       .finally(() => setCargando(false));
@@ -207,7 +208,7 @@ export default function ProyectosPage() {
               <select className="input" value={f.ejecutiva} onChange={(e) => setF({ ...f, ejecutiva: e.target.value })}>
                 <option value="">Todas</option>
                 {usuarios
-                  .filter((u) => u.activo)
+                  .filter((u) => u.activo || u.id === f.ejecutiva || items.some((p) => p.owner_ejecutiva === u.id))
                   .map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.nombre}

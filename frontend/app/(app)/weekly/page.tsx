@@ -4,7 +4,8 @@ import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
 import { CausasPendientes } from './CausasPendientes';
 import { meServer, puedeEscribir } from '@/lib/me.server';
-import { hoyLocal } from '@backio/shared';
+import { hoyLocal, nombrePersona } from '@backio/shared';
+import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export default async function WeeklyPage() {
       apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
       apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
       apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad`),
-      apiServer<{ items: Usuario[] }>('/usuarios'),
+      apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
       apiServer<{ items: Mesa[] }>('/mesas'),
     ]);
   const { items: reqs } = await apiServer<{ items: RequerimientoMetricas[] }>('/requerimientos?activos=1');
@@ -40,7 +41,10 @@ export default async function WeeklyPage() {
       dias_arrastre: number;
     }[];
   }>('/dashboard');
-  const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
+  const nombre = (id: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : '—';
+  };
   const hoy = hoyLocal();
   const vencidos = abiertos.filter((a) => a.fecha_compromiso < hoy);
 
@@ -157,7 +161,7 @@ export default async function WeeklyPage() {
             <div className="font-semibold">Acuerdos de la sesión</div>
             <p className="text-xs text-gray-500">Cada acuerdo lleva responsable y una fecha concreta del calendario.</p>
             {escribe ? (
-              <AcuerdoForm semanaId={semana.id} usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre }))} />
+              <AcuerdoForm semanaId={semana.id} usuarios={usuarios.filter((u) => u.activo).map((u) => ({ id: u.id, nombre: u.nombre }))} />
             ) : (
               <p className="text-xs text-gray-400">Los acuerdos los registra quien dirige el weekly.</p>
             )}

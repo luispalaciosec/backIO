@@ -285,11 +285,13 @@ function BacklogInner() {
               <label className="label">Persona</label>
               <select className="input" value={filtro.owner} onChange={(e) => setFiltro({ ...filtro, owner: e.target.value })}>
                 <option value="">Todas</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre}
-                  </option>
-                ))}
+                {usuarios
+                  .filter((u) => u.activo || u.id === filtro.owner || items.some((r) => r.owner_agencia.includes(u.id)))
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nombre}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="min-w-44">

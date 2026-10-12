@@ -3,6 +3,7 @@ import type { Usuario } from '@backio/shared';
 import { api } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { fecha } from '@/lib/format';
+import { elegibles } from '@/lib/personas';
 import { toInput, type WizardState } from '../wizard';
 
 interface Preview {
@@ -49,7 +50,7 @@ export function Step4EquipoFechas({
                 onChange={(e) => upd(b.id, e.target.value || null)}
               >
                 <option value="">Sin asignar</option>
-                {usuarios.map((u) => (
+                {elegibles(usuarios, [s.bloques[b.id]?.owner_id]).map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.nombre}
                   </option>

@@ -6,7 +6,8 @@ import { apiServer } from '@/lib/api.server';
 import { meServer, puedeEscribir } from '@/lib/me.server';
 import { fecha } from '@/lib/format';
 import { EstadoChip } from '@/components/ui/EstadoChip';
-import { ZONA, hoyLocal } from '@backio/shared';
+import { ZONA, hoyLocal, nombrePersona } from '@backio/shared';
+import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic';
 export default async function DailyPage({ searchParams: spP }: { searchParams: Promise<{ mesa?: string }> }) {
   const searchParams = await spP;
   const [{ items: usuarios }, { items: mesas }, me] = await Promise.all([
-    apiServer<{ items: Usuario[] }>('/usuarios'),
+    apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     apiServer<{ items: Mesa[] }>('/mesas'),
     meServer(),
   ]);
@@ -30,7 +31,10 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
       : null;
   const elegida = !!mesa || todas;
   const d = elegida ? await apiServer<DailyView>(`/semanas/daily${mesa ? `?mesa=${mesa.id}` : ''}`) : null;
-  const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
+  const nombre = (id?: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : '—';
+  };
   const hoy = hoyLocal();
   const escribe = puedeEscribir(me.rol);
   const mesaNombre = mesa?.nombre ?? 'Toda la agencia';

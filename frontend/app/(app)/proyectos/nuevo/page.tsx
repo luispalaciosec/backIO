@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { Plantilla, PlantillaArbol, Cliente, Usuario } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { ESTADO_INICIAL, guardarBorrador, leerBorrador, limpiarBorrador, toInput, type WizardState, type Catalogo } from './wizard';
 import { Step1Plantilla } from './_steps/Step1Plantilla';
 import { Step2Brief } from './_steps/Step2Brief';
@@ -34,9 +35,9 @@ export default function NuevoProyectoPage() {
     Promise.all([
       api<{ items: Plantilla[] }>('/plantillas'),
       api<{ items: Cliente[] }>('/clientes'),
-      api<{ items: Usuario[] }>('/usuarios'),
+      api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     ])
-      .then(([p, c, u]) => setCat({ plantillas: p.items, clientes: c.items, usuarios: u.items }))
+      .then(([p, c, u]) => setCat({ plantillas: p.items, clientes: c.items, usuarios: conNombrePersona(u.items) }))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar el catálogo'));
     api<{ items: Borrador[] }>('/proyectos/borradores')
       .then((r) => setBorradores(r.items))

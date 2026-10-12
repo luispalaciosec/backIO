@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { iniciales } from '@/lib/format';
+import { elegibles } from '@/lib/personas';
 
 /** Celda de color sólido con selector nativo superpuesto (click en toda la celda). */
 export function CeldaSelect({
@@ -133,7 +134,8 @@ export function CeldaOwners({
   onChange,
 }: {
   ids: string[];
-  usuarios: { id: string; nombre: string }[];
+  /** Lista completa (con inactivos): se muestran si ya están asignados, pero solo se ofrecen activos. */
+  usuarios: { id: string; nombre: string; activo?: boolean }[];
   onChange: (ids: string[]) => void | Promise<void>;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -166,7 +168,7 @@ export function CeldaOwners({
       document.removeEventListener('keydown', esc);
     };
   }, [abierto]);
-  const filtrados = usuarios.filter((u) => !q || u.nombre.toLowerCase().includes(q.toLowerCase()));
+  const filtrados = elegibles(usuarios, ids).filter((u) => !q || u.nombre.toLowerCase().includes(q.toLowerCase()));
   const ordenados = [...filtrados].sort(
     (a, b) => Number(ids.includes(b.id)) - Number(ids.includes(a.id)) || a.nombre.localeCompare(b.nombre),
   );
