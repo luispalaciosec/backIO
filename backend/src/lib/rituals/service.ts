@@ -21,7 +21,7 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
   if (!semana) throw new Error('Semana no encontrada');
   const [activos, usuarios, clientes, acuerdosAbiertos, u, sinMotivo] = await Promise.all([
     listBacklog(ctx, { solo_activos: true }),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
     getUmbralesSenales(ctx),
@@ -47,7 +47,7 @@ export async function capacidadSemana(ctx: DbCtx, semanaId: string): Promise<Cap
   if (!semana) throw new Error('Semana no encontrada');
   const [reqs, usuarios] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, desde: semana.fecha_inicio, hasta: semana.fecha_fin }),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
   ]);
   return calcularCapacidad(reqs, usuarios);
 }
@@ -72,7 +72,7 @@ export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?
   const { mesa, alcance } = await filtroMesa(ctx, mesaId);
   const [prioridades, usuarios, clientes, pendientes, riesgos] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, desde: semana.fecha_inicio, hasta: semana.fecha_fin, mesa: alcance }),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
     listSenales(ctx, semanaId, ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga']),
@@ -102,7 +102,7 @@ export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: s
   const { mesa, alcance } = await filtroMesa(ctx, mesaId);
   const [prioridades, usuarios, clientes, pendientes, senales, acuerdos] = await Promise.all([
     listBacklog(ctx, { desde: semana.fecha_inicio, hasta: semana.fecha_fin, mesa: alcance }),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx),
     listAcuerdosAbiertos(ctx),
     listSenales(ctx, semanaId),

@@ -43,7 +43,13 @@ export async function previewProyecto(ctx: DbCtx, input: CrearProyectoInput): Pr
   ]);
   if (!plantilla) throw new DbError('Plantilla no encontrada', 404);
   if (!cliente) throw new DbError('Cliente no encontrado', 404);
-  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [], tiposPieza });
+  const plan = planificarProyecto({
+    plantilla,
+    fecha_entrega: input.fecha_entrega,
+    bloques: input.bloques ?? [],
+    tiposPieza,
+    ownersActivos: new Set(usuarios.map((u) => u.id)),
+  });
   const ahora = new Date().toISOString();
   const vista_cliente = sanitizeForClient(
     { nombre: input.nombre, fecha_entrega: input.fecha_entrega },
@@ -81,15 +87,25 @@ export interface ResultadoCreacion {
 }
 
 export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyectoInput): Promise<ResultadoCreacion> {
-  const [plantilla, cliente, tiposPieza] = await Promise.all([
+  const [plantilla, cliente, tiposPieza, usuarios] = await Promise.all([
     getPlantillaArbol(ctx, input.plantilla_id),
     getCliente(ctx, input.cliente_id),
     listTiposPieza(ctx),
+    listUsuarios(ctx),
   ]);
   if (!plantilla) throw new DbError('Plantilla no encontrada', 404);
   if (!cliente) throw new DbError('Cliente no encontrado', 404);
 
-  const plan = planificarProyecto({ plantilla, fecha_entrega: input.fecha_entrega, bloques: input.bloques ?? [], tiposPieza });
+  // Recurrencias: un bloque cuyo responsable ya se fue genera sus tareas sin responsable, nunca a nombre de él.
+  const plan = planificarProyecto({
+    plantilla,
+    fecha_entrega: input.fecha_entrega,
+    bloques: input.bloques ?? [],
+    tiposPieza,
+    ownersActivos: new Set(usuarios.map((u) => u.id)),
+  });
+  if (plan.owners_inactivos.length)
+    log.warn('[builder] bloques con responsable inactivo; sus tareas nacen sin responsable', plan.owners_inactivos.join(','));
   const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;
   const fecha_inicio = input.fecha_inicio ?? (primeraFecha < input.fecha_entrega ? primeraFecha : restarDias(input.fecha_entrega, 1));
 

@@ -37,6 +37,8 @@ export interface PlanProyecto {
   bloques_activos: { id: string; nombre: string; peso: number }[];
   alertas: AlertaCapacidad[];
   visibles: number;
+  /** Responsables de bloque que ya no están activos: sus tareas nacen sin responsable. */
+  owners_inactivos: string[];
 }
 
 export interface PlanInput {
@@ -45,6 +47,8 @@ export interface PlanInput {
   bloques: BloqueAlcanceInput[];
   umbral_concentracion_pct?: number;
   tiposPieza?: TipoPieza[];
+  /** Personas activas. Si se pasa, un owner de bloque que no esté aquí no recibe tareas (alguien que se fue). */
+  ownersActivos?: Set<string>;
 }
 
 export function redistribuirPesos(bloques: { id: string; peso: number }[], activosIds: Set<string>): Map<string, number> {
@@ -76,6 +80,15 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
   const config = new Map(bloques.map((b) => [b.bloque_id, b]));
   const activosIds = new Set(plantilla.bloques.filter((b) => (config.get(b.id)?.activo ?? true) || !b.opcional).map((b) => b.id));
   const pesos = redistribuirPesos(plantilla.bloques, activosIds);
+  const inactivos = new Set<string>();
+  const ownerDe = (id: string | null | undefined): string[] => {
+    if (!id) return [];
+    if (input.ownersActivos && !input.ownersActivos.has(id)) {
+      inactivos.add(id);
+      return [];
+    }
+    return [id];
+  };
 
   const tareas: TareaPlanificada[] = [];
   for (const bloque of plantilla.bloques) {
@@ -101,7 +114,7 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
         visible_cliente: t.visible_cliente_default && !!t.etiqueta_cliente,
         peso: round3(pesoBloque * (t.peso_relativo / sumaRel)),
         fecha_entrega: restarDias(fecha_entrega, t.dias_offset),
-        owner_agencia: cfg?.owner_id ? [cfg.owner_id] : [],
+        owner_agencia: ownerDe(cfg?.owner_id),
         piezas: lotes.length ? 0 : piezasBloque,
         rol_sugerido: t.rol_sugerido,
       });
@@ -126,7 +139,7 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
             visible_cliente: visible,
             peso: round3(pesoLote * u.factor * (paso.peso / sumaPasos)),
             fecha_entrega: restarDias(fecha_entrega, paso.dias_offset),
-            owner_agencia: cfg?.owner_id ? [cfg.owner_id] : [],
+            owner_agencia: ownerDe(cfg?.owner_id),
             piezas: u.piezas,
             rol_sugerido: paso.rol ?? null,
             tipo_pieza_id: tipo.id,
@@ -144,6 +157,7 @@ export function planificarProyecto(input: PlanInput): PlanProyecto {
       .map((b) => ({ id: b.id, nombre: b.nombre, peso: pesos.get(b.id) ?? 0 })),
     alertas: detectarConcentracion(tareas, umbral),
     visibles: tareas.filter((t) => t.visible_cliente).length,
+    owners_inactivos: [...inactivos],
   };
 }
 

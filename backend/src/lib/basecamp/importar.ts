@@ -70,7 +70,10 @@ async function importar(
   const cliente = await getCliente(ctx, clienteId);
   if (!cliente?.basecamp_project_id) throw new Error('Cliente sin proyecto Basecamp');
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const porBcUser = mapaUsuariosBasecamp(await listUsuarios(ctx));
+  // Con inactivos: así se reconoce a quien se fue y no se confunde con «sin asignar» (ver cambiosDeEnlazado).
+  const usuarios = await listUsuarios(ctx, { incluirInactivos: true });
+  const porBcUser = mapaUsuariosBasecamp(usuarios);
+  const inactivos = new Set(usuarios.filter((u) => !u.activo).map((u) => u.id));
   const { todosetId, listas } = await recorrerTodos(bc, cliente.basecamp_project_id, opts.incluirCompletados ?? true);
 
   const proyectoPorLista = new Map(
@@ -114,7 +117,13 @@ async function importar(
       else if (clase === 'enlazado') {
         r.ya_enlazados += 1;
         const ex = enlazadoPorTodo.get(t.id)!;
-        const c = cambiosDeEnlazado(ex, t, { proyectoId: proyectoPorLista.get(lista.id)?.id ?? null, listaId: lista.id }, porBcUser);
+        const c = cambiosDeEnlazado(
+          ex,
+          t,
+          { proyectoId: proyectoPorLista.get(lista.id)?.id ?? null, listaId: lista.id },
+          porBcUser,
+          inactivos,
+        );
         if (c.titulo) r.titulos_actualizados += 1;
         if (c.movido) r.movidos += 1;
         if (c.responsables) r.responsables_actualizados += 1;
@@ -151,7 +160,10 @@ async function importar(
 
     const creados: number[] = [];
     for (const t of nuevos) {
-      const req = await insertarEnlazado(ctx, filaDesdeTodo(t, { clienteId, proyectoId: proyecto.id, listaId: lista.id, porBcUser }));
+      const req = await insertarEnlazado(
+        ctx,
+        filaDesdeTodo(t, { clienteId, proyectoId: proyecto.id, listaId: lista.id, porBcUser, inactivos }),
+      );
       enlazados.add(t.id);
       if (!req) {
         r.ya_enlazados += 1; // Otro proceso lo enlazó entre la lectura y la inserción.
@@ -173,7 +185,7 @@ async function importar(
             bloque: t.bloque,
             creador: t.creator_nombre,
             due_on: t.due_on,
-            sin_responsable: ownersDeBasecamp(t.assignee_ids, porBcUser).length === 0,
+            sin_responsable: !ownersDeBasecamp(t.assignee_ids, porBcUser).some((u) => !inactivos.has(u)),
           },
         });
     }

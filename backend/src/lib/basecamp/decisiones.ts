@@ -44,6 +44,7 @@ export function cambiosDeEnlazado(
   t: TodoPlano,
   destino: { proyectoId: string | null; listaId: number },
   porBcUser: Map<number, string>,
+  inactivos: Set<string> = new Set(),
 ): { patch: FilaUpdate<'requerimientos'>; titulo: boolean; movido: boolean; responsables: boolean } {
   const patch: FilaUpdate<'requerimientos'> = {};
   const titulo = !!t.titulo && t.titulo !== ex.titulo_interno;
@@ -55,9 +56,13 @@ export function cambiosDeEnlazado(
     patch.basecamp_todolist_id = t.grupoId ?? destino.listaId;
   }
   // Solo si Basecamp tiene asignados con usuario en BackIO: un to-do sin asignar no borra los responsables de BackIO.
+  // Una tarea cerrada no cambia de responsables: es la historia de quién la hizo. Y si Basecamp todavía asigna a
+  // alguien que ya no está (inactivos), Basecamp está desactualizado: BackIO conserva su reparto.
+  const cerrada = ex.estado_operativo === 'completado' || ex.estado_operativo === 'cancelado';
   const owners = ownersDeBasecamp(t.assignee_ids, porBcUser);
+  const conInactivo = owners.some((o) => inactivos.has(o));
   const igual = owners.length === ex.owner_agencia.length && owners.every((o) => ex.owner_agencia.includes(o));
-  const responsables = owners.length > 0 && !igual;
+  const responsables = !cerrada && !conInactivo && owners.length > 0 && !igual;
   if (responsables) patch.owner_agencia = owners;
   return { patch, titulo, movido, responsables };
 }
@@ -78,7 +83,10 @@ export function fechasProyectoNuevo(todos: Pick<TodoPlano, 'due_on'>[], hoy: str
  * insertaba y después se enlazaba, y en ese hueco el webhook y el cron podían crear la misma tarea dos veces).
  * D1: entra el título, nunca visible al cliente.
  */
-export function filaDesdeTodo(t: TodoPlano, o: { clienteId: string; proyectoId: string; listaId: number; porBcUser: Map<number, string> }) {
+export function filaDesdeTodo(
+  t: TodoPlano,
+  o: { clienteId: string; proyectoId: string; listaId: number; porBcUser: Map<number, string>; inactivos?: Set<string> },
+) {
   return {
     cliente_id: o.clienteId,
     proyecto_id: o.proyectoId,
@@ -92,7 +100,8 @@ export function filaDesdeTodo(t: TodoPlano, o: { clienteId: string; proyectoId: 
     peso: 1,
     fecha_pedido: t.created_at ? diaLocal(t.created_at) : null,
     fecha_entrega: t.due_on,
-    owner_agencia: ownersDeBasecamp(t.assignee_ids, o.porBcUser),
+    // Quien ya no está no recibe tareas nuevas, aunque Basecamp todavía lo tenga asignado.
+    owner_agencia: ownersDeBasecamp(t.assignee_ids, o.porBcUser).filter((u) => !o.inactivos?.has(u)),
     piezas: 0,
     basecamp_todo_id: t.id,
     basecamp_todolist_id: t.grupoId ?? o.listaId,

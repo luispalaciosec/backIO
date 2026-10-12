@@ -216,10 +216,10 @@ Basecamp → BackIO, automático:
 | Título del to-do editado | `titulo_interno` (excepción D1, solo por la lectura de listas; el webhook sigue sin extraer texto) | Cada 15 min o con ↻ Sincronizar |
 | To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada 15 min |
 | Lista renombrada | Nombre del proyecto | Cada 15 min |
-| Responsables cambiados | `owner_agencia` (si la persona está vinculada) | Cada 15 min |
+| Responsables cambiados | `owner_agencia` (si la persona está vinculada), solo en tareas abiertas. No cambia si Basecamp todavía asigna a alguien que ya no tiene acceso: ahí manda el reparto de BackIO | Cada 15 min |
 | To-do nuevo creado a mano | Se importa como requerimiento (ver «Basecamp como origen aceptado») | Webhook, unos 20 s; cada 15 min como respaldo |
 | Lista nueva | Se importa como proyecto | Cada 15 min |
-| Horas del timesheet | Horas por tarea y persona | Cada 6 h |
+| Horas del timesheet | Horas por tarea y persona (también de quien ya no tiene acceso) | Cada 6 h |
 
 Manual e inmediato: Admin → Clientes → **↻ Sincronizar Basecamp** (`POST /clientes/:id/basecamp/importar`) hace lo
 mismo que la corrida de 15 min para ese cliente. Lo pueden usar admin, operaciones y ejecutivas.

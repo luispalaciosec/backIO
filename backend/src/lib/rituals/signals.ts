@@ -3,6 +3,7 @@
  * Principio: las reglas deciden, la IA solo redacta. Reglas deterministas y puras
  * sobre un WeekContext; los umbrales viven en tenants.config.signal_thresholds.
  */
+import { nombrePersona } from '@backio/shared';
 import type { RequerimientoMetricas, Usuario, Acuerdo, Cliente, TipoSenal, SeveridadSenal } from '@backio/shared';
 
 export interface SignalThresholds {
@@ -54,7 +55,10 @@ export interface SignalRule {
   detectar: (ctx: WeekContext, u: SignalThresholds) => SignalOut[];
 }
 
-const nombreDe = (ctx: WeekContext, id: string) => ctx.usuarios.find((u) => u.id === id)?.nombre ?? 'Sin asignar';
+const nombreDe = (ctx: WeekContext, id: string) => {
+  const u = ctx.usuarios.find((x) => x.id === id);
+  return u ? nombrePersona(u) : 'Sin asignar';
+};
 const clienteDe = (ctx: WeekContext, id: string) => ctx.clientes.find((c) => c.id === id)?.nombre ?? 'Cliente';
 
 const enSemana = (ctx: WeekContext, r: RequerimientoMetricas) =>
@@ -104,7 +108,8 @@ export const REGLAS: SignalRule[] = [
       const porOwner = new Map<string, number>();
       for (const r of semana) {
         const o = r.owner_agencia[0];
-        if (o) porOwner.set(o, (porOwner.get(o) ?? 0) + 1);
+        // Quien ya se fue no «concentra carga»: sus tareas pendientes son otro problema (reasignarlas).
+        if (o && ctx.usuarios.find((x) => x.id === o)?.activo !== false) porOwner.set(o, (porOwner.get(o) ?? 0) + 1);
       }
       return [...porOwner.entries()]
         .filter(([, n]) => (n / total) * 100 > u.concentracion_carga_pct)

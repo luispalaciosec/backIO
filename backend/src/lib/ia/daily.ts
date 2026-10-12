@@ -11,7 +11,7 @@ import { alcanceMesa } from '../db/mesas';
 import { listReprocesosDelDia } from '../db/ia';
 import { dailyItemTexto, type DailyItem, type DailyMensaje, type DailyKpis } from '../mcp/publish';
 import { generarTexto } from './index';
-import { hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
+import { hoyLocal, inicioDiaLocal, sumarDias, nombrePersona } from '@backio/shared';
 
 /** El daily no se arma ni se publica con tareas sin responsable: nadie sabría a quién preguntar. */
 export class DailySinResponsable extends Error {
@@ -31,14 +31,17 @@ export async function armarDailyMensaje(
 ): Promise<DailyMensaje> {
   const [alcance, usuarios, clientes] = await Promise.all([
     alcanceMesa(ctx, mesa.id),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx, { incluirInactivos: true }),
   ]);
   const activos = await listBacklog(ctx, { solo_activos: true, mesa: alcance });
   const hoy = hoyLocal();
   const mananaIso = sumarDias(hoy, 1);
   const hace24h = new Date(Date.now() - 86_400_000).toISOString();
-  const nombre = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? 'sin asignar';
+  const nombre = (id?: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : 'sin asignar';
+  };
   const cliente = (id: string) => clientes.find((x) => x.id === id)?.nombre ?? '';
   const linea = (r: {
     titulo_interno: string;

@@ -9,7 +9,7 @@ import { listUsuarios } from '../db/usuarios';
 import { getMesa } from '../db/mesas';
 import { buildDashboard } from '../dashboard';
 import { generarTexto } from './index';
-import { hoyLocal } from '@backio/shared';
+import { hoyLocal, nombrePersona } from '@backio/shared';
 
 export const CAUSAS: Record<TipoSenal, string> = {
   bloqueo_cliente: 'Dependencias del cliente',
@@ -72,11 +72,14 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
   const [senales, abiertos, usuarios, dash] = await Promise.all([
     listSenales(ctx, semanaId),
     listAcuerdosAbiertos(ctx),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     buildDashboard(ctx, mesaId ?? null),
   ]);
   const hoy = hoyLocal();
-  const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '—';
+  const nombre = (id: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : '—';
+  };
   const vencidos = abiertos
     .filter((a) => a.fecha_compromiso < hoy)
     .map((a) => `${a.descripcion} · ${nombre(a.responsable_id)} · ${a.fecha_compromiso}`);

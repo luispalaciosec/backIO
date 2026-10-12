@@ -121,6 +121,15 @@ describe('builder · planificarProyecto', () => {
     expect(plan.tareas.find((t) => t.titulo_interno === 'Piezas')?.peso).toBe(45); // 60 * 3/4
   });
 
+  it('un bloque cuyo responsable se fue genera sus tareas sin responsable y lo avisa', () => {
+    const bloques = [{ bloque_id: 'b1', activo: true, owner_id: 'ex', piezas_por_canal: {} }];
+    const plan = planificarProyecto({ plantilla, fecha_entrega: '2026-12-15', bloques, ownersActivos: new Set(['u1']) });
+    expect(plan.tareas.filter((t) => t.bloque_id === 'b1').every((t) => t.owner_agencia.length === 0)).toBe(true);
+    expect(plan.owners_inactivos).toEqual(['ex']);
+    const conActivo = planificarProyecto({ plantilla, fecha_entrega: '2026-12-15', bloques, ownersActivos: new Set(['ex']) });
+    expect(conActivo.tareas.filter((t) => t.bloque_id === 'b1').every((t) => t.owner_agencia[0] === 'ex')).toBe(true);
+  });
+
   it('redistribuye proporcionalmente al desmarcar un bloque opcional', () => {
     const plan = planificarProyecto({
       plantilla,

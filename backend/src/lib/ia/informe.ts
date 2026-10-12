@@ -14,7 +14,7 @@ import { resumenHoras } from '../horas';
 import { listCumplimientoDesde } from '../db/historial';
 import { resumirCumplimiento, labelMotivoReproceso, labelMotivoReprogramacion } from '../cumplimiento';
 import { generarTexto } from './index';
-import { finDiaLocal, inicioDiaLocal } from '@backio/shared';
+import { finDiaLocal, inicioDiaLocal, nombrePersona } from '@backio/shared';
 
 export function rangoMes(mes: string): { desde: string; hasta: string; etiqueta: string } {
   const [y, m] = mes.split('-').map(Number);
@@ -43,7 +43,7 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
   const alcance = await alcanceMesa(ctx, mesaId);
   const [clientes, usuarios, activos, horas] = await Promise.all([
     listClientes(ctx, { incluirInactivos: true }),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
     resumenHoras(ctx, inicioDiaLocal(desde), { clienteIds: alcance.clienteIds }),
   ]);
@@ -61,7 +61,10 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
     cotizado.set(p.cliente_id, (cotizado.get(p.cliente_id) ?? 0) + Number(p.valor_cotizado ?? 0));
 
   const nombreC = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? id;
-  const nombreU = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? id;
+  const nombreU = (id: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : id === 'sin_usuario' ? 'Sin persona' : '—';
+  };
   const idsCliente = new Set([...alcance.clienteIds, ...activos.map((r) => r.cliente_id), ...completados.map((r) => r.cliente_id)]);
   const porCliente = [...idsCliente]
     .map((id) => {

@@ -195,100 +195,102 @@ export default function AdminUsuariosPage() {
             </tr>
           </thead>
           <tbody>
-            {usuarios.map((u) => (
-              <tr key={u.id}>
-                <td className="td font-medium">{u.nombre}</td>
-                <td className="td text-gray-600">{u.email}</td>
-                <td className="td">
-                  <select className="input" defaultValue={u.rol} onChange={(e) => patch(u.id, { rol: e.target.value })}>
-                    {ROLES.map((r) => (
-                      <option key={r}>{r}</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="td">
-                  <select className="input" defaultValue={u.area ?? ''} onChange={(e) => patch(u.id, { area: e.target.value || null })}>
-                    <option value="">Sin área</option>
-                    {AREAS.map((a) => (
-                      <option key={a} value={a}>
-                        {AREA_LABEL[a]}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="td">
-                  <input
-                    className="input w-20"
-                    type="number"
-                    min={1}
-                    max={80}
-                    defaultValue={u.capacidad_semanal}
-                    onBlur={(e) =>
-                      Number(e.target.value) !== u.capacidad_semanal && patch(u.id, { capacidad_semanal: Number(e.target.value) })
-                    }
-                  />
-                </td>
-                <td className="td">
-                  <input
-                    className="input w-36"
-                    inputMode="numeric"
-                    defaultValue={u.basecamp_user_id ?? ''}
-                    placeholder="opcional"
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      const n = v ? Number(v) : null;
-                      if (n !== u.basecamp_user_id) void patch(u.id, { basecamp_user_id: n });
-                    }}
-                  />
-                </td>
-                <td className="td whitespace-nowrap">
-                  {u.activo ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs font-semibold">activo</span>
-                      <button
-                        type="button"
-                        className="link-danger text-xs"
-                        onClick={() => {
-                          setQuitar(u);
-                          setReasignarA('');
-                        }}
-                      >
-                        Quitar acceso
-                      </button>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-semibold">sin acceso</span>
-                      <button
-                        type="button"
-                        className="link-action text-xs"
-                        disabled={busyAcceso}
-                        onClick={async () => {
-                          if (
-                            !confirm(
-                              `Restaurar el acceso de ${u.nombre}. Se reactiva la cuenta y recibe un correo para definir contraseña nueva. ¿Continuar?`,
+            {[...usuarios]
+              .sort((a, b) => Number(b.activo) - Number(a.activo))
+              .map((u) => (
+                <tr key={u.id}>
+                  <td className="td font-medium">{u.nombre}</td>
+                  <td className="td text-gray-600">{u.email}</td>
+                  <td className="td">
+                    <select className="input" defaultValue={u.rol} onChange={(e) => patch(u.id, { rol: e.target.value })}>
+                      {ROLES.map((r) => (
+                        <option key={r}>{r}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="td">
+                    <select className="input" defaultValue={u.area ?? ''} onChange={(e) => patch(u.id, { area: e.target.value || null })}>
+                      <option value="">Sin área</option>
+                      {AREAS.map((a) => (
+                        <option key={a} value={a}>
+                          {AREA_LABEL[a]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="td">
+                    <input
+                      className="input w-20"
+                      type="number"
+                      min={1}
+                      max={80}
+                      defaultValue={u.capacidad_semanal}
+                      onBlur={(e) =>
+                        Number(e.target.value) !== u.capacidad_semanal && patch(u.id, { capacidad_semanal: Number(e.target.value) })
+                      }
+                    />
+                  </td>
+                  <td className="td">
+                    <input
+                      className="input w-36"
+                      inputMode="numeric"
+                      defaultValue={u.basecamp_user_id ?? ''}
+                      placeholder="opcional"
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        const n = v ? Number(v) : null;
+                        if (n !== u.basecamp_user_id) void patch(u.id, { basecamp_user_id: n });
+                      }}
+                    />
+                  </td>
+                  <td className="td whitespace-nowrap">
+                    {u.activo ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs font-semibold">activo</span>
+                        <button
+                          type="button"
+                          className="link-danger text-xs"
+                          onClick={() => {
+                            setQuitar(u);
+                            setReasignarA('');
+                          }}
+                        >
+                          Quitar acceso
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-semibold">sin acceso</span>
+                        <button
+                          type="button"
+                          className="link-action text-xs"
+                          disabled={busyAcceso}
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                `Restaurar el acceso de ${u.nombre}. Se reactiva la cuenta y recibe un correo para definir contraseña nueva. Las tareas que se reasignaron no vuelven solas. ¿Continuar?`,
+                              )
                             )
-                          )
-                            return;
-                          setBusyAcceso(true);
-                          setError(null);
-                          try {
-                            await api(`/admin/usuarios/${u.id}/restaurar-acceso`, { method: 'POST' });
-                            setOk(`Acceso restaurado para ${u.nombre}; le llegará el correo para definir su contraseña.`);
-                            await cargar();
-                          } catch (e) {
-                            setError(e instanceof ApiError ? e.message : 'Error');
-                          }
-                          setBusyAcceso(false);
-                        }}
-                      >
-                        Restaurar
-                      </button>
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                              return;
+                            setBusyAcceso(true);
+                            setError(null);
+                            try {
+                              await api(`/admin/usuarios/${u.id}/restaurar-acceso`, { method: 'POST' });
+                              setOk(`Acceso restaurado para ${u.nombre}; le llegará el correo para definir su contraseña.`);
+                              await cargar();
+                            } catch (e) {
+                              setError(e instanceof ApiError ? e.message : 'Error');
+                            }
+                            setBusyAcceso(false);
+                          }}
+                        >
+                          Restaurar
+                        </button>
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </section>

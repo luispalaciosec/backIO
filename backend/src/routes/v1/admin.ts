@@ -32,7 +32,8 @@ admin.use('*', requireScope('admin'));
 const ROLES = ['admin', 'gerencia', 'operaciones', 'ejecutiva', 'lider', 'colaborador'] as const;
 
 // ---------------- usuarios
-admin.get('/usuarios', async (c) => c.json({ items: await listUsuarios(ctxOf(c)) }));
+// Con inactivos: quien ya no tiene acceso sigue en la lista (al final) para poder restaurarlo.
+admin.get('/usuarios', async (c) => c.json({ items: await listUsuarios(ctxOf(c), { incluirInactivos: true }) }));
 
 /** Escanea las personas de la cuenta Basecamp y enlaza usuarios por email (basecamp_user_id). */
 admin.post('/usuarios/basecamp/vincular', async (c) => {

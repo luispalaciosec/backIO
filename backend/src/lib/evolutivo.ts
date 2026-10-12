@@ -4,7 +4,16 @@
  * la evolución del mes. Lo anterior al despliegue se reconstruye desde la auditoría (origen «reconstruido»).
  */
 import type { Mesa } from '@backio/shared';
-import { MOTIVOS_REPROGRAMACION, diaLocal, hoyLocal, inicioDiaLocal, porcentaje, sumarDias, cerradaATiempo } from '@backio/shared';
+import {
+  MOTIVOS_REPROGRAMACION,
+  diaLocal,
+  hoyLocal,
+  inicioDiaLocal,
+  porcentaje,
+  sumarDias,
+  cerradaATiempo,
+  nombrePersona,
+} from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { alcanceMesa, listMesas } from './db/mesas';
 import { listUsuarios } from './db/usuarios';
@@ -279,7 +288,7 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
     listEventosDailyFecha(ctx, desdeIso),
     listEventosBloqueo(ctx, desdeIso),
     listPublicacionesDaily(ctx, mesa.id, desdeIso),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
   ]);
   return {
     mesa,
@@ -295,7 +304,7 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
       at: x.created_at,
       message_id: x.detalle?.message_id ?? null,
     })),
-    nombres: new Map(usuarios.map((u) => [u.id, u.nombre])),
+    nombres: new Map(usuarios.map((u) => [u.id, nombrePersona(u)])),
   };
 }
 

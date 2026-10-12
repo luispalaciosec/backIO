@@ -22,7 +22,8 @@ export async function sincronizarHoras(
   const clientes = (await listClientes(ctx)).filter((c) => c.basecamp_project_id && (!opts.clienteId || c.id === opts.clienteId));
   if (!clientes.length) return { clientes: 0, entradas: 0, guardadas: 0, sin_requerimiento: 0 };
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const usuarios = await listUsuarios(ctx);
+  // Con inactivos: cada corrida reescribe 45 días, y sin ellos las horas de quien se fue quedaban sin persona.
+  const usuarios = await listUsuarios(ctx, { incluirInactivos: true });
   const porPersona = new Map(usuarios.filter((u) => u.basecamp_user_id).map((u) => [u.basecamp_user_id as number, u.id]));
   // Paginado: PostgREST corta en 1000 filas; sin esto las horas de los to-dos restantes quedaban sin tarea.
   // Una página fallida lanza: antes cortaba el bucle en silencio y las horas quedaban sin tarea.

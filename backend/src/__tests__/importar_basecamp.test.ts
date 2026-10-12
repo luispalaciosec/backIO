@@ -115,6 +115,57 @@ describe('decisiones de la importación', () => {
       owner_agencia: ['u1'],
     });
   });
+  it('una tarea cerrada no cambia de responsables: es la historia de quién la hizo', () => {
+    const ex = {
+      id: 'r1',
+      basecamp_todo_id: 1,
+      owner_agencia: ['ex', 'u2'],
+      titulo_interno: 'Tarea 1',
+      bloque_nombre: null,
+      proyecto_id: 'p1',
+      estado_operativo: 'completado',
+    };
+    const mapa = new Map([[502, 'u2']]);
+    const c = cambiosDeEnlazado(ex, todo(1, { assignee_ids: [501, 502] }), { proyectoId: 'p1', listaId: 100 }, mapa);
+    expect(c.responsables).toBe(false);
+    expect(c.patch.owner_agencia).toBeUndefined();
+  });
+  it('si Basecamp todavía asigna a alguien que se fue, BackIO conserva su reparto', () => {
+    const ex = {
+      id: 'r1',
+      basecamp_todo_id: 1,
+      owner_agencia: ['nuevo'],
+      titulo_interno: 'Tarea 1',
+      bloque_nombre: null,
+      proyecto_id: 'p1',
+      estado_operativo: 'en_ejecucion',
+    };
+    const mapa = new Map([
+      [501, 'ex'],
+      [502, 'u2'],
+    ]);
+    const c = cambiosDeEnlazado(ex, todo(1, { assignee_ids: [501, 502] }), { proyectoId: 'p1', listaId: 100 }, mapa, new Set(['ex']));
+    expect(c.responsables).toBe(false);
+    // Cuando Basecamp ya está al día (sin el inactivo), manda otra vez.
+    expect(
+      cambiosDeEnlazado(ex, todo(1, { assignee_ids: [502] }), { proyectoId: 'p1', listaId: 100 }, mapa, new Set(['ex'])).patch,
+    ).toEqual({
+      owner_agencia: ['u2'],
+    });
+  });
+  it('una tarea nueva nunca nace a nombre de alguien que se fue', () => {
+    const f = filaDesdeTodo(todo(8, { assignee_ids: [501, 502] }), {
+      clienteId: 'c1',
+      proyectoId: 'p1',
+      listaId: 100,
+      porBcUser: new Map([
+        [501, 'ex'],
+        [502, 'u2'],
+      ]),
+      inactivos: new Set(['ex']),
+    });
+    expect(f.owner_agencia).toEqual(['u2']);
+  });
   it('fechas de un proyecto nuevo', () => {
     expect(fechasProyectoNuevo([{ due_on: '2026-10-20' }, { due_on: '2026-10-05' }], '2026-10-10')).toEqual({
       inicio: '2026-10-05',

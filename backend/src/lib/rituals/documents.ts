@@ -2,6 +2,7 @@
  * Generación de Plan Operativo (lunes) y Acta de Cierre (viernes).
  * El markdown replica el formato actual de las actas de Geeks.
  */
+import { nombrePersona } from '@backio/shared';
 import type { RequerimientoMetricas, Semana, Senal, Acuerdo, Usuario, Cliente, CapacidadPersona } from '@backio/shared';
 import { temaAgenda } from './signals';
 
@@ -39,6 +40,12 @@ const ESTADO: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
+/** Nombre de una persona (con «(ex)» si ya no está), o «—». */
+function nombreEn(usuarios: Usuario[], id: string | null | undefined): string {
+  const u = id ? usuarios.find((x) => x.id === id) : undefined;
+  return u ? nombrePersona(u) : '—';
+}
+
 export function calcularCapacidad(reqs: RequerimientoMetricas[], usuarios: Usuario[]): CapacidadPersona[] {
   const total = reqs.length || 1;
   return usuarios
@@ -58,7 +65,7 @@ export function calcularCapacidad(reqs: RequerimientoMetricas[], usuarios: Usuar
 }
 
 function tablaTareas(reqs: RequerimientoMetricas[], d: PlanOperativoData, conEstado: boolean): string {
-  const nombre = (id: string | undefined) => (id ? (d.usuarios.find((u) => u.id === id)?.nombre ?? '—') : '—');
+  const nombre = (id: string | undefined) => nombreEn(d.usuarios, id);
   const cliente = (id: string) => d.clientes.find((c) => c.id === id)?.nombre ?? '—';
   const head = conEstado
     ? '| # | Cliente | Tarea | Responsable | Prioridad | Fecha | Estado |\n|---|---|---|---|---|---|---|'
@@ -83,10 +90,7 @@ export function renderPlanOperativo(d: PlanOperativoData): string {
   lineas.push(
     d.pendientes_anteriores.length
       ? d.pendientes_anteriores
-          .map(
-            (a) =>
-              `- [ ] ${a.descripcion} — **${d.usuarios.find((u) => u.id === a.responsable_id)?.nombre ?? '—'}** · ${fmt(a.fecha_compromiso)}`,
-          )
+          .map((a) => `- [ ] ${a.descripcion} — **${nombreEn(d.usuarios, a.responsable_id)}** · ${fmt(a.fecha_compromiso)}`)
           .join('\n')
       : '_Sin pendientes._',
   );
@@ -136,8 +140,7 @@ export function renderActaCierre(d: ActaCierreData): string {
   lineas.push('| Acuerdo | Responsable | Fecha compromiso | Estado |', '|---|---|---|---|');
   lineas.push(
     ...d.acuerdos_semana.map(
-      (a) =>
-        `| ${a.descripcion} | ${d.usuarios.find((u) => u.id === a.responsable_id)?.nombre ?? '—'} | ${fmt(a.fecha_compromiso)} | ${a.estado} |`,
+      (a) => `| ${a.descripcion} | ${nombreEn(d.usuarios, a.responsable_id)} | ${fmt(a.fecha_compromiso)} | ${a.estado} |`,
     ),
   );
   lineas.push('', '---', `_Generado por BackIO el ${fmt(new Date().toISOString())}._`);
