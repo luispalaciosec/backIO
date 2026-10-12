@@ -142,7 +142,9 @@ describe('aplicar la salida', () => {
     expect(e.rpc.mock.invocationCallOrder[0]!).toBeLessThan(e.ban.mock.invocationCallOrder[0]!);
     // Solo el to-do del cliente con proyecto de Basecamp; entra el id de Basecamp del líder.
     expect(e.reemplazar.mock.calls[0]![1]).toEqual([{ requerimientoId: 'a', projectId: 10, todoId: 70, sale: 501, entra: 502 }]);
-    expect(r).toMatchObject({ auth_bloqueado: true, basecamp: { actualizados: 1 } });
+    expect(r).toMatchObject({ auth_bloqueado: true, auth_error: null, basecamp: { actualizados: 1 } });
+    // signOut recibe un JWT, no un id: llamarlo con el id fallaba siempre (prueba en producción del 11/10).
+    expect(e.signOut).not.toHaveBeenCalled();
     const acciones = e.audit.mock.calls.map((c) => c[1].accion);
     expect(acciones.filter((a) => a === 'salida_reasignacion')).toHaveLength(2);
     expect(acciones).toContain('salida_colaborador');

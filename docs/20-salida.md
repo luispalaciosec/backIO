@@ -34,7 +34,8 @@ En **una sola transacción** (`salida_colaborador`, migración 30):
 
 Después, fuera de la transacción:
 
-- **Supabase Auth:** se bloquea su ingreso y se cierran todas sus sesiones. Si esto falla, la persona igual queda sin
+- **Supabase Auth:** se bloquea su ingreso; una sesión abierta ya no se puede renovar, y BackIO la rechaza desde ese
+  momento porque la persona está inactiva. Si esto falla, la persona igual queda sin
   acceso (BackIO rechaza a los inactivos) y la pantalla lo avisa.
 - **Basecamp:** en cada to-do abierto se saca a quien se va y se pone a quien lo recibe, sin tocar a los demás
   asignados, de a 50 to-dos por vez (`reemplazarResponsableEnTodos` en `lib/basecamp/write.ts`). Si un to-do falla,

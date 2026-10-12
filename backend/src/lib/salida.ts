@@ -162,14 +162,16 @@ export interface ResultadoSalida extends ResultadoSalidaRpc {
   basecamp: { actualizados: number; sin_cambios: number; errores: { requerimientoId: string; error: string }[] };
 }
 
-/** Bloquea el ingreso y cierra todas las sesiones en Supabase Auth. Devuelve el error, o null si salió bien. */
+/**
+ * Bloquea el ingreso en Supabase Auth. Devuelve el error, o null si salió bien.
+ * No hace falta cerrar sesiones aparte: un usuario bloqueado no puede renovar su sesión, y BackIO rechaza a los
+ * inactivos en cada petición (middleware). `auth.admin.signOut` recibe el JWT de la persona, no su id: llamarlo con el
+ * id fallaba siempre («invalid JWT»).
+ */
 export async function bloquearEnAuth(usuarioId: string): Promise<string | null> {
-  const db = serviceClient();
   try {
-    const ban = await db.auth.admin.updateUserById(usuarioId, { ban_duration: '876600h' });
-    if (ban.error) return ban.error.message;
-    const salida = await db.auth.admin.signOut(usuarioId, 'global');
-    return salida.error ? `sesiones: ${salida.error.message}` : null;
+    const ban = await serviceClient().auth.admin.updateUserById(usuarioId, { ban_duration: '876600h' });
+    return ban.error ? ban.error.message : null;
   } catch (err) {
     return err instanceof Error ? err.message : 'error';
   }

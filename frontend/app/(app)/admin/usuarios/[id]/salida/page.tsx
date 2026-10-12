@@ -368,7 +368,7 @@ export default function SalidaPage({ params }: { params: Promise<{ id: string }>
               {heredadas > 0 && <li className="text-amber-900">{heredadas} quedan como heredadas.</li>}
               <li>{enBasecamp} to-dos de Basecamp cambian de responsable (de a 50).</li>
               <li>
-                Se cierran sus sesiones, se bloquea su ingreso y se{' '}
+                Se bloquea su ingreso (BackIO la rechaza desde ese momento) y se{' '}
                 {inv.api_keys === 1 ? 'revoca 1 API key' : `revocan ${inv.api_keys} API keys`}.
               </li>
             </ul>
