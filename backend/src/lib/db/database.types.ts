@@ -2194,6 +2194,58 @@ export type Database = {
           },
         ];
       };
+      requerimiento_responsables: {
+        Row: {
+          id: number;
+          tenant_id: string;
+          requerimiento_id: string;
+          usuario_id: string;
+          desde: string;
+          hasta: string | null;
+          motivo: string | null;
+        };
+        Insert: {
+          id?: number;
+          tenant_id: string;
+          requerimiento_id: string;
+          usuario_id: string;
+          desde?: string;
+          hasta?: string | null;
+          motivo?: string | null;
+        };
+        Update: {
+          id?: number;
+          tenant_id?: string;
+          requerimiento_id?: string;
+          usuario_id?: string;
+          desde?: string;
+          hasta?: string | null;
+          motivo?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'requerimiento_responsables_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'requerimiento_responsables_requerimiento_id_fkey';
+            columns: ['requerimiento_id'];
+            isOneToOne: false;
+            referencedRelation: 'requerimientos';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'requerimiento_responsables_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       requerimientos: {
         Row: {
           id: string;
@@ -2237,6 +2289,8 @@ export type Database = {
           clase: string;
           proactiva: boolean;
           primera_respuesta_at: string | null;
+          responsables_cierre: string[] | null;
+          heredada: boolean;
         };
         Insert: {
           id?: string;
@@ -2280,6 +2334,8 @@ export type Database = {
           clase?: string;
           proactiva?: boolean;
           primera_respuesta_at?: string | null;
+          responsables_cierre?: string[] | null;
+          heredada?: boolean;
         };
         Update: {
           id?: string;
@@ -2323,6 +2379,8 @@ export type Database = {
           clase?: string;
           proactiva?: boolean;
           primera_respuesta_at?: string | null;
+          responsables_cierre?: string[] | null;
+          heredada?: boolean;
         };
         Relationships: [
           {
@@ -2571,6 +2629,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           area: string | null;
+          fecha_salida: string | null;
+          motivo_salida: string | null;
         };
         Insert: {
           id: string;
@@ -2585,6 +2645,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           area?: string | null;
+          fecha_salida?: string | null;
+          motivo_salida?: string | null;
         };
         Update: {
           id?: string;
@@ -2599,6 +2661,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           area?: string | null;
+          fecha_salida?: string | null;
+          motivo_salida?: string | null;
         };
         Relationships: [
           {
@@ -2940,6 +3004,17 @@ export type Database = {
       };
       quitar_acceso: {
         Args: { p_actor: string | null; p_reasignar_a: string | null; p_tenant: string | null; p_usuario: string | null };
+        Returns: Json;
+      };
+      salida_colaborador: {
+        Args: {
+          p_actor: string | null;
+          p_fecha: string | null;
+          p_motivo: string | null;
+          p_plan: Json | null;
+          p_tenant: string | null;
+          p_usuario: string | null;
+        };
         Returns: Json;
       };
     };

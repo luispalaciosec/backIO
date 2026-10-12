@@ -49,6 +49,8 @@ Personas con acceso: rol, capacidad semanal, área y su usuario de Basecamp.
 | `created_at` | fecha y hora | sí | por defecto `now()` |
 | `updated_at` | fecha y hora | sí | por defecto `now()` |
 | `area` | texto |  |  |
+| `fecha_salida` | date |  |  |
+| `motivo_salida` | texto |  |  |
 
 ### clientes
 
@@ -189,6 +191,8 @@ Las tareas del backlog: estado, aprobación, prioridad, fechas, responsables, vi
 | `clase` | texto | sí | por defecto `tarea` |
 | `proactiva` | boolean | sí | por defecto `false` |
 | `primera_respuesta_at` | fecha y hora |  |  |
+| `responsables_cierre` | uuid[] |  |  |
+| `heredada` | boolean | sí | por defecto `false` |
 
 ### plantillas
 
@@ -879,3 +883,19 @@ Avance de cada proyecto según el peso de sus tareas completadas.
 | `avance` | integer |  |  |
 | `atrasados` | bigint |  |  |
 | `esperando_cliente` | bigint |  |  |
+
+## Sin clasificar
+
+### requerimiento_responsables
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | bigint | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `requerimiento_id` | uuid | sí | → [requerimientos](#requerimientos).id |
+| `usuario_id` | uuid | sí | → [usuarios](#usuarios).id |
+| `desde` | fecha y hora | sí | por defecto `now()` |
+| `hasta` | fecha y hora |  |  |
+| `motivo` | texto |  |  |
