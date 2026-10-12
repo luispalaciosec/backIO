@@ -52,6 +52,15 @@ días hábiles** para la entrega, o ya vencida, queda marcada como **heredada**,
 cuenta para nadie. La marca la calcula el backend al confirmar (`esHeredada` en `shared/src/metricas.ts`). La pantalla
 la muestra antes de confirmar.
 
+## Cómo se mide después
+
+- **KPIs:** quien se fue aparece en los meses en que trabajó, con «(ex)», y no en los siguientes. Lo que cerró sigue
+  contando para él. Ver [KPIs](./19-kpis.md).
+- **Personas y dashboard:** igual, en los periodos que lo incluyen. Las reprogramaciones y reprocesos cuentan para
+  quien tenía la tarea en ese momento, no para quien la recibió después. Ver [Cumplimiento](./16-cumplimiento.md).
+- **Weekly:** la señal `tareas_sin_responsable` avisa por cliente cuando quedan tareas sin responsable con entrega en
+  la semana o vencidas.
+
 ## Lo que no se toca
 
 - **Lo cerrado.** Las tareas completadas y canceladas conservan sus responsables. Desde la migración 30, al completarse

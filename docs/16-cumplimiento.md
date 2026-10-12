@@ -71,6 +71,14 @@ cierre en hora de Guayaquil y lo compara con la fecha comprometida, incluyendo e
 KPIs, evolutivo, dashboard, personas e informes. Ejemplo: una tarea con fecha 15/10 cerrada el 15/10 a las 19:30
 está a tiempo; cerrada el 16/10 a las 00:30 está tarde.
 
+Cuando alguien se va ([Cuando alguien se va](./20-salida.md)):
+
+- Una tarea **heredada** (la recibió otra persona con menos de 3 días hábiles para la entrega, o vencida) que se
+  cierra tarde da `null` en `cerradaATiempo`: queda fuera del porcentaje, ni a tiempo ni tarde.
+- Por persona, lo completado cuenta para sus responsables al cierre (`responsablesDe`). Una reprogramación o un
+  reproceso cuenta para quien tenía la tarea **en ese momento**, según el historial `requerimiento_responsables`
+  (`responsablesEn`); en tareas anteriores a la migración 30, para sus responsables actuales.
+
 Señales nuevas del Weekly: `reproceso_reincidente` (crítica, ≥ 2 reprocesos), `reprogramacion_sin_motivo` y
 `reproceso_sin_motivo` (media). Causa de agenda IA: "Calidad y reprocesos" / "Causas pendientes de registrar".
 

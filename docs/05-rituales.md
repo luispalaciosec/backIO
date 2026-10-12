@@ -42,6 +42,7 @@ Se calculan el domingo a las 18:00 y se persisten en `senales`. Hay 11 reglas, t
 | `reproceso_reincidente` | `veces_reproceso >= 2` | Crítica | "Revisar brief y control de calidad antes de enviar" (ver `16-cumplimiento.md`) |
 | `reprogramacion_sin_motivo` | reprogramación sin causa en 45 días | Media | "Completar la causa de la reprogramación" |
 | `reproceso_sin_motivo` | reproceso sin causa en 45 días | Media | "Completar la causa del reproceso" |
+| `tareas_sin_responsable` | tareas activas sin responsable con entrega esta semana o vencida, agrupadas por cliente (pasa sobre todo cuando alguien se va; ver [Cuando alguien se va](./20-salida.md)) | Alta | "Asignar responsable" |
 | `concentracion_carga` | Un owner con >30% de las tareas de la semana (solo si la semana tiene al menos 3 tareas) | Crítica | "Redistribución de carga — riesgo de punto único" |
 | `bloqueo_cliente` | `estado_aprobacion = 'pendiente_cliente'` y `dias_sin_movimiento > 5` | Alta | "Escalamiento a ejecutiva de cuenta" |
 | `cuenta_silenciosa` | Cliente sin requerimientos completados en 14 días | Alta | "Revisión de estado de cuenta" |

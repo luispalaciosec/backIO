@@ -26,11 +26,12 @@ import { log } from './logger';
 // «A tiempo» compara el día de cierre en hora de Guayaquil (B4: antes se tomaba el día UTC).
 const dia = diaLocal;
 
-export function aTiempoOriginal(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original'>): boolean | null {
-  return cerradaATiempo(r.completado_at, r.fecha_entrega_original);
+// Una tarea heredada por una salida y cerrada tarde da null: queda fuera del cálculo (docs/20).
+export function aTiempoOriginal(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original' | 'heredada'>): boolean | null {
+  return cerradaATiempo(r.completado_at, r.fecha_entrega_original, r.heredada);
 }
-export function aTiempoVigente(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega'>): boolean | null {
-  return cerradaATiempo(r.completado_at, r.fecha_entrega);
+export function aTiempoVigente(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega' | 'heredada'>): boolean | null {
+  return cerradaATiempo(r.completado_at, r.fecha_entrega, r.heredada);
 }
 /** Días entre la fecha original y la entrega real (positivo = tarde). */
 export function desvioDias(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original'>): number | null {

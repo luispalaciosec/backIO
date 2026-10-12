@@ -93,9 +93,11 @@ export interface ReqKpi {
   proactiva: boolean;
   primera_respuesta_at: string | null;
   basecamp_url: string | null;
+  responsables_cierre: string[] | null;
+  heredada: boolean;
 }
 const CAMPOS =
-  'id, titulo_interno, cliente_id, proyecto_id, owner_agencia, prioridad, estado_operativo, estado_aprobacion, fecha_entrega, fecha_entrega_original, completado_at, created_at, clase, proactiva, primera_respuesta_at, basecamp_url';
+  'id, titulo_interno, cliente_id, proyecto_id, owner_agencia, prioridad, estado_operativo, estado_aprobacion, fecha_entrega, fecha_entrega_original, completado_at, created_at, clase, proactiva, primera_respuesta_at, basecamp_url, responsables_cierre, heredada';
 
 export interface DatosKpi {
   completadas: ReqKpi[];

@@ -275,6 +275,26 @@ const REGLAS_CUMPLIMIENTO: SignalRule[] = [
         }));
     },
   },
+  {
+    // Pasa cuando alguien se va y sus tareas quedan sin reemplazo, o cuando se crean sin asignar (docs/20).
+    tipo: 'tareas_sin_responsable',
+    severidad: 'alta',
+    tema_agenda: 'Asignar responsable',
+    detectar: (ctx) => {
+      const porCliente = new Map<string, number>();
+      for (const r of ctx.activos)
+        if (!r.owner_agencia.length && r.fecha_entrega && r.fecha_entrega <= ctx.semana.fecha_fin)
+          porCliente.set(r.cliente_id, (porCliente.get(r.cliente_id) ?? 0) + 1);
+      return [...porCliente.entries()].map(([clienteId, n]) => ({
+        tipo: 'tareas_sin_responsable',
+        severidad: 'alta',
+        entidad_tipo: 'cliente',
+        entidad_id: clienteId,
+        titulo: `${clienteDe(ctx, clienteId)}: ${n} ${n === 1 ? 'tarea sin responsable vence' : 'tareas sin responsable vencen'} esta semana o ya vencieron`,
+        detalle: { tareas: n },
+      }));
+    },
+  },
 ];
 REGLAS.push(...REGLAS_CUMPLIMIENTO);
 

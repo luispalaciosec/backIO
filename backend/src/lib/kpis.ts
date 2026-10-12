@@ -5,7 +5,7 @@
  *  - Lo guardado a mano (manual/ajustado) manda sobre lo calculado; lo calculado de meses cerrados se congela.
  */
 import type { Area, KpiDefinicion, KpiMedicion, KpiValor, KpiTablero, KpiDetalleTarea, Usuario } from '@backio/shared';
-import { AREAS, MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, cerradaATiempo } from '@backio/shared';
+import { AREAS, MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, cerradaATiempo, nombrePersona, responsablesDe } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { listUsuarios } from './db/usuarios';
 import { listDefiniciones, listMediciones, cargarDatosKpi, guardarMedicion, type DatosKpi, type ReqKpi } from './db/kpis';
@@ -18,7 +18,7 @@ export const FEATURES_DESDE = '2026-09-25T05:00:00.000Z';
  * el 7-8/09 se cerraron en bloque cientos con meses de atraso, y medirlas castigaría al equipo por la limpieza.
  */
 export const OPERACION_DESDE = '2026-09-04';
-const heredada = (r: ReqKpi) => !!r.fecha_entrega_original && r.fecha_entrega_original < OPERACION_DESDE;
+const deAntesDeOperacion = (r: ReqKpi) => !!r.fecha_entrega_original && r.fecha_entrega_original < OPERACION_DESDE;
 
 // ---------------------------------------------------------------- periodos (hora Guayaquil)
 export function periodoMes(d = new Date()): string {
@@ -36,6 +36,18 @@ export function rangoPeriodo(periodo: string): { desde: string; hasta: string } 
   const desde = new Date(Date.UTC(y, m1 - 1, 1, 5));
   const hasta = new Date(Date.UTC(y, m1 - 1 + meses, 1, 5));
   return { desde: desde.toISOString(), hasta: hasta.toISOString() };
+}
+/**
+ * Integrantes de un área en un periodo: los activos, más quien se fue durante el periodo o después (docs/20). Así
+ * quien se fue sigue en los meses en que trabajó y deja de aparecer en los siguientes.
+ */
+export function integrantesDe<U extends Pick<Usuario, 'area' | 'activo' | 'fecha_salida'>>(
+  usuarios: U[],
+  area: Area,
+  periodo: string,
+): U[] {
+  const inicio = rangoPeriodo(periodo).desde.slice(0, 10);
+  return usuarios.filter((u) => u.area === area && (u.activo || (!!u.fecha_salida && u.fecha_salida >= inicio)));
 }
 export function periodosAnteriores(periodo: string, n: number): string[] {
   const out: string[] = [];
@@ -71,7 +83,8 @@ export interface CalculoResultado {
 }
 
 function miembros(r: ReqKpi, d: DatosKpi, incluirEjecutiva: boolean): string[] {
-  const s = new Set(r.owner_agencia ?? []);
+  // Lo completado cuenta para quienes la tenían al cerrar, aunque después alguien se haya ido o se haya editado.
+  const s = new Set(responsablesDe(r));
   if (incluirEjecutiva && r.proyecto_id) {
     const e = d.ejecutivaProyecto.get(r.proyecto_id);
     if (e) s.add(e);
@@ -95,7 +108,7 @@ export function calcular(def: KpiDefinicion, d: DatosKpi, rango: { desde: string
   // Los que dependen de datos nuevos (clase, proactiva, Respondido) solo miden meses completos desde que existen:
   // un mes a medias saldría «no cumple» sin que nadie haya podido marcar nada.
   const antesDeFeatures = rango.desde < FEATURES_DESDE;
-  const completadas = d.completadas.filter((r) => enRango(r.completado_at, rango) && !heredada(r));
+  const completadas = d.completadas.filter((r) => enRango(r.completado_at, rango) && !deAntesDeOperacion(r));
   const repPorReq = new Map<string, DatosKpi['reprocesos']>();
   for (const rp of d.reprocesos) repPorReq.set(rp.requerimiento_id, [...(repPorReq.get(rp.requerimiento_id) ?? []), rp]);
   const rgPorReq = new Map<string, DatosKpi['reprogramaciones']>();
@@ -112,7 +125,7 @@ export function calcular(def: KpiDefinicion, d: DatosKpi, rango: { desde: string
         sin_dato: false,
         items: completadas
           .filter((r) => r.fecha_entrega_original || r.fecha_entrega)
-          .map((r) => {
+          .flatMap((r) => {
             const original = cerradaATiempo(r.completado_at, r.fecha_entrega_original) === true;
             // Excluye dependencias externas: si todas las reprogramaciones fueron del cliente o neutras, vale la fecha vigente.
             const reprogs = rgPorReq.get(r.id) ?? [];
@@ -120,7 +133,10 @@ export function calcular(def: KpiDefinicion, d: DatosKpi, rango: { desde: string
               reprogs.length > 0 &&
               reprogs.every((g) => MOTIVOS_REPROGRAMACION.find((m) => m.valor === g.motivo)?.atribuible !== 'equipo' && g.motivo !== null);
             const vigente = cerradaATiempo(r.completado_at, r.fecha_entrega) === true;
-            return item(r, original || (soloExternas && vigente));
+            const a = original || (soloExternas && vigente);
+            // Heredada por una salida (docs/20): si se cerró tarde, ese atraso no cuenta para nadie.
+            if (!a && r.heredada) return [];
+            return [item(r, a)];
           }),
       };
     case 'retrabajo':
@@ -294,7 +310,7 @@ export function resolverKpi(
 
 // ---------------------------------------------------------------- orquestación
 export async function tableroKpis(ctx: DbCtx, mes: string): Promise<KpiTablero> {
-  const [defs, usuarios] = await Promise.all([listDefiniciones(ctx, true), listUsuarios(ctx)]);
+  const [defs, usuarios] = await Promise.all([listDefiniciones(ctx, true), listUsuarios(ctx, { incluirInactivos: true })]);
   const meses = periodosAnteriores(mes, 6);
   const trimestres = periodosAnteriores(trimestreDe(mes), 4);
   const rango = { desde: rangoPeriodo(meses[0]!).desde, hasta: rangoPeriodo(mes).hasta };
@@ -308,24 +324,29 @@ export async function tableroKpis(ctx: DbCtx, mes: string): Promise<KpiTablero> 
   const resumen = { cumple: 0, no_cumple: 0, sin_dato: 0 };
   const areas: KpiTablero['areas'] = [];
   for (const area of AREAS) {
-    const integrantes = usuarios.filter((u) => u.area === area);
     const kpis: KpiTablero['areas'][number]['kpis'] = [];
     for (const def of defs.filter((x) => x.area === area)) {
       const periodo = periodoDeKpi(def, mes);
       const serieP = def.periodicidad === 'trimestral' ? trimestres : meses;
+      const integrantes = integrantesDe(usuarios, area, periodo);
       const r = resolverKpi(def, periodo, d, integrantes, mediciones, cerrado(periodo));
       resumen[r.equipo.estado] += 1;
       kpis.push({
         definicion: def,
         equipo: r.equipo,
-        personas: integrantes.map((u) => ({ usuario_id: u.id, nombre: u.nombre, avatar_url: u.avatar_url, valor: r.personas.get(u.id)! })),
+        personas: integrantes.map((u) => ({
+          usuario_id: u.id,
+          nombre: nombrePersona(u),
+          avatar_url: u.avatar_url,
+          valor: r.personas.get(u.id)!,
+        })),
         serie: serieP.map((p) => {
-          const v = p === periodo ? r.equipo : resolverKpi(def, p, d, integrantes, mediciones, cerrado(p)).equipo;
+          const v = p === periodo ? r.equipo : resolverKpi(def, p, d, integrantesDe(usuarios, area, p), mediciones, cerrado(p)).equipo;
           return { periodo: p, resultado: v.resultado, estado: v.estado };
         }),
       });
     }
-    areas.push({ area, integrantes: integrantes.length, kpis });
+    areas.push({ area, integrantes: integrantesDe(usuarios, area, mes).length, kpis });
   }
   return {
     periodo: mes,
@@ -333,7 +354,7 @@ export async function tableroKpis(ctx: DbCtx, mes: string): Promise<KpiTablero> 
     areas,
     resumen,
     sin_area: usuarios
-      .filter((u) => !u.area && !['admin', 'gerencia', 'operaciones'].includes(u.rol))
+      .filter((u) => u.activo && !u.area && !['admin', 'gerencia', 'operaciones'].includes(u.rol))
       .map((u) => ({ usuario_id: u.id, nombre: u.nombre })),
   };
 }
@@ -345,7 +366,7 @@ export async function detalleKpi(
   mes: string,
   usuarioId?: string,
 ): Promise<{ definicion: KpiDefinicion; periodo: string; tareas: KpiDetalleTarea[] }> {
-  const [defs, usuarios] = await Promise.all([listDefiniciones(ctx), listUsuarios(ctx)]);
+  const [defs, usuarios] = await Promise.all([listDefiniciones(ctx), listUsuarios(ctx, { incluirInactivos: true })]);
   const def = defs.find((x) => x.codigo === codigo);
   if (!def) throw new Error('KPI no encontrado');
   const periodo = periodoDeKpi(def, mes);
@@ -353,8 +374,11 @@ export async function detalleKpi(
   const r = rangoPeriodo(periodo);
   const d = await cargarDatosKpi(ctx, r.desde, r.hasta);
   const calc = calcular(def, d, r);
-  const ids = new Set(usuarioId ? [usuarioId] : usuarios.filter((u) => u.area === def.area).map((u) => u.id));
-  const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? '';
+  const ids = new Set(usuarioId ? [usuarioId] : integrantesDe(usuarios, def.area, periodo).map((u) => u.id));
+  const nombre = (id: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : '';
+  };
   const nota = (i: ItemKpi): string | null => {
     if (def.calculo === 'sla_respuesta') return i.req.primera_respuesta_at ? null : 'sin «Respondido»';
     return null;
@@ -380,14 +404,15 @@ export async function detalleKpi(
 
 /** Día 1: guarda como `auto` los valores calculados del periodo cerrado (no pisa lo manual/ajustado). */
 export async function congelarPeriodo(ctx: DbCtx, periodo: string): Promise<number> {
-  const [defs, usuarios] = await Promise.all([listDefiniciones(ctx, true), listUsuarios(ctx)]);
+  const [defs, usuarios] = await Promise.all([listDefiniciones(ctx, true), listUsuarios(ctx, { incluirInactivos: true })]);
   const auto = defs.filter((x) => x.calculo !== 'manual' && (x.periodicidad === 'trimestral') === periodo.includes('-T'));
   if (!auto.length) return 0;
   const r = rangoPeriodo(periodo);
   const [d, mediciones] = await Promise.all([cargarDatosKpi(ctx, r.desde, r.hasta), listMediciones(ctx, [periodo])]);
   let n = 0;
   for (const def of auto) {
-    const integrantes = usuarios.filter((u) => u.area === def.area);
+    // Incluye a quien se fue durante el periodo: su mes también se congela.
+    const integrantes = integrantesDe(usuarios, def.area, periodo);
     const res = resolverKpi(def, periodo, d, integrantes, mediciones, false);
     const filas: [string | null, KpiValor][] = [[null, res.equipo], ...[...res.personas.entries()]];
     for (const [usuarioId, v] of filas) {
@@ -403,7 +428,7 @@ export async function congelarPeriodo(ctx: DbCtx, periodo: string): Promise<numb
 
 /** Fila CSV compatible con Plantilla_KPIs.xlsx (hoja Seguimiento KPI). */
 export async function exportarCsv(ctx: DbCtx, meses: string[]): Promise<string> {
-  const usuarios = await listUsuarios(ctx);
+  const usuarios = await listUsuarios(ctx, { incluirInactivos: true });
   const esc = (v: unknown) => {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -431,7 +456,10 @@ export async function exportarCsv(ctx: DbCtx, meses: string[]): Promise<string> 
       'Fecha seguimiento',
     ],
   ];
-  const nombre = (id: string | null | undefined) => usuarios.find((u) => u.id === id)?.nombre ?? '';
+  const nombre = (id: string | null | undefined) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : '';
+  };
   const vistos = new Set<string>();
   for (const mes of meses) {
     const t = await tableroKpis(ctx, mes);

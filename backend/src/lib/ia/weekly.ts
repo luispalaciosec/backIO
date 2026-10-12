@@ -23,6 +23,7 @@ export const CAUSAS: Record<TipoSenal, string> = {
   reproceso_reincidente: 'Calidad y reprocesos',
   reprogramacion_sin_motivo: 'Causas pendientes de registrar',
   reproceso_sin_motivo: 'Causas pendientes de registrar',
+  tareas_sin_responsable: 'Capacidad del equipo',
 };
 
 export function agruparPorCausa(

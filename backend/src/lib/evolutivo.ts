@@ -12,6 +12,7 @@ import {
   porcentaje,
   sumarDias,
   cerradaATiempo,
+  responsablesDe,
   nombrePersona,
 } from '@backio/shared';
 import type { DbCtx } from './db/client';
@@ -47,6 +48,8 @@ export interface TareaEvo {
   daily_fecha: string | null;
   /** Día real del pedido. En lo importado de Basecamp es la fecha de creación del to-do, no la de importación. */
   fecha_pedido?: string | null;
+  responsables_cierre?: string[] | null;
+  heredada?: boolean;
 }
 export interface EventoSeleccion {
   requerimiento_id: string;
@@ -172,12 +175,12 @@ export function metricasDia(p: {
     return porPersona.get(id)!;
   };
   for (const t of planificadas)
-    for (const o of t.owner_agencia) {
+    for (const o of responsablesDe(t)) {
       const x = pp(o);
       x.planificadas += 1;
       if (enRango(t.completado_at, desde, hasta)) x.cerradas += 1;
     }
-  for (const t of fuera) for (const o of t.owner_agencia) pp(o).fuera += 1;
+  for (const t of fuera) for (const o of responsablesDe(t)) pp(o).fuera += 1;
   return {
     metricas: {
       planificadas: planificadas.length,
@@ -218,7 +221,9 @@ export function metricasSemana(p: {
       !(t.estado_operativo === 'completado' && !t.completado_at) &&
       t.fecha_entrega_original &&
       t.fecha_entrega_original >= p.inicio &&
-      t.fecha_entrega_original <= p.fin,
+      t.fecha_entrega_original <= p.fin &&
+      // Heredada por una salida y cerrada tarde: ese atraso no cuenta (docs/20).
+      !(t.heredada && cerradaATiempo(t.completado_at, t.fecha_entrega_original, true) === null && !!t.completado_at),
   );
   const hechaAntes = (t: TareaEvo, fecha: string | null) => cerradaATiempo(t.completado_at, fecha) === true;
   const aOrig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega_original)).length;

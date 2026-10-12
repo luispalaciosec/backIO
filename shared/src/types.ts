@@ -65,6 +65,8 @@ export interface Usuario {
   basecamp_user_id: number | null;
   capacidad_semanal: number;
   activo: boolean;
+  /** Día en que dejó la agencia (migración 30). */
+  fecha_salida?: string | null;
   /** Equipo funcional: define qué KPIs le aplican (migración 22). */
   area?: Area | null;
 }
@@ -200,6 +202,10 @@ export interface Requerimiento {
   basecamp_url: string | null;
   ultima_actualizacion: string;
   completado_at: string | null;
+  /** Responsables cuando se completó (migración 30); null si está abierta o es anterior. */
+  responsables_cierre?: string[] | null;
+  /** Pasó a otra persona por una salida con poco margen: si se cierra tarde, el atraso no cuenta (docs/20). */
+  heredada?: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -237,7 +243,8 @@ export type TipoSenal =
   | 'atraso_critico'
   | 'reproceso_reincidente'
   | 'reprogramacion_sin_motivo'
-  | 'reproceso_sin_motivo';
+  | 'reproceso_sin_motivo'
+  | 'tareas_sin_responsable';
 
 export interface Senal {
   id: string;

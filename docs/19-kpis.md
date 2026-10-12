@@ -24,7 +24,12 @@ consejo concreto para mejorarlo (`frontend/components/kpis/ComoSeCalcula.tsx`).
 
 ## Cómo se mide
 
-- **Persona**: tareas donde está en `owner_agencia`; en Cuentas también las de proyectos donde es `owner_ejecutiva`.
+- **Persona**: tareas donde es responsable; en Cuentas también las de proyectos donde es `owner_ejecutiva`. Lo
+  completado cuenta para quienes eran responsables **al cerrar** (`responsables_cierre`, migración 30), aunque
+  después la tarea cambie de manos o la persona se vaya.
+- **Integrantes de un periodo**: los activos del área, más quien se fue durante ese periodo o después (con «(ex)»).
+  Quien se fue sigue en los meses en que trabajó y no aparece en los siguientes; el día 1 su último mes también se
+  congela. Ver [Cuando alguien se va](./20-salida.md).
 - **Equipo**: Σ A / Σ B sobre las tareas únicas de sus integrantes (una tarea compartida cuenta una vez).
   Si hay personas ajustadas a mano o el KPI es manual, el equipo agrega Σ A / Σ B de las personas.
 - **Proactividad**: meta por persona (3 y 10 al mes); el equipo usa meta × integrantes.
@@ -66,6 +71,10 @@ septiembre sale «sin dato» y arrancan en octubre.
 **Backlog heredado excluido (`OPERACION_DESDE = 2026-09-04`).** Las tareas con fecha original anterior al
 inicio de BackIO no cuentan: el 7-8/09 se cerraron en bloque 385 tareas importadas con una mediana de 62 días
 de atraso, y medirlas castigaba al equipo por la limpieza (a tiempo de Diseño pasaba de 47% a 19%).
+
+**Tareas heredadas por una salida.** Una tarea que alguien recibió con menos de 3 días hábiles para la entrega
+(o ya vencida) queda marcada `heredada`. Si se cierra tarde, no entra en «a tiempo» de nadie; si se cierra a
+tiempo, cuenta para quien la cerró (decisión de Luis, 11/10/2026).
 
 ## Datos nuevos que los alimentan (migración 22)
 

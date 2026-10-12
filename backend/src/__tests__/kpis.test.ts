@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { KpiDefinicion, Reproceso, Reprogramacion } from '@backio/shared';
 import { minutosHabiles, dentroSla } from '../lib/horas_habiles';
-import { rangoPeriodo, periodosAnteriores, trimestreDe, calcular, resolverKpi, estadoDe, FEATURES_DESDE } from '../lib/kpis';
+import { rangoPeriodo, periodosAnteriores, trimestreDe, calcular, resolverKpi, estadoDe, FEATURES_DESDE, integrantesDe } from '../lib/kpis';
 import type { DatosKpi, ReqKpi } from '../lib/db/kpis';
 import { marcasDeTitulo } from '../lib/basecamp/importar';
 
@@ -43,6 +43,8 @@ const req = (p: Partial<ReqKpi>): ReqKpi => ({
   proactiva: false,
   primera_respuesta_at: null,
   basecamp_url: null,
+  responsables_cierre: null,
+  heredada: false,
   ...p,
 });
 const datos = (p: Partial<DatosKpi>): DatosKpi => ({
@@ -194,6 +196,34 @@ describe('persona y equipo', () => {
     expect(estadoDe(0, 0, '<=')).toBe('cumple');
     expect(estadoDe(0.01, 0, '<=')).toBe('no_cumple');
     expect(estadoDe(null, 0.9, '>=')).toBe('sin_dato');
+  });
+});
+
+describe('cuando alguien se va (docs/20)', () => {
+  it('lo completado cuenta para quien la tenía al cerrar, aunque después cambie el responsable', () => {
+    const r = req({ owner_agencia: ['beto'], responsables_cierre: ['ana'] });
+    const res = resolverKpi(def({}), '2026-10', datos({ completadas: [r] }), [{ id: 'ana' }, { id: 'beto' }], [], false);
+    expect(res.personas.get('ana')).toMatchObject({ dato_a: 1, dato_b: 1 });
+    expect(res.personas.get('beto')?.dato_b).toBe(0);
+  });
+  it('una heredada cerrada tarde no cuenta para nadie; a tiempo sí cuenta para quien la cerró', () => {
+    const tarde = { fecha_entrega_original: '2026-10-01', fecha_entrega: '2026-10-01', completado_at: '2026-10-05T15:00:00Z' };
+    const c = calcular(
+      def({}),
+      datos({ completadas: [req({ ...tarde, heredada: true }), req({ heredada: true }), req(tarde)] }),
+      rangoPeriodo('2026-10'),
+    );
+    expect(c.items.map((i) => i.a)).toEqual([true, false]);
+  });
+  it('integrantes de un periodo: activos y quien se fue durante o después de ese periodo', () => {
+    const us = [
+      { id: 'ana', area: 'diseno' as const, activo: true, fecha_salida: null },
+      { id: 'ex', area: 'diseno' as const, activo: false, fecha_salida: '2026-10-15' },
+      { id: 'viejo', area: 'diseno' as const, activo: false, fecha_salida: '2026-08-31' },
+    ];
+    expect(integrantesDe(us, 'diseno', '2026-10').map((u) => u.id)).toEqual(['ana', 'ex']);
+    expect(integrantesDe(us, 'diseno', '2026-11').map((u) => u.id)).toEqual(['ana']);
+    expect(integrantesDe(us, 'diseno', '2026-09').map((u) => u.id)).toEqual(['ana', 'ex']);
   });
 });
 

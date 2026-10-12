@@ -6,11 +6,12 @@ import type { Usuario } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { listCompletadosDesde, listHorasDesde } from './db/dashboard';
 import { listUsuarios } from './db/usuarios';
+import { tramosResponsables } from './db/responsables';
 import { listClientes } from './db/clientes';
 import { listBacklog } from './db/requerimientos';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento } from './cumplimiento';
-import { diaLocal, finDiaLocal, hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
+import { diaLocal, finDiaLocal, hoyLocal, inicioDiaLocal, sumarDias, responsablesDe, responsablesEn, nombrePersona } from '@backio/shared';
 
 export type Periodo = 'dia' | 'semana' | 'mes';
 
@@ -75,7 +76,7 @@ export async function resumenPersonas(
   const desdeIso = inicioDiaLocal(desde);
   const hastaIso = finDiaLocal(hasta);
   const [usuarios, clientes, activos, cumpl] = await Promise.all([
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx, { incluirInactivos: true }),
     listBacklog(ctx, { solo_activos: true }),
     listCumplimientoDesde(ctx, desdeIso),
@@ -85,21 +86,31 @@ export async function resumenPersonas(
   const horas = hrs as { usuario_id: string | null; fecha: string; horas: number }[];
   const nombreC = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '—';
   const reqPorId = new Map([...activos, ...completados].map((r) => [r.id, r]));
+  // Reprogramaciones y reprocesos cuentan para quien tenía la tarea en ese momento (historial, migración 30).
+  const tramos = await tramosResponsables(ctx, [
+    ...cumpl.reprogramaciones.map((x) => x.requerimiento_id),
+    ...cumpl.reprocesos.map((x) => x.requerimiento_id),
+  ]);
+  const deQuienEra = (reqId: string, instante: string) => {
+    const r = reqPorId.get(reqId);
+    return responsablesEn(tramos.get(reqId) ?? [], instante, r ? responsablesDe(r) : []);
+  };
   const enPeriodo = (iso: string | null) => !!iso && iso >= desdeIso && iso <= hastaIso;
   const capacidadPeriodo = (u: Usuario) =>
     periodo === 'dia' ? u.capacidad_semanal / 5 : periodo === 'semana' ? u.capacidad_semanal : (u.capacidad_semanal / 5) * ((dias * 5) / 7);
 
   // Admin y gerencia no ejecutan tareas: no se miden aquí (pedido de Luis 08/09/2026).
+  // Quien se fue aparece en los periodos en que trabajó, con «(ex)» (docs/20).
   const personas: PersonaResumen[] = usuarios
-    .filter((u) => u.activo && u.rol !== 'admin' && u.rol !== 'gerencia')
+    .filter((u) => (u.activo || (!!u.fecha_salida && u.fecha_salida >= desde)) && u.rol !== 'admin' && u.rol !== 'gerencia')
     .map((u) => {
       const mios = activos.filter((r) => r.owner_agencia.includes(u.id));
-      const entregados = completados.filter((r) => r.owner_agencia.includes(u.id) && enPeriodo(r.completado_at));
-      const esMio = (id: string) => reqPorId.get(id)?.owner_agencia.includes(u.id) ?? false;
+      const deU = (r: (typeof completados)[number]) => responsablesDe(r).includes(u.id);
+      const entregados = completados.filter((r) => deU(r) && enPeriodo(r.completado_at));
       const cu = resumirCumplimiento(
         entregados,
-        cumpl.reprogramaciones.filter((x) => esMio(x.requerimiento_id) && x.created_at <= hastaIso),
-        cumpl.reprocesos.filter((x) => esMio(x.requerimiento_id) && x.abierto_at <= hastaIso),
+        cumpl.reprogramaciones.filter((x) => x.created_at <= hastaIso && deQuienEra(x.requerimiento_id, x.created_at).includes(u.id)),
+        cumpl.reprocesos.filter((x) => x.abierto_at <= hastaIso && deQuienEra(x.requerimiento_id, x.abierto_at).includes(u.id)),
       );
       const hMias = horas.filter((h) => h.usuario_id === u.id);
       const hPeriodo = hMias.filter((h) => h.fecha >= desde && h.fecha <= hasta).reduce((s, h) => s + Number(h.horas), 0);
@@ -108,7 +119,7 @@ export async function resumenPersonas(
         const f = sumarDias(desde30, i);
         return {
           fecha: f,
-          entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && diaLocal(r.completado_at ?? '') === f).length,
+          entregados: completados.filter((r) => deU(r) && diaLocal(r.completado_at ?? '') === f).length,
           horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s, h) => s + Number(h.horas), 0) * 10) / 10,
         };
       });
@@ -122,7 +133,7 @@ export async function resumenPersonas(
           fecha: f,
           horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s2, h) => s2 + Number(h.horas), 0) * 10) / 10,
           esperado: laborable ? Math.round(esperadoDia * 10) / 10 : 0,
-          entregados: completados.filter((r) => r.owner_agencia.includes(u.id) && diaLocal(r.completado_at ?? '') === f).length,
+          entregados: completados.filter((r) => deU(r) && diaLocal(r.completado_at ?? '') === f).length,
         });
       }
       const laborables = diasPeriodo.filter((d) => d.esperado > 0);
@@ -147,7 +158,7 @@ export async function resumenPersonas(
       const puntaje = Math.round(pctAt * 0.4 + pctSinAtraso * 0.3 + pctPrimera * 0.2 + pctMov * 0.1);
       return {
         usuario_id: u.id,
-        nombre: u.nombre,
+        nombre: nombrePersona(u),
         email: u.email,
         rol: u.rol,
         area: u.area ?? null,

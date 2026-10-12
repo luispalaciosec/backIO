@@ -8,12 +8,13 @@ import { contarHuerfanosPendientes, listCompletadosDesde } from './db/dashboard'
 import { listBacklog } from './db/requerimientos';
 import { listProyectos } from './db/proyectos';
 import { listUsuarios } from './db/usuarios';
+import { tramosResponsables } from './db/responsables';
 import { listClientes } from './db/clientes';
 import { listMesas, alcanceMesa } from './db/mesas';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento, labelMotivoReprogramacion, labelMotivoReproceso, aTiempoOriginal, aTiempoVigente } from './cumplimiento';
 import { resumenHoras } from './horas';
-import { diaLocal, hoyLocal, inicioDiaLocal, lunesDe } from '@backio/shared';
+import { diaLocal, hoyLocal, inicioDiaLocal, lunesDe, nombrePersona, responsablesDe, responsablesEn } from '@backio/shared';
 
 export interface DashboardKpis {
   activos: number;
@@ -123,7 +124,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
 
   const [mesas, usuarios, clientes, proyectos] = await Promise.all([
     listMesas(ctx),
-    listUsuarios(ctx),
+    listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx, { incluirInactivos: true }),
     listProyectos(ctx),
   ]);
@@ -144,7 +145,10 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   const reprocs30 = cumpl.reprocesos.filter((x) => reqIdsAlcance.has(x.requerimiento_id));
   const cumplTotal = resumirCumplimiento(completados30, reprogs30, reprocs30);
 
-  const nombreU = (id?: string) => usuarios.find((u) => u.id === id)?.nombre ?? null;
+  const nombreU = (id?: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? nombrePersona(u) : null;
+  };
   const clienteDe = (id: string) => clientes.find((c) => c.id === id);
   const mesaDe = (c?: Cliente) => (c?.mesa_id ? (mesas.find((m) => m.id === c.mesa_id)?.nombre ?? null) : null);
   const proyectosAlcance = alcance ? proyectos.filter((p) => alcance.proyectoIds.includes(p.id)) : proyectos;
@@ -226,22 +230,32 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   const finSemana = new Date(`${lunes}T12:00:00Z`);
   finSemana.setUTCDate(finSemana.getUTCDate() + 6);
   const finSemanaIso = finSemana.toISOString().slice(0, 10);
+  // Reprogramaciones y reprocesos cuentan para quien tenía la tarea en ese momento (historial, migración 30).
+  const tramos = await tramosResponsables(
+    ctx,
+    [...reprogs30, ...reprocs30].map((x) => x.requerimiento_id),
+  );
+  const deQuienEra = (reqId: string, instante: string) => {
+    const r = reqPorId.get(reqId);
+    return responsablesEn(tramos.get(reqId) ?? [], instante, r ? responsablesDe(r) : []);
+  };
+  const desde30 = hace30.slice(0, 10);
+  // Quien se fue en los últimos 30 días sigue con lo que cerró, con «(ex)» (docs/20).
   const por_persona: FilaPersona[] = usuarios
-    .filter((u) => u.activo)
+    .filter((u) => u.activo || (!!u.fecha_salida && u.fecha_salida >= desde30))
     .map((u) => {
       const mios = activos.filter((r) => r.owner_agencia.includes(u.id));
       const semana = mios.filter((r) => r.fecha_entrega && r.fecha_entrega >= lunes && r.fecha_entrega <= finSemanaIso);
       const totalSemana = activos.filter((r) => r.fecha_entrega && r.fecha_entrega >= lunes && r.fecha_entrega <= finSemanaIso).length || 1;
-      const entregados = completados30.filter((r) => r.owner_agencia.includes(u.id));
-      const esMio = (id: string) => reqPorId.get(id)?.owner_agencia.includes(u.id) ?? false;
+      const entregados = completados30.filter((r) => responsablesDe(r).includes(u.id));
       const cu = resumirCumplimiento(
         entregados,
-        reprogs30.filter((x) => esMio(x.requerimiento_id)),
-        reprocs30.filter((x) => esMio(x.requerimiento_id)),
+        reprogs30.filter((x) => deQuienEra(x.requerimiento_id, x.created_at).includes(u.id)),
+        reprocs30.filter((x) => deQuienEra(x.requerimiento_id, x.abierto_at).includes(u.id)),
       );
       return {
         usuario_id: u.id,
-        nombre: u.nombre,
+        nombre: nombrePersona(u),
         activos: mios.length,
         semana_actual: semana.length,
         atrasados: mios.filter((r) => r.dias_atraso > 0).length,

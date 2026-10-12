@@ -90,3 +90,30 @@ describe('una sola definición de «a tiempo»', () => {
     });
   }
 });
+
+// Salida de un colaborador (docs/20): una tarea heredada que se cierra tarde no cuenta para nadie, en ningún módulo.
+describe('tareas heredadas: el atraso no cuenta en ningún módulo', () => {
+  it('cumplimiento, evolutivo y KPIs la dejan fuera si se cerró tarde', () => {
+    const r = { completado_at: MADRUGADA, fecha_entrega_original: VENCE, fecha_entrega: VENCE, heredada: true };
+    expect(aTiempoOriginal(r)).toBeNull();
+    const cu = resumirCumplimiento([{ ...r, id: 'r1' } as never], [], []);
+    expect(cu.entregados).toBe(1);
+    expect(cu.pct_original).toBeNull();
+    const sem = metricasSemana({
+      inicio: '2026-10-05',
+      fin: '2026-10-11',
+      tareas: [{ ...evo(MADRUGADA), heredada: true }],
+      reprocesos: [],
+      reprogramaciones: [],
+      senales: [],
+      acuerdos: [],
+      planIds: null,
+      dailies: { apertura: 0, cierre: 0 },
+    });
+    expect(sem.comprometidas).toBe(0);
+    expect(calcular(defATiempo, datos([{ ...kpiReq(MADRUGADA), heredada: true }]), rangoPeriodo('2026-10')).items).toEqual([]);
+  });
+  it('si se cerró a tiempo, cuenta como a tiempo', () => {
+    expect(aTiempoOriginal({ completado_at: NOCHE, fecha_entrega_original: VENCE, heredada: true })).toBe(true);
+  });
+});
