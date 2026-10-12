@@ -2717,6 +2717,8 @@ export type Database = {
           clase: string | null;
           proactiva: boolean | null;
           primera_respuesta_at: string | null;
+          responsables_cierre: string[] | null;
+          heredada: boolean | null;
           dias_atraso: number | null;
           dias_sin_movimiento: number | null;
           peso_completado: number | null;
@@ -2763,6 +2765,8 @@ export type Database = {
           clase?: string | null;
           proactiva?: boolean | null;
           primera_respuesta_at?: string | null;
+          responsables_cierre?: string[] | null;
+          heredada?: boolean | null;
           dias_atraso?: number | null;
           dias_sin_movimiento?: number | null;
           peso_completado?: number | null;
@@ -2809,6 +2813,8 @@ export type Database = {
           clase?: string | null;
           proactiva?: boolean | null;
           primera_respuesta_at?: string | null;
+          responsables_cierre?: string[] | null;
+          heredada?: boolean | null;
           dias_atraso?: number | null;
           dias_sin_movimiento?: number | null;
           peso_completado?: number | null;
@@ -3000,10 +3006,6 @@ export type Database = {
       };
       proyectos_recalcular_estado: {
         Args: { p_proyecto: string | null };
-        Returns: Json;
-      };
-      quitar_acceso: {
-        Args: { p_actor: string | null; p_reasignar_a: string | null; p_tenant: string | null; p_usuario: string | null };
         Returns: Json;
       };
       salida_colaborador: {

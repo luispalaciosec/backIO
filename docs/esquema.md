@@ -865,6 +865,8 @@ Requerimientos con días de atraso y días sin movimiento calculados (hora de Gu
 | `clase` | texto |  |  |
 | `proactiva` | boolean |  |  |
 | `primera_respuesta_at` | fecha y hora |  |  |
+| `responsables_cierre` | uuid[] |  |  |
+| `heredada` | boolean |  |  |
 | `dias_atraso` | integer |  |  |
 | `dias_sin_movimiento` | integer |  |  |
 | `peso_completado` | numeric |  |  |
