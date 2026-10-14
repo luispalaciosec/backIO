@@ -143,7 +143,7 @@ hallazgo por hallazgo, con archivos y cómo se verificó, está en [Endurecimien
 | Entradas | Títulos de una línea (S5); `bodyLimit`; errores de validación legibles (B3); CSP con nonce en el frontend y `default-src 'none'` en el backend |
 | Abuso | Límite de peticiones persistente en Postgres (`limites`); Turnstile en login y recuperar; signup público apagado en Supabase |
 | Dependencias | `pnpm audit --prod --audit-level=high` en CI (de 34 vulnerabilidades a 0); Next 15 + React 19; Dependabot |
-| Transacciones | Import CSV y Builder en `crear_lote` (B7); «quitar acceso» en `quitar_acceso`, credenciales primero (B8) — migración 29 |
+| Transacciones | Import CSV y Builder en `crear_lote` (B7); «quitar acceso» en `quitar_acceso`, credenciales primero (B8) — migración 29; desde la migración 30 lo reemplaza `salida_colaborador` (la 31 borró `quitar_acceso`) |
 | Operación | Jobs con ventana y registro en `cron_runs` (B10); logger JSON con niveles; Sentry opcional sin datos personales |
 
 Migraciones de esta ronda: 27 (seguridad), 28 (límites y `cron_runs`) y 29 (transacciones), aplicadas y verificadas

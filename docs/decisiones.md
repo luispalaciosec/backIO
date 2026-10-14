@@ -60,6 +60,7 @@ mezcle datos entre organizaciones.
 | Id | Decisión | Por qué | Fecha · quién |
 |---|---|---|---|
 | <span id="d1">D1</span> | El **título** de los to-dos de Basecamp entra como título interno, nunca visible al cliente | Sin títulos no se podían importar las listas existentes; el título es un dato operativo, no una conversación | 04/09/2026 · Luis |
+| <span id="d1b">D1b</span> | El **nombre de la lista** de Basecamp entra como nombre del proyecto y el cliente lo ve en el portal; el equipo nombra las listas como las vería el cliente | El portal necesita un nombre de proyecto y ese es el que le pone el equipo; no es una conversación | 13/10/2026 · Luis |
 | D2 | Los fees generan el proyecto del mes siguiente **el día configurado** de cada recurrencia (25 por defecto, de 1 a 28), con el patrón de la plantilla. Se configura en Admin → Recurrencias; el proyecto se crea completo y baja a Basecamp sin pasar por un borrador | — | 04/09/2026 · Marcia |
 | D3 | Los textos de la IA se firman «Redactado por BackIO, publicado por [persona]» | La IA redacta y una persona publica: queda claro quién responde | Por defecto; ajustable · Marcia / Grace |
 | D4 | El informe mensual trae la lectura del mes, las decisiones y tablas por cliente y por persona | Formato inicial; se ajusta con Marcia | 09/2026 · Marcia |

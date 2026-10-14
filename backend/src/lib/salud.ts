@@ -3,6 +3,7 @@
  * Solo estado y milisegundos; sin detalle interno de errores hacia el cliente.
  */
 import { env, frontendOrigins } from '../config/env';
+import { MODELO_IA } from './ia';
 import { pingTenant } from './db/salud';
 import { getStatus } from './basecamp/oauth';
 import { BasecampClient } from './basecamp/client';
@@ -112,7 +113,7 @@ export async function verificarSalud(
         }),
         (s) => s === 200,
       );
-      return 'claude-sonnet-5';
+      return MODELO_IA;
     }),
     medir('prometio', 'PrometIO', async (signal) => {
       const url = process.env.PROMETIO_URL ?? 'https://prometio-backend-production.up.railway.app';

@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Usuario } from '@backio/shared';
-import { api, BACKEND } from '@/lib/api';
+import { api, ApiError, BACKEND, descargar } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
 import {
@@ -131,19 +131,11 @@ function Kpis() {
             type="button"
             className="btn-secondary text-xs"
             title="Descarga el mes con las columnas de la plantilla de KPIs"
-            onClick={async () => {
-              const { supabaseBrowser } = await import('@/lib/supabase/client');
-              const { data } = await supabaseBrowser().auth.getSession();
-              const r = await fetch(`${BACKEND}/api/v1/kpis/export?hasta=${mes}&meses=1`, {
-                headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` },
-              });
-              const url = URL.createObjectURL(await r.blob());
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `kpis-${mes}.csv`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
+            onClick={() =>
+              descargar(`/kpis/export?hasta=${mes}&meses=1`, `kpis-${mes}.csv`).catch((e) =>
+                alert(e instanceof ApiError ? `No se pudo descargar: ${e.message}` : 'No se pudo descargar el CSV'),
+              )
+            }
           >
             ⬇ CSV
           </button>

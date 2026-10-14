@@ -92,6 +92,11 @@ tarea, no una conversación. Siguen fuera, sin excepción: descripción, comenta
 descripción de las entradas de timesheet. Se implementa en `BasecampClient.listTodosSafe` y
 `timesheetSafe`, que construyen el objeto campo a campo.
 
+**Excepción D1b (aprobada por Luis, 13/10/2026).** El **nombre de la lista** de Basecamp entra como nombre del
+proyecto (`lib/basecamp/importar.ts`) y el cliente lo ve en su portal. Es el nombre que el equipo le da al proyecto, no
+una conversación, y el portal necesita uno. Consecuencia para el equipo: en Basecamp, las listas se nombran como las
+vería el cliente.
+
 ### Defensa 2 — Visibilidad heredada, monotónica (lógica)
 
 `visible_cliente` se hereda de `plantilla_tareas.visible_cliente_default`.

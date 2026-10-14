@@ -5,6 +5,7 @@
  */
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
+import { MODELO_IA, SIN_RAZONAMIENTO } from '../ia';
 import type { ClientSafeProject } from '@backio/shared';
 import { assertClientSafe } from '@backio/shared';
 import { env } from '../../config/env';
@@ -24,7 +25,8 @@ Reglas:
 - No inventes fechas, nombres, personas ni actividades que no estén en el JSON.
 - No uses jerga de agencia ni las fórmulas "no es X, es Y", "clave", "potenciar" o enumeraciones de tres adjetivos.
 - Nunca uses voseo argentino.
-- Si no hay datos suficientes para un párrafo, escribe menos.`;
+- Si no hay datos suficientes para un párrafo, escribe menos.
+- Texto plano: sin título, sin negritas ni otro formato. El portal lo muestra tal cual.`;
 
 export interface PayloadResumen {
   proyecto: string;
@@ -63,9 +65,9 @@ export async function generarResumen(proyectoId: string, tenantId: string, safe:
   if (!key) throw new Error('ANTHROPIC_API_KEY no configurada');
   const anthropic = new Anthropic({ apiKey: key });
   const res = await anthropic.messages.create({
-    model: 'claude-sonnet-5',
+    model: MODELO_IA,
     max_tokens: 600,
-    thinking: { type: 'disabled' },
+    thinking: SIN_RAZONAMIENTO,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: JSON.stringify(payload, null, 2) }],
   });
@@ -74,6 +76,8 @@ export async function generarResumen(proyectoId: string, tenantId: string, safe:
     .map((b) => b.text)
     .join('\n')
     .trim();
+  // Sin texto (rechazo del modelo o límite de tokens): no se guarda un resumen vacío en la caché del portal.
+  if (!texto) throw new Error(`Resumen vacío (${res.stop_reason ?? 'sin motivo'})`);
 
   await guardarResumenPortal({
     proyecto_id: proyectoId,

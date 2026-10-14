@@ -191,6 +191,7 @@ Formato OBLIGATORIO (markdown simple, se convierte a HTML):
 - Nombres de tareas en negrita (**así**) y el responsable después de dos puntos.
 - Fechas como día/mes (22/09), nunca 2026-09-22. Sin títulos propios, sin #, sin tablas, sin emojis, sin saludos ni despedidas.
 Contenido: bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos).
+No relaciones tareas entre sí ni agregues causas o consecuencias que no estén en los datos.
 En un cierre: kpis trae los indicadores del día (cumplimiento del plan, entradas fuera de planificación, reprocesos, vencidas abiertas); úsalos en el balance con sus números, sin inventar otros. completadas_hoy y completadas_fuera_del_daily son lo que sí se cerró (dilo por persona, reconociendo el trabajo sin exagerar); hoy_se_trabaja es lo que quedó abierto de la selección del día.
 Tono de compañero de mesa, no de jefe.`;
 

@@ -4,7 +4,7 @@ vi.mock('../supabase/client', () => ({
   supabaseBrowser: () => ({ auth: { getSession: async () => ({ data: { session: { access_token: 'jwt-prueba' } } }) } }),
 }));
 
-import { api, apiPortal, ApiError, mensajeDeError, pedir } from '../api';
+import { api, apiPortal, ApiError, descargar, mensajeDeError, pedir } from '../api';
 
 const respuesta = (status: number, cuerpo?: unknown, crudo?: string) =>
   new Response(crudo ?? (cuerpo === undefined ? null : JSON.stringify(cuerpo)), { status });
@@ -67,5 +67,15 @@ describe('envoltorios', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(String(url)).toMatch(/\/api\/portal\/tok$/);
     expect(init.headers).toEqual({ 'X-Portal-Pin': '1234' });
+  });
+});
+
+describe('descargar (CSV)', () => {
+  it('si el backend falla, lanza el error y no baja un archivo con el error adentro', async () => {
+    fetchMock.mockResolvedValueOnce(respuesta(500, { error: 'Error interno' }));
+    const crear = vi.spyOn(URL, 'createObjectURL');
+    await expect(descargar('/kpis/export?hasta=2026-10&meses=1', 'kpis.csv')).rejects.toBeInstanceOf(ApiError);
+    expect(crear).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0]![1].headers.Authorization).toBe('Bearer jwt-prueba');
   });
 });

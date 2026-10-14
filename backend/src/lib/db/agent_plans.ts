@@ -19,6 +19,7 @@ export async function marcarAgentPlanEjecutado(ctx: DbCtx, planId: string): Prom
     .from('agent_plans')
     .update({ ejecutado_at: new Date().toISOString() })
     .eq('id', planId)
+    .eq('tenant_id', ctx.tenantId)
     .is('ejecutado_at', null)
     .select('id');
   throwIf(error);
@@ -26,5 +27,5 @@ export async function marcarAgentPlanEjecutado(ctx: DbCtx, planId: string): Prom
 }
 
 export async function guardarResultadoAgentPlan(ctx: DbCtx, planId: string, resultado: unknown): Promise<void> {
-  await ctx.db.from('agent_plans').update({ resultado }).eq('id', planId);
+  await ctx.db.from('agent_plans').update({ resultado }).eq('id', planId).eq('tenant_id', ctx.tenantId);
 }

@@ -61,7 +61,8 @@ export async function completarUltimaReprogramacion(
         usuario_id: ctx.usuarioId,
         ...(inc && datos.observacion ? { observacion: datos.observacion } : {}),
       })
-      .eq('id', row.id),
+      .eq('id', row.id)
+      .eq('tenant_id', ctx.tenantId),
   );
   throwIf(error as never);
 }

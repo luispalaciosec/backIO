@@ -63,6 +63,7 @@ export async function guardarMedicion(
         .from('kpi_mediciones')
         .update(fila)
         .eq('id', (ex as { id: string }).id)
+        .eq('tenant_id', ctx.tenantId)
         .select()
         .single()
     : await db.from('kpi_mediciones').insert(fila).select().single();

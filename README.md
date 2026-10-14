@@ -112,6 +112,7 @@ Todo está en **[backio.vercel.app/docs](https://backio.vercel.app/docs)**. Para
 | Tocar el portal o la sincronización | [Qué ve el cliente](docs/02-visibilidad.md) · [Basecamp](docs/04-basecamp.md) |
 | Cambiar código | [Arquitectura técnica](docs/17-arquitectura-tecnica.md) · [`CLAUDE.md`](CLAUDE.md) |
 | Integrar un sistema o un agente | [API y agentes](docs/07-api-mcp.md) · [Referencia de la API](docs/referencia-api.md) |
+| Dar de baja a alguien | [Cuando alguien se va](docs/20-salida.md) |
 | Revisar la seguridad | [Seguridad](docs/18-seguridad.md) · [`HARDENING-CHANGELOG.md`](HARDENING-CHANGELOG.md) |
 
 ## Cómo contribuir

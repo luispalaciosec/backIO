@@ -331,3 +331,10 @@ alter table senales              enable row level security;
 alter table acuerdos             enable row level security;
 alter table actas                enable row level security;
 alter table mapeo_servicios      enable row level security;
+
+-- ---------------------------------------------------------------- tenant Geeks
+-- Las migraciones 05, 07 y 10 insertan filas de Geeks (invitación de Marcia, mesas, tipos de pieza): sin el tenant,
+-- una base nueva (`supabase db reset`) fallaba antes de llegar a seed.sql. Agregado el 13/10/2026; en producción esta
+-- migración ya estaba aplicada y no se vuelve a correr. seed.sql completa la configuración.
+insert into tenants (id, nombre, slug) values ('00000000-0000-4000-8000-000000000001', 'Geeks Ecuador', 'geeks')
+on conflict (id) do nothing;

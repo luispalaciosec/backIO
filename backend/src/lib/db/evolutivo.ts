@@ -116,7 +116,7 @@ export async function getDailySnapshot(ctx: DbCtx, mesaId: string, fecha: string
 export async function guardarDailySnapshot(existenteId: string | null, fila: FilaInsert<'daily_snapshots'>): Promise<void> {
   const db = serviceClient();
   const { error } = existenteId
-    ? await db.from('daily_snapshots').update(fila).eq('id', existenteId)
+    ? await db.from('daily_snapshots').update(fila).eq('id', existenteId).eq('tenant_id', fila.tenant_id)
     : await db.from('daily_snapshots').insert(fila);
   throwIf(error);
 }
@@ -152,7 +152,7 @@ export async function getWeeklySnapshot(ctx: DbCtx, mesaId: string, semanaId: st
 export async function guardarWeeklySnapshot(existenteId: string | null, fila: FilaInsert<'weekly_snapshots'>): Promise<void> {
   const db = serviceClient();
   const { error } = existenteId
-    ? await db.from('weekly_snapshots').update(fila).eq('id', existenteId)
+    ? await db.from('weekly_snapshots').update(fila).eq('id', existenteId).eq('tenant_id', fila.tenant_id)
     : await db.from('weekly_snapshots').insert(fila);
   throwIf(error);
 }

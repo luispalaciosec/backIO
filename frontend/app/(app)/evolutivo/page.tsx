@@ -1,7 +1,7 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api, ApiError, BACKEND } from '@/lib/api';
+import { api, ApiError, BACKEND, descargar } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
 import { Tarjeta, BarrasDobles, Lineas } from '@/components/informe/Graficas';
@@ -209,19 +209,11 @@ function EvolutivoVista() {
           {d && (
             <button
               className="btn-secondary text-xs"
-              onClick={async () => {
-                const { supabaseBrowser } = await import('@/lib/supabase/client');
-                const { data } = await supabaseBrowser().auth.getSession();
-                const res = await fetch(`${BACKEND}/api/v1/evolutivo/export?mesa=${d.mesa.id}&mes=${mes}`, {
-                  headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` },
-                });
-                const url = URL.createObjectURL(await res.blob());
-                const el = document.createElement('a');
-                el.href = url;
-                el.download = `evolutivo-${mes}.csv`;
-                el.click();
-                URL.revokeObjectURL(url);
-              }}
+              onClick={() =>
+                descargar(`/evolutivo/export?mesa=${d.mesa.id}&mes=${mes}`, `evolutivo-${mes}.csv`).catch((e) =>
+                  setError(e instanceof ApiError ? `No se pudo descargar: ${e.message}` : 'No se pudo descargar el CSV'),
+                )
+              }
             >
               ⬇ CSV
             </button>

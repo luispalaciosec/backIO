@@ -46,7 +46,11 @@ export async function listHuerfanosPendientesTodo(ctx: DbCtx): Promise<{ id: str
 
 /** Cierra como adoptados los huérfanos indicados (sin propagar error). */
 export async function marcarHuerfanosAdoptados(ctx: DbCtx, ids: string[]): Promise<void> {
-  await ctx.db.from('basecamp_huerfanos').update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' }).in('id', ids);
+  await ctx.db
+    .from('basecamp_huerfanos')
+    .update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado' })
+    .eq('tenant_id', ctx.tenantId)
+    .in('id', ids);
 }
 
 /** Ids de to-do ya registrados como huérfanos, resueltos o no. Si la consulta falla devuelve []. */
@@ -96,12 +100,12 @@ export async function getRequerimientoPorTodo(ctx: DbCtx, todoId: number): Promi
 
 /** Quita el borrado lógico de un requerimiento (sin propagar error). */
 export async function restaurarRequerimiento(ctx: DbCtx, id: string): Promise<void> {
-  await ctx.db.from('requerimientos').update({ deleted_at: null }).eq('id', id);
+  await ctx.db.from('requerimientos').update({ deleted_at: null }).eq('id', id).eq('tenant_id', ctx.tenantId);
 }
 
 /** Borrado lógico de un requerimiento (sin propagar error). */
 export async function descartarRequerimiento(ctx: DbCtx, id: string): Promise<void> {
-  await ctx.db.from('requerimientos').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  await ctx.db.from('requerimientos').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('tenant_id', ctx.tenantId);
 }
 
 /** Proyectos vivos de un cliente con sus listas y grupos de Basecamp. Si la consulta falla devuelve []. */
@@ -133,7 +137,8 @@ export async function marcarHuerfanoAdoptado(ctx: DbCtx, id: string, requerimien
   await ctx.db
     .from('basecamp_huerfanos')
     .update({ resuelto_at: new Date().toISOString(), resolucion: 'adoptado', requerimiento_id: requerimientoId })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('tenant_id', ctx.tenantId);
 }
 
 export async function marcarHuerfanoIgnorado(ctx: DbCtx, id: string): Promise<void> {

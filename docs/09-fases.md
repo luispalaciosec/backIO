@@ -1,7 +1,9 @@
 # 09 · Plan de fases
 
 ::: warning Documento histórico
-Plan de fases original (septiembre 2026). Sirve de contexto; no describe el estado actual. Lo vigente está en
+Plan de fases original (septiembre 2026). Sirve de contexto; no describe el estado actual. Las casillas técnicas se
+marcaron el 13/10/2026 contra el código; las que siguen abiertas son de operación (móvil, migración de cuentas, baja de
+Monday). Lo vigente está en
 [Arquitectura técnica](./17-arquitectura-tecnica.md) y en el [registro de decisiones](./decisiones.md).
 :::
 
@@ -36,14 +38,14 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [x] Migraciones versionadas aplicadas (6 migraciones, 03/09/2026)
 - [x] RLS verificada: JWT sin usuario lee 0 filas. Pendiente repetir con usuario real de un tenant B
 - [x] Clientes migrados con **IDs idénticos** a PrometIO (4, datos de prueba)
-- [ ] `basecamp_project_id` poblado para clientes activos (solo Acme → sandbox)
+- [x] `basecamp_project_id` poblado para clientes activos (solo Acme → sandbox)
 - [x] Trigger de visibilidad monotónica aplicado y probado
 
 ### Fase 1
-- [ ] Builder completo, paso 5 usando `sanitizeForClient` real
-- [ ] Bulk import CSV con preview y validación de `etiqueta_cliente`
-- [ ] Notificaciones funcionando (canal decidido por Marcia)
-- [ ] Alerta de concentración de carga en paso 4
+- [x] Builder completo, paso 5 usando `sanitizeForClient` real
+- [x] Bulk import CSV con preview y validación de `etiqueta_cliente`
+- [x] Notificaciones funcionando (canal decidido por Marcia)
+- [x] Alerta de concentración de carga en paso 4
 
 ### Fase 2
 - [x] OAuth Basecamp funcionando con refresh automático (conectado 03/09/2026)
@@ -54,10 +56,10 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [x] Límite de 50 to-dos por operación implementado
 
 ### Fase 2.5
-- [ ] Las 8 reglas de señales implementadas y parametrizables
-- [ ] Plan Operativo genera markdown en el formato actual de Geeks
-- [ ] Acta de Cierre genera markdown en el formato actual de Geeks
-- [ ] Constraint de fecha real en `acuerdos` (sin "Próxima Weekly")
+- [x] Las 8 reglas de señales implementadas y parametrizables
+- [x] Plan Operativo genera markdown en el formato actual de Geeks
+- [x] Acta de Cierre genera markdown en el formato actual de Geeks
+- [x] Constraint de fecha real en `acuerdos` (sin "Próxima Weekly")
 - [ ] Vista `/daily` en una pantalla sin scroll
 
 ### Fase 2.7

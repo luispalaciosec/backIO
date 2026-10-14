@@ -14,7 +14,15 @@ import { DbError, type DbCtx } from '../db/client';
 import { insertarGeneracionIa, ultimaGeneracionIa } from '../db/ia';
 import { log } from '../logger';
 
-export const MODELO_IA = 'claude-sonnet-5';
+/** Único lugar donde se fija el modelo: lo usan los textos de lib/ia, el resumen del portal y Admin → Servicios. */
+export const MODELO_IA = 'claude-sonnet-5-5';
+
+/**
+ * Sin razonamiento extendido: aquí solo se redacta. En Sonnet 5.5 `{ type: 'disabled' }` da 400; el ajuste más bajo es
+ * `between_tools` (con esfuerzo `high` o menor, el valor por defecto, y sin otros campos). El SDK 0.39 aún no lo tipa.
+ * Si se cambia de modelo, revisar este valor: otros modelos rechazan `between_tools`.
+ */
+export const SIN_RAZONAMIENTO = { type: 'between_tools' } as unknown as Anthropic.ThinkingConfigParam;
 
 export const ESTILO_GEEKS = `Escribes para Geeks Ecuador, agencia creativa en Quito. Español de Ecuador, neutro y directo.
 Reglas fijas:
@@ -69,9 +77,8 @@ export async function generarTexto(ctx: DbCtx, o: GenerarOpts): Promise<Generado
     res = await anthropic.messages.create({
       model: MODELO_IA,
       max_tokens: o.maxTokens ?? 900,
-      // La cuenta de producción activa el razonamiento extendido por defecto y sus bloques 'thinking'
-      // agotaban max_tokens sin escribir texto. Lo desactivamos: aquí solo queremos redacción.
-      thinking: { type: 'disabled' },
+      // Con razonamiento, sus bloques agotaban max_tokens sin escribir texto. Aquí solo queremos redacción.
+      thinking: SIN_RAZONAMIENTO,
       system: `${ESTILO_GEEKS}\n\n${o.system}`,
       messages: [{ role: 'user', content: JSON.stringify(o.payload, null, 2) }],
     });

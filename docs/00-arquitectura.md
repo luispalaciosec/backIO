@@ -57,7 +57,8 @@ Lo que entra desde Basecamp, con detalle:
 - Estado del to-do: `completed`, `completed_at`, `due_on` y los ids de los responsables.
 - El título del to-do, que se guarda como `titulo_interno` y nunca es visible al cliente. Es la excepción D1
   (ver [02 · Visibilidad](./02-visibilidad.md)).
-- La estructura: cada lista de to-dos se vuelve un proyecto y cada grupo, un bloque
+- La estructura: cada lista de to-dos se vuelve un proyecto y cada grupo, un bloque. El nombre de la lista es el
+  nombre del proyecto y el cliente lo ve en el portal (excepción D1b)
   (`backend/src/lib/basecamp/importar.ts`).
 - Las horas del timesheet por tarea y persona, sin la descripción de cada entrada
   (`BasecampClient.timesheetSafe` en `backend/src/lib/basecamp/client.ts`).

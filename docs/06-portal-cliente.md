@@ -139,9 +139,10 @@ Reglas:
 - No uses jerga de agencia ni las fórmulas "no es X, es Y", "clave", "potenciar" o enumeraciones de tres adjetivos.
 - Nunca uses voseo argentino.
 - Si no hay datos suficientes para un párrafo, escribe menos.
+- Texto plano: sin título, sin negritas ni otro formato. El portal lo muestra tal cual.
 ```
 
-El modelo es `claude-sonnet-5`. Antes de llamarlo, el backend vuelve a pasar el payload por `assertClientSafe`.
+El modelo es el de `MODELO_IA` (`backend/src/lib/ia/index.ts`, hoy `claude-sonnet-5-5`). Antes de llamarlo, el backend vuelve a pasar el payload por `assertClientSafe`.
 
 El modelo no puede alucinar contenido interno porque no lo tiene.
 

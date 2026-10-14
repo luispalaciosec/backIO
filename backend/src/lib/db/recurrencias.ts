@@ -62,6 +62,7 @@ export async function marcarPeriodoGenerado(ctx: DbCtx, id: string, periodo: str
   const { error } = await ctx.db
     .from('recurrencias')
     .update({ ultimo_mes_generado: periodo, ultimo_proyecto_id: proyectoId, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('tenant_id', ctx.tenantId);
   throwIf(error);
 }

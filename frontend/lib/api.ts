@@ -82,3 +82,30 @@ export async function apiRaw<T>(path: string, init: RequestInit & { json?: unkno
 export async function apiPortal<T>(path: string, init: RequestInit = {}, pin?: string): Promise<T> {
   return pedir<T>(`${BACKEND}/api/portal${path}`, { ...init, pin });
 }
+
+/**
+ * Descarga un archivo de la API v1 (CSV). Si el backend responde con error, lanza ApiError en vez de bajar un
+ * archivo con el mensaje de error adentro.
+ */
+export async function descargar(path: string, nombre: string): Promise<void> {
+  const res = await fetch(`${BACKEND}/api/v1${path}`, {
+    headers: { Authorization: `Bearer ${(await token()) ?? ''}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const texto = await res.text();
+    let cuerpo: unknown;
+    try {
+      cuerpo = JSON.parse(texto);
+    } catch {
+      cuerpo = undefined;
+    }
+    throw new ApiError(res.status, mensajeDeError(cuerpo, res.status));
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}

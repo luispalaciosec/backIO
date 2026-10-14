@@ -33,7 +33,8 @@ como sistema de ejecución.
 BackIO sincroniza desde Basecamp únicamente: `completed (bool)`, `completed_at`, `due_on`,
 `assignee_ids`. **Nunca** el cuerpo de comentarios, nunca descripciones, nunca adjuntos de
 discusión. El canal de producción vive y muere en Basecamp. Excepciones acotadas y aprobadas: el título del to-do
-entra como `titulo_interno`, nunca visible al cliente (D1, 04/09/2026), y las horas del timesheet (sin descripción).
+entra como `titulo_interno`, nunca visible al cliente (D1, 04/09/2026); el nombre de la lista entra como nombre del
+proyecto y **sí** lo ve el cliente en el portal (D1b, 13/10/2026); y las horas del timesheet (sin descripción).
 
 Razón: es la única garantía estructural de que un comentario interno ("esto está horrible")
 no pueda llegar al cliente. Si el texto nunca entra, no hay bug posible que lo saque.

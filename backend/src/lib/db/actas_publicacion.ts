@@ -10,6 +10,7 @@ export async function reservarActaParaPublicar(ctx: DbCtx, actaId: string, reser
     .from('actas')
     .update({ publicado_at: reservado, publicado_por: ctx.usuarioId })
     .eq('id', actaId)
+    .eq('tenant_id', ctx.tenantId)
     .is('publicado_at', null)
     .select('id');
   throwIf(error);
@@ -18,7 +19,12 @@ export async function reservarActaParaPublicar(ctx: DbCtx, actaId: string, reser
 
 /** Libera la reserva, solo si sigue siendo la que tomó esta llamada. */
 export async function liberarReservaActa(ctx: DbCtx, actaId: string, reservado: string): Promise<void> {
-  await ctx.db.from('actas').update({ publicado_at: null, publicado_por: null }).eq('id', actaId).eq('publicado_at', reservado);
+  await ctx.db
+    .from('actas')
+    .update({ publicado_at: null, publicado_por: null })
+    .eq('id', actaId)
+    .eq('tenant_id', ctx.tenantId)
+    .eq('publicado_at', reservado);
 }
 
 /** Proyecto Basecamp de los Docs de la agencia (tenants.config.basecamp_docs_project_id). */
@@ -29,11 +35,11 @@ export async function basecampDocsProjectId(ctx: DbCtx): Promise<number | null> 
 }
 
 export async function guardarBasecampDocActa(ctx: DbCtx, actaId: string, basecampDocId: number): Promise<void> {
-  const { error } = await ctx.db.from('actas').update({ basecamp_doc_id: basecampDocId }).eq('id', actaId);
+  const { error } = await ctx.db.from('actas').update({ basecamp_doc_id: basecampDocId }).eq('id', actaId).eq('tenant_id', ctx.tenantId);
   throwIf(error);
 }
 
 /** Marca en la semana la publicación del plan o del acta. */
 export async function marcarPublicacionSemana(ctx: DbCtx, semanaId: string, campos: FilaUpdate<'semanas'>): Promise<void> {
-  await ctx.db.from('semanas').update(campos).eq('id', semanaId);
+  await ctx.db.from('semanas').update(campos).eq('id', semanaId).eq('tenant_id', ctx.tenantId);
 }
