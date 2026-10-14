@@ -63,6 +63,35 @@ export async function mapas(ctx: DbCtx) {
   };
 }
 
+const normalizar = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+
+/**
+ * Persona por id o por nombre. Vale el nombre exacto (sin mayúsculas ni tildes) o, si no, una sola persona cuyo nombre
+ * tenga una palabra que empiece así («Ana» → «Ana López», nunca «Mariana»). Si no hay una sola, error con las opciones:
+ * un agente no debe asignar a alguien por adivinanza.
+ */
+export function resolverPersona<U extends { id: string; nombre: string }>(usuarios: U[], ref: string): { id: string } | { error: string } {
+  const porId = usuarios.find((u) => u.id === ref);
+  if (porId) return { id: porId.id };
+  const q = normalizar(ref);
+  const exactos = usuarios.filter((u) => normalizar(u.nombre) === q);
+  const candidatos = exactos.length
+    ? exactos
+    : usuarios.filter((u) =>
+        normalizar(u.nombre)
+          .split(/\s+/)
+          .some((p) => p.startsWith(q)),
+      );
+  if (candidatos.length === 1) return { id: candidatos[0]!.id };
+  if (!candidatos.length) return { error: `No hay nadie llamado «${ref}» en el equipo` };
+  return { error: `«${ref}» es ambiguo: ${candidatos.map((u) => u.nombre).join(', ')}. Usa el nombre completo o el id.` };
+}
+
 export async function resolverCliente(ctx: DbCtx, ref: string | undefined) {
   if (!ref) return null;
   const todos = await listClientes(ctx, { incluirInactivos: true });

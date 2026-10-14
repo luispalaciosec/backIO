@@ -1,12 +1,14 @@
 /**
- * ZONA DE REVISIÓN HUMANA (CLAUDE.md · lib/mcp/tools/*write*). Generar actas (no publica) y publicarlas en Basecamp.
+ * ZONA DE REVISIÓN HUMANA (CLAUDE.md · lib/mcp/tools/*write*). Generar actas (borradores internos, no publica) y
+ * pedir su publicación en Basecamp: publish_document devuelve un plan y publica recién con confirm_plan (regla 4;
+ * escaneo del 13/10/2026, aprobado por Luis). Antes publicaba en una sola llamada.
  */
 import { z } from 'zod';
 import { resolverMesa, listMesas } from '../../db/mesas';
 import { ensureSemana, getSemana, getActa } from '../../db/semanas';
 import { audit } from '../../db/audit';
 import { generarPlanOperativo, generarActaCierre } from '../../rituals/service';
-import { publicarActaEnBasecamp } from '../publish';
+import { guardarPlan } from '../plans';
 import { hoyLocal } from '@backio/shared';
 import { type Herramientas, ok, fail } from '../comun';
 
@@ -49,7 +51,7 @@ export function registrarActas({ server, ctx, guard }: Herramientas): void {
             acta_id: acta.id,
             tipo: acta.tipo,
             markdown: acta.markdown,
-            siguiente_paso: 'Revisar y, si procede, publish_document con acta_id.',
+            siguiente_paso: 'Revisar y, si procede, publish_document con acta_id (devuelve un plan para confirm_plan).',
           });
         })(),
     );
@@ -59,7 +61,7 @@ export function registrarActas({ server, ctx, guard }: Herramientas): void {
     'publish_document',
     {
       description:
-        'Publica un acta generada como Documento en el proyecto Basecamp de operaciones del tenant. Requiere que el acta exista y no haya sido publicada.',
+        'Devuelve un PLAN para publicar un acta generada en el board de su mesa en Basecamp (lo ve el equipo). NO publica. Para publicar, llamar confirm_plan con el plan_id dentro de 15 minutos.',
       inputSchema: { acta_id: z.string().uuid() },
     },
     ({ acta_id }) =>
@@ -67,9 +69,17 @@ export function registrarActas({ server, ctx, guard }: Herramientas): void {
         const acta = await getActa(ctx, acta_id);
         if (!acta) return fail('Acta no encontrada');
         if (acta.publicado_at) return fail('El acta ya fue publicada');
-        const r = await publicarActaEnBasecamp(ctx, acta);
-        await audit(ctx, { accion: 'publicar_acta', entidad: 'acta', entidad_id: acta.id, detalle: r });
-        return ok(r);
+        const mesa = acta.mesa_id ? (await listMesas(ctx)).find((m) => m.id === acta.mesa_id) : undefined;
+        const resumen = {
+          acta_id: acta.id,
+          tipo: acta.tipo,
+          mesa: mesa?.nombre ?? null,
+          destino: 'Board de la mesa en Basecamp (lo lee el equipo; avisa a los suscriptores)',
+          inicio: acta.markdown.slice(0, 400),
+        };
+        const { plan_id, expira_en } = await guardarPlan(ctx, 'publish_document', { acta_id: acta.id }, resumen);
+        await audit(ctx, { accion: 'mcp_plan', entidad: 'acta', entidad_id: acta.id, detalle: { tool: 'publish_document', plan_id } });
+        return ok({ plan_id, expira_en, publicaria: resumen, siguiente_paso: 'Si es correcto, llama confirm_plan con este plan_id.' });
       })(),
   );
 }

@@ -122,15 +122,18 @@ servidor y revisa permisos.
 | `plan_project_from_template` | `plantilla`, `cliente`, `nombre`, `fecha_entrega`, `brief`, `bloques?` | **Devuelve plan, NO ejecuta** |
 | `confirm_plan` | `plan_id` | Ejecuta el plan previamente generado |
 | `plan_requirement_update` | `requerimiento_id`, `cambios` | Devuelve diff, no aplica |
-| `generate_weekly_plan` | `semana_id?`, `mesa` (obligatoria) | Genera el Plan Operativo, no publica |
-| `generate_closing_minutes` | `semana_id?`, `mesa` (obligatoria) | Genera el Acta de Cierre, no publica |
-| `publish_document` | `acta_id` | Publica el acta como Message en el board Weekly de su mesa |
+| `generate_weekly_plan` | `semana_id?`, `mesa` (obligatoria) | Genera el Plan Operativo como borrador interno, no publica |
+| `generate_closing_minutes` | `semana_id?`, `mesa` (obligatoria) | Genera el Acta de Cierre como borrador interno, no publica |
+| `publish_document` | `acta_id` | **Devuelve plan, NO publica.** `confirm_plan` publica el acta como Message en el board Weekly de su mesa |
 
 Detalles de los parámetros:
 
 - En `plan_project_from_template`, `brief` es un objeto con `objetivo_negocio`, `publico_objetivo`,
   `canales` (al menos uno) y `mandatorios_marca` opcional. Cada elemento de `bloques` indica el bloque, si está
   activo, su responsable y las piezas por canal o por tipo.
+- Los responsables (`owners` y el responsable de cada bloque) se buscan por id o por nombre: vale el nombre exacto
+  (sin mayúsculas ni tildes) o una sola persona cuyo nombre tenga una palabra que empiece así («Ana» es Ana López,
+  nunca Mariana). Si hay más de una o ninguna, no hay plan y el error dice las opciones.
 - En `plan_requirement_update`, `cambios` acepta solo estos campos: `estado_operativo`, `estado_aprobacion`,
   `prioridad`, `fecha_entrega`, `motivo_reprogramacion`, `owners` y `piezas`. Cambiar la fecha exige el motivo.
   El preview aplica las mismas reglas que la pantalla (`validarActualizacion` en
@@ -214,7 +217,7 @@ Ejecutiva: "arma la campaña de Black Friday para Cliente Ejemplo,
   → plan_project_from_template → preview → confirm_plan
 
 Marcia (viernes): "genera el acta de cierre"
-  → generate_closing_minutes → revisa → publish_document
+  → generate_closing_minutes → revisa → publish_document → confirm_plan
 ```
 
 ---

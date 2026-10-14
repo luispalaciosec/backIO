@@ -66,7 +66,8 @@ una API key de BackIO.
 
 ## Publicar actas en Basecamp
 
-Como `generate_*` exige mesa, `publish_document` publica el acta como Message en el board Weekly de esa mesa.
+Como `generate_*` exige mesa, el acta se publica como Message en el board Weekly de esa mesa: `publish_document`
+devuelve un plan y `confirm_plan` publica.
 La mesa necesita tener configurados `basecamp_project_id` y `basecamp_board_weekly_id` (Admin → Mesas →
 Detectar boards).
 
@@ -82,4 +83,4 @@ update tenants set config = config || '{"basecamp_docs_project_id": 12345678}' w
 - "¿Cómo va Cliente Ejemplo esta semana?" → `get_client_health` + `list_backlog(cliente, semana: actual)`
 - "Prepara la agenda del weekly" → `get_weekly_signals` + `get_capacity`
 - "Arma la campaña de Black Friday para Cliente Ejemplo, entrega 20 de noviembre" → `list_clients_and_templates` → `plan_project_from_template` → revisar → `confirm_plan`
-- "Genera el acta de cierre" → `generate_closing_minutes` → revisar → `publish_document`
+- "Genera el acta de cierre" → `generate_closing_minutes` → revisar → `publish_document` → `confirm_plan`

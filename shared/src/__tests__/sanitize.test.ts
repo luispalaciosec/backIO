@@ -133,5 +133,14 @@ describe('frontera de visibilidad · sanitizeForClient', () => {
   it('assertClientSafe detecta campos prohibidos', () => {
     expect(() => assertClientSafe({ hitos: [{ peso: 3 }] })).toThrow(/peso/);
     expect(() => assertClientSafe({ x: { basecamp_url: 'u' } })).toThrow(/basecamp/);
+    expect(() => assertClientSafe([{ a: [{ titulo_interno: 'x' }] }])).toThrow(/titulo_interno/);
+  });
+
+  it('assertClientSafe no tumba el portal por el TEXTO de un hito (solo por nombres de campo)', () => {
+    const out = sanitizeForClient(proyecto, [
+      req({ visible_cliente: true, etiqueta_cliente: 'peso ideal del empaque', peso: 1 }),
+      req({ visible_cliente: true, etiqueta_cliente: 'basecamp de lanzamiento', peso: 1 }),
+    ]);
+    expect(() => assertClientSafe(out)).not.toThrow();
   });
 });

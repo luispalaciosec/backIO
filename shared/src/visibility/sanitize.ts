@@ -121,10 +121,17 @@ export const CAMPOS_PROHIBIDOS_CLIENTE: readonly string[] = [
 ];
 
 export function assertClientSafe(payload: unknown): void {
-  const dump = JSON.stringify(payload);
-  for (const campo of CAMPOS_PROHIBIDOS_CLIENTE) {
-    if (dump.includes(`"${campo}`)) {
-      throw new Error(`Payload cliente contiene campo prohibido: ${campo}`);
+  // Revisa los NOMBRES de los campos, a cualquier profundidad (un campo que empiece por «basecamp» también cae).
+  // Antes buscaba el texto en todo el JSON, valores incluidos: un hito llamado «peso ideal» tumbaba el portal con un
+  // 500 (escaneo del 13/10/2026). El JSON intermedio es el mismo que se envía (respeta toJSON).
+  const revisar = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(revisar);
+    if (v === null || typeof v !== 'object') return;
+    for (const [k, x] of Object.entries(v)) {
+      const campo = CAMPOS_PROHIBIDOS_CLIENTE.find((c) => k.startsWith(c));
+      if (campo) throw new Error(`Payload cliente contiene campo prohibido: ${campo}`);
+      revisar(x);
     }
-  }
+  };
+  revisar(JSON.parse(JSON.stringify(payload ?? null)));
 }

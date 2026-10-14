@@ -13,7 +13,7 @@ import { validarActualizacion, ReglaError } from '../../requerimientos/actualiza
 import { esColaborador } from '../../auth/roles';
 import { guardarPlan } from '../plans';
 import type { CrearProyectoInput, ActualizarRequerimientoInput } from '@backio/shared';
-import { type Herramientas, ok, fail, resolverCliente } from '../comun';
+import { type Herramientas, ok, fail, resolverCliente, resolverPersona } from '../comun';
 
 export function registrarPlanes({ server, auth, ctx, guard }: Herramientas): void {
   server.registerTool(
@@ -58,6 +58,12 @@ export function registrarPlanes({ server, auth, ctx, guard }: Herramientas): voi
           plantillas.find((p) => p.nombre.toLowerCase().includes(args.plantilla.toLowerCase()));
         if (!pl) return fail(`Plantilla "${args.plantilla}" no encontrada. Disponibles: ${plantillas.map((p) => p.nombre).join(', ')}`);
         const [usuarios, tipos] = await Promise.all([listUsuarios(ctx), listTiposPieza(ctx)]);
+        const errores: string[] = [];
+        const ownerDe = (ref: string): string | null => {
+          const r = resolverPersona(usuarios, ref);
+          if ('error' in r) errores.push(r.error);
+          return 'id' in r ? r.id : null;
+        };
         const tipoId = (k: string) =>
           tipos.find((t) => t.slug === k.toLowerCase() || t.nombre.toLowerCase() === k.toLowerCase() || t.id === k)?.id;
         const input: CrearProyectoInput = {
@@ -75,11 +81,10 @@ export function registrarPlanes({ server, auth, ctx, guard }: Herramientas): voi
                 .map(([k, v]) => [tipoId(k) ?? k, v])
                 .filter(([k]) => tipos.some((t) => t.id === k)),
             ),
-            owner_id: b.owner
-              ? (usuarios.find((u) => u.id === b.owner || u.nombre.toLowerCase().includes(b.owner!.toLowerCase()))?.id ?? null)
-              : null,
+            owner_id: b.owner ? ownerDe(b.owner) : null,
           })),
         };
+        if (errores.length) return fail(errores.join(' · '));
         const preview = await previewProyecto(ctx, input);
         const { plan_id, expira_en } = await guardarPlan(ctx, 'plan_project_from_template', input, preview.resumen);
         await audit(ctx, {
@@ -157,10 +162,13 @@ export function registrarPlanes({ server, auth, ctx, guard }: Herramientas): voi
           );
         if (cambios.motivo_reprogramacion) patch.motivo_reprogramacion = cambios.motivo_reprogramacion;
         if (cambios.piezas !== undefined) patch.piezas = cambios.piezas;
-        if (cambios.owners)
-          patch.owner_agencia = cambios.owners
-            .map((o) => usuarios.find((u) => u.id === o || u.nombre.toLowerCase().includes(o.toLowerCase()))?.id)
-            .filter((x): x is string => !!x);
+        if (cambios.owners) {
+          // Antes se descartaba en silencio a quien no se encontraba: el plan quitaba responsables sin decirlo.
+          const r = cambios.owners.map((o) => resolverPersona(usuarios, o));
+          const errores = r.flatMap((x) => ('error' in x ? [x.error] : []));
+          if (errores.length) return fail(errores.join(' · '));
+          patch.owner_agencia = [...new Set(r.flatMap((x) => ('id' in x ? [x.id] : [])))];
+        }
         const diff = Object.entries(patch)
           .filter(([k]) => k !== 'motivo_reprogramacion')
           .map(([k, v]) => ({ campo: k, antes: (r as unknown as Record<string, unknown>)[k], despues: v }));

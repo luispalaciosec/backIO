@@ -7,6 +7,8 @@ import { crearProyectoDesdePlantilla } from '../../builder/service';
 import { actualizarRequerimiento, ReglaError, type ResultadoBasecampDueOn } from '../../requerimientos/actualizar';
 import { esColaborador } from '../../auth/roles';
 import { tomarPlan, guardarResultado, verPlan } from '../plans';
+import { publicarActaEnBasecamp } from '../publish';
+import { getActa } from '../../db/semanas';
 import type { CrearProyectoInput, ActualizarRequerimientoInput } from '@backio/shared';
 import { type Herramientas, ok, fail, tiene } from '../comun';
 
@@ -15,7 +17,7 @@ export function registrarConfirmacion({ server, auth, ctx, guard }: Herramientas
     'confirm_plan',
     {
       description:
-        'Ejecuta un plan generado por plan_project_from_template o plan_requirement_update. El plan_id expira en 15 minutos y es de un solo uso.',
+        'Ejecuta un plan generado por plan_project_from_template, plan_requirement_update o publish_document. El plan_id expira en 15 minutos y es de un solo uso.',
       inputSchema: { plan_id: z.string().regex(/^plan_[0-9a-f]{12}$/) },
     },
     ({ plan_id }) =>
@@ -29,7 +31,9 @@ export function registrarConfirmacion({ server, auth, ctx, guard }: Herramientas
             ? 'write:proyectos'
             : visto.tool === 'plan_requirement_update'
               ? 'write:requerimientos'
-              : null;
+              : visto.tool === 'publish_document'
+                ? 'write:actas'
+                : null;
         if (!scopeNecesario) return fail(`Tool de plan desconocida: ${visto.tool}`);
         if (!tiene(auth, scopeNecesario)) return fail(`Scope requerido: ${scopeNecesario}`);
         if ((visto.api_key_id ?? null) !== (ctx.apiKeyId ?? null) || (visto.usuario_id ?? null) !== (ctx.usuarioId ?? null))
@@ -66,6 +70,18 @@ export function registrarConfirmacion({ server, auth, ctx, guard }: Herramientas
           }
           await guardarResultado(ctx, plan_id, { ok: true });
           return ok({ ok: true, requerimiento_id, aplicado: patch, basecamp_due_on });
+        }
+        if (plan.tool === 'publish_document') {
+          if (!tiene(auth, 'write:actas')) return fail('Scope requerido: write:actas');
+          const { acta_id } = plan.parametros as { acta_id: string };
+          const acta = await getActa(ctx, acta_id);
+          if (!acta) return fail('Acta no encontrada');
+          if (acta.publicado_at) return fail('El acta ya fue publicada');
+          // publicarActaEnBasecamp reserva el acta de forma atómica antes de llamar a Basecamp (S7).
+          const r = await publicarActaEnBasecamp(ctx, acta);
+          await guardarResultado(ctx, plan_id, r);
+          await audit(ctx, { accion: 'publicar_acta', entidad: 'acta', entidad_id: acta.id, detalle: { ...r, plan_id } });
+          return ok(r);
         }
         return fail(`Tool de plan desconocida: ${plan.tool}`);
       })(),

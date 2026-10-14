@@ -52,7 +52,9 @@ export async function createProjectStructure(
   reqs: Requerimiento[],
   opts: { confirmarSobreLimite?: boolean; bc?: BasecampClient } = {},
 ): Promise<CreateStructureResult> {
-  const pendientes = reqs.filter((r) => !r.basecamp_todo_id && r.estado_operativo !== 'cancelado');
+  // Ni canceladas ni completadas: una completada sin to-do se crearía abierta en Basecamp, el aviso de Basecamp la
+  // reabriría en BackIO y quedaría un reproceso falso (escaneo del 13/10/2026).
+  const pendientes = reqs.filter((r) => !r.basecamp_todo_id && r.estado_operativo !== 'cancelado' && r.estado_operativo !== 'completado');
   if (pendientes.length > LIMITE_TODOS_POR_OPERACION && !opts.confirmarSobreLimite) {
     throw new Error(
       `La operación crearía ${pendientes.length} to-dos (límite ${LIMITE_TODOS_POR_OPERACION}). Requiere confirmación explícita.`,
