@@ -49,7 +49,7 @@ Estas reglas viven en la base (triggers y funciones), así que valen aunque la p
 | Cada cambio de estado de aprobación queda registrado (para los KPIs) | `requerimientos_registrar_aprobacion` |
 | El estado del proyecto se recalcula cuando cambian sus tareas | `requerimientos_after_change_estado_proyecto`, `proyectos_recalcular_estado` |
 | Un colaborador solo cambia campos permitidos de sus propias tareas | `requerimientos_limitar_colaborador` |
-| Solo un admin cambia rol, estado, correo, capacidad o vínculo con Basecamp de una persona | `usuarios_proteger_columnas` |
+| Solo un admin cambia rol, estado, correo, capacidad, área, vínculo con Basecamp o fecha y motivo de salida de una persona | `usuarios_proteger_columnas` |
 | Quien no es de gestión no puede mover un registro de reprogramaciones, reprocesos o bitácora a otra tarea ni a otro autor; sus notas de bitácora nacen no visibles al cliente | `historial_proteger_no_gestion` |
 | Una notificación solo puede marcarse como leída | `notificaciones_solo_leida` |
 | Una cuenta nueva solo se crea con una invitación y el correo confirmado | `handle_new_auth_user` |

@@ -120,9 +120,11 @@ create trigger trg_visibilidad_monotonica
 ```
 
 Ese trigger solo actúa al actualizar. Desde la revisión del 23/09/2026 hay un segundo trigger para la creación
-(`trg_requerimientos_visibilidad_insert`, migración `20260923000021_seguridad_rls.sql`). Si una tarea sin plantilla (`plantilla_tarea_id` nulo) se crea como
-visible y quien la crea no es de gestión, nace oculta. Así un agente con permiso de escritura no puede crear una
-tarea visible al cliente por fuera de una plantilla.
+(`trg_requerimientos_visibilidad_insert`, migración `20260923000021_seguridad_rls.sql`, endurecido en la
+`20261013000032_escaneo_triggers.sql`). Una tarea nace visible solo si su `plantilla_tarea_id` apunta a una tarea de
+plantilla del mismo tenant marcada como visible por defecto, o si la crea alguien de gestión. En cualquier otro caso
+nace oculta. Así un agente con permiso de escritura no puede crear una tarea visible al cliente por fuera de una
+plantilla, ni mandando un `plantilla_tarea_id` cualquiera (antes bastaba con que no fuera nulo).
 
 Enforced en base de datos, no en UI. Un bug de frontend, una llamada directa a la API o un
 agente LLM mal configurado no pueden saltarse un trigger.
