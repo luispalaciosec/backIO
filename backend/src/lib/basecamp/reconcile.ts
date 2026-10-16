@@ -10,6 +10,7 @@ import { pushDueDate } from './write';
 import { BasecampClient } from './client';
 import { applyBasecampUpdate, extractSafeTodo } from './sync';
 import { audit } from '../db/audit';
+import { ultimoQueReprogramo } from '../db/historial';
 import { log } from '../logger';
 
 /** Tope de fechas reenviadas a Basecamp por corrida: un desfase masivo no se propaga entero de una vez (M14). */
@@ -18,7 +19,9 @@ const MAX_FECHAS_POR_CORRIDA = 25;
 export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; aplicados: number }> {
   const activos = (await listBacklog(ctx, { solo_activos: true })).filter((r) => r.basecamp_todo_id);
   if (activos.length === 0) return { revisados: 0, aplicados: 0 };
+  // Lectura con la cuenta de la organización; el reenvío de fechas, con la de quien la cambió (abajo).
   const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const clientes = new Map<string, BasecampClient>();
   const proyectosPorCliente = new Map<string, number | null>();
   let aplicados = 0,
     fechas = 0;
@@ -36,7 +39,11 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
       if (safe && r.fecha_entrega && safe.due_on !== r.fecha_entrega && fechas < MAX_FECHAS_POR_CORRIDA) {
         fechas += 1;
         try {
-          await pushDueDate(ctx, r, bc);
+          // A nombre de quien cambió esa fecha por última vez en BackIO, si conectó su Basecamp (16/10/2026).
+          const quien = await ultimoQueReprogramo(ctx, r.id);
+          const k = quien ?? '';
+          if (!clientes.has(k)) clientes.set(k, quien ? await BasecampClient.forResponsable(ctx.tenantId, quien) : bc);
+          await pushDueDate(ctx, r, clientes.get(k));
           await audit(ctx, {
             accion: 'basecamp_fecha_reenviada',
             entidad: 'requerimiento',

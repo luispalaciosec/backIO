@@ -8,6 +8,8 @@ const e = vi.hoisted(() => ({
   push: vi.fn(),
   audit: vi.fn(),
   getCliente: vi.fn(),
+  quien: null as string | null,
+  responsable: vi.fn(),
 }));
 
 vi.mock('../lib/db/requerimientos', () => ({ listBacklog: async () => e.activos }));
@@ -15,9 +17,12 @@ vi.mock('../lib/db/clientes', () => ({ getCliente: e.getCliente }));
 vi.mock('../lib/db/audit', () => ({ audit: e.audit }));
 vi.mock('../lib/basecamp/write', () => ({ pushDueDate: e.push }));
 vi.mock('../lib/basecamp/sync', async (orig) => ({ ...(await orig<object>()), applyBasecampUpdate: e.aplicar }));
+vi.mock('../lib/db/historial', () => ({ ultimoQueReprogramo: async () => e.quien }));
 vi.mock('../lib/basecamp/client', () => ({
   BasecampClient: {
+    forResponsable: e.responsable,
     forTenant: async () => ({
+      cuenta: 'organizacion',
       getTodoRaw: async (_p: number, id: number) => {
         const t = e.todos.get(id);
         if (t instanceof Error) throw t;
@@ -48,6 +53,8 @@ beforeEach(() => {
     .mockImplementation(async (_c: unknown, id: string) => ({ id, basecamp_project_id: e.proyectoDe.get(id) ?? null }));
   e.aplicar.mockReset().mockResolvedValue({ aplicado: false });
   e.push.mockReset().mockResolvedValue(undefined);
+  e.quien = null;
+  e.responsable.mockReset().mockImplementation(async (_t: string, u: string) => ({ cuenta: u }));
   e.audit.mockReset();
 });
 
@@ -96,5 +103,18 @@ describe('reconcileTenant', () => {
   it('sin tareas enlazadas no llama a Basecamp', async () => {
     e.activos = [req(1, { basecamp_todo_id: null })];
     expect(await reconcileTenant(ctx)).toEqual({ revisados: 0, aplicados: 0 });
+  });
+  // 16/10/2026: la fecha reenviada sale a nombre de quien la cambió en BackIO, no de quien conectó la integración.
+  it('reenvía la fecha con la cuenta de quien la cambió por última vez; sin nadie conocido, con la de la organización', async () => {
+    e.activos = [req(1)];
+    e.todos.set(1, todo(1, { due_on: '2026-10-25' }));
+    e.quien = 'johanna';
+    await reconcileTenant(ctx);
+    expect(e.responsable).toHaveBeenCalledWith('t', 'johanna');
+    expect(e.push.mock.calls[0]![2]).toEqual({ cuenta: 'johanna' });
+    e.quien = null;
+    e.push.mockClear();
+    await reconcileTenant(ctx);
+    expect(e.push.mock.calls[0]![2]).toMatchObject({ cuenta: 'organizacion' });
   });
 });

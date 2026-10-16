@@ -36,10 +36,13 @@ OAuth2 de Basecamp 3, con dos clases de cuenta (migración 33, 16/10/2026):
   sea la de esa persona (`usuarios.basecamp_user_id`, o el mismo correo si todavía no estaba enlazada): nadie puede
   conectar la cuenta de otro. Tokens en `basecamp_credenciales_usuario` (solo service role). Al registrar la salida de
   alguien, su conexión se borra.
-- **La de la organización** (Admin → Integraciones), para **lo automático**: sincronización, reconciliación y reenvío
-  de fechas, proyectos de recurrencias generados por la tarea programada, webhooks y lecturas. Se conecta con un usuario
-  de Basecamp llamado **«BackIO»**, no con la cuenta de una persona, para que lo automático no salga a nombre de nadie.
-  También la usan las API keys de integraciones (no tienen persona).
+- **Lo automático con un responsable** también va con la cuenta de esa persona, si la conectó
+  (`BasecampClient.forResponsable`): el proyecto mensual de un fee recurrente, con la de la **ejecutiva** del proyecto;
+  la fecha que la reconciliación reenvía, con la de **quien la cambió por última vez** en BackIO. Si esa persona no
+  conectó su cuenta, se usa la de la organización.
+- **La de la organización** (Admin → Integraciones), para lo demás: lecturas (sincronización, horas, huérfanos),
+  webhooks, las API keys de integraciones (no tienen persona) y lo automático cuyo responsable no conectó su cuenta. No
+  hace falta un usuario aparte: alcanza con la cuenta de quien la conectó (decisión de Luis, 16/10/2026).
 
 Código: `BasecampClient.forActor(ctx)` (persona, o la de la organización si no hay persona) y `forTenant` (solo
 organización), en `backend/src/lib/basecamp/client.ts`; validación de identidad en `lib/basecamp/persona.ts`.

@@ -35,6 +35,16 @@ describe('qué cuenta de Basecamp se usa', () => {
   });
 });
 
+describe('lo automático con responsable (fee de una ejecutiva, fecha que alguien cambió)', () => {
+  it('su cuenta si la conectó; si no, la de la organización (sin error: nadie espera en pantalla)', async () => {
+    e.persona = { ...tokens, email: 'ana@geeks.ec' };
+    expect(dueno(await BasecampClient.forResponsable('t', 'u1'))).toBe('u1');
+    e.persona = null;
+    expect(dueno(await BasecampClient.forResponsable('t', 'u1'))).toBeNull();
+    expect(dueno(await BasecampClient.forResponsable('t', null))).toBeNull();
+  });
+});
+
 describe('solo se conecta la cuenta propia', () => {
   const identidad = { id: 501, email_address: 'ana@geeks.ec', first_name: 'Ana', last_name: 'López' };
   it('la persona enlazada en BackIO', () =>

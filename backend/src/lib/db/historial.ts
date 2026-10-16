@@ -197,3 +197,18 @@ export async function requerimientoDeHistorial(ctx: DbCtx, tabla: 'reprogramacio
   throwIf(error);
   return data?.requerimiento_id ?? null;
 }
+
+/** Quién cambió por última vez la fecha de una tarea (para reenviarla a Basecamp a su nombre). null si nadie conocido. */
+export async function ultimoQueReprogramo(ctx: DbCtx, requerimientoId: string): Promise<string | null> {
+  const { data, error } = await ctx.db
+    .from('reprogramaciones')
+    .select('usuario_id')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('requerimiento_id', requerimientoId)
+    .not('usuario_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIf(error);
+  return data?.usuario_id ?? null;
+}

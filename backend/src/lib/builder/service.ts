@@ -107,9 +107,14 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   });
   if (plan.owners_inactivos.length)
     log.warn('[builder] bloques con responsable inactivo; sus tareas nacen sin responsable', plan.owners_inactivos.join(','));
-  // Basecamp con la cuenta de quien crea el proyecto (o «BackIO» si es una tarea programada). Se pide ANTES de crear
-  // nada: si la persona no conectó su Basecamp, no queda un proyecto a medias (migración 33).
-  const bc = cliente.basecamp_project_id ? await BasecampClient.forActor(ctx) : undefined;
+  // Basecamp con la cuenta de quien crea el proyecto. Se pide ANTES de crear nada: si la persona no conectó su
+  // Basecamp, no queda un proyecto a medias (migración 33). Si lo crea una tarea programada (fee recurrente), va a
+  // nombre de la ejecutiva del proyecto si conectó su cuenta; si no, con la de la organización.
+  const bc = !cliente.basecamp_project_id
+    ? undefined
+    : ctx.usuarioId
+      ? await BasecampClient.forActor(ctx)
+      : await BasecampClient.forResponsable(ctx.tenantId, input.owner_ejecutiva ?? null);
   const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;
   const fecha_inicio = input.fecha_inicio ?? (primeraFecha < input.fecha_entrega ? primeraFecha : restarDias(input.fecha_entrega, 1));
 

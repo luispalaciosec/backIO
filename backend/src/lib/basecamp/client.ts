@@ -72,6 +72,24 @@ export class BasecampClient {
    * nombre. Sin persona (tarea programada, webhook, API key de una integración) usa la cuenta del tenant («BackIO»).
    * Si la persona no conectó su cuenta, lanza BasecampSinConectar: hay que llamarlo ANTES de cambiar nada en BackIO.
    */
+  /**
+   * Para lo automático que tiene una persona responsable (el fee de una ejecutiva, la fecha que alguien cambió): su
+   * cuenta si la conectó; si no, la de la organización. Nunca lanza BasecampSinConectar: nadie está esperando en pantalla.
+   */
+  static async forResponsable(tenantId: string, usuarioId: string | null): Promise<BasecampClient> {
+    if (usuarioId) {
+      const { leerCredencialesPersona } = await import('../db/credenciales');
+      const c = await leerCredencialesPersona(usuarioId);
+      if (c?.access_token && c.refresh_token && c.expires_at)
+        return new BasecampClient(
+          tenantId,
+          { access_token: c.access_token, refresh_token: c.refresh_token, expires_at: c.expires_at },
+          usuarioId,
+        );
+    }
+    return BasecampClient.forTenant(tenantId);
+  }
+
   static async forActor(ctx: { tenantId: string; usuarioId: string | null }): Promise<BasecampClient> {
     if (!ctx.usuarioId) return BasecampClient.forTenant(ctx.tenantId);
     const { leerCredencialesPersona } = await import('../db/credenciales');
