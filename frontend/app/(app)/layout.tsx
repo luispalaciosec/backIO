@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/Sidebar';
 import { meServer } from '@/lib/me.server';
+import { AvisoBasecamp } from '@/components/AvisoBasecamp';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { data } = await (await supabaseServer()).auth.getUser();
@@ -10,7 +11,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex">
       <Sidebar email={data.user.email ?? ''} rol={me.rol} />
-      <main className="flex-1 min-w-0 p-6">{children}</main>
+      <main className="flex-1 min-w-0 p-6">
+        <AvisoBasecamp />
+        {children}
+      </main>
     </div>
   );
 }

@@ -2,10 +2,13 @@
  * Cliente HTTP de Basecamp 3.
  *  - User-Agent obligatorio (Basecamp bloquea sin él).
  *  - Rate limit 50 req / 10 s → cola con backoff exponencial.
- *  - OAuth2 a nivel de organización; tokens en integracion_credenciales, solo servidor (refresh automático, credenciales.ts).
+ *  - Dos clases de token (migración 33): el de cada persona (`forActor`, lo que alguien hace desde BackIO sale a su
+ *    nombre en Basecamp) y el del tenant (`forTenant`, lo automático, con un usuario «BackIO»). Solo servidor, con
+ *    refresh automático (credenciales.ts).
  * Las respuestas se tipan SOLO con los campos que BackIO necesita. Nunca se guardan enteras.
  */
 import { env } from '../../config/env';
+import { DbError } from '../db/client';
 
 export interface BasecampTokens {
   access_token: string;
@@ -44,12 +47,42 @@ export function descripcionParaGuardar(html: string): string {
   return limpio.replace(/<figure\b[^>]*>(?:(?!<\/figure>)[\s\S])*?<img\b[^>]*class="[^"]*\bavatar\b[^"]*"[\s\S]*?<\/figure>/gi, '');
 }
 
+/** La persona no conectó su Basecamp: BackIO no escribe a nombre de otro (decisión de Luis, 16/10/2026). */
+export class BasecampSinConectar extends DbError {
+  readonly codigo = 'basecamp_sin_conectar';
+  constructor() {
+    super(
+      'Para que esto salga a tu nombre en Basecamp, primero conecta tu cuenta con «Conectar mi Basecamp» (arriba en la pantalla).',
+      428,
+    );
+  }
+}
+
 export class BasecampClient {
   private timestamps: number[] = [];
   constructor(
     private readonly tenantId: string,
     private tokens: BasecampTokens,
+    /** Dueño del token si es el de una persona; null = el del tenant. */
+    private readonly usuarioId: string | null = null,
   ) {}
+
+  /**
+   * Cliente para lo que hace alguien: su propia cuenta de Basecamp, así el to-do, el mensaje o el cambio salen a su
+   * nombre. Sin persona (tarea programada, webhook, API key de una integración) usa la cuenta del tenant («BackIO»).
+   * Si la persona no conectó su cuenta, lanza BasecampSinConectar: hay que llamarlo ANTES de cambiar nada en BackIO.
+   */
+  static async forActor(ctx: { tenantId: string; usuarioId: string | null }): Promise<BasecampClient> {
+    if (!ctx.usuarioId) return BasecampClient.forTenant(ctx.tenantId);
+    const { leerCredencialesPersona } = await import('../db/credenciales');
+    const c = await leerCredencialesPersona(ctx.usuarioId);
+    if (!c?.access_token || !c.refresh_token || !c.expires_at) throw new BasecampSinConectar();
+    return new BasecampClient(
+      ctx.tenantId,
+      { access_token: c.access_token, refresh_token: c.refresh_token, expires_at: c.expires_at },
+      ctx.usuarioId,
+    );
+  }
 
   static async forTenant(tenantId: string): Promise<BasecampClient> {
     const { leerCredencialesBasecamp } = await import('./credenciales');
@@ -77,6 +110,19 @@ export class BasecampClient {
   private async refreshIfNeeded(): Promise<void> {
     if (new Date(this.tokens.expires_at).getTime() - Date.now() > 60_000) return;
     const { refreshTokens } = await import('./oauth');
+    if (this.usuarioId) {
+      // Token de una persona: mismo criterio (reutilizar si otra petición ya refrescó), en su propia fila.
+      const { leerCredencialesPersona, actualizarTokensPersona } = await import('../db/credenciales');
+      const actual = await leerCredencialesPersona(this.usuarioId);
+      if (!actual) throw new BasecampSinConectar();
+      if (actual.access_token !== this.tokens.access_token && new Date(actual.expires_at).getTime() - Date.now() > 60_000) {
+        this.tokens = { access_token: actual.access_token, refresh_token: actual.refresh_token, expires_at: actual.expires_at };
+        return;
+      }
+      this.tokens = await refreshTokens(this.tokens);
+      await actualizarTokensPersona(this.usuarioId, { ...actual, ...this.tokens });
+      return;
+    }
     const { leerCredencialesBasecamp, guardarCredencialesBasecamp } = await import('./credenciales');
     // Si otra instancia (scheduler u otra petición) ya refrescó, se reutiliza ese token en vez de pisarlo.
     const actual = await leerCredencialesBasecamp(this.tenantId);

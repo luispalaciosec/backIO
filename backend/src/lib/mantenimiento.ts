@@ -264,7 +264,8 @@ export async function aplicar(ctx: DbCtx, tarea: Tarea, confirmadas: string[]): 
     );
     res.aplicadas += bajas.length;
   }
-  const bc = acciones.some((a) => a.tipo === 'reenviar_responsables') ? await BasecampClient.forTenant(ctx.tenantId) : null;
+  // Los cambios en Basecamp van a nombre del admin que aplica (su cuenta); la revisión solo lee, con la del tenant.
+  const bc = acciones.some((a) => a.tipo === 'reenviar_responsables') ? await BasecampClient.forActor(ctx) : null;
   for (const a of acciones.filter((x) => x.tipo !== 'dar_de_baja')) {
     try {
       if (a.tipo === 'enlazar') {

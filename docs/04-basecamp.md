@@ -25,7 +25,24 @@ mapearlos en ambos sentidos genera conflictos permanentes. **No se hace.**
 
 ## Autenticación
 
-OAuth2 de Basecamp 3, a nivel de organización (no por usuario).
+OAuth2 de Basecamp 3, con dos clases de cuenta (migración 33, 16/10/2026):
+
+- **La de cada persona** («Mi Basecamp»). Basecamp registra como autor a la cuenta que hace cada cambio, así que lo que
+  alguien hace desde BackIO (crear proyectos o tareas, cambiar una fecha, reabrir, publicar el daily o un acta,
+  registrar una salida, aplicar Mantenimiento) va con **su** cuenta y sale a su nombre, con sus avisos. Antes todo
+  salía a nombre de quien había conectado la integración. Si la persona no conectó su cuenta, BackIO no escribe en
+  Basecamp por ella: responde 428 (`basecamp_sin_conectar`) **antes** de cambiar nada, y la pantalla muestra el
+  botón «Conectar mi Basecamp» (decisión de Luis, 16/10/2026). Al conectar, BackIO comprueba que la cuenta autorizada
+  sea la de esa persona (`usuarios.basecamp_user_id`, o el mismo correo si todavía no estaba enlazada): nadie puede
+  conectar la cuenta de otro. Tokens en `basecamp_credenciales_usuario` (solo service role). Al registrar la salida de
+  alguien, su conexión se borra.
+- **La de la organización** (Admin → Integraciones), para **lo automático**: sincronización, reconciliación y reenvío
+  de fechas, proyectos de recurrencias generados por la tarea programada, webhooks y lecturas. Se conecta con un usuario
+  de Basecamp llamado **«BackIO»**, no con la cuenta de una persona, para que lo automático no salga a nombre de nadie.
+  También la usan las API keys de integraciones (no tienen persona).
+
+Código: `BasecampClient.forActor(ctx)` (persona, o la de la organización si no hay persona) y `forTenant` (solo
+organización), en `backend/src/lib/basecamp/client.ts`; validación de identidad en `lib/basecamp/persona.ts`.
 
 ```
 BASECAMP_CLIENT_ID
@@ -34,7 +51,7 @@ BASECAMP_ACCOUNT_ID
 BASECAMP_REDIRECT_URI
 ```
 
-El token de acceso y el de refresh se guardan en la tabla `integracion_credenciales`, como JSON sin cifrar. La
+El token de acceso y el de refresh de la organización se guardan en la tabla `integracion_credenciales`, como JSON sin cifrar (los de cada persona, en `basecamp_credenciales_usuario`, con la misma protección). La
 protección es de acceso: la tabla tiene RLS activo y ninguna política, así que solo el service role del backend
 puede leerla (`backend/src/lib/basecamp/credenciales.ts`, migración `20260923000021_seguridad_rls.sql`). Antes
 estaban en `tenants.config`, que cualquier usuario del tenant podía leer. El refresh es automático cuando falta

@@ -41,3 +41,71 @@ export async function borrarCredencialesBasecamp(tenantId: string): Promise<void
     await db.from('tenants').update({ config: rest }).eq('id', tenantId);
   }
 }
+
+// ---------------------------------------------------------------- credenciales de cada persona (migración 33)
+// Mismo criterio que las del tenant: tabla con RLS y sin políticas, solo service role.
+
+export interface CredencialesPersona {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  email: string | null;
+}
+
+export async function leerCredencialesPersona(usuarioId: string): Promise<CredencialesPersona | null> {
+  const { data, error } = await serviceClient()
+    .from('basecamp_credenciales_usuario')
+    .select('datos')
+    .eq('usuario_id', usuarioId)
+    .maybeSingle();
+  throwIf(error);
+  return data ? (data.datos as unknown as CredencialesPersona) : null;
+}
+
+export async function guardarCredencialesPersona(
+  tenantId: string,
+  usuarioId: string,
+  basecampPersonId: number,
+  datos: CredencialesPersona,
+): Promise<void> {
+  const ahora = new Date().toISOString();
+  const { error } = await serviceClient()
+    .from('basecamp_credenciales_usuario')
+    .upsert(
+      {
+        usuario_id: usuarioId,
+        tenant_id: tenantId,
+        basecamp_person_id: basecampPersonId,
+        datos: datos as never,
+        conectado_at: ahora,
+        updated_at: ahora,
+      },
+      { onConflict: 'usuario_id' },
+    );
+  throwIf(error);
+}
+
+/** Solo renueva los tokens (refresh), sin tocar la fecha de conexión. */
+export async function actualizarTokensPersona(usuarioId: string, datos: CredencialesPersona): Promise<void> {
+  const { error } = await serviceClient()
+    .from('basecamp_credenciales_usuario')
+    .update({ datos: datos as never, updated_at: new Date().toISOString() })
+    .eq('usuario_id', usuarioId);
+  throwIf(error);
+}
+
+export async function borrarCredencialesPersona(usuarioId: string): Promise<void> {
+  const { error } = await serviceClient().from('basecamp_credenciales_usuario').delete().eq('usuario_id', usuarioId);
+  throwIf(error);
+}
+
+/** Si la persona conectó su Basecamp, desde cuándo y con qué correo (nunca los tokens). */
+export async function conexionPersona(usuarioId: string): Promise<{ conectado_at: string; email: string | null } | null> {
+  const { data, error } = await serviceClient()
+    .from('basecamp_credenciales_usuario')
+    .select('conectado_at, datos')
+    .eq('usuario_id', usuarioId)
+    .maybeSingle();
+  throwIf(error);
+  return data ? { conectado_at: data.conectado_at, email: (data.datos as { email?: string | null }).email ?? null } : null;
+}

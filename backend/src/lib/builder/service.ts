@@ -14,6 +14,7 @@ import { listTiposPieza } from '../db/tipos_pieza';
 import { audit } from '../db/audit';
 import { notificar } from '../notificaciones';
 import { createProjectStructure } from '../basecamp/write';
+import { BasecampClient } from '../basecamp/client';
 import { generarPortalToken } from '../portal/token';
 import { planificarProyecto, restarDias, type PlanProyecto, type AlertaCapacidad } from './plan';
 import { crearLote } from '../db/lote';
@@ -106,6 +107,9 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   });
   if (plan.owners_inactivos.length)
     log.warn('[builder] bloques con responsable inactivo; sus tareas nacen sin responsable', plan.owners_inactivos.join(','));
+  // Basecamp con la cuenta de quien crea el proyecto (o «BackIO» si es una tarea programada). Se pide ANTES de crear
+  // nada: si la persona no conectó su Basecamp, no queda un proyecto a medias (migración 33).
+  const bc = cliente.basecamp_project_id ? await BasecampClient.forActor(ctx) : undefined;
   const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;
   const fecha_inicio = input.fecha_inicio ?? (primeraFecha < input.fecha_entrega ? primeraFecha : restarDias(input.fecha_entrega, 1));
 
@@ -182,7 +186,7 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   let basecamp: unknown = { omitido: true, motivo: 'cliente sin basecamp_project_id' };
   if (cliente.basecamp_project_id) {
     try {
-      basecamp = await createProjectStructure(ctx, proyecto, requerimientos);
+      basecamp = await createProjectStructure(ctx, proyecto, requerimientos, { bc });
     } catch (err) {
       await updateProyecto(ctx, proyecto.id, { sync_estado: 'incompleto' });
       basecamp = { error: err instanceof Error ? err.message : String(err) };

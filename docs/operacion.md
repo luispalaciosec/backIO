@@ -136,7 +136,8 @@ pnpm --filter @backio/backend db:types
 ### Dar de alta o quitar a una persona
 
 - **Alta:** Admin → Usuarios → invitar. Le llega un correo para definir su contraseña. La cuenta se crea recién cuando
-  confirma.
+  confirma. Después, la persona conecta su Basecamp una vez («Conectar mi Basecamp», arriba en la pantalla o en Mi
+  Basecamp): sin eso, BackIO no escribe en Basecamp por ella. Ver [Basecamp](./04-basecamp.md#autenticacion).
 - **Baja:** Admin → Usuarios → «Registrar salida». La pantalla muestra todo lo que la persona tiene abierto (tareas
   por cliente, proyectos, mesas, acuerdos y recurrencias) con un destino propuesto. Al confirmar, en una sola
   operación reparte todo eso, revoca sus API keys y tokens de agentes y la desactiva; después bloquea su login y

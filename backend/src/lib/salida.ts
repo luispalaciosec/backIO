@@ -11,6 +11,7 @@
  */
 import { esHeredada, hoyLocal, nombrePersona } from '@backio/shared';
 import { serviceClient, DbError, type DbCtx } from './db/client';
+import { borrarCredencialesPersona } from './db/credenciales';
 import { audit } from './db/audit';
 import { listUsuarios } from './db/usuarios';
 import { listClientes } from './db/clientes';
@@ -193,11 +194,18 @@ export async function aplicarSalida(ctx: DbCtx, usuarioId: string, plan: PlanSal
     acuerdos: plan.acuerdos,
     recurrencias: plan.recurrencias,
   };
+  // Los cambios de responsable en Basecamp van a nombre del admin que registra la salida (su cuenta). Se pide antes de
+  // la transacción: si no conectó su Basecamp, no se aplica nada (migración 33).
+  const bc = abiertas.some((t) => t.basecamp_todo_id) ? await BasecampClient.forActor(ctx) : undefined;
   const r = await registrarSalida(ctx, usuarioId, { fecha: plan.fecha_salida, motivo: plan.motivo ?? null, plan: planRpc });
 
   // Fuera de la transacción: la persona ya está inactiva en BackIO (el middleware la rechaza) aunque esto falle.
   const authError = await bloquearEnAuth(usuarioId);
-  const basecamp = await cambiarEnBasecamp(ctx, usuarioId, abiertas, plan.tareas);
+  // Su cuenta de Basecamp deja de estar conectada a BackIO.
+  await borrarCredencialesPersona(usuarioId).catch((e) => log.error('[salida] no se borró su conexión con Basecamp', e));
+  const basecamp = bc
+    ? await cambiarEnBasecamp(ctx, usuarioId, abiertas, plan.tareas, bc)
+    : { actualizados: 0, sin_cambios: 0, errores: [] };
 
   const de = inv.persona.nombre;
   const nombreDestino = new Map(inv.destinos.map((d) => [d.id, d.nombre]));
@@ -231,6 +239,7 @@ async function cambiarEnBasecamp(
   usuarioId: string,
   abiertas: TareaDeSalida[],
   plan: PlanSalida['tareas'],
+  bc: BasecampClient,
 ): Promise<ResultadoSalida['basecamp']> {
   const out: ResultadoSalida['basecamp'] = { actualizados: 0, sin_cambios: 0, errores: [] };
   const [usuarios, clientes] = await Promise.all([
@@ -251,13 +260,6 @@ async function cambiarEnBasecamp(
     cambios.push({ requerimientoId: t.id, projectId, todoId: t.basecamp_todo_id, sale, entra: a ? (bcDe.get(a) ?? null) : null });
   }
   if (!cambios.length) return out;
-  let bc: BasecampClient;
-  try {
-    bc = await BasecampClient.forTenant(ctx.tenantId);
-  } catch (e) {
-    const error = e instanceof Error ? e.message : 'Basecamp no disponible';
-    return { ...out, errores: cambios.map((c) => ({ requerimientoId: c.requerimientoId, error })) };
-  }
   for (let i = 0; i < cambios.length; i += LIMITE_TODOS_POR_OPERACION) {
     const r = await reemplazarResponsableEnTodos(ctx, cambios.slice(i, i + LIMITE_TODOS_POR_OPERACION), bc);
     out.actualizados += r.actualizados;

@@ -39,19 +39,24 @@ export function tituloWeekly(acta: Acta, semana: { numero_iso: number; fecha_ini
  * llamadas simultáneas (REST o MCP) ya no publican dos mensajes (auditoría 10/10, S7). Si Basecamp falla, se libera.
  */
 export async function publicarActaEnBasecamp(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
+  // A nombre de quien publica (su cuenta de Basecamp); se pide antes de reservar el acta (migración 33).
+  const bc = await BasecampClient.forActor(ctx);
   const reservado = new Date().toISOString();
   const claim = await reservarActaParaPublicar(ctx, acta.id, reservado);
   if (!claim?.length) throw new DbError('El acta ya fue publicada', 409);
   try {
-    return await publicarReservada(ctx, acta);
+    return await publicarReservada(ctx, acta, bc);
   } catch (err) {
     await liberarReservaActa(ctx, acta.id, reservado);
     throw err;
   }
 }
 
-async function publicarReservada(ctx: DbCtx, acta: Acta): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
-  const bc = await BasecampClient.forTenant(ctx.tenantId);
+async function publicarReservada(
+  ctx: DbCtx,
+  acta: Acta,
+  bc: BasecampClient,
+): Promise<{ acta_id: string; basecamp_doc_id: number; url: string }> {
   const html = markdownBasico(acta.markdown);
   let doc: { id: number; app_url: string };
 
@@ -260,7 +265,8 @@ export function porPersonaDaily(hoy: DailyItem[], men?: Menciones): string {
 export async function publicarDailyEnBasecamp(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<{ id: number; url: string }> {
   if (!mesa.basecamp_project_id || !mesa.basecamp_board_daily_id)
     throw new Error(`La mesa ${mesa.nombre} no tiene board Daily configurado`);
-  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  // El daily sale a nombre de quien lo publica, no de quien conectó la integración (migración 33).
+  const bc = await BasecampClient.forActor(ctx);
   const r = await bc.createMessage(mesa.basecamp_project_id, mesa.basecamp_board_daily_id, {
     subject: tituloDaily(m, mesa),
     content: cuerpoDaily(m, await mencionesDailyBasecamp(ctx, bc)),

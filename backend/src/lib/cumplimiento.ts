@@ -21,6 +21,7 @@ import { audit } from './db/audit';
 import { setVecesReproceso, getReproceso } from './db/cumplimiento';
 import { listHorasRequerimientoDesde } from './db/horas';
 import { reabrirTodo } from './basecamp/write';
+import type { BasecampClient } from './basecamp/client';
 import { log } from './logger';
 
 // «A tiempo» compara el día de cierre en hora de Guayaquil (B4: antes se tomaba el día UTC).
@@ -118,6 +119,10 @@ export async function registrarReproceso(
     observacion?: string | null;
     area_responsable?: string | null;
     atribuible?: string | null;
+    /** La tarea estaba completada antes de este cambio (quien llama ya la reabrió en BackIO). */
+    estabaCompletada?: boolean;
+    /** Cliente de Basecamp de quien registra (su cuenta); sin él se usa la de la persona del ctx. */
+    bc?: BasecampClient;
   },
 ): Promise<Reproceso> {
   const req = await getRequerimiento(ctx, requerimientoId);
@@ -166,8 +171,12 @@ export async function registrarReproceso(
     entidad_id: requerimientoId,
     detalle: { reproceso_id: rp.id, origen: o.origen, motivo: o.motivo, paso_retorno: o.paso_retorno ?? null },
   });
-  if (o.reabrir_basecamp && req.basecamp_todo_id && req.estado_operativo === 'completado') {
-    reabrirTodo(ctx, req).catch((err) => log.error('[basecamp] no se pudo reabrir el to-do', err instanceof Error ? err.message : err));
+  // Antes solo se miraba el estado releído: cuando actualizarRequerimiento ya la había reabierto, el to-do de Basecamp
+  // nunca se reabría (16/10/2026).
+  if (o.reabrir_basecamp && req.basecamp_todo_id && (req.estado_operativo === 'completado' || o.estabaCompletada)) {
+    reabrirTodo(ctx, req, o.bc).catch((err) =>
+      log.error('[basecamp] no se pudo reabrir el to-do', err instanceof Error ? err.message : err),
+    );
   }
   return rp;
 }

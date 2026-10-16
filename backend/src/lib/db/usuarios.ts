@@ -27,3 +27,29 @@ export async function usuarioPorEmailSinSesion(
   throwIf(error);
   return data;
 }
+
+/** Lo que hace falta para validar que alguien conecta SU cuenta de Basecamp (service role: el callback no tiene sesión). */
+export async function usuarioParaBasecamp(
+  tenantId: string,
+  usuarioId: string,
+): Promise<{ id: string; email: string; activo: boolean; basecamp_user_id: number | null } | null> {
+  const { data, error } = await serviceClient()
+    .from('usuarios')
+    .select('id, email, activo, basecamp_user_id')
+    .eq('tenant_id', tenantId)
+    .eq('id', usuarioId)
+    .maybeSingle();
+  throwIf(error);
+  return data;
+}
+
+/** Enlaza a la persona con su usuario de Basecamp (cuando conecta su cuenta y aún no estaba enlazada). */
+export async function fijarBasecampUserId(tenantId: string, usuarioId: string, basecampUserId: number): Promise<void> {
+  const { error } = await serviceClient()
+    .from('usuarios')
+    .update({ basecamp_user_id: basecampUserId })
+    .eq('tenant_id', tenantId)
+    .eq('id', usuarioId)
+    .is('basecamp_user_id', null);
+  throwIf(error);
+}

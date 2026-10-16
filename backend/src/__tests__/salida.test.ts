@@ -13,7 +13,8 @@ const e = vi.hoisted(() => ({
   ban: vi.fn(),
   signOut: vi.fn(),
   reemplazar: vi.fn(),
-  forTenant: vi.fn(),
+  forActor: vi.fn(),
+  borrarCredenciales: vi.fn(),
   usuarios: [] as Record<string, unknown>[],
 }));
 
@@ -48,7 +49,8 @@ vi.mock('../lib/db/client', async (orig) => ({
   serviceClient: () => ({ auth: { admin: { updateUserById: e.ban, signOut: e.signOut } } }),
 }));
 vi.mock('../lib/basecamp/write', async (orig) => ({ ...(await orig<object>()), reemplazarResponsableEnTodos: e.reemplazar }));
-vi.mock('../lib/basecamp/client', () => ({ BasecampClient: { forTenant: e.forTenant } }));
+vi.mock('../lib/basecamp/client', () => ({ BasecampClient: { forActor: e.forActor } }));
+vi.mock('../lib/db/credenciales', () => ({ borrarCredencialesPersona: e.borrarCredenciales }));
 
 const { aplicarSalida, inventarioSalida } = await import('../lib/salida');
 const ctx = { db: {} as never, tenantId: 't', usuarioId: ADMIN, origen: 'ui' as const };
@@ -78,7 +80,8 @@ beforeEach(() => {
   e.ban.mockResolvedValue({ error: null });
   e.signOut.mockResolvedValue({ error: null });
   e.reemplazar.mockResolvedValue({ actualizados: 0, sin_cambios: 0, errores: [] });
-  e.forTenant.mockResolvedValue({});
+  e.forActor.mockResolvedValue({});
+  e.borrarCredenciales.mockResolvedValue(undefined);
 });
 
 const planVacio = { fecha_salida: '2026-10-11', tareas: [], proyectos: [], mesas: [], acuerdos: [], recurrencias: [] };
@@ -156,11 +159,23 @@ describe('aplicar la salida', () => {
     expect(e.ban).not.toHaveBeenCalled();
     expect(e.reemplazar).not.toHaveBeenCalled();
   });
-  it('si Basecamp no responde, BackIO queda bien y la respuesta lista los pendientes', async () => {
+  it('si quien registra no tiene su Basecamp conectado, no se aplica nada (migración 33)', async () => {
     e.tareas = [tarea('a', { basecamp_todo_id: 70 })];
-    e.forTenant.mockRejectedValueOnce(new Error('Basecamp desconectado'));
-    const r = await aplicarSalida(ctx, SALE, { ...planVacio, tareas: [{ id: 'a', a: LIDER }] });
-    expect(r.basecamp.errores).toEqual([{ requerimientoId: 'a', error: 'Basecamp desconectado' }]);
+    e.forActor.mockRejectedValueOnce(Object.assign(new Error('conecta tu Basecamp'), { status: 428 }));
+    await expect(aplicarSalida(ctx, SALE, { ...planVacio, tareas: [{ id: 'a', a: LIDER }] })).rejects.toMatchObject({ status: 428 });
+    expect(e.rpc).not.toHaveBeenCalled();
+    expect(e.ban).not.toHaveBeenCalled();
+  });
+  it('los cambios en Basecamp van con la cuenta de quien registra, y se borra la conexión de quien se va', async () => {
+    e.tareas = [tarea('a', { basecamp_todo_id: 70 })];
+    await aplicarSalida(ctx, SALE, { ...planVacio, tareas: [{ id: 'a', a: LIDER }] });
+    expect(e.forActor).toHaveBeenCalledWith(ctx);
+    expect(e.borrarCredenciales).toHaveBeenCalledWith(SALE);
+  });
+  it('sin to-dos enlazados no hace falta tener Basecamp conectado', async () => {
+    e.tareas = [tarea('a')];
+    await aplicarSalida(ctx, SALE, { ...planVacio, tareas: [{ id: 'a', a: LIDER }] });
+    expect(e.forActor).not.toHaveBeenCalled();
   });
   it('parte los to-dos de Basecamp en lotes de 50', async () => {
     e.tareas = Array.from({ length: 120 }, (_, i) => tarea(`t${i}`, { basecamp_todo_id: 1000 + i }));

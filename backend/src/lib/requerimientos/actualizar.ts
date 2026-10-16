@@ -4,6 +4,7 @@
  * del daily, no registraban el reproceso al reabrir y el push de la fecha a Basecamp fallaba en silencio.
  * Las rutas quedan como adaptadores: traducen la entrada, llaman aquí y convierten ReglaError en su respuesta.
  */
+import { BasecampClient } from '../basecamp/client';
 import type { ActualizarRequerimientoInput, MotivoReprogramacion, Requerimiento } from '@backio/shared';
 import { CAMPOS_COLABORADOR } from '@backio/shared';
 import type { DbCtx } from '../db/client';
@@ -77,6 +78,15 @@ export async function actualizarRequerimiento(
   validarActualizacion(ctx, previo, patch, opts);
 
   const reprogramado = esReprogramacion(previo, patch);
+  const rechazo = patch.estado_aprobacion === 'rechazado' && previo.estado_aprobacion !== 'rechazado';
+  const reapertura =
+    previo.estado_operativo === 'completado' &&
+    !!patch.estado_operativo &&
+    patch.estado_operativo !== 'completado' &&
+    patch.estado_operativo !== 'cancelado';
+  // Lo que baja a Basecamp va con la cuenta de quien hace el cambio. Se pide ANTES de guardar nada: si la persona no
+  // conectó su Basecamp, el cambio no se aplica a medias (migración 33).
+  const bc = previo.basecamp_todo_id && (reprogramado || rechazo || reapertura) ? await BasecampClient.forActor(ctx) : undefined;
   const { motivo_reprogramacion, observacion_reprogramacion, ...cambios } = patch;
   const r = await updateRequerimiento(ctx, id, cambios);
   if (reprogramado)
@@ -87,15 +97,10 @@ export async function actualizarRequerimiento(
     });
 
   // Rechazo del cliente o reapertura de un completado = reproceso.
-  if (patch.estado_aprobacion === 'rechazado' && previo.estado_aprobacion !== 'rechazado') {
-    await registrarReproceso(ctx, id, { origen: 'cliente', motivo: null, reabrir_basecamp: true });
-  } else if (
-    previo.estado_operativo === 'completado' &&
-    patch.estado_operativo &&
-    patch.estado_operativo !== 'completado' &&
-    patch.estado_operativo !== 'cancelado'
-  ) {
-    await registrarReproceso(ctx, id, { origen: 'interno', motivo: null, reabrir_basecamp: true });
+  if (rechazo) {
+    await registrarReproceso(ctx, id, { origen: 'cliente', motivo: null, reabrir_basecamp: true, bc });
+  } else if (reapertura) {
+    await registrarReproceso(ctx, id, { origen: 'interno', motivo: null, reabrir_basecamp: true, estabaCompletada: true, bc });
   }
   if (patch.estado_operativo === 'completado' && previo.estado_operativo !== 'completado')
     await cerrarReproceso(ctx, id).catch((e) => log.error('[requerimientos] cerrar reproceso', id, e));
@@ -111,7 +116,7 @@ export async function actualizarRequerimiento(
   let basecamp_due_on: ResultadoBasecampDueOn = 'sin_todo';
   if (reprogramado && r.basecamp_todo_id) {
     try {
-      await pushDueDate(ctx, r);
+      await pushDueDate(ctx, r, bc);
       basecamp_due_on = 'ok';
     } catch (err) {
       basecamp_due_on = 'error';

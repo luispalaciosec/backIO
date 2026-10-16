@@ -38,7 +38,9 @@ Después, fuera de la transacción:
   momento porque la persona está inactiva. Si esto falla, la persona igual queda sin
   acceso (BackIO rechaza a los inactivos) y la pantalla lo avisa.
 - **Basecamp:** en cada to-do abierto se saca a quien se va y se pone a quien lo recibe, sin tocar a los demás
-  asignados, de a 50 to-dos por vez (`reemplazarResponsableEnTodos` en `lib/basecamp/write.ts`). Si un to-do falla,
+  asignados, de a 50 to-dos por vez (`reemplazarResponsableEnTodos` en `lib/basecamp/write.ts`), con la cuenta de
+  Basecamp del admin que registra la salida: si no la conectó, no se aplica nada. Se borra la conexión de Basecamp de
+  quien se va. Si un to-do falla,
   BackIO ya quedó bien. Para terminar lo que faltó: Admin → Mantenimiento → «Responsables perdidos en Basecamp», que
   también detecta to-dos asignados a alguien que ya no tiene acceso.
 - **Auditoría:** un registro por tarea (`salida_reasignacion`, de quién a quién) y uno de la salida

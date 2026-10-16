@@ -77,7 +77,12 @@ export function createApp(): Hono {
       // En producción un 5xx no devuelve el texto de Postgres (nombres de tablas, constraints…).
       const prod = env().NODE_ENV === 'production';
       return c.json(
-        { error: prod && err.status >= 500 ? 'Error interno' : err.message, detalle: prod ? undefined : err.detalle },
+        {
+          error: prod && err.status >= 500 ? 'Error interno' : err.message,
+          detalle: prod ? undefined : err.detalle,
+          // Para que la pantalla reconozca el caso sin leer el texto (p. ej. basecamp_sin_conectar → botón de conectar).
+          codigo: (err as { codigo?: string }).codigo,
+        },
         err.status as 400,
       );
     }

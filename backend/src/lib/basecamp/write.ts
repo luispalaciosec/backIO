@@ -67,7 +67,7 @@ export async function createProjectStructure(
   if (!cliente?.basecamp_project_id) throw new Error('Cliente sin proyecto Basecamp configurado');
   const bcProjectId = cliente.basecamp_project_id;
 
-  const bc = opts.bc ?? (await BasecampClient.forTenant(ctx.tenantId));
+  const bc = opts.bc ?? (await BasecampClient.forActor(ctx));
   const usuarios = await listUsuarios(ctx);
   const subscribers = completionSubscribers(proyecto, usuarios);
 
@@ -133,11 +133,16 @@ export async function createProjectStructure(
 }
 
 /** Un solo requerimiento (creado a mano en el backlog dentro de un proyecto ya sincronizado). */
-export async function pushRequerimiento(ctx: DbCtx, proyecto: Proyecto, req: Requerimiento): Promise<{ todo_id: number } | null> {
+export async function pushRequerimiento(
+  ctx: DbCtx,
+  proyecto: Proyecto,
+  req: Requerimiento,
+  cliente_bc?: BasecampClient,
+): Promise<{ todo_id: number } | null> {
   if (req.basecamp_todo_id || !req.fecha_entrega || !proyecto.basecamp_todolist_id) return null;
   const cliente = await getCliente(ctx, proyecto.cliente_id);
   if (!cliente?.basecamp_project_id) return null;
-  const bc = await BasecampClient.forTenant(ctx.tenantId);
+  const bc = cliente_bc ?? (await BasecampClient.forActor(ctx));
   const usuarios = await listUsuarios(ctx);
   let destino = proyecto.basecamp_todolist_id;
   if (req.bloque_nombre) {
@@ -168,7 +173,7 @@ export async function pushDueDate(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
   if (!req.basecamp_todo_id) return;
   const cliente = await getCliente(ctx, req.cliente_id);
   if (!cliente?.basecamp_project_id) return;
-  const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
+  const client = bc ?? (await BasecampClient.forActor(ctx));
   await client.updateTodo(cliente.basecamp_project_id, req.basecamp_todo_id, { due_on: req.fecha_entrega });
 }
 
@@ -180,7 +185,7 @@ export async function reabrirTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
   if (!req.basecamp_todo_id) return;
   const cliente = await getCliente(ctx, req.cliente_id);
   if (!cliente?.basecamp_project_id) return;
-  const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
+  const client = bc ?? (await BasecampClient.forActor(ctx));
   await client.uncompleteTodo(cliente.basecamp_project_id, req.basecamp_todo_id);
   await audit(ctx, {
     accion: 'basecamp_reabrir_todo',
@@ -214,7 +219,7 @@ export async function reemplazarResponsableEnTodos(
   if (cambios.length > LIMITE_TODOS_POR_OPERACION) {
     throw new Error(`Como máximo ${LIMITE_TODOS_POR_OPERACION} to-dos por operación`);
   }
-  const client = bc ?? (await BasecampClient.forTenant(ctx.tenantId));
+  const client = bc ?? (await BasecampClient.forActor(ctx));
   const r = { actualizados: 0, sin_cambios: 0, errores: [] as { requerimientoId: string; error: string }[] };
   for (const c of cambios) {
     try {

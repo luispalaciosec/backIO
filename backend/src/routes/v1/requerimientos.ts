@@ -1,3 +1,4 @@
+import { BasecampClient } from '../../lib/basecamp/client';
 import { alcanceMesa } from '../../lib/db/mesas';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
@@ -129,20 +130,20 @@ async function planificacionAutomatica(
 requerimientos.post('/', requireScope('write:requerimientos'), zValidator('json', crearRequerimientoSchema), async (c) => {
   const ctx = ctxOf(c);
   const body = c.req.valid('json');
+  // Si pertenece a un proyecto ya sincronizado y tiene fecha, baja a Basecamp (regla: cliente → BackIO → Basecamp),
+  // con la cuenta de quien la crea. Se pide antes de crearla: sin Basecamp conectado no queda una tarea sin to-do.
+  const p = body.proyecto_id && body.fecha_entrega ? await getProyecto(ctx, body.proyecto_id) : null;
+  const bc = p?.basecamp_todolist_id ? await BasecampClient.forActor(ctx) : null;
   const planificacion = body.planificacion ?? (await planificacionAutomatica(ctx, body.fecha_entrega));
   const [r] = await insertRequerimientos(ctx, [{ ...body, planificacion }]);
   if (!r) throw new DbError('No se pudo crear', 500);
   await audit(ctx, { accion: 'crear', entidad: 'requerimiento', entidad_id: r.id });
-  // Si pertenece a un proyecto ya sincronizado y tiene fecha, baja a Basecamp (regla: cliente → BackIO → Basecamp).
   let basecamp: unknown = null;
-  if (r.proyecto_id && r.fecha_entrega) {
-    const p = await getProyecto(ctx, r.proyecto_id);
-    if (p?.basecamp_todolist_id) {
-      try {
-        basecamp = await pushRequerimiento(ctx, p, r);
-      } catch (err) {
-        basecamp = { error: err instanceof Error ? err.message : String(err) };
-      }
+  if (p && bc) {
+    try {
+      basecamp = await pushRequerimiento(ctx, p, r, bc);
+    } catch (err) {
+      basecamp = { error: err instanceof Error ? err.message : String(err) };
     }
   }
   return c.json({ ...r, basecamp }, 201);
@@ -318,7 +319,13 @@ requerimientos.post(
     const a = c.get('auth');
     if (esColaborador(a) && !(ctx.usuarioId && previo.owner_agencia.includes(ctx.usuarioId)))
       return c.json({ error: 'Solo puedes registrar reprocesos en tus tareas' }, 403);
+    // Reabrir el to-do va con la cuenta de quien registra; se pide antes de registrar (migración 33).
+    const bc =
+      b.reabrir_basecamp && previo.basecamp_todo_id && previo.estado_operativo === 'completado'
+        ? await BasecampClient.forActor(ctx)
+        : undefined;
     const rp = await registrarReproceso(ctx, previo.id, {
+      bc,
       origen: b.origen as OrigenReproceso,
       motivo: b.motivo as MotivoReproceso,
       paso_retorno: b.paso_retorno ?? null,

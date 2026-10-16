@@ -29,6 +29,10 @@ vi.mock('../lib/basecamp/client', () => ({
       request: async (_m: string, path: string) => e.vivos.get(Number(/todos\/(\d+)/.exec(path)![1])),
       updateTodo: e.updateTodo,
     }),
+    forActor: async () => ({
+      request: async (_m: string, path: string) => e.vivos.get(Number(/todos\/(\d+)/.exec(path)![1])),
+      updateTodo: e.updateTodo,
+    }),
   },
 }));
 

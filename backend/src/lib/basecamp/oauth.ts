@@ -1,7 +1,10 @@
 /**
- * OAuth2 de Basecamp 3 (Launchpad), a nivel de organización.
- *  - start: URL de autorización con `state` firmado (HMAC) que lleva tenant_id + usuario + expiración.
- *  - callback: canjea el code por access/refresh token y los guarda en tenants.config.basecamp.
+ * OAuth2 de Basecamp 3 (Launchpad), en dos modos (migración 33):
+ *  - `tenant`: la cuenta de la organización, para lo automático (Admin → Integraciones, con el usuario «BackIO»).
+ *  - `persona`: la cuenta de cada persona, para que lo que hace desde BackIO salga a su nombre (Mi Basecamp).
+ *  - start: URL de autorización con `state` firmado (HMAC) que lleva tenant_id + usuario + modo + expiración.
+ *  - callback: canjea el code por access/refresh token y los guarda (integracion_credenciales o
+ *    basecamp_credenciales_usuario, ambas solo service role).
  *  - status: si está conectado, cuándo expira y qué cuenta autorizó.
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -20,21 +23,23 @@ function firmar(payload: string): string {
   return createHmac('sha256', secret()).update(payload).digest('base64url');
 }
 
-export function buildState(tenantId: string, usuarioId: string): string {
+export type ModoOAuth = 'tenant' | 'persona';
+
+export function buildState(tenantId: string, usuarioId: string, modo: ModoOAuth = 'tenant'): string {
   const payload = Buffer.from(
-    JSON.stringify({ t: tenantId, u: usuarioId, n: randomBytes(8).toString('hex'), e: Date.now() + 10 * 60_000 }),
+    JSON.stringify({ t: tenantId, u: usuarioId, m: modo, n: randomBytes(8).toString('hex'), e: Date.now() + 10 * 60_000 }),
   ).toString('base64url');
   return `${payload}.${firmar(payload)}`;
 }
 
-export function verifyState(state: string): { tenantId: string; usuarioId: string } | null {
+export function verifyState(state: string): { tenantId: string; usuarioId: string; modo: ModoOAuth } | null {
   const [payload, sig] = state.split('.');
   if (!payload || !sig) return null;
   const esperado = firmar(payload);
   if (sig.length !== esperado.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) return null;
-  const data = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { t: string; u: string; e: number };
+  const data = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { t: string; u: string; m?: ModoOAuth; e: number };
   if (Date.now() > data.e) return null;
-  return { tenantId: data.t, usuarioId: data.u };
+  return { tenantId: data.t, usuarioId: data.u, modo: data.m === 'persona' ? 'persona' : 'tenant' };
 }
 
 export function authorizationUrl(state: string): string {
@@ -82,7 +87,7 @@ export async function refreshTokens(tokens: BasecampTokens): Promise<BasecampTok
 }
 
 export interface BasecampAuthInfo {
-  identity: { email_address: string; first_name: string; last_name: string };
+  identity: { id: number; email_address: string; first_name: string; last_name: string };
   accounts: { id: number; name: string; product: string; href: string }[];
 }
 

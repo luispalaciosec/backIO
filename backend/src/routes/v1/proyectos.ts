@@ -1,3 +1,4 @@
+import { BasecampClient } from '../../lib/basecamp/client';
 import { Hono } from 'hono';
 import { upsertRecurrencia } from '../../lib/recurrencias';
 import { z } from 'zod';
@@ -114,8 +115,10 @@ proyectos.post('/:id/basecamp/reintentar', requireScope('write:proyectos'), asyn
   const det = await getProyectoDetalle(ctx, c.req.param('id'));
   if (!det) return c.json({ error: 'No encontrado' }, 404);
   const confirmar = c.req.query('confirmar') === '1';
+  // Con la cuenta de quien reintenta; si no conectó su Basecamp, 428 con el aviso para conectarla.
+  const bc = await BasecampClient.forActor(ctx);
   try {
-    const r = await createProjectStructure(ctx, det, det.requerimientos, { confirmarSobreLimite: confirmar });
+    const r = await createProjectStructure(ctx, det, det.requerimientos, { confirmarSobreLimite: confirmar, bc });
     return c.json(r);
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);

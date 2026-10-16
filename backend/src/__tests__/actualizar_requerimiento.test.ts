@@ -6,6 +6,7 @@ const espias = vi.hoisted(() => ({
   registrarReproceso: vi.fn(),
   cerrarReproceso: vi.fn(),
   completarUltimaReprogramacion: vi.fn(),
+  forActor: vi.fn(),
 }));
 
 vi.mock('../lib/db', () => ({
@@ -19,8 +20,13 @@ vi.mock('../lib/db', () => ({
 vi.mock('../lib/db/historial', () => ({ completarUltimaReprogramacion: espias.completarUltimaReprogramacion }));
 vi.mock('../lib/cumplimiento', () => ({ registrarReproceso: espias.registrarReproceso, cerrarReproceso: espias.cerrarReproceso }));
 vi.mock('../lib/basecamp/write', () => ({ pushDueDate: espias.pushDueDate }));
+vi.mock('../lib/basecamp/client', async (orig) => ({
+  ...(await orig<object>()),
+  BasecampClient: { forActor: espias.forActor },
+}));
 
 import { actualizarRequerimiento, ReglaError } from '../lib/requerimientos/actualizar';
+import { BasecampSinConectar } from '../lib/basecamp/client';
 
 const ctx = { tenantId: 't', usuarioId: 'u1', origen: 'mcp' } as never;
 const base = {
@@ -44,6 +50,7 @@ beforeEach(() => {
   estado.auditoria = [];
   estado.updates = [];
   Object.values(espias).forEach((f) => f.mockReset());
+  espias.forActor.mockResolvedValue({ cuenta: 'de u1' });
 });
 
 // B9: la misma función atiende la UI y el confirm_plan del MCP; antes el MCP se saltaba estas reglas.
@@ -107,5 +114,32 @@ describe('actualizarRequerimiento (REST y MCP)', () => {
   it('requerimiento inexistente: 404', async () => {
     estado.req = null;
     expect(await regla(actualizarRequerimiento(ctx, 'r1', { piezas: 1 }, opts))).toEqual([404, 'No encontrado']);
+  });
+
+  // Migración 33: lo que baja a Basecamp va con la cuenta de quien hace el cambio, y sin cuenta conectada no se aplica.
+  it('la fecha baja a Basecamp con la cuenta de quien cambia; sin su Basecamp conectado no cambia nada', async () => {
+    await actualizarRequerimiento(ctx, 'r1', { fecha_entrega: '2026-10-20', motivo_reprogramacion: 'cambio_alcance' }, opts);
+    expect(espias.forActor).toHaveBeenCalledWith(ctx);
+    expect(espias.pushDueDate).toHaveBeenCalledWith(ctx, expect.anything(), { cuenta: 'de u1' });
+    estado.updates = [];
+    espias.forActor.mockRejectedValueOnce(new BasecampSinConectar());
+    await expect(
+      actualizarRequerimiento(ctx, 'r1', { fecha_entrega: '2026-10-21', motivo_reprogramacion: 'cambio_alcance' }, opts),
+    ).rejects.toBeInstanceOf(BasecampSinConectar);
+    expect(estado.updates).toEqual([]);
+  });
+  it('sin to-do en Basecamp no hace falta tener la cuenta conectada', async () => {
+    estado.req = { ...base, basecamp_todo_id: null };
+    await actualizarRequerimiento(ctx, 'r1', { fecha_entrega: '2026-10-20', motivo_reprogramacion: 'cambio_alcance' }, opts);
+    expect(espias.forActor).not.toHaveBeenCalled();
+  });
+  it('reabrir un completado reabre también el to-do (antes nunca se reabría)', async () => {
+    estado.req = { ...base, estado_operativo: 'completado' };
+    await actualizarRequerimiento(ctx, 'r1', { estado_operativo: 'en_ejecucion' }, opts);
+    expect(espias.registrarReproceso).toHaveBeenCalledWith(
+      ctx,
+      'r1',
+      expect.objectContaining({ estabaCompletada: true, bc: { cuenta: 'de u1' } }),
+    );
   });
 });

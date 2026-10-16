@@ -1,0 +1,62 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const e = vi.hoisted(() => ({ persona: null as unknown, tenant: null as unknown }));
+vi.mock('../lib/db/credenciales', () => ({
+  leerCredencialesPersona: async () => e.persona,
+  leerCredencialesBasecamp: async () => e.tenant,
+}));
+
+import { BasecampClient, BasecampSinConectar } from '../lib/basecamp/client';
+import { validarIdentidadPersona } from '../lib/basecamp/persona';
+
+const tokens = { access_token: 'a', refresh_token: 'r', expires_at: '2099-01-01T00:00:00Z' };
+const dueno = (c: BasecampClient) => (c as unknown as { usuarioId: string | null }).usuarioId;
+
+beforeEach(() => {
+  e.persona = null;
+  e.tenant = tokens;
+});
+
+// Migración 33: lo que alguien hace desde BackIO sale a su nombre en Basecamp.
+describe('qué cuenta de Basecamp se usa', () => {
+  it('una persona usa su propia cuenta', async () => {
+    e.persona = { ...tokens, email: 'ana@geeks.ec' };
+    expect(dueno(await BasecampClient.forActor({ tenantId: 't', usuarioId: 'u1' }))).toBe('u1');
+  });
+  it('si la persona no conectó su cuenta, no se escribe a nombre de otro', async () => {
+    await expect(BasecampClient.forActor({ tenantId: 't', usuarioId: 'u1' })).rejects.toBeInstanceOf(BasecampSinConectar);
+    await expect(BasecampClient.forActor({ tenantId: 't', usuarioId: 'u1' })).rejects.toMatchObject({
+      status: 428,
+      codigo: 'basecamp_sin_conectar',
+    });
+  });
+  it('sin persona (tarea programada, webhook, API key de una integración) usa la cuenta del tenant («BackIO»)', async () => {
+    expect(dueno(await BasecampClient.forActor({ tenantId: 't', usuarioId: null }))).toBeNull();
+  });
+});
+
+describe('solo se conecta la cuenta propia', () => {
+  const identidad = { id: 501, email_address: 'ana@geeks.ec', first_name: 'Ana', last_name: 'López' };
+  it('la persona enlazada en BackIO', () =>
+    expect(validarIdentidadPersona({ email: 'otra@geeks.ec', activo: true, basecamp_user_id: 501 }, identidad)).toEqual({
+      ok: true,
+      enlazar: false,
+    }));
+  it('la cuenta de otra persona se rechaza', () =>
+    expect(validarIdentidadPersona({ email: 'ana@geeks.ec', activo: true, basecamp_user_id: 777 }, identidad)).toMatchObject({
+      ok: false,
+    }));
+  it('sin enlace previo: mismo correo (sin mayúsculas) y se enlaza', () =>
+    expect(validarIdentidadPersona({ email: 'Ana@Geeks.ec', activo: true, basecamp_user_id: null }, identidad)).toEqual({
+      ok: true,
+      enlazar: true,
+    }));
+  it('sin enlace previo y otro correo: se rechaza', () =>
+    expect(validarIdentidadPersona({ email: 'beto@geeks.ec', activo: true, basecamp_user_id: null }, identidad)).toMatchObject({
+      ok: false,
+    }));
+  it('un usuario inactivo no conecta nada', () =>
+    expect(validarIdentidadPersona({ email: 'ana@geeks.ec', activo: false, basecamp_user_id: 501 }, identidad)).toMatchObject({
+      ok: false,
+    }));
+});

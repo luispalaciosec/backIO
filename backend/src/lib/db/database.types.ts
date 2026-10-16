@@ -389,6 +389,48 @@ export type Database = {
           },
         ];
       };
+      basecamp_credenciales_usuario: {
+        Row: {
+          usuario_id: string;
+          tenant_id: string;
+          basecamp_person_id: number;
+          datos: Json;
+          conectado_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          usuario_id: string;
+          tenant_id: string;
+          basecamp_person_id: number;
+          datos?: Json;
+          conectado_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          usuario_id?: string;
+          tenant_id?: string;
+          basecamp_person_id?: number;
+          datos?: Json;
+          conectado_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'basecamp_credenciales_usuario_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'basecamp_credenciales_usuario_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       basecamp_huerfanos: {
         Row: {
           id: string;

@@ -78,6 +78,7 @@ mezcle datos entre organizaciones.
 | — | Cuando alguien se va, una tarea reasignada **cuenta para quien la cierra**; si la recibió con menos de 3 días hábiles para la entrega (o vencida) queda «heredada» y su atraso no cuenta para nadie | — | 11/10/2026 · Luis. Ver [Cuando alguien se va](./20-salida.md) |
 | — | Las tareas de quien se va se reparten **por cliente, con vista previa**: por defecto al líder de la mesa, con cambio por grupo o por tarea | — | 11/10/2026 · Luis |
 | — | En una salida, BackIO **cambia también al responsable en Basecamp**, de a 50 to-dos | — | 11/10/2026 · Luis |
+| — | Lo que alguien hace desde BackIO se escribe en Basecamp **con su propia cuenta**; si no la conectó, BackIO no escribe por ella. Lo automático va con un usuario «BackIO» de Basecamp | Basecamp mostraba todo como hecho por quien conectó la integración y se perdía la trazabilidad de quién hizo qué | 16/10/2026 · Luis. Ver [Basecamp](./04-basecamp.md#autenticacion) |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 
 ## Decisiones técnicas
