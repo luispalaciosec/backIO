@@ -3,14 +3,14 @@
  * solo si conecta SU cuenta: la identidad de Basecamp tiene que ser la persona enlazada en BackIO
  * (usuarios.basecamp_user_id) o, si todavía no estaba enlazada, la del mismo correo.
  */
-import type { BasecampAuthInfo } from './oauth';
 
 export type ResultadoIdentidad = { ok: true; enlazar: boolean } | { ok: false; motivo: string };
 
 /** ¿La cuenta de Basecamp que se autorizó es de esta persona? `enlazar`: hay que guardar su basecamp_user_id. */
 export function validarIdentidadPersona(
   usuario: { email: string; activo: boolean; basecamp_user_id: number | null },
-  identidad: BasecampAuthInfo['identity'],
+  /** Perfil de Basecamp 3 (my/profile.json), no la identidad de 37signals. */
+  identidad: { id: number; email_address: string },
 ): ResultadoIdentidad {
   if (!usuario.activo) return { ok: false, motivo: 'Tu usuario de BackIO no está activo' };
   if (usuario.basecamp_user_id !== null) {

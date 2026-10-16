@@ -1,7 +1,7 @@
 /** Callback público de OAuth (Basecamp redirige aquí). El state firmado identifica tenant y usuario. */
 import { Hono } from 'hono';
 import { env, frontendOrigins } from '../config/env';
-import { verifyState, exchangeCode, authorizationInfo, saveTokens } from '../lib/basecamp/oauth';
+import { verifyState, exchangeCode, authorizationInfo, perfilBasecamp, saveTokens } from '../lib/basecamp/oauth';
 import { serviceClient, audit } from '../lib/db';
 import { validarIdentidadPersona } from '../lib/basecamp/persona';
 import { fijarBasecampUserId, usuarioParaBasecamp } from '../lib/db/usuarios';
@@ -74,17 +74,19 @@ async function conectarPersona(code: string, ctx: { tenantId: string; usuarioId:
     }
     const usuario = await usuarioParaBasecamp(ctx.tenantId, ctx.usuarioId);
     if (!usuario) return volver({ basecamp: 'error', motivo: 'Usuario no encontrado' });
-    const v = validarIdentidadPersona(usuario, info.identity);
+    // La persona de Basecamp sale del perfil en la cuenta de Geeks, no de identity.id (otro número).
+    const perfil = await perfilBasecamp(tokens.access_token);
+    const v = validarIdentidadPersona(usuario, perfil);
     if (!v.ok) return volver({ basecamp: 'error', motivo: v.motivo });
-    if (v.enlazar) await fijarBasecampUserId(ctx.tenantId, ctx.usuarioId, info.identity.id);
-    await guardarCredencialesPersona(ctx.tenantId, ctx.usuarioId, info.identity.id, { ...tokens, email: info.identity.email_address });
+    if (v.enlazar) await fijarBasecampUserId(ctx.tenantId, ctx.usuarioId, perfil.id);
+    await guardarCredencialesPersona(ctx.tenantId, ctx.usuarioId, perfil.id, { ...tokens, email: perfil.email_address });
     await audit(
       { db: serviceClient(), tenantId: ctx.tenantId, usuarioId: ctx.usuarioId, origen: 'ui' },
       {
         accion: 'basecamp_persona_conectada',
         entidad: 'usuario',
         entidad_id: ctx.usuarioId,
-        detalle: { basecamp_person_id: info.identity.id, email: info.identity.email_address, enlazado: v.enlazar },
+        detalle: { basecamp_person_id: perfil.id, email: perfil.email_address, enlazado: v.enlazar },
       },
     );
     return volver({ basecamp: 'ok' });

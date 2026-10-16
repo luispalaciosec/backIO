@@ -99,6 +99,21 @@ export async function authorizationInfo(accessToken: string): Promise<BasecampAu
   return (await res.json()) as BasecampAuthInfo;
 }
 
+/**
+ * Perfil de Basecamp 3 de quien autorizó, dentro de la cuenta de Geeks. Su `id` es el de la persona en Basecamp
+ * (el de usuarios.basecamp_user_id). Ojo: `authorization.json → identity.id` es otro número (la identidad de
+ * 37signals) y nunca coincide; compararlo rechazaba a todos (16/10/2026).
+ */
+export async function perfilBasecamp(accessToken: string): Promise<{ id: number; email_address: string }> {
+  const e = env();
+  const res = await fetch(`https://3.basecampapi.com/${e.BASECAMP_ACCOUNT_ID}/my/profile.json`, {
+    headers: { Authorization: `Bearer ${accessToken}`, 'User-Agent': e.BASECAMP_USER_AGENT },
+  });
+  if (!res.ok) throw new Error(`No se pudo leer tu perfil de Basecamp (${res.status})`);
+  const p = (await res.json()) as { id: number; email_address: string };
+  return { id: p.id, email_address: p.email_address };
+}
+
 export interface BasecampConfig extends BasecampTokens {
   cuenta_id: number | null;
   cuenta_nombre: string | null;

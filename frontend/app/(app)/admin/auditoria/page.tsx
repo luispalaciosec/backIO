@@ -44,7 +44,11 @@ export default function AuditoriaPage() {
     try {
       setR(await api<Resultado>(`/admin/audit?${qs}`));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Error');
+      setError(
+        e instanceof ApiError
+          ? e.message
+          : `No se pudo cargar la auditoría: ${e instanceof Error ? e.message : 'error desconocido'}. Recarga la página.`,
+      );
     }
     setBusy(false);
   }, [f]);
