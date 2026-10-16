@@ -251,7 +251,13 @@ async function importar(
             accion: 'basecamp_movido',
             entidad: 'requerimiento',
             entidad_id: ex.id,
-            detalle: { de: ex.basecamp_todo_id, a: d.todoId, cliente_destino: destino.nombre, titulo: ex.titulo_interno, resultado: 'reenlazado' },
+            detalle: {
+              de: ex.basecamp_todo_id,
+              a: d.todoId,
+              cliente_destino: destino.nombre,
+              titulo: ex.titulo_interno,
+              resultado: 'reenlazado',
+            },
           });
           r.movidos_a_otro_proyecto += 1;
         }
