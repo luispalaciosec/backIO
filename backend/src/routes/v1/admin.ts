@@ -9,6 +9,7 @@ import { verificarSalud } from '../../lib/salud';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 import { aplicarSalida, inventarioSalida } from '../../lib/salida';
+import { conexionesDelTenant } from '../../lib/db/credenciales';
 import { aplicar, revisar, TAREAS, TopeExcedido, type Tarea } from '../../lib/mantenimiento';
 import {
   actualizarUsuario,
@@ -32,8 +33,13 @@ admin.use('*', requireScope('admin'));
 const ROLES = ['admin', 'gerencia', 'operaciones', 'ejecutiva', 'lider', 'colaborador'] as const;
 
 // ---------------- usuarios
-// Con inactivos: quien ya no tiene acceso sigue en la lista (al final) para poder restaurarlo.
-admin.get('/usuarios', async (c) => c.json({ items: await listUsuarios(ctxOf(c), { incluirInactivos: true }) }));
+// Con inactivos: quien ya no tiene acceso sigue en la lista (al final) para poder restaurarlo. Cada persona trae si
+// conectó su Basecamp (`basecamp_conectado_at`), nunca sus tokens.
+admin.get('/usuarios', async (c) => {
+  const ctx = ctxOf(c);
+  const [usuarios, conexiones] = await Promise.all([listUsuarios(ctx, { incluirInactivos: true }), conexionesDelTenant(ctx.tenantId)]);
+  return c.json({ items: usuarios.map((u) => ({ ...u, basecamp_conectado_at: conexiones.get(u.id) ?? null })) });
+});
 
 /** Escanea las personas de la cuenta Basecamp y enlaza usuarios por email (basecamp_user_id). */
 admin.post('/usuarios/basecamp/vincular', async (c) => {

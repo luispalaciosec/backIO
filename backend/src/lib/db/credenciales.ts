@@ -109,3 +109,13 @@ export async function conexionPersona(usuarioId: string): Promise<{ conectado_at
   throwIf(error);
   return data ? { conectado_at: data.conectado_at, email: (data.datos as { email?: string | null }).email ?? null } : null;
 }
+
+/** Quién del tenant conectó su Basecamp y desde cuándo (para Admin → Usuarios). Nunca devuelve tokens. */
+export async function conexionesDelTenant(tenantId: string): Promise<Map<string, string>> {
+  const { data, error } = await serviceClient()
+    .from('basecamp_credenciales_usuario')
+    .select('usuario_id, conectado_at')
+    .eq('tenant_id', tenantId);
+  throwIf(error);
+  return new Map((data ?? []).map((c) => [c.usuario_id, c.conectado_at]));
+}
