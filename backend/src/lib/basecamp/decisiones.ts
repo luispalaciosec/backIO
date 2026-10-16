@@ -112,3 +112,22 @@ export function filaDesdeTodo(
   };
 }
 export type FilaDesdeTodo = ReturnType<typeof filaDesdeTodo>;
+
+/**
+ * Un to-do enlazado que ya no aparece en las listas del cliente: ¿se movió a otro proyecto de Basecamp?
+ * Basecamp no mueve: crea un to-do nuevo (otro id) en el proyecto destino y el id viejo redirige al nuevo. Sin esto,
+ * el to-do nuevo entraba como tarea nueva y la vieja quedaba duplicada en el cliente original (16/10/2026).
+ *  - `baja`: el to-do nuevo ya está enlazado a otra tarea → la vieja sobra (baja lógica).
+ *  - `reenlazar`: nadie tiene el to-do nuevo → la tarea vieja pasa a él (y a su cliente), con su historia.
+ */
+export function decidirMovido(
+  ex: { basecamp_todo_id: number },
+  vivo: { id: number; bucketId: number | null },
+  proyectoDelCliente: number,
+  otroConElNuevo: { id: string } | null,
+): { tipo: 'ninguno' } | { tipo: 'baja'; conservado: string } | { tipo: 'reenlazar'; todoId: number; bucketId: number } {
+  const movido = vivo.id !== ex.basecamp_todo_id || (vivo.bucketId !== null && vivo.bucketId !== proyectoDelCliente);
+  if (!movido || vivo.bucketId === null) return { tipo: 'ninguno' };
+  if (otroConElNuevo) return { tipo: 'baja', conservado: otroConElNuevo.id };
+  return { tipo: 'reenlazar', todoId: vivo.id, bucketId: vivo.bucketId };
+}

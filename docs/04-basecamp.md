@@ -235,6 +235,7 @@ Basecamp → BackIO, automático:
 | To-do enviado a la papelera o archivado | Requerimiento **cancelado** (auditoría `basecamp_eliminado`); si se restaura, vuelve a En proceso | Webhook, segundos; verificación cada 15 min |
 | Título del to-do editado | `titulo_interno` (excepción D1, solo por la lectura de listas; el webhook sigue sin extraer texto) | Cada 15 min o con ↻ Sincronizar |
 | To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada 15 min |
+| To-do movido a **otro proyecto de Basecamp** (otro cliente) | Basecamp crea un to-do nuevo y el id viejo redirige a él. Si el nuevo ya entró a BackIO, la tarea vieja se da de baja (no queda duplicada); si no, la tarea vieja pasa al to-do nuevo y a su cliente, oculta en el portal. Queda `basecamp_movido` en la auditoría | Cada 15 min |
 | Lista renombrada | Nombre del proyecto | Cada 15 min |
 | Responsables cambiados | `owner_agencia` (si la persona está vinculada), solo en tareas abiertas. No cambia si Basecamp todavía asigna a alguien que ya no tiene acceso: ahí manda el reparto de BackIO | Cada 15 min |
 | To-do nuevo creado a mano | Se importa como requerimiento (ver «Basecamp como origen aceptado») | Webhook, unos 20 s; cada 15 min como respaldo |

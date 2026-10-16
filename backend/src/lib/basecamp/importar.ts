@@ -25,10 +25,19 @@ import { generarPortalToken } from '../portal/token';
 import { conCandado } from '../candado';
 import { BasecampClient } from './client';
 import { mapaUsuariosBasecamp, ownersDeBasecamp, recorrerTodos } from './recorrer';
-import { cambiosDeEnlazado, clasificarTodo, fechasProyectoNuevo, filaDesdeTodo } from './decisiones';
+import { cambiosDeEnlazado, clasificarTodo, decidirMovido, fechasProyectoNuevo, filaDesdeTodo } from './decisiones';
+import { getRequerimientoPorTodo } from '../db/huerfanos';
+import { clientePorProyectoBasecamp } from '../db/clientes';
 import { hoyLocal } from '@backio/shared';
 
 export { marcasDeTitulo } from './decisiones';
+
+/** Lo que se mira del to-do vivo cuando ya no aparece en las listas del cliente (nunca texto). */
+interface TodoVivo {
+  id?: number;
+  status?: string;
+  bucket?: { id?: number };
+}
 
 export interface ResultadoImport {
   listas: number;
@@ -41,6 +50,8 @@ export interface ResultadoImport {
   movidos: number;
   proyectos_renombrados: number;
   eliminados_en_basecamp: number;
+  /** To-dos que se movieron a otro proyecto de Basecamp (baja del duplicado o reenlace). */
+  movidos_a_otro_proyecto: number;
 }
 
 /**
@@ -96,6 +107,7 @@ async function importar(
     movidos: 0,
     proyectos_renombrados: 0,
     eliminados_en_basecamp: 0,
+    movidos_a_otro_proyecto: 0,
   };
 
   for (const { lista, grupos, todos } of listas) {
@@ -199,11 +211,52 @@ async function importar(
   for (const ex of enlazadoPorTodo.values()) {
     if (vistos.has(ex.basecamp_todo_id) || ex.estado_operativo === 'completado' || ex.estado_operativo === 'cancelado') continue;
     let eliminado = false;
+    let raw: TodoVivo | null = null;
     try {
-      const raw = (await bc.getTodoRaw(cliente.basecamp_project_id, ex.basecamp_todo_id)) as { status?: string } | null;
+      raw = (await bc.getTodoRaw(cliente.basecamp_project_id, ex.basecamp_todo_id)) as TodoVivo | null;
       eliminado = !raw || raw.status === 'trashed' || raw.status === 'archived';
     } catch (err) {
       eliminado = /\b404\b/.test(err instanceof Error ? err.message : '');
+    }
+    // Movido a otro proyecto de Basecamp: el id viejo redirige al to-do nuevo (ver decidirMovido).
+    if (!eliminado && raw?.id) {
+      const otro = raw.id !== ex.basecamp_todo_id ? await getRequerimientoPorTodo(ctx, raw.id) : null;
+      const d = decidirMovido(
+        ex,
+        { id: raw.id, bucketId: raw.bucket?.id ?? null },
+        cliente.basecamp_project_id,
+        otro && otro.id !== ex.id && !otro.deleted_at ? otro : null,
+      );
+      if (d.tipo === 'baja') {
+        await actualizarEnlazado(ctx, ex.id, { deleted_at: new Date().toISOString(), daily_fecha: null });
+        await audit(ctx, {
+          accion: 'basecamp_movido',
+          entidad: 'requerimiento',
+          entidad_id: ex.id,
+          detalle: { de: ex.basecamp_todo_id, a: raw.id, conservado: d.conservado, titulo: ex.titulo_interno, resultado: 'baja_duplicado' },
+        });
+        r.movidos_a_otro_proyecto += 1;
+      } else if (d.tipo === 'reenlazar') {
+        const destino = await clientePorProyectoBasecamp(d.bucketId);
+        if (destino && destino.tenant_id === ctx.tenantId) {
+          // Cambia de cliente: nace oculta en el portal del nuevo (regla 2: solo se restringe). El proyecto y el bloque los
+          // corrige la próxima importación del cliente destino, que ya la ve como enlazada.
+          await actualizarEnlazado(ctx, ex.id, {
+            basecamp_todo_id: d.todoId,
+            cliente_id: destino.id,
+            proyecto_id: null,
+            visible_cliente: false,
+          });
+          await audit(ctx, {
+            accion: 'basecamp_movido',
+            entidad: 'requerimiento',
+            entidad_id: ex.id,
+            detalle: { de: ex.basecamp_todo_id, a: d.todoId, cliente_destino: destino.nombre, titulo: ex.titulo_interno, resultado: 'reenlazado' },
+          });
+          r.movidos_a_otro_proyecto += 1;
+        }
+      }
+      if (d.tipo !== 'ninguno') continue;
     }
     if (!eliminado) continue;
     await actualizarEnlazado(ctx, ex.id, { estado_operativo: 'cancelado', daily_fecha: null });

@@ -7,9 +7,16 @@ const estado = vi.hoisted(() => ({
   enlazados: [] as unknown[],
   ignorados: new Set<number>(),
   todos: [] as unknown[],
+  vivo: { status: 'active' } as Record<string, unknown>,
+  conElNuevo: null as { id: string; deleted_at: string | null } | null,
+  actualizar: vi.fn(),
 }));
 
-vi.mock('../lib/db/clientes', () => ({ getCliente: async () => ({ id: 'c1', basecamp_project_id: 10 }) }));
+vi.mock('../lib/db/clientes', () => ({
+  getCliente: async () => ({ id: 'c1', basecamp_project_id: 10 }),
+  clientePorProyectoBasecamp: async (b: number) => ({ id: `c-de-${b}`, tenant_id: 't', nombre: `Cliente ${b}` }),
+}));
+vi.mock('../lib/db/huerfanos', () => ({ getRequerimientoPorTodo: async () => estado.conElNuevo }));
 vi.mock('../lib/db/usuarios', () => ({ listUsuarios: async () => [{ id: 'u1', basecamp_user_id: 501 }] }));
 vi.mock('../lib/db/proyectos', () => ({
   insertProyecto: async () => ({ id: 'p-nuevo' }),
@@ -28,7 +35,7 @@ vi.mock('../lib/db/basecamp_import', () => ({
     estado.insertados.push(fila);
     return { id: `r${fila.basecamp_todo_id}` };
   },
-  actualizarEnlazado: async () => undefined,
+  actualizarEnlazado: estado.actualizar,
   marcarHuerfanosAdoptados: async () => undefined,
   marcarClienteImportado: async () => undefined,
 }));
@@ -39,13 +46,13 @@ vi.mock('../lib/basecamp/client', () => ({
       listTodolists: async () => [{ id: 100, name: 'Lista' }],
       listGroups: async () => [],
       listTodosSafe: async () => estado.todos,
-      getTodoRaw: async () => ({ status: 'active' }),
+      getTodoRaw: async () => estado.vivo,
     }),
   },
 }));
 
 import { importarBasecampCliente } from '../lib/basecamp/importar';
-import { cambiosDeEnlazado, clasificarTodo, fechasProyectoNuevo, filaDesdeTodo } from '../lib/basecamp/decisiones';
+import { cambiosDeEnlazado, clasificarTodo, decidirMovido, fechasProyectoNuevo, filaDesdeTodo } from '../lib/basecamp/decisiones';
 import { conCandado } from '../lib/candado';
 
 const todo = (id: number, extra: Partial<TodoPlano> = {}): TodoPlano => ({
@@ -71,6 +78,9 @@ beforeEach(() => {
   estado.enlazados = [];
   estado.ignorados = new Set();
   estado.todos = [];
+  estado.vivo = { status: 'active' };
+  estado.conElNuevo = null;
+  estado.actualizar.mockReset();
 });
 
 describe('decisiones de la importación', () => {
@@ -193,6 +203,50 @@ describe('importarBasecampCliente (B6)', () => {
     estado.ignorados = new Set([2]);
     await importarBasecampCliente(ctx, 'c1');
     expect(estado.insertados.map((x) => x.basecamp_todo_id)).toEqual([1]);
+  });
+});
+
+// 16/10/2026 (caso de Grace): mover un to-do a otro proyecto de Basecamp crea uno nuevo; el id viejo redirige a él.
+describe('to-do movido a otro proyecto de Basecamp', () => {
+  const ex = {
+    id: 'r-viejo',
+    basecamp_todo_id: 7,
+    owner_agencia: [],
+    titulo_interno: 'Tend card',
+    bloque_nombre: null,
+    proyecto_id: 'p1',
+    estado_operativo: 'en_ejecucion',
+  };
+  it('decide: nada si sigue en su proyecto; baja si el nuevo ya está en BackIO; reenlace si no', () => {
+    expect(decidirMovido(ex, { id: 7, bucketId: 10 }, 10, null)).toEqual({ tipo: 'ninguno' });
+    expect(decidirMovido(ex, { id: 8, bucketId: 20 }, 10, { id: 'r-nuevo' })).toEqual({ tipo: 'baja', conservado: 'r-nuevo' });
+    expect(decidirMovido(ex, { id: 8, bucketId: 20 }, 10, null)).toEqual({ tipo: 'reenlazar', todoId: 8, bucketId: 20 });
+  });
+  it('si el to-do nuevo ya entró como tarea, la vieja se da de baja (no queda duplicada en dos clientes)', async () => {
+    estado.enlazados = [ex];
+    estado.vivo = { id: 8, status: 'active', bucket: { id: 20 } };
+    estado.conElNuevo = { id: 'r-nuevo', deleted_at: null };
+    const r = await importarBasecampCliente(ctx, 'c1');
+    expect(estado.actualizar).toHaveBeenCalledWith(ctx, 'r-viejo', expect.objectContaining({ deleted_at: expect.any(String) }));
+    expect(r.movidos_a_otro_proyecto).toBe(1);
+    expect(r.eliminados_en_basecamp).toBe(0);
+  });
+  it('si todavía no entró, la tarea vieja pasa al to-do nuevo y a su cliente, oculta en el portal', async () => {
+    estado.enlazados = [ex];
+    estado.vivo = { id: 8, status: 'active', bucket: { id: 20 } };
+    await importarBasecampCliente(ctx, 'c1');
+    expect(estado.actualizar).toHaveBeenCalledWith(ctx, 'r-viejo', {
+      basecamp_todo_id: 8,
+      cliente_id: 'c-de-20',
+      proyecto_id: null,
+      visible_cliente: false,
+    });
+  });
+  it('un to-do que sigue en su proyecto no se toca', async () => {
+    estado.enlazados = [ex];
+    estado.vivo = { id: 7, status: 'active', bucket: { id: 10 } };
+    await importarBasecampCliente(ctx, 'c1');
+    expect(estado.actualizar).not.toHaveBeenCalled();
   });
 });
 
