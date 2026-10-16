@@ -67,9 +67,9 @@ function Integraciones() {
             <div className="text-sm text-gray-500">
               Ejecución de producción. BackIO solo lee <code>completed</code>, <code>due_on</code> y asignaciones. Nunca texto.
               <br />
-              Esta es la cuenta de <strong>lo automático</strong> (sincronización, reenvío de fechas, proyectos de recurrencias): conéctala
-              con el usuario <strong>«BackIO»</strong> de Basecamp, no con tu cuenta personal. Lo que cada persona hace desde BackIO sale
-              con su propia cuenta (Mi Basecamp).
+              Esta es la cuenta de la organización: lecturas, webhooks y lo automático cuyo responsable no conectó su Basecamp. Lo que cada
+              persona hace desde BackIO sale con su propia cuenta (Mi Basecamp); el fee recurrente, a nombre de la ejecutiva, y la fecha
+              reenviada, a nombre de quien la cambió.
             </div>
           </div>
           <span
