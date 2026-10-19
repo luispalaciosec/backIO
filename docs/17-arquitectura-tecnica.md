@@ -348,7 +348,7 @@ El recorrido completo, síntoma por síntoma, está en [Operación](./operacion.
 |---|---|
 | Una tarea programada no corrió o terminó mal | Admin → Servicios y la tabla `cron_runs`; en los logs de Railway, las líneas `[jobs] <job> …` |
 | Un cambio en Basecamp no se ve en BackIO | `cron_runs` del job `estructura`, luego `audit_log` acción `basecamp_importar` del cliente. Logs: `[jobs] estructura …` y `[webhook basecamp] …` |
-| Una fecha de BackIO no llegó a Basecamp | `audit_log` acción `reprogramar`; si quedó desfasada, `reconcile.ts` la reenvía en la siguiente corrida (máximo 25 por corrida) y deja `basecamp_fecha_reenviada` |
+| Una fecha de BackIO no llegó a Basecamp | `audit_log` acción `reprogramar`; si quedó desfasada, `reconcile.ts` la reenvía en la siguiente corrida con la cuenta de quien la cambió (máximo 25 por corrida) y deja `basecamp_fecha_reenviada`; si se cambió después en Basecamp, gana esa (`basecamp_fecha_aceptada`) |
 | Asignados desaparecen en Basecamp | `client.ts:updateTodo` debe reenviar `assignee_ids` (incidente 22/09 en `docs/04`) |
 | La IA da error | `traducirErrorIA` en `lib/ia/index.ts`; el mensaje llega tal cual a la UI |
 | Un usuario no ve algo | Primero `requireScope` de la ruta, luego la política RLS de la tabla |

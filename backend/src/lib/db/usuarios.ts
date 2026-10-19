@@ -53,3 +53,17 @@ export async function fijarBasecampUserId(tenantId: string, usuarioId: string, b
     .is('basecamp_user_id', null);
   throwIf(error);
 }
+
+/** Persona activa de BackIO enlazada a una persona de Basecamp (para atribuir lo que hizo allá). */
+export async function usuarioPorBasecampId(ctx: DbCtx, basecampUserId: number): Promise<string | null> {
+  const { data, error } = await ctx.db
+    .from('usuarios')
+    .select('id')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('basecamp_user_id', basecampUserId)
+    .eq('activo', true)
+    .limit(1)
+    .maybeSingle();
+  throwIf(error);
+  return data?.id ?? null;
+}

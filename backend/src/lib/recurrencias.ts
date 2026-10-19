@@ -172,6 +172,7 @@ export async function generarPeriodo(
     entidad_id: r.proyecto.id,
     detalle: { recurrencia_id: rec.id, periodo, requerimientos: r.requerimientos.length },
   });
+  const pendienteBasecamp = !!(r.basecamp && typeof r.basecamp === 'object' && 'pendiente' in r.basecamp);
   const destino = rec.owner_ejecutiva
     ? { usuarioIds: [rec.owner_ejecutiva], roles: ['operaciones' as const] }
     : { roles: ['operaciones' as const, 'ejecutiva' as const] };
@@ -180,7 +181,9 @@ export async function generarPeriodo(
     {
       tipo: 'recurrencia_generada',
       titulo: `Listo el fee de ${periodo}: ${nombre}`,
-      cuerpo: `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas y lo envió a Basecamp. Revisa fechas, piezas y responsables antes de que arranque el mes.`,
+      cuerpo: pendienteBasecamp
+        ? `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas, pero no lo envió a Basecamp: la ejecutiva no conectó su Basecamp (en BackIO no se escribe a nombre de otra persona). Conéctalo en «Mi Basecamp» y pulsa «Reintentar Basecamp» en el proyecto.`
+        : `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas y lo envió a Basecamp. Revisa fechas, piezas y responsables antes de que arranque el mes.`,
       ruta: `/proyectos/${r.proyecto.id}`,
       entidad_tipo: 'proyecto',
       entidad_id: r.proyecto.id,

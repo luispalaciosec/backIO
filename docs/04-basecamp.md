@@ -13,7 +13,7 @@
 |---|---|---|
 | `completed` / `completed_at` | **Basecamp** | Basecamp → BackIO |
 | Existencia del to-do | BackIO lo crea; desde el 23/09/2026 también entra lo creado en Basecamp | Ambas |
-| `due_on` | BackIO | BackIO → Basecamp (al crear y al reprogramar) |
+| `due_on` | El cambio más reciente | BackIO → Basecamp (al crear y al reprogramar). Si alguien la cambia en Basecamp después, BackIO la acepta como reprogramación (19/10/2026) |
 | Asignaciones | BackIO | BackIO → Basecamp |
 | Estado operativo, aprobación, prioridad, peso | **BackIO** | No sale |
 | Comentarios, adjuntos, descripciones | **Basecamp** | **No entra jamás** |
@@ -39,13 +39,18 @@ OAuth2 de Basecamp 3, con dos clases de cuenta (migración 33, 16/10/2026):
 - **Lo automático con un responsable** también va con la cuenta de esa persona, si la conectó
   (`BasecampClient.forResponsable`): el proyecto mensual de un fee recurrente, con la de la **ejecutiva** del proyecto;
   la fecha que la reconciliación reenvía, con la de **quien la cambió por última vez** en BackIO. Si esa persona no
-  conectó su cuenta, se usa la de la organización.
-- **La de la organización** (Admin → Integraciones), para lo demás: lecturas (sincronización, horas, huérfanos),
-  webhooks, las API keys de integraciones (no tienen persona) y lo automático cuyo responsable no conectó su cuenta. No
-  hace falta un usuario aparte: alcanza con la cuenta de quien la conectó (decisión de Luis, 16/10/2026).
+  conectó su cuenta, **no se escribe** (decisión de Luis, 19/10/2026): el fee se crea en BackIO con el proyecto
+  marcado para reintentar y la ejecutiva recibe el aviso de conectar su Basecamp y pulsar «Reintentar Basecamp»; la
+  fecha queda pendiente hasta que esa persona conecte.
+- **Las API keys** escriben a nombre de **quien creó la key**, con su cuenta. Si no la conectó, la escritura se rechaza
+  con 428.
+- **La de la organización** (Admin → Integraciones) es **solo para leer**: sincronización, horas, huérfanos y
+  reconciliación. Nunca escribe a nombre de nadie: en Basecamp no aparece nada a nombre de una persona que no lo hizo
+  (antes salía a nombre de quien conectó la integración; caso de Grace, 19/10/2026).
 
-Código: `BasecampClient.forActor(ctx)` (persona, o la de la organización si no hay persona) y `forTenant` (solo
-organización), en `backend/src/lib/basecamp/client.ts`; validación de identidad en `lib/basecamp/persona.ts`.
+Código: `BasecampClient.forActor(ctx)` (la persona, o quien creó la API key; si no hay ninguna conectada, 428),
+`forResponsable` (la persona o nada) y `forTenant` (solo lecturas), en `backend/src/lib/basecamp/client.ts`;
+validación de identidad en `lib/basecamp/persona.ts`.
 
 ```
 BASECAMP_CLIENT_ID
@@ -192,9 +197,19 @@ Los webhooks de Basecamp fallan ocasionalmente. El job `reconcile` corre cada 30
 (`backend/src/lib/basecamp/reconcile.ts`). Recorre los requerimientos activos que tienen to-do enlazado, lee cada
 to-do vivo y aplica las diferencias de estado con la misma lógica del webhook.
 
-También corrige fechas. BackIO manda sobre `due_on`: si la fecha en Basecamp no coincide con la de BackIO, se
-reenvía la de BackIO. Para que un desfase masivo no se propague de golpe, se reenvían como máximo 25 fechas por
-corrida, y cada una queda en la auditoría.
+También corrige fechas, y gana el cambio más reciente (decisión de Luis, 19/10/2026):
+
+- **Si alguien cambió la fecha en Basecamp** después del último cambio hecho en BackIO, BackIO la acepta: queda como
+  reprogramación con origen «basecamp», sin motivo (aparece en Causas pendientes para completarla), a nombre de quien
+  la cambió si el webhook lo informa, y en la auditoría como `basecamp_fecha_aceptada`. Lo mismo hace el webhook al
+  instante. Antes la reconciliación la revertía con la cuenta de la organización y en Basecamp aparecía otra persona
+  cambiando la fecha.
+- **Si BackIO la cambió después** y no llegó a Basecamp, se reenvía con la cuenta de quien la cambió
+  (`basecamp_fecha_reenviada`). Si esa persona no conectó su Basecamp, no se reenvía. Si Basecamp todavía tiene la
+  fecha anterior a ese cambio, tampoco cuenta como un cambio hecho en Basecamp (un comentario en el to-do mueve su
+  fecha de actualización).
+
+Para que un desfase masivo no se propague de golpe, se reenvían como máximo 25 fechas por corrida.
 
 Sin esto, un webhook perdido deja una tarea marcada como pendiente indefinidamente — y esa
 tarea termina apareciendo como falso atraso en el weekly.

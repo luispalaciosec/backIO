@@ -50,9 +50,10 @@ export function descripcionParaGuardar(html: string): string {
 /** La persona no conectó su Basecamp: BackIO no escribe a nombre de otro (decisión de Luis, 16/10/2026). */
 export class BasecampSinConectar extends DbError {
   readonly codigo = 'basecamp_sin_conectar';
-  constructor() {
+  constructor(mensaje?: string) {
     super(
-      'Para que esto salga a tu nombre en Basecamp, primero conecta tu cuenta con «Conectar mi Basecamp» (arriba en la pantalla).',
+      mensaje ??
+        'Para que esto salga a tu nombre en Basecamp, primero conecta tu cuenta con «Conectar mi Basecamp» (arriba en la pantalla).',
       428,
     );
   }
@@ -68,38 +69,37 @@ export class BasecampClient {
   ) {}
 
   /**
-   * Cliente para lo que hace alguien: su propia cuenta de Basecamp, así el to-do, el mensaje o el cambio salen a su
-   * nombre. Sin persona (tarea programada, webhook, API key de una integración) usa la cuenta del tenant («BackIO»).
-   * Si la persona no conectó su cuenta, lanza BasecampSinConectar: hay que llamarlo ANTES de cambiar nada en BackIO.
-   */
-  /**
    * Para lo automático que tiene una persona responsable (el fee de una ejecutiva, la fecha que alguien cambió): su
-   * cuenta si la conectó; si no, la de la organización. Nunca lanza BasecampSinConectar: nadie está esperando en pantalla.
+   * cuenta si la conectó. Si no, null: NO se escribe con la cuenta de otro (decisión de Luis, 19/10/2026: nada puede
+   * salir en Basecamp a nombre de quien no lo hizo). Quien llama lo deja pendiente y avisa.
    */
-  static async forResponsable(tenantId: string, usuarioId: string | null): Promise<BasecampClient> {
-    if (usuarioId) {
-      const { leerCredencialesPersona } = await import('../db/credenciales');
-      const c = await leerCredencialesPersona(usuarioId);
-      if (c?.access_token && c.refresh_token && c.expires_at)
-        return new BasecampClient(
-          tenantId,
-          { access_token: c.access_token, refresh_token: c.refresh_token, expires_at: c.expires_at },
-          usuarioId,
-        );
-    }
-    return BasecampClient.forTenant(tenantId);
+  static async forResponsable(tenantId: string, usuarioId: string | null): Promise<BasecampClient | null> {
+    if (!usuarioId) return null;
+    const { leerCredencialesPersona } = await import('../db/credenciales');
+    const c = await leerCredencialesPersona(usuarioId);
+    if (!c?.access_token || !c.refresh_token || !c.expires_at) return null;
+    return new BasecampClient(
+      tenantId,
+      { access_token: c.access_token, refresh_token: c.refresh_token, expires_at: c.expires_at },
+      usuarioId,
+    );
   }
 
-  static async forActor(ctx: { tenantId: string; usuarioId: string | null }): Promise<BasecampClient> {
-    if (!ctx.usuarioId) return BasecampClient.forTenant(ctx.tenantId);
-    const { leerCredencialesPersona } = await import('../db/credenciales');
-    const c = await leerCredencialesPersona(ctx.usuarioId);
-    if (!c?.access_token || !c.refresh_token || !c.expires_at) throw new BasecampSinConectar();
-    return new BasecampClient(
-      ctx.tenantId,
-      { access_token: c.access_token, refresh_token: c.refresh_token, expires_at: c.expires_at },
-      ctx.usuarioId,
-    );
+  /**
+   * Cliente para escribir en Basecamp: SIEMPRE con la cuenta de una persona, así el to-do, el mensaje o el cambio salen
+   * a su nombre. Una API key (agente o integración) escribe a nombre de quien la creó. Sin persona, o si la persona no
+   * conectó su cuenta, lanza BasecampSinConectar: nunca se escribe con la cuenta de la integración (19/10/2026). Hay
+   * que llamarlo ANTES de cambiar nada en BackIO. La cuenta de la integración (forTenant) queda solo para leer.
+   */
+  static async forActor(ctx: { tenantId: string; usuarioId: string | null; apiKeyId?: string | null }): Promise<BasecampClient> {
+    let persona = ctx.usuarioId;
+    if (!persona && ctx.apiKeyId) {
+      const { creadorDeApiKey } = await import('../db/auth');
+      persona = await creadorDeApiKey(ctx.apiKeyId);
+    }
+    const c = await BasecampClient.forResponsable(ctx.tenantId, persona);
+    if (!c) throw new BasecampSinConectar(persona ? undefined : 'Esta acción no tiene una persona a cuyo nombre escribir en Basecamp.');
+    return c;
   }
 
   static async forTenant(tenantId: string): Promise<BasecampClient> {

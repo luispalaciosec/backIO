@@ -30,12 +30,14 @@ si el texto nunca entra, no hay error posible que lo saque. La excepción acotad
 
 ### R3 · Los estados no se sincronizan en los dos sentidos
 
-**Qué.** Basecamp manda sobre «completado». BackIO manda sobre todo lo demás: estado operativo, aprobación, prioridad y
-fecha de entrega. Si la fecha de Basecamp queda desfasada, BackIO la vuelve a enviar.
+**Qué.** Basecamp manda sobre «completado». BackIO manda sobre todo lo demás: estado operativo, aprobación y prioridad.
+La fecha de entrega la decide el cambio más reciente: si alguien la cambia en Basecamp después que en BackIO, BackIO la
+acepta como reprogramación desde Basecamp (sin motivo, queda en Causas pendientes); si BackIO la cambió después, la
+vuelve a enviar (decisión de Luis, 19/10/2026; antes BackIO siempre reenviaba la suya).
 
 **Por qué.** Basecamp solo conoce «completado sí o no» y BackIO tiene ocho estados operativos: mapearlos en los dos sentidos genera conflictos permanentes.
 
-**Dónde.** `lib/requerimientos/actualizar.ts`, `lib/basecamp/reconcile.ts`.
+**Dónde.** `lib/requerimientos/actualizar.ts`, `lib/basecamp/sync.ts` (`aceptarFechaDeBasecamp`), `lib/basecamp/reconcile.ts`.
 
 ### R4 · Un agente propone y una persona confirma
 
@@ -79,6 +81,7 @@ mezcle datos entre organizaciones.
 | — | Las tareas de quien se va se reparten **por cliente, con vista previa**: por defecto al líder de la mesa, con cambio por grupo o por tarea | — | 11/10/2026 · Luis |
 | — | En una salida, BackIO **cambia también al responsable en Basecamp**, de a 50 to-dos | — | 11/10/2026 · Luis |
 | — | Lo que alguien hace desde BackIO se escribe en Basecamp **con su propia cuenta**; si no la conectó, BackIO no escribe por ella. Lo automático con responsable (fee recurrente, fecha reenviada) va con la cuenta de esa persona; sin usuario «BackIO» aparte. Todos usan BackIO y Basecamp por igual | Basecamp mostraba todo como hecho por quien conectó la integración y se perdía la trazabilidad de quién hizo qué | 16/10/2026 · Luis. Ver [Basecamp](./04-basecamp.md#autenticacion) |
+| — | En Basecamp no sale nada a nombre de quien no lo hizo. La fecha cambiada en Basecamp después que en BackIO se acepta como reprogramación desde Basecamp; lo automático cuyo responsable no conectó su Basecamp no se escribe y se avisa; la cuenta de la organización solo lee; una API key escribe a nombre de quien la creó | Grace cambió una fecha en Basecamp, la reconciliación la revirtió y Basecamp mostró a Luis como autor | 19/10/2026 · Luis. Ver [Basecamp](./04-basecamp.md#autenticacion) |
 | — | **Acme EC S.A.S es cliente de prueba**: no cuenta en señales, actas, dashboard, personas ni KPIs | Es el cliente del sandbox de Basecamp; sus tareas de prueba ensuciaban el weekly de las mesas | 19/10/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 

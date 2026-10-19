@@ -71,6 +71,7 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
       id: 'r1',
       tenant_id: 't1',
       estado_operativo: 'en_ejecucion',
+      fecha_entrega: '2026-09-05',
     } as never);
     vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, patch) => {
       escrituras.push(patch);
@@ -93,7 +94,12 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
 
   it('reabre a en_ejecucion, no a backlog', async () => {
     let patch: unknown;
-    vi.spyOn(reqs, 'findByBasecampTodo').mockResolvedValue({ id: 'r1', tenant_id: 't1', estado_operativo: 'completado' } as never);
+    vi.spyOn(reqs, 'findByBasecampTodo').mockResolvedValue({
+      id: 'r1',
+      tenant_id: 't1',
+      estado_operativo: 'completado',
+      fecha_entrega: '2026-09-05',
+    } as never);
     vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, p) => {
       patch = p;
       return {} as never;

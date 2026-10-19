@@ -109,7 +109,8 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
     log.warn('[builder] bloques con responsable inactivo; sus tareas nacen sin responsable', plan.owners_inactivos.join(','));
   // Basecamp con la cuenta de quien crea el proyecto. Se pide ANTES de crear nada: si la persona no conectó su
   // Basecamp, no queda un proyecto a medias (migración 33). Si lo crea una tarea programada (fee recurrente), va a
-  // nombre de la ejecutiva del proyecto si conectó su cuenta; si no, con la de la organización.
+  // nombre de la ejecutiva del proyecto si conectó su cuenta; si no, el proyecto se crea en BackIO y queda pendiente
+  // de bajar a Basecamp (nunca con la cuenta de otro, 19/10/2026): la ejecutiva conecta y pulsa «Reintentar Basecamp».
   const bc = !cliente.basecamp_project_id
     ? undefined
     : ctx.usuarioId
@@ -189,9 +190,14 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   }
 
   let basecamp: unknown = { omitido: true, motivo: 'cliente sin basecamp_project_id' };
-  if (cliente.basecamp_project_id) {
+  if (cliente.basecamp_project_id && !bc) {
+    await updateProyecto(ctx, proyecto.id, { sync_estado: 'incompleto' });
+    basecamp = {
+      pendiente: 'La ejecutiva no conectó su Basecamp: el proyecto baja a Basecamp cuando lo conecte y pulse «Reintentar Basecamp».',
+    };
+  } else if (cliente.basecamp_project_id) {
     try {
-      basecamp = await createProjectStructure(ctx, proyecto, requerimientos, { bc });
+      basecamp = await createProjectStructure(ctx, proyecto, requerimientos, { bc: bc ?? undefined });
     } catch (err) {
       await updateProyecto(ctx, proyecto.id, { sync_estado: 'incompleto' });
       basecamp = { error: err instanceof Error ? err.message : String(err) };

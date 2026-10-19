@@ -212,3 +212,21 @@ export async function ultimoQueReprogramo(ctx: DbCtx, requerimientoId: string): 
   throwIf(error);
   return data?.usuario_id ?? null;
 }
+
+/** El último cambio de fecha de una tarea hecho DESDE BackIO (pantalla, API o agente; no desde Basecamp). */
+export async function ultimoCambioDeFechaEnBackio(
+  ctx: DbCtx,
+  requerimientoId: string,
+): Promise<{ created_at: string; fecha_anterior: string | null } | null> {
+  const { data, error } = await ctx.db
+    .from('reprogramaciones')
+    .select('created_at, fecha_anterior')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('requerimiento_id', requerimientoId)
+    .neq('origen', 'basecamp')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIf(error);
+  return data ?? null;
+}

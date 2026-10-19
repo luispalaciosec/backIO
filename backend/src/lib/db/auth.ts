@@ -2,7 +2,7 @@
  * Consultas del middleware de autenticación (lib/auth/middleware). Reciben el cliente explícito porque cada vía usa
  * el suyo: service role para API keys y OAuth, cliente con el JWT del usuario (RLS) para la sesión de la UI.
  */
-import type { Db } from './client';
+import { serviceClient, type Db } from './client';
 
 export async function getApiKeyPorHash(db: Db, keyHash: string) {
   const { data } = await db
@@ -36,4 +36,10 @@ export async function getUsuarioSesion(db: Db, usuarioId: string) {
 export async function getUsuarioOAuth(db: Db, usuarioId: string, tenantId: string) {
   const { data } = await db.from('usuarios').select('rol, nombre, activo').eq('id', usuarioId).eq('tenant_id', tenantId).maybeSingle();
   return data;
+}
+
+/** Quién creó una API key: lo que un agente o una integración escribe en Basecamp va a su nombre. */
+export async function creadorDeApiKey(apiKeyId: string): Promise<string | null> {
+  const { data } = await serviceClient().from('api_keys').select('creado_por').eq('id', apiKeyId).maybeSingle();
+  return data?.creado_por ?? null;
 }

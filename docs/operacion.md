@@ -66,7 +66,10 @@ problema**. No vuelve a avisar una corrida que terminó con errores: ese error y
 ### Una fecha cambiada en BackIO no llegó a Basecamp
 
 - La pantalla avisa si Basecamp rechazó la fecha, y en `audit_log` queda `basecamp_due_on_error`.
-- La reconciliación la reintenta cada 30 min y deja `basecamp_fecha_reenviada`.
+- La reconciliación la reintenta cada 30 min con la cuenta de quien la cambió y deja `basecamp_fecha_reenviada`. Si
+  esa persona no conectó su Basecamp, no se reenvía: que la conecte en «Mi Basecamp».
+- Si alguien cambió la fecha en Basecamp después, gana esa: queda `basecamp_fecha_aceptada` y una reprogramación con
+  origen «basecamp».
 
 ### En Basecamp desaparecieron los asignados de un to-do
 

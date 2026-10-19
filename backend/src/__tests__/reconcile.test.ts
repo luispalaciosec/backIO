@@ -53,8 +53,9 @@ beforeEach(() => {
     .mockImplementation(async (_c: unknown, id: string) => ({ id, basecamp_project_id: e.proyectoDe.get(id) ?? null }));
   e.aplicar.mockReset().mockResolvedValue({ aplicado: false });
   e.push.mockReset().mockResolvedValue(undefined);
-  e.quien = null;
-  e.responsable.mockReset().mockImplementation(async (_t: string, u: string) => ({ cuenta: u }));
+  e.quien = 'ana';
+  // Sin persona, o persona sin su Basecamp conectado: null (nunca la cuenta de otro).
+  e.responsable.mockReset().mockImplementation(async (_t: string, u: string | null) => (u && u !== 'sin_conectar' ? { cuenta: u } : null));
   e.audit.mockReset();
 });
 
@@ -105,16 +106,34 @@ describe('reconcileTenant', () => {
     expect(await reconcileTenant(ctx)).toEqual({ revisados: 0, aplicados: 0 });
   });
   // 16/10/2026: la fecha reenviada sale a nombre de quien la cambió en BackIO, no de quien conectó la integración.
-  it('reenvía la fecha con la cuenta de quien la cambió por última vez; sin nadie conocido, con la de la organización', async () => {
+  // 19/10/2026: y si esa persona no conectó su Basecamp (o no se sabe quién fue), no se reenvía con la cuenta de nadie.
+  it('reenvía la fecha con la cuenta de quien la cambió por última vez; si no hay quien, no se escribe', async () => {
     e.activos = [req(1)];
     e.todos.set(1, todo(1, { due_on: '2026-10-25' }));
     e.quien = 'johanna';
     await reconcileTenant(ctx);
     expect(e.responsable).toHaveBeenCalledWith('t', 'johanna');
     expect(e.push.mock.calls[0]![2]).toEqual({ cuenta: 'johanna' });
-    e.quien = null;
-    e.push.mockClear();
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    for (const quien of [null, 'sin_conectar']) {
+      e.quien = quien;
+      e.push.mockClear();
+      e.audit.mockClear();
+      await reconcileTenant(ctx);
+      expect(e.push).not.toHaveBeenCalled();
+      expect(e.audit).not.toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ accion: 'basecamp_fecha_reenviada', detalle: expect.objectContaining({ basecamp: '2026-10-25' }) }),
+      );
+      e.audit.mockClear();
+    }
+  });
+  // 19/10/2026 (Grace): si la fecha se cambió en Basecamp después que en BackIO, BackIO la acepta y no la pisa.
+  it('si la fecha nueva de Basecamp se aceptó como reprogramación, no se reenvía la vieja', async () => {
+    e.activos = [req(1)];
+    e.todos.set(1, todo(1, { due_on: '2026-10-25' }));
+    e.aplicar.mockResolvedValue({ aplicado: true, fecha_aceptada: true });
     await reconcileTenant(ctx);
-    expect(e.push.mock.calls[0]![2]).toMatchObject({ cuenta: 'organizacion' });
+    expect(e.push).not.toHaveBeenCalled();
   });
 });

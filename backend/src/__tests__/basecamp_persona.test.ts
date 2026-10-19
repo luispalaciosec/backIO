@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const e = vi.hoisted(() => ({ persona: null as unknown, tenant: null as unknown }));
+const e = vi.hoisted(() => ({ persona: null as unknown, tenant: null as unknown, creador: null as string | null }));
 vi.mock('../lib/db/credenciales', () => ({
   leerCredencialesPersona: async () => e.persona,
   leerCredencialesBasecamp: async () => e.tenant,
 }));
+vi.mock('../lib/db/auth', () => ({ creadorDeApiKey: async () => e.creador }));
 
 import { BasecampClient, BasecampSinConectar } from '../lib/basecamp/client';
 import { validarIdentidadPersona } from '../lib/basecamp/persona';
 
 const tokens = { access_token: 'a', refresh_token: 'r', expires_at: '2099-01-01T00:00:00Z' };
-const dueno = (c: BasecampClient) => (c as unknown as { usuarioId: string | null }).usuarioId;
+const dueno = (c: BasecampClient | null) => c && (c as unknown as { usuarioId: string | null }).usuarioId;
 
 beforeEach(() => {
   e.persona = null;
   e.tenant = tokens;
+  e.creador = null;
 });
 
 // Migración 33: lo que alguien hace desde BackIO sale a su nombre en Basecamp.
@@ -30,13 +32,19 @@ describe('qué cuenta de Basecamp se usa', () => {
       codigo: 'basecamp_sin_conectar',
     });
   });
-  it('sin persona (tarea programada, webhook, API key de una integración) usa la cuenta del tenant («BackIO»)', async () => {
-    expect(dueno(await BasecampClient.forActor({ tenantId: 't', usuarioId: null }))).toBeNull();
+  it('una API key escribe a nombre de quien la creó', async () => {
+    e.persona = { ...tokens, email: 'ana@geeks.ec' };
+    e.creador = 'u7';
+    expect(dueno(await BasecampClient.forActor({ tenantId: 't', usuarioId: null, apiKeyId: 'k1' }))).toBe('u7');
+  });
+  it('sin persona no se escribe con la cuenta de otro (19/10/2026)', async () => {
+    await expect(BasecampClient.forActor({ tenantId: 't', usuarioId: null })).rejects.toBeInstanceOf(BasecampSinConectar);
+    await expect(BasecampClient.forActor({ tenantId: 't', usuarioId: null, apiKeyId: 'k1' })).rejects.toBeInstanceOf(BasecampSinConectar);
   });
 });
 
 describe('lo automático con responsable (fee de una ejecutiva, fecha que alguien cambió)', () => {
-  it('su cuenta si la conectó; si no, la de la organización (sin error: nadie espera en pantalla)', async () => {
+  it('su cuenta si la conectó; si no, ninguna: no se escribe (nunca con la cuenta de otro)', async () => {
     e.persona = { ...tokens, email: 'ana@geeks.ec' };
     expect(dueno(await BasecampClient.forResponsable('t', 'u1'))).toBe('u1');
     e.persona = null;

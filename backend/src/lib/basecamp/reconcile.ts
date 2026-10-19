@@ -21,7 +21,7 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
   if (activos.length === 0) return { revisados: 0, aplicados: 0 };
   // Lectura con la cuenta de la organización; el reenvío de fechas, con la de quien la cambió (abajo).
   const bc = await BasecampClient.forTenant(ctx.tenantId);
-  const clientes = new Map<string, BasecampClient>();
+  const clientes = new Map<string, BasecampClient | null>();
   const proyectosPorCliente = new Map<string, number | null>();
   let aplicados = 0,
     fechas = 0;
@@ -34,16 +34,23 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
     try {
       const raw = await bc.getTodoRaw(bcProject, r.basecamp_todo_id as number);
       const safe = extractSafeTodo(raw);
-      if (safe && (await applyBasecampUpdate(ctx, { ...safe, completed: safe.completed ?? false })).aplicado) aplicados += 1;
-      // Regla 3: BackIO manda sobre la fecha. Si Basecamp quedó desfasado, se reenvía.
-      if (safe && r.fecha_entrega && safe.due_on !== r.fecha_entrega && fechas < MAX_FECHAS_POR_CORRIDA) {
-        fechas += 1;
+      const res = safe ? await applyBasecampUpdate(ctx, { ...safe, completed: safe.completed ?? false }) : null;
+      if (res?.aplicado) aplicados += 1;
+      // La fecha: si alguien la cambió en Basecamp después que en BackIO, applyBasecampUpdate ya la aceptó. Si BackIO la
+      // cambió después y no llegó a Basecamp, se reenvía a nombre de quien la cambió, solo si conectó su Basecamp:
+      // nunca con la cuenta de otro (19/10/2026). Si no, queda pendiente hasta que lo conecte.
+      if (safe && !res?.fecha_aceptada && r.fecha_entrega && safe.due_on !== r.fecha_entrega && fechas < MAX_FECHAS_POR_CORRIDA) {
         try {
-          // A nombre de quien cambió esa fecha por última vez en BackIO, si conectó su Basecamp (16/10/2026).
           const quien = await ultimoQueReprogramo(ctx, r.id);
           const k = quien ?? '';
-          if (!clientes.has(k)) clientes.set(k, quien ? await BasecampClient.forResponsable(ctx.tenantId, quien) : bc);
-          await pushDueDate(ctx, r, clientes.get(k));
+          if (!clientes.has(k)) clientes.set(k, await BasecampClient.forResponsable(ctx.tenantId, quien));
+          const suyo = clientes.get(k);
+          if (!suyo) {
+            log.warn('[reconcile] fecha sin reenviar: quien la cambió no conectó su Basecamp', r.basecamp_todo_id);
+            continue;
+          }
+          fechas += 1;
+          await pushDueDate(ctx, r, suyo);
           await audit(ctx, {
             accion: 'basecamp_fecha_reenviada',
             entidad: 'requerimiento',
