@@ -7,7 +7,7 @@ import type { DbCtx } from './db/client';
 import { listCompletadosDesde, listHorasDesde } from './db/dashboard';
 import { listUsuarios } from './db/usuarios';
 import { tramosResponsables } from './db/responsables';
-import { listClientes } from './db/clientes';
+import { listClientes, idsClientesDePrueba } from './db/clientes';
 import { listBacklog } from './db/requerimientos';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento } from './cumplimiento';
@@ -75,13 +75,18 @@ export async function resumenPersonas(
   const desde30 = sumarDias(hoy, -29);
   const desdeIso = inicioDiaLocal(desde);
   const hastaIso = finDiaLocal(hasta);
-  const [usuarios, clientes, activos, cumpl] = await Promise.all([
+  const [usuarios, clientes, activosTodos, cumpl, prueba] = await Promise.all([
     listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx, { incluirInactivos: true }),
     listBacklog(ctx, { solo_activos: true }),
     listCumplimientoDesde(ctx, desdeIso),
+    idsClientesDePrueba(ctx),
   ]);
-  const completados = await listCompletadosDesde(ctx, inicioDiaLocal(desde30 < desde ? desde30 : desde));
+  // Los clientes de prueba (migración 34) no cuentan en las métricas por persona.
+  const activos = activosTodos.filter((r) => !prueba.has(r.cliente_id));
+  const completados = (await listCompletadosDesde(ctx, inicioDiaLocal(desde30 < desde ? desde30 : desde))).filter(
+    (r) => !prueba.has(r.cliente_id),
+  );
   const hrs = await listHorasDesde(ctx, desde30 < desde ? desde30 : desde);
   const horas = hrs as { usuario_id: string | null; fecha: string; horas: number }[];
   const nombreC = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '—';

@@ -579,6 +579,7 @@ export type Database = {
           basecamp_project_id: number | null;
           config: Json;
           activo: boolean;
+          es_prueba: boolean;
           created_at: string;
           updated_at: string;
           created_by: string | null;
@@ -597,6 +598,7 @@ export type Database = {
           basecamp_project_id?: number | null;
           config?: Json;
           activo?: boolean;
+          es_prueba?: boolean;
           created_at?: string;
           updated_at?: string;
           created_by?: string | null;
@@ -615,6 +617,7 @@ export type Database = {
           basecamp_project_id?: number | null;
           config?: Json;
           activo?: boolean;
+          es_prueba?: boolean;
           created_at?: string;
           updated_at?: string;
           created_by?: string | null;

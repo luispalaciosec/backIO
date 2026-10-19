@@ -177,6 +177,13 @@ pantalla del weekly, que llama a `POST /semanas/:id/plan` y `POST /semanas/:id/a
   semana. Guarda el resultado en `actas`.
 - `backend/src/lib/rituals/documents.ts` solo arma el texto (`renderPlanOperativo`, `renderActaCierre`) y
   calcula la capacidad por persona.
+- **Con `?mesa=`, todo es de esa mesa** (19/10/2026): tareas, números, **señales** y **acuerdos**. Las señales se
+  calculan con los clientes y proyectos de la mesa (`senalesDeMesa`), respetando las que ya se marcaron como atendidas;
+  los acuerdos, que no tienen mesa, entran si su responsable trabaja en ella. Antes las señales y los acuerdos eran los
+  de toda la agencia: en el cierre de Omega de la semana 42 aparecieron AB-Inbev (Orión) y Acme (prueba).
+- En el acta, el **resultado** y el **arrastre** no cuentan las tareas canceladas (no pasan a la semana siguiente).
+- Los **clientes de prueba** (`clientes.es_prueba`, migración 34; hoy Acme EC S.A.S, el del sandbox de Basecamp) no
+  generan señales ni cuentan en actas, dashboard, personas ni KPIs. Siguen en el backlog para poder probar.
 
 Ver la lista de rutas en la [referencia de la API](./referencia-api.md).
 

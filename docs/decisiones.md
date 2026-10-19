@@ -79,6 +79,7 @@ mezcle datos entre organizaciones.
 | — | Las tareas de quien se va se reparten **por cliente, con vista previa**: por defecto al líder de la mesa, con cambio por grupo o por tarea | — | 11/10/2026 · Luis |
 | — | En una salida, BackIO **cambia también al responsable en Basecamp**, de a 50 to-dos | — | 11/10/2026 · Luis |
 | — | Lo que alguien hace desde BackIO se escribe en Basecamp **con su propia cuenta**; si no la conectó, BackIO no escribe por ella. Lo automático con responsable (fee recurrente, fecha reenviada) va con la cuenta de esa persona; sin usuario «BackIO» aparte. Todos usan BackIO y Basecamp por igual | Basecamp mostraba todo como hecho por quien conectó la integración y se perdía la trazabilidad de quién hizo qué | 16/10/2026 · Luis. Ver [Basecamp](./04-basecamp.md#autenticacion) |
+| — | **Acme EC S.A.S es cliente de prueba**: no cuenta en señales, actas, dashboard, personas ni KPIs | Es el cliente del sandbox de Basecamp; sus tareas de prueba ensuciaban el weekly de las mesas | 19/10/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 
 ## Decisiones técnicas

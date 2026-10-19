@@ -2,6 +2,7 @@
  * Acceso a datos de KPIs (docs/19-kpis.md). Las tablas de KPIs se escriben con service role:
  * el permiso fino (catálogo solo admin; mediciones admin/gerencia/operaciones) lo aplica la ruta.
  */
+import { idsClientesDePrueba } from './clientes';
 import type { KpiDefinicion, KpiMedicion, Reproceso, Reprogramacion } from '@backio/shared';
 import { type DbCtx, serviceClient, throwIf } from './client';
 import { paginar } from './paginar';
@@ -186,10 +187,13 @@ export async function cargarDatosKpi(ctx: DbCtx, desdeIso: string, hastaIso: str
   ]);
   throwIf(e3);
   throwIf(e4);
+  // Los clientes de prueba (migración 34) no cuentan en los KPIs.
+  const prueba = await idsClientesDePrueba(ctx);
+  const real = (r: ReqKpi) => !prueba.has(r.cliente_id);
   return {
-    completadas,
-    creadas,
-    decididas: [...new Map(decididas.map((r) => [r.id, r])).values()],
+    completadas: completadas.filter(real),
+    creadas: creadas.filter(real),
+    decididas: [...new Map(decididas.filter(real).map((r) => [r.id, r])).values()],
     reprocesos,
     reprogramaciones,
     eventos,

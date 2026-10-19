@@ -111,15 +111,19 @@ export function renderPlanOperativo(d: PlanOperativoData): string {
 
 export function renderActaCierre(d: ActaCierreData): string {
   const s = d.semana;
-  const completadas = d.prioridades.filter((r) => r.estado_operativo === 'completado');
-  const noCompletadas = d.prioridades.filter((r) => r.estado_operativo !== 'completado');
+  // Las canceladas no cuentan: ni en el resultado ni en el arrastre (no pasan a la semana siguiente). Antes el cierre de
+  // Omega de la semana 42 decía «17 de 31 (55 %)» con 7 canceladas adentro: eran 17 de 24 (71 %) (19/10/2026).
+  const vigentes = d.prioridades.filter((r) => r.estado_operativo !== 'cancelado');
+  const completadas = vigentes.filter((r) => r.estado_operativo === 'completado');
+  const noCompletadas = vigentes.filter((r) => r.estado_operativo !== 'completado');
+  const canceladas = d.prioridades.length - vigentes.length;
   const lineas: string[] = [];
   lineas.push(
     `# Acta de Cierre${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
     '',
   );
   lineas.push(
-    `**Resultado:** ${completadas.length} de ${d.prioridades.length} tareas completadas (${d.prioridades.length ? Math.round((completadas.length / d.prioridades.length) * 100) : 0}%).`,
+    `**Resultado:** ${completadas.length} de ${vigentes.length} tareas completadas (${vigentes.length ? Math.round((completadas.length / vigentes.length) * 100) : 0}%)${canceladas ? `; ${canceladas} ${canceladas === 1 ? 'cancelada no cuenta' : 'canceladas no cuentan'}` : ''}.`,
     '',
   );
   lineas.push('## 1. Estado de las prioridades', '');

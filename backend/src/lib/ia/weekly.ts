@@ -4,7 +4,8 @@
  */
 import type { Senal, TipoSenal, WeeklyIA, AgendaIA } from '@backio/shared';
 import type { DbCtx } from '../db/client';
-import { getSemana, listSenales, listAcuerdosAbiertos } from '../db/semanas';
+import { getSemana } from '../db/semanas';
+import { acuerdosAbiertosDeMesa, senalesDeMesa } from '../rituals/service';
 import { listUsuarios } from '../db/usuarios';
 import { getMesa } from '../db/mesas';
 import { buildDashboard } from '../dashboard';
@@ -70,9 +71,10 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
   const mesa = mesaId ? await getMesa(ctx, mesaId) : null;
+  // Señales y acuerdos de la mesa, no de toda la agencia (19/10/2026).
   const [senales, abiertos, usuarios, dash] = await Promise.all([
-    listSenales(ctx, semanaId),
-    listAcuerdosAbiertos(ctx),
+    senalesDeMesa(ctx, semana, mesaId ?? null),
+    acuerdosAbiertosDeMesa(ctx, mesaId ?? null),
     listUsuarios(ctx, { incluirInactivos: true }),
     buildDashboard(ctx, mesaId ?? null),
   ]);
@@ -101,7 +103,8 @@ export async function narrarWeekly(ctx: DbCtx, semanaId: string, mesaId?: string
     por_persona: dash.por_persona.map((p) => ({
       persona: p.nombre,
       activos: p.activos,
-      esta_semana: p.semana_actual,
+      // Nombre explícito: con «esta_semana» la IA escribía «17 activos con 0 asignados».
+      con_entrega_esta_semana: p.semana_actual,
       pct_capacidad: p.pct_semana,
       atrasados: p.atrasados,
       horas_30d: p.horas_30d,

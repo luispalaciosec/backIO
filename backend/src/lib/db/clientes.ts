@@ -126,3 +126,13 @@ export async function ponerLogoSiFalta(ctx: DbCtx, clienteId: string, logoUrl: s
     .is('logo_url', null);
   throwIf(error);
 }
+
+/**
+ * Clientes de prueba (migración 34, p. ej. el del sandbox de Basecamp): sus tareas no cuentan en señales, actas,
+ * dashboard, KPIs ni informes. Si la columna todavía no existe (migración sin aplicar), no excluye a nadie.
+ */
+export async function idsClientesDePrueba(ctx: DbCtx): Promise<Set<string>> {
+  const { data, error } = await ctx.db.from('clientes').select('id').eq('tenant_id', ctx.tenantId).eq('es_prueba', true);
+  if (error) return new Set();
+  return new Set((data ?? []).map((c) => c.id));
+}

@@ -9,7 +9,7 @@ import { listBacklog } from './db/requerimientos';
 import { listProyectos } from './db/proyectos';
 import { listUsuarios } from './db/usuarios';
 import { tramosResponsables } from './db/responsables';
-import { listClientes } from './db/clientes';
+import { listClientes, idsClientesDePrueba } from './db/clientes';
 import { listMesas, alcanceMesa } from './db/mesas';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento, labelMotivoReprogramacion, labelMotivoReproceso, aTiempoOriginal, aTiempoVigente } from './cumplimiento';
@@ -130,12 +130,16 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   ]);
   const mesa = mesaId ? (mesas.find((m) => m.id === mesaId) ?? null) : null;
   const alcance = mesa ? await alcanceMesa(ctx, mesa.id) : undefined;
-  const [activos, completados56, horas, cumpl] = await Promise.all([
+  const [activosTodos, completadosTodos, horas, cumpl, prueba] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
     listCompletadosDesde(ctx, hace56, alcance),
     resumenHoras(ctx, hace30, alcance ? { clienteIds: alcance.clienteIds } : {}),
     listCumplimientoDesde(ctx, hace30),
+    idsClientesDePrueba(ctx),
   ]);
+  // Los clientes de prueba (migración 34) no cuentan en el dashboard.
+  const activos = activosTodos.filter((r) => !prueba.has(r.cliente_id));
+  const completados56 = completadosTodos.filter((r) => !prueba.has(r.cliente_id));
   const huerfanosPend = await contarHuerfanosPendientes(ctx);
   const completados30 = completados56.filter((r) => r.completado_at && r.completado_at >= hace30);
   // Reprogramaciones/reprocesos 30d acotados al alcance (por requerimiento visible en activos o completados).
