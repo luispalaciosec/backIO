@@ -579,7 +579,6 @@ export type Database = {
           basecamp_project_id: number | null;
           config: Json;
           activo: boolean;
-          es_prueba: boolean;
           created_at: string;
           updated_at: string;
           created_by: string | null;
@@ -587,6 +586,7 @@ export type Database = {
           deleted_at: string | null;
           mesa_id: string | null;
           basecamp_importado_at: string | null;
+          es_prueba: boolean;
         };
         Insert: {
           id: string;
@@ -598,7 +598,6 @@ export type Database = {
           basecamp_project_id?: number | null;
           config?: Json;
           activo?: boolean;
-          es_prueba?: boolean;
           created_at?: string;
           updated_at?: string;
           created_by?: string | null;
@@ -606,6 +605,7 @@ export type Database = {
           deleted_at?: string | null;
           mesa_id?: string | null;
           basecamp_importado_at?: string | null;
+          es_prueba?: boolean;
         };
         Update: {
           id?: string;
@@ -617,7 +617,6 @@ export type Database = {
           basecamp_project_id?: number | null;
           config?: Json;
           activo?: boolean;
-          es_prueba?: boolean;
           created_at?: string;
           updated_at?: string;
           created_by?: string | null;
@@ -625,6 +624,7 @@ export type Database = {
           deleted_at?: string | null;
           mesa_id?: string | null;
           basecamp_importado_at?: string | null;
+          es_prueba?: boolean;
         };
         Relationships: [
           {
