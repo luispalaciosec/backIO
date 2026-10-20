@@ -3,6 +3,7 @@
  * El markdown replica el formato actual de las actas de Geeks.
  */
 import { nombrePersona } from '@backio/shared';
+import { renderMarcadorCierre, renderMarcadorPlan, type Marcador } from './marcador';
 import type { RequerimientoMetricas, Semana, Senal, Acuerdo, Usuario, Cliente, CapacidadPersona } from '@backio/shared';
 import { temaAgenda } from './signals';
 
@@ -15,6 +16,8 @@ export interface PlanOperativoData {
   pendientes_anteriores: Acuerdo[];
   usuarios: Usuario[];
   clientes: Pick<Cliente, 'id' | 'nombre'>[];
+  /** Marcador de la mesa (solo en documentos de una mesa). */
+  marcador?: Marcador;
 }
 
 export interface ActaCierreData extends PlanOperativoData {
@@ -86,6 +89,7 @@ export function renderPlanOperativo(d: PlanOperativoData): string {
     `# Plan Operativo Semanal${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
     '',
   );
+  if (d.marcador) lineas.push(renderMarcadorPlan(d.marcador), '');
   lineas.push('## 1. Compromisos pendientes de semanas anteriores', '');
   lineas.push(
     d.pendientes_anteriores.length
@@ -122,10 +126,16 @@ export function renderActaCierre(d: ActaCierreData): string {
     `# Acta de Cierre${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
     '',
   );
-  lineas.push(
-    `**Resultado:** ${completadas.length} de ${vigentes.length} tareas completadas (${vigentes.length ? Math.round((completadas.length / vigentes.length) * 100) : 0}%)${canceladas ? `; ${canceladas} ${canceladas === 1 ? 'cancelada no cuenta' : 'canceladas no cuentan'}` : ''}.`,
-    '',
-  );
+  if (d.marcador)
+    lineas.push(
+      renderMarcadorCierre(d.marcador, canceladas, (id) => nombreEn(d.usuarios, id)),
+      '',
+    );
+  else
+    lineas.push(
+      `**Resultado:** ${completadas.length} de ${vigentes.length} tareas completadas (${vigentes.length ? Math.round((completadas.length / vigentes.length) * 100) : 0}%)${canceladas ? `; ${canceladas} ${canceladas === 1 ? 'cancelada no cuenta' : 'canceladas no cuentan'}` : ''}.`,
+      '',
+    );
   lineas.push('## 1. Estado de las prioridades', '');
   lineas.push(tablaTareas(d.prioridades, d, true));
   lineas.push('', `## 2. Arrastre a la siguiente semana (${noCompletadas.length})`, '');

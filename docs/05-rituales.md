@@ -185,6 +185,21 @@ pantalla del weekly, que llama a `POST /semanas/:id/plan` y `POST /semanas/:id/a
 - Los **clientes de prueba** (`clientes.es_prueba`, migración 34; hoy Acme EC S.A.S, el del sandbox de Basecamp) no
   generan señales ni cuentan en actas, dashboard, personas ni KPIs. Siguen en el backlog para poder probar.
 
+### Marcador (20/10/2026)
+
+Arriba de los documentos de una mesa va un **marcador**, para que el weekly se sienta como avance de equipo sin perder
+seriedad (decisión de Luis). Todo sale de los datos: nada se escribe a mano, no lleva emojis ni frases de juego, y
+nunca se nombra a quien no cumplió. Código: `backend/src/lib/rituals/marcador.ts`.
+
+| Pieza | Cómo se calcula |
+|---|---|
+| Resultado | Tareas con entrega en la semana completadas **dentro de la semana** (hasta el domingo) sobre las vigentes; las canceladas no cuentan. El corte hace que una semana dé el mismo número en su cierre y como «semana pasada» en el plan siguiente, y que cerrar tarde no la mejore |
+| Meta | 80 % para todas las mesas (`META_SEMANAL`) |
+| Compromiso (plan) | Tareas con entrega en la semana y cuántas ya están completadas |
+| Racha | Semanas seguidas en la meta o por encima, contando hacia atrás; una semana sin tareas no corta ni suma |
+| Récord (cierre) | Si la semana iguala o supera la mejor del **trimestre calendario**. Solo aparece con al menos dos semanas previas en el trimestre |
+| Reconocimiento (cierre) | Quien entregó a tiempo **todas** sus tareas de la semana, con al menos 4 (`RECONOCIMIENTO_MINIMO`). A tiempo = cerrada hasta la fecha **original**: reprogramar no cuenta como a tiempo. Una heredada cerrada tarde no cuenta para nadie. Si nadie llega, la sección no sale |
+
 Ver la lista de rutas en la [referencia de la API](./referencia-api.md).
 
 El markdown resultante **replica el formato actual de las actas de Geeks**, para que la

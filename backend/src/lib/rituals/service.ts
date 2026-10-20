@@ -13,7 +13,8 @@ import { calcularSenales } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
 import { getUmbralesSenales, listCompletadosRecientes } from '../db/rituales';
 import type { Senal, Acta, Acuerdo, CapacidadPersona, Semana } from '@backio/shared';
-import { hoyLocal } from '@backio/shared';
+import { hoyLocal, sumarDias } from '@backio/shared';
+import { calcularMarcador, inicioTrimestre, lunesDe, SEMANAS_HISTORIAL, type Marcador } from './marcador';
 
 export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<Senal[]> {
   const hoy = hoyLocal();
@@ -133,6 +134,30 @@ async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
   return { mesa, alcance: await alcanceMesa(ctx, mesaId) };
 }
 
+/**
+ * Marcador de la mesa: tareas de la mesa con entrega desde el inicio del historial (trimestre o 16 semanas) hasta el fin
+ * de la semana, sin clientes de prueba. Se trae de a 4 semanas para no chocar con el tope de filas de la API.
+ */
+async function marcadorDeMesa(
+  ctx: DbCtx,
+  semana: Semana,
+  alcance: Awaited<ReturnType<typeof alcanceMesa>> | undefined,
+  prueba: Set<string>,
+  cierre: boolean,
+): Promise<Marcador | undefined> {
+  if (!alcance) return undefined;
+  const inicio = lunesDe(semana.fecha_inicio);
+  const desde = lunesDe([inicioTrimestre(inicio), sumarDias(inicio, -7 * SEMANAS_HISTORIAL)].sort()[0]!);
+  const tramos: [string, string][] = [];
+  for (let s = desde; s <= inicio; s = sumarDias(s, 28)) tramos.push([s, [sumarDias(s, 27), sumarDias(inicio, 6)].sort()[0]!]);
+  const partes = await Promise.all(tramos.map(([d, h]) => listBacklog(ctx, { desde: d, hasta: h, mesa: alcance })));
+  return calcularMarcador(
+    partes.flat().filter((r) => !prueba.has(r.cliente_id)),
+    inicio,
+    { cierre },
+  );
+}
+
 export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?: string | null, narrativa?: string): Promise<Acta> {
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
@@ -148,9 +173,11 @@ export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?
   const prioridades = prioridadesTodas.filter((r) => !prueba.has(r.cliente_id));
   const riesgos = senales.filter((s) => ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga'].includes(s.tipo));
   const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, personasDeLaMesa(prioridades)) : pendientesTodos;
+  const marcador = await marcadorDeMesa(ctx, semana, alcance, prueba, false);
   const data = {
     semana,
     mesa: mesa?.nombre ?? null,
+    ...(marcador ? { marcador } : {}),
     capacidad: calcularCapacidad(prioridades, usuarios),
     prioridades,
     riesgos,
@@ -185,9 +212,11 @@ export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: s
   const personas = personasDeLaMesa([...prioridades, ...activosMesa]);
   const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, personas) : pendientesTodos;
   const acuerdos = mesa ? acuerdosDeLaMesa(acuerdosTodos, personas) : acuerdosTodos;
+  const marcador = await marcadorDeMesa(ctx, semana, alcance, prueba, true);
   const data = {
     semana,
     mesa: mesa?.nombre ?? null,
+    ...(marcador ? { marcador } : {}),
     capacidad: calcularCapacidad(prioridades, usuarios),
     prioridades,
     riesgos: [],
