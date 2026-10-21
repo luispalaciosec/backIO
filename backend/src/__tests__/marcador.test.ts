@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calcularMarcador,
+  fechaCompromiso,
   inicioTrimestre,
   numeroIso,
   racha,
@@ -44,6 +45,36 @@ describe('resultado de la semana', () => {
   it('en una semana pasada, lo que se cerró después no cambia su resultado', () => {
     const tarde = t('2026-10-14', { completado_at: '2026-10-21T15:00:00Z' });
     expect(resultadoSemana([t('2026-10-14'), tarde], '2026-10-12', '2026-10-18').completadas).toBe(1);
+  });
+});
+
+// 21/10/2026, decisión de Luis: se mide contra la fecha original, salvo que el cliente la haya movido.
+describe('fecha comprometida', () => {
+  const rp = (created_at: string, fecha_nueva: string, motivo: string | null) => ({ created_at, fecha_nueva, motivo });
+  const tarea = pendiente('2026-10-22', { fecha_entrega_original: '2026-10-15' });
+  it('reprogramar por el equipo o sin motivo no la saca de su semana', () => {
+    expect(fechaCompromiso(tarea, [rp('2026-10-16T10:00:00Z', '2026-10-22', 'capacidad_equipo')])).toBe('2026-10-15');
+    expect(fechaCompromiso(tarea, [rp('2026-10-16T10:00:00Z', '2026-10-22', null)])).toBe('2026-10-15');
+    expect(fechaCompromiso(tarea, [rp('2026-10-16T10:00:00Z', '2026-10-22', 'prioridad_negocio')])).toBe('2026-10-15');
+  });
+  it('si la movió el cliente, cuenta desde la fecha que fijó ese cambio (y no los cambios del equipo después)', () => {
+    expect(
+      fechaCompromiso(tarea, [
+        rp('2026-10-14T10:00:00Z', '2026-10-20', 'insumos_cliente'),
+        rp('2026-10-19T10:00:00Z', '2026-10-22', 'capacidad_equipo'),
+      ]),
+    ).toBe('2026-10-20');
+  });
+  it('en el marcador: la tarea pasada a otra semana por el equipo sigue contando como no cumplida en la suya', () => {
+    const tareas = [
+      ...semana('2026-10-14', 3, 3),
+      {
+        ...t('2026-10-21', { fecha_entrega_original: '2026-10-14', completado_at: '2026-10-21T15:00:00Z' }),
+        fecha_compromiso: '2026-10-14',
+      },
+    ];
+    expect(resultadoSemana(tareas, '2026-10-12', '2026-10-18')).toMatchObject({ completadas: 3, vigentes: 4, pct: 75 });
+    expect(resultadoSemana(tareas, '2026-10-19', '2026-10-25').vigentes).toBe(0);
   });
 });
 

@@ -1,5 +1,6 @@
 /** Reprogramaciones y reprocesos por requerimiento + agregados de cumplimiento. */
 import type { Reprogramacion, Reproceso, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
+import { paginar } from './paginar';
 import { type DbCtx, throwIf } from './client';
 
 export async function listReprogramaciones(ctx: DbCtx, requerimientoId: string): Promise<Reprogramacion[]> {
@@ -250,4 +251,17 @@ export async function fechaPendienteDeEnviar(ctx: DbCtx, requerimientoId: string
     .maybeSingle();
   throwIf(error);
   return data?.accion === 'basecamp_due_on_error' ? data.created_at : null;
+}
+
+/** Reprogramaciones con su fecha nueva y motivo, para la fecha comprometida del marcador. Paginado. */
+export async function listReprogramacionesMarcador(ctx: DbCtx, desdeIso: string) {
+  return paginar<{ requerimiento_id: string; created_at: string; fecha_nueva: string | null; motivo: string | null }>((a, b) =>
+    ctx.db
+      .from('reprogramaciones')
+      .select('requerimiento_id, created_at, fecha_nueva, motivo')
+      .eq('tenant_id', ctx.tenantId)
+      .gte('created_at', desdeIso)
+      .order('created_at')
+      .range(a, b),
+  );
 }

@@ -3,7 +3,7 @@
  * tiempo, arriba del plan operativo y del acta de cierre de cada mesa. Todo sale de los datos; nada se escribe a mano y
  * nunca se nombra a quien no cumplió.
  */
-import { cerradaATiempo, diaLocal, responsablesDe, sumarDias } from '@backio/shared';
+import { cerradaATiempo, diaLocal, MOTIVOS_REPROGRAMACION, responsablesDe, sumarDias } from '@backio/shared';
 
 /** Meta de la semana: % de tareas vigentes completadas. Igual para todas las mesas. */
 export const META_SEMANAL = 80;
@@ -15,12 +15,36 @@ export const SEMANAS_HISTORIAL = 16;
 export interface TareaMarcador {
   fecha_entrega: string | null;
   fecha_entrega_original?: string | null;
+  /** Fecha comprometida (ver fechaCompromiso). Si no viene, se usa la original y, si no hay, la vigente. */
+  fecha_compromiso?: string | null;
   estado_operativo: string;
   completado_at: string | null;
   owner_agencia: string[];
   responsables_cierre?: string[] | null;
   heredada?: boolean | null;
 }
+
+export interface ReprogramacionMarcador {
+  created_at: string;
+  fecha_nueva: string | null;
+  motivo: string | null;
+}
+
+/**
+ * Fecha contra la que se mide una tarea en el marcador (decisión de Luis, 21/10/2026): la original, salvo que el cliente
+ * la haya movido (motivo atribuible al cliente); entonces, la última que fijó un cambio del cliente. Reprogramar por
+ * causa del equipo, neutra o sin motivo no saca la tarea de su semana: sigue contando ahí como no cumplida.
+ */
+export function fechaCompromiso(t: TareaMarcador, reprogramaciones: ReprogramacionMarcador[]): string | null {
+  const delCliente = reprogramaciones
+    .filter((r) => r.fecha_nueva && MOTIVOS_REPROGRAMACION.find((m) => m.valor === r.motivo)?.atribuible === 'cliente')
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .at(-1);
+  return delCliente?.fecha_nueva ?? t.fecha_entrega_original ?? t.fecha_entrega;
+}
+
+const compromiso = (t: TareaMarcador) =>
+  t.fecha_compromiso !== undefined ? t.fecha_compromiso : (t.fecha_entrega_original ?? t.fecha_entrega);
 
 export interface ResultadoSemana {
   inicio: string;
@@ -80,9 +104,10 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : null);
  */
 export function resultadoSemana(tareas: TareaMarcador[], inicio: string, corte: string | null): ResultadoSemana {
   const fin = sumarDias(inicio, 6);
-  const vigentes = tareas.filter(
-    (t) => t.fecha_entrega && t.fecha_entrega >= inicio && t.fecha_entrega <= fin && t.estado_operativo !== 'cancelado',
-  );
+  const vigentes = tareas.filter((t) => {
+    const f = compromiso(t);
+    return !!f && f >= inicio && f <= fin && t.estado_operativo !== 'cancelado';
+  });
   // Una completada sin completado_at (históricas, docs/05) cuenta como completada: no se sabe cuándo, no se castiga.
   const hechas = vigentes.filter((t) => t.estado_operativo === 'completado');
   const enSemana = hechas.filter((t) => !corte || !t.completado_at || diaLocal(t.completado_at) <= corte).length;
@@ -130,8 +155,9 @@ export function reconocidos(tareas: TareaMarcador[], inicio: string, minimo = RE
   const fin = sumarDias(inicio, 6);
   const porPersona = new Map<string, { total: number; a_tiempo: number }>();
   for (const t of tareas) {
-    if (!t.fecha_entrega || t.fecha_entrega < inicio || t.fecha_entrega > fin || t.estado_operativo === 'cancelado') continue;
-    const r = cerradaATiempo(t.completado_at, t.fecha_entrega_original ?? t.fecha_entrega, !!t.heredada);
+    const f = compromiso(t);
+    if (!f || f < inicio || f > fin || t.estado_operativo === 'cancelado') continue;
+    const r = cerradaATiempo(t.completado_at, f, !!t.heredada);
     if (r === null && t.completado_at) continue;
     for (const u of responsablesDe(t)) {
       const p = porPersona.get(u) ?? { total: 0, a_tiempo: 0 };

@@ -13,8 +13,17 @@ import { calcularSenales } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
 import { getUmbralesSenales, listCompletadosRecientes } from '../db/rituales';
 import type { Senal, Acta, Acuerdo, CapacidadPersona, Semana } from '@backio/shared';
-import { hoyLocal, sumarDias } from '@backio/shared';
-import { calcularMarcador, inicioTrimestre, lunesDe, SEMANAS_HISTORIAL, type Marcador } from './marcador';
+import { hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
+import {
+  calcularMarcador,
+  fechaCompromiso,
+  inicioTrimestre,
+  lunesDe,
+  SEMANAS_HISTORIAL,
+  type Marcador,
+  type ReprogramacionMarcador,
+} from './marcador';
+import { listReprogramacionesMarcador } from '../db/historial';
 
 export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<Senal[]> {
   const hoy = hoyLocal();
@@ -138,7 +147,7 @@ async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
  * Marcador de la mesa: tareas de la mesa con entrega desde el inicio del historial (trimestre o 16 semanas) hasta el fin
  * de la semana, sin clientes de prueba. Se trae de a 4 semanas para no chocar con el tope de filas de la API.
  */
-async function marcadorDeMesa(
+export async function marcadorDeMesa(
   ctx: DbCtx,
   semana: Semana,
   alcance: Awaited<ReturnType<typeof alcanceMesa>> | undefined,
@@ -150,12 +159,19 @@ async function marcadorDeMesa(
   const desde = lunesDe([inicioTrimestre(inicio), sumarDias(inicio, -7 * SEMANAS_HISTORIAL)].sort()[0]!);
   const tramos: [string, string][] = [];
   for (let s = desde; s <= inicio; s = sumarDias(s, 28)) tramos.push([s, [sumarDias(s, 27), sumarDias(inicio, 6)].sort()[0]!]);
-  const partes = await Promise.all(tramos.map(([d, h]) => listBacklog(ctx, { desde: d, hasta: h, mesa: alcance })));
-  return calcularMarcador(
-    partes.flat().filter((r) => !prueba.has(r.cliente_id)),
-    inicio,
-    { cierre },
-  );
+  // Por fecha vigente y por fecha original: una tarea reprogramada fuera de la ventana sigue contando en su semana.
+  const [vigentes, originales, reprogs] = await Promise.all([
+    Promise.all(tramos.map(([d, h]) => listBacklog(ctx, { desde: d, hasta: h, mesa: alcance }))),
+    Promise.all(tramos.map(([d, h]) => listBacklog(ctx, { original_desde: d, original_hasta: h, mesa: alcance }))),
+    listReprogramacionesMarcador(ctx, inicioDiaLocal(sumarDias(desde, -180))),
+  ]);
+  const porId = new Map([...vigentes.flat(), ...originales.flat()].map((r) => [r.id, r]));
+  const porTarea = new Map<string, ReprogramacionMarcador[]>();
+  for (const r of reprogs) porTarea.set(r.requerimiento_id, [...(porTarea.get(r.requerimiento_id) ?? []), r]);
+  const tareas = [...porId.values()]
+    .filter((r) => !prueba.has(r.cliente_id))
+    .map((r) => ({ ...r, fecha_compromiso: fechaCompromiso(r, porTarea.get(r.id) ?? []) }));
+  return calcularMarcador(tareas, inicio, { cierre });
 }
 
 export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?: string | null, narrativa?: string): Promise<Acta> {

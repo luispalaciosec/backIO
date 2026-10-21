@@ -15,6 +15,8 @@ export interface FiltroBacklog {
   min_dias_atraso?: number;
   desde?: string; // fecha_entrega >=
   hasta?: string; // fecha_entrega <=
+  original_desde?: string; // fecha_entrega_original >=
+  original_hasta?: string; // fecha_entrega_original <=
   solo_activos?: boolean;
   query?: string;
   /** Alcance de mesa: requerimientos de estos clientes O de estos proyectos */
@@ -31,6 +33,8 @@ export async function listBacklog(ctx: DbCtx, f: FiltroBacklog = {}): Promise<Re
   if (f.min_dias_atraso !== undefined) q = q.gte('dias_atraso', f.min_dias_atraso);
   if (f.desde) q = q.gte('fecha_entrega', f.desde);
   if (f.hasta) q = q.lte('fecha_entrega', f.hasta);
+  if (f.original_desde) q = q.gte('fecha_entrega_original', f.original_desde);
+  if (f.original_hasta) q = q.lte('fecha_entrega_original', f.original_hasta);
   if (f.query) q = q.ilike('titulo_interno', `%${f.query}%`);
   if (f.mesa) {
     const partes: string[] = [];

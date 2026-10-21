@@ -193,12 +193,13 @@ nunca se nombra a quien no cumplió. Código: `backend/src/lib/rituals/marcador.
 
 | Pieza | Cómo se calcula |
 |---|---|
-| Resultado | Tareas con entrega en la semana completadas **dentro de la semana** (hasta el domingo) sobre las vigentes; las canceladas no cuentan. Cerrar tarde no la mejora, y lo que se completó después del domingo se dice aparte («1 se completó después del domingo»), para que cuadre con el arrastre. Una completada sin fecha de cierre (históricas) cuenta como completada. Si el acta se genera antes del domingo, lo que se cierre el fin de semana todavía sube el número que muestre el plan siguiente |
+| Semana de cada tarea | La de su **fecha comprometida**: la original, salvo que el cliente la haya movido (motivo atribuible al cliente: insumos o aprobación, cambio de alcance); entonces, la última fecha que fijó un cambio del cliente. Reprogramar por causa del equipo, neutra o sin motivo no saca la tarea de su semana: sigue contando ahí como no cumplida (decisión de Luis, 21/10/2026). Completar el motivo de una reprogramación del cliente la pasa a la semana nueva |
+| Resultado | Tareas comprometidas para la semana completadas **dentro de la semana** (hasta el domingo) sobre las vigentes; las canceladas no cuentan. Cerrar tarde no la mejora, y lo que se completó después del domingo se dice aparte («1 se completó después del domingo»), para que cuadre con el arrastre. Una completada sin fecha de cierre (históricas) cuenta como completada. Si el acta se genera antes del domingo, lo que se cierre el fin de semana todavía sube el número que muestre el plan siguiente |
 | Meta | 80 % para todas las mesas (`META_SEMANAL`) |
 | Compromiso (plan) | Tareas con entrega en la semana y cuántas ya están completadas |
 | Racha | Semanas seguidas en la meta o por encima, contando hacia atrás (hasta 16 semanas); una semana sin tareas no corta ni suma. La «mejor racha del trimestre» es la mejor que llegó al trimestre, aunque haya empezado antes: nunca es menor que la actual |
 | Récord (cierre) | Si la semana iguala o supera la mejor del **trimestre calendario**. Solo aparece con al menos dos semanas previas en el trimestre |
-| Reconocimiento (cierre) | Quien entregó a tiempo **todas** sus tareas de la semana, con al menos 4 (`RECONOCIMIENTO_MINIMO`). A tiempo = cerrada hasta la fecha **original**: reprogramar no cuenta como a tiempo. Una heredada cerrada tarde no cuenta para nadie. Si nadie llega, la sección no sale |
+| Reconocimiento (cierre) | Quien entregó a tiempo **todas** sus tareas de la semana, con al menos 4 (`RECONOCIMIENTO_MINIMO`). A tiempo = cerrada hasta la fecha comprometida: reprogramar por el equipo no cuenta como a tiempo. Una heredada cerrada tarde no cuenta para nadie. Si nadie llega, la sección no sale |
 
 Ver la lista de rutas en la [referencia de la API](./referencia-api.md).
 
