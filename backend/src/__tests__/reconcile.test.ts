@@ -136,4 +136,11 @@ describe('reconcileTenant', () => {
     await reconcileTenant(ctx);
     expect(e.push).not.toHaveBeenCalled();
   });
+  it('un to-do movido a otro proyecto (Basecamp redirige a otro id) no se compara ni se escribe', async () => {
+    e.activos = [req(1)];
+    e.todos.set(1, todo(99, { due_on: '2026-10-25' }));
+    await reconcileTenant(ctx);
+    expect(e.aplicar).not.toHaveBeenCalled();
+    expect(e.push).not.toHaveBeenCalled();
+  });
 });

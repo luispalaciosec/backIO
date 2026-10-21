@@ -70,7 +70,7 @@ function conNarrativa(md: string, narrativa?: string): string {
 export async function senalesDeMesa(ctx: DbCtx, semana: Semana, mesaId?: string | null): Promise<Senal[]> {
   const guardadas = await listSenales(ctx, semana.id);
   if (!mesaId) return guardadas;
-  const alcance = await alcanceMesa(ctx, mesaId);
+  const alcance = await alcanceMesa(ctx, mesaId, { sinPrueba: true });
   const [activos, usuarios, clientes, acuerdos, u, sinMotivo, prueba] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
     listUsuarios(ctx, { incluirInactivos: true }),
@@ -123,7 +123,7 @@ function acuerdosDeLaMesa<A extends Pick<Acuerdo, 'responsable_id'>>(acuerdos: A
 export async function acuerdosAbiertosDeMesa(ctx: DbCtx, mesaId?: string | null): Promise<Acuerdo[]> {
   const abiertos = await listAcuerdosAbiertos(ctx);
   if (!mesaId) return abiertos;
-  const activos = await listBacklog(ctx, { solo_activos: true, mesa: await alcanceMesa(ctx, mesaId) });
+  const activos = await listBacklog(ctx, { solo_activos: true, mesa: await alcanceMesa(ctx, mesaId, { sinPrueba: true }) });
   return acuerdosDeLaMesa(abiertos, personasDeLaMesa(activos));
 }
 
@@ -131,7 +131,7 @@ async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
   if (!mesaId) return { mesa: null, alcance: undefined };
   const mesa = await getMesa(ctx, mesaId);
   if (!mesa) throw new Error('Mesa no encontrada');
-  return { mesa, alcance: await alcanceMesa(ctx, mesaId) };
+  return { mesa, alcance: await alcanceMesa(ctx, mesaId, { sinPrueba: true }) };
 }
 
 /**
@@ -172,7 +172,11 @@ export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?
   ]);
   const prioridades = prioridadesTodas.filter((r) => !prueba.has(r.cliente_id));
   const riesgos = senales.filter((s) => ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga'].includes(s.tipo));
-  const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, personasDeLaMesa(prioridades)) : pendientesTodos;
+  // Personas de la mesa: con tareas activas en ella, no solo con entrega esta semana (igual que el acta; revisión 20/10).
+  const activosMesa = alcance
+    ? (await listBacklog(ctx, { solo_activos: true, mesa: alcance })).filter((r) => !prueba.has(r.cliente_id))
+    : [];
+  const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, personasDeLaMesa([...prioridades, ...activosMesa])) : pendientesTodos;
   const marcador = await marcadorDeMesa(ctx, semana, alcance, prueba, false);
   const data = {
     semana,

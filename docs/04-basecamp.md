@@ -47,6 +47,10 @@ OAuth2 de Basecamp 3, con dos clases de cuenta (migración 33, 16/10/2026):
 - **La de la organización** (Admin → Integraciones) es **solo para leer**: sincronización, horas, huérfanos y
   reconciliación. Nunca escribe a nombre de nadie: en Basecamp no aparece nada a nombre de una persona que no lo hizo
   (antes salía a nombre de quien conectó la integración; caso de Grace, 19/10/2026).
+- **Si Basecamp rechaza la cuenta de una persona** (401, por ejemplo «OAuth token expired (rekeyed_identity)»), BackIO
+  pide un token nuevo con el refresh y repite. Si tampoco sirve, borra esa conexión: la persona aparece «Sin conectar»
+  en Admin → Usuarios y BackIO le pide conectar otra vez antes de su próximo cambio (20/10/2026; antes fallaba en
+  silencio en cada cambio).
 
 Código: `BasecampClient.forActor(ctx)` (la persona, o quien creó la API key; si no hay ninguna conectada, 428),
 `forResponsable` (la persona o nada) y `forTenant` (solo lecturas), en `backend/src/lib/basecamp/client.ts`;
@@ -207,7 +211,12 @@ También corrige fechas, y gana el cambio más reciente (decisión de Luis, 19/1
 - **Si BackIO la cambió después** y no llegó a Basecamp, se reenvía con la cuenta de quien la cambió
   (`basecamp_fecha_reenviada`). Si esa persona no conectó su Basecamp, no se reenvía. Si Basecamp todavía tiene la
   fecha anterior a ese cambio, tampoco cuenta como un cambio hecho en Basecamp (un comentario en el to-do mueve su
-  fecha de actualización).
+  fecha de actualización). Y mientras el último envío de BackIO haya fallado (`basecamp_due_on_error` sin un
+  `basecamp_fecha_reenviada` después), manda BackIO: no se acepta ninguna fecha de Basecamp hasta que llegue.
+- **Quién la cambió** sale del evento del webhook (`creator`), aunque el estado se lea del to-do vivo. La reconciliación
+  no lo sabe: lo que acepta queda sin autor.
+- Un to-do **movido** a otro proyecto (Basecamp responde con otro id) no se compara en la reconciliación: lo resuelve
+  la importación.
 
 Para que un desfase masivo no se propague de golpe, se reenvían como máximo 25 fechas por corrida.
 

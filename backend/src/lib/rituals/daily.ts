@@ -12,7 +12,7 @@ export async function getDaily(ctx: DbCtx, opts: { mesaId?: string } = {}): Prom
   const hoy = hoyLocal();
   const manana = sumarDias(hoy, 1);
   const hace24h = new Date(Date.now() - 86_400_000).toISOString();
-  const mesa = opts.mesaId ? await alcanceMesa(ctx, opts.mesaId) : undefined;
+  const mesa = opts.mesaId ? await alcanceMesa(ctx, opts.mesaId, { sinPrueba: true }) : undefined;
   const activos = await listBacklog(ctx, { solo_activos: true, mesa });
   const cambiados = new Set(await requerimientosConFechaCambiadaDesde(ctx, hace24h));
 

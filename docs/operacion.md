@@ -69,7 +69,9 @@ problema**. No vuelve a avisar una corrida que terminó con errores: ese error y
 - La reconciliación la reintenta cada 30 min con la cuenta de quien la cambió y deja `basecamp_fecha_reenviada`. Si
   esa persona no conectó su Basecamp, no se reenvía: que la conecte en «Mi Basecamp».
 - Si alguien cambió la fecha en Basecamp después, gana esa: queda `basecamp_fecha_aceptada` y una reprogramación con
-  origen «basecamp».
+  origen «basecamp». Mientras el envío de BackIO esté fallando, no se acepta nada de Basecamp.
+- Si el error es `401` (token rechazado por Basecamp), BackIO intenta renovarlo; si no puede, desconecta a esa persona
+  y le pide conectar de nuevo en «Mi Basecamp». Cuando conecta, la reconciliación reenvía sus fechas pendientes.
 
 ### En Basecamp desaparecieron los asignados de un to-do
 

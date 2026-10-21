@@ -40,7 +40,7 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
   const mesa = await getMesa(ctx, mesaId);
   if (!mesa) throw new Error('Mesa no encontrada');
   const { desde, hasta, etiqueta } = rangoMes(mes);
-  const alcance = await alcanceMesa(ctx, mesaId);
+  const alcance = await alcanceMesa(ctx, mesaId, { sinPrueba: true });
   const [clientes, usuarios, activos, horas] = await Promise.all([
     listClientes(ctx, { incluirInactivos: true }),
     listUsuarios(ctx, { incluirInactivos: true }),

@@ -205,7 +205,9 @@ export async function ultimoQueReprogramo(ctx: DbCtx, requerimientoId: string): 
     .select('usuario_id')
     .eq('tenant_id', ctx.tenantId)
     .eq('requerimiento_id', requerimientoId)
-    .not('usuario_id', 'is', null)
+    // Solo el último cambio hecho desde BackIO. Si no tiene autor (p. ej. una API key), nadie: no se toma el de un cambio
+    // anterior, que haría salir la fecha a nombre de otra persona (revisión del 20/10/2026).
+    .neq('origen', 'basecamp')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -229,4 +231,23 @@ export async function ultimoCambioDeFechaEnBackio(
     .maybeSingle();
   throwIf(error);
   return data ?? null;
+}
+
+/**
+ * ¿El último intento de llevar la fecha de BackIO a Basecamp falló y no se reenvió después? (auditoría
+ * `basecamp_due_on_error` sin un `basecamp_fecha_reenviada` posterior). Devuelve cuándo falló, o null.
+ */
+export async function fechaPendienteDeEnviar(ctx: DbCtx, requerimientoId: string): Promise<string | null> {
+  const { data, error } = await ctx.db
+    .from('audit_log')
+    .select('accion, created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('entidad', 'requerimiento')
+    .eq('entidad_id', requerimientoId)
+    .in('accion', ['basecamp_due_on_error', 'basecamp_fecha_reenviada'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIf(error);
+  return data?.accion === 'basecamp_due_on_error' ? data.created_at : null;
 }

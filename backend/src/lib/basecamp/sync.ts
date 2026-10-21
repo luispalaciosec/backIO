@@ -10,7 +10,7 @@ import type { DbCtx } from '../db/client';
 import { registrarReproceso, cerrarReproceso } from '../cumplimiento';
 import { findByBasecampTodo, updateRequerimiento } from '../db/requerimientos';
 import { audit } from '../db/audit';
-import { completarUltimaReprogramacion, ultimoCambioDeFechaEnBackio } from '../db/historial';
+import { completarUltimaReprogramacion, fechaPendienteDeEnviar, ultimoCambioDeFechaEnBackio } from '../db/historial';
 import { usuarioPorBasecampId } from '../db/usuarios';
 import type { Requerimiento } from '@backio/shared';
 import { log } from '../logger';
@@ -120,12 +120,18 @@ async function aceptarFechaDeBasecamp(ctx: DbCtx, req: Requerimiento, safe: Base
     // Basecamp sigue con la fecha de antes del último cambio de BackIO: ese cambio aún no llegó (p. ej., quien lo hizo no
     // conectó su Basecamp) y el to-do se tocó por otra cosa (un comentario mueve updated_at). No es un cambio en Basecamp.
     if (ultimoEnBackio.fecha_anterior === safe.due_on) return false;
+    // El último cambio de BackIO no llegó a Basecamp (token vencido, Basecamp caído): manda BackIO hasta que llegue.
+    // Sin esto, cualquier toque al to-do (un comentario mueve updated_at) revertía el cambio (to-do 10288810481, 20/10).
+    const pendiente = await fechaPendienteDeEnviar(ctx, req.id);
+    if (pendiente && Date.parse(pendiente) >= Date.parse(ultimoEnBackio.created_at)) return false;
   }
   const actor = safe.actor_basecamp_id ? await usuarioPorBasecampId(ctx, safe.actor_basecamp_id) : null;
   // El trigger de la base registra la reprogramación (y cuenta veces_reprogramado) con updated_by como autor.
   const ctxActor = { ...ctx, usuarioId: actor };
   await updateRequerimiento(ctxActor, req.id, { fecha_entrega: safe.due_on });
-  await completarUltimaReprogramacion(ctxActor, req.id, { motivo: null, origen: 'basecamp' });
+  // Sin fecha previa el trigger no crea reprogramación (poner fecha no es reprogramar): no hay fila que completar, y
+  // completar la última «desconocido» pisaría una reprogramación vieja.
+  if (req.fecha_entrega) await completarUltimaReprogramacion(ctxActor, req.id, { motivo: null, origen: 'basecamp' });
   await audit(ctx, {
     accion: 'basecamp_fecha_aceptada',
     entidad: 'requerimiento',

@@ -30,7 +30,7 @@ export async function armarDailyMensaje(
   responsable: string,
 ): Promise<DailyMensaje> {
   const [alcance, usuarios, clientes] = await Promise.all([
-    alcanceMesa(ctx, mesa.id),
+    alcanceMesa(ctx, mesa.id, { sinPrueba: true }),
     listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx, { incluirInactivos: true }),
   ]);

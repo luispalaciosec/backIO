@@ -7,6 +7,7 @@
  *    refresh automático (credenciales.ts).
  * Las respuestas se tipan SOLO con los campos que BackIO necesita. Nunca se guardan enteras.
  */
+import { log } from '../logger';
 import { env } from '../../config/env';
 import { DbError } from '../db/client';
 
@@ -158,7 +159,30 @@ export class BasecampClient {
     await guardarCredencialesBasecamp(this.tenantId, { ...(actual ?? {}), ...this.tokens });
   }
 
-  async request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, intento = 0): Promise<T> {
+  /**
+   * Basecamp rechazó un token que no había vencido por fecha (p. ej. «OAuth token expired (rekeyed_identity)»). Se pide uno
+   * nuevo con el refresh; si eso falla y la cuenta es de una persona, se borra su conexión: BackIO deja de mostrarla como
+   * conectada y le pide conectar otra vez («Mi Basecamp»), en vez de fallar en silencio en cada cambio (Grace, 19/10/2026).
+   */
+  private async renovarTrasRechazo(): Promise<void> {
+    try {
+      this.tokens = { ...this.tokens, expires_at: new Date(0).toISOString() };
+      await this.refreshIfNeeded();
+    } catch (err) {
+      await this.desconectarPersona();
+      throw err;
+    }
+  }
+
+  private async desconectarPersona(): Promise<void> {
+    if (!this.usuarioId) return;
+    const { borrarCredencialesPersona } = await import('../db/credenciales');
+    await borrarCredencialesPersona(this.usuarioId);
+    log.warn('[basecamp] conexión de la persona rechazada por Basecamp; se borra para que vuelva a conectar', this.usuarioId);
+    throw new BasecampSinConectar('Tu conexión con Basecamp venció. Vuelve a conectarla en «Mi Basecamp» y repite el cambio.');
+  }
+
+  async request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, intento = 0, renovado = false): Promise<T> {
     await this.refreshIfNeeded();
     await this.throttle();
     const res = await fetch(`${this.base()}${path}`, {
@@ -174,7 +198,14 @@ export class BasecampClient {
       if (intento >= 5) throw new Error(`Basecamp ${res.status} tras ${intento} reintentos: ${path}`);
       const retryAfter = Number(res.headers.get('Retry-After')) || 2 ** intento;
       await new Promise((r) => setTimeout(r, retryAfter * 1000));
-      return this.request<T>(method, path, body, intento + 1);
+      return this.request<T>(method, path, body, intento + 1, renovado);
+    }
+    if (res.status === 401) {
+      if (!renovado) {
+        await this.renovarTrasRechazo();
+        return this.request<T>(method, path, body, intento, true);
+      }
+      await this.desconectarPersona();
     }
     if (!res.ok) throw new Error(`Basecamp ${res.status} ${method} ${path}: ${await res.text()}`);
     if (res.status === 204) return undefined as T;
@@ -320,12 +351,20 @@ export class BasecampClient {
   async requestAll<T>(path: string, maxPages = 20): Promise<T[]> {
     const out: T[] = [];
     let url: string | null = `${this.base()}${path}`;
+    let renovadoAll = false;
     for (let i = 0; i < maxPages && url; i++) {
       await this.refreshIfNeeded();
       await this.throttle();
       const res: Response = await fetch(url, {
         headers: { Authorization: `Bearer ${this.tokens.access_token}`, 'User-Agent': env().BASECAMP_USER_AGENT },
       });
+      if (res.status === 401 && !renovadoAll) {
+        renovadoAll = true;
+        await this.renovarTrasRechazo();
+        i -= 1;
+        continue;
+      }
+      if (res.status === 401) await this.desconectarPersona();
       if (!res.ok) throw new Error(`Basecamp ${res.status} GET ${url}: ${await res.text()}`);
       const page = (await res.json()) as T[];
       out.push(...(Array.isArray(page) ? page : []));

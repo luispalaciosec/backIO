@@ -111,9 +111,10 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
   // Basecamp, no queda un proyecto a medias (migración 33). Si lo crea una tarea programada (fee recurrente), va a
   // nombre de la ejecutiva del proyecto si conectó su cuenta; si no, el proyecto se crea en BackIO y queda pendiente
   // de bajar a Basecamp (nunca con la cuenta de otro, 19/10/2026): la ejecutiva conecta y pulsa «Reintentar Basecamp».
+  // Una API key escribe como quien la creó (forActor), no como la ejecutiva.
   const bc = !cliente.basecamp_project_id
     ? undefined
-    : ctx.usuarioId
+    : ctx.usuarioId || ctx.apiKeyId
       ? await BasecampClient.forActor(ctx)
       : await BasecampClient.forResponsable(ctx.tenantId, input.owner_ejecutiva ?? null);
   const primeraFecha = plan.tareas.map((t) => t.fecha_entrega).sort()[0] ?? input.fecha_entrega;

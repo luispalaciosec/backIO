@@ -239,6 +239,9 @@ async function importar(
       } else if (d.tipo === 'reenlazar') {
         const destino = await clientePorProyectoBasecamp(d.bucketId);
         if (destino && destino.tenant_id === ctx.tenantId) {
+          // Una fila dada de baja que aún tenga el id del to-do nuevo choca con el índice único (revisión del 20/10/2026):
+          // se le libera el id antes de reenlazar.
+          if (otro?.deleted_at) await actualizarEnlazado(ctx, otro.id, { basecamp_todo_id: null });
           // Cambia de cliente: nace oculta en el portal del nuevo (regla 2: solo se restringe). El proyecto y el bloque los
           // corrige la próxima importación del cliente destino, que ya la ve como enlazada.
           await actualizarEnlazado(ctx, ex.id, {

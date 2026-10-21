@@ -133,6 +133,8 @@ export async function ponerLogoSiFalta(ctx: DbCtx, clienteId: string, logoUrl: s
  */
 export async function idsClientesDePrueba(ctx: DbCtx): Promise<Set<string>> {
   const { data, error } = await ctx.db.from('clientes').select('id').eq('tenant_id', ctx.tenantId).eq('es_prueba', true);
-  if (error) return new Set();
+  // Solo se tolera que la columna no exista todavía (migración 34 sin aplicar); otro error no deja pasar a los de prueba.
+  if (error?.code === '42703') return new Set();
+  throwIf(error);
   return new Set((data ?? []).map((c) => c.id));
 }

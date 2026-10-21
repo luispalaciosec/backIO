@@ -280,7 +280,7 @@ interface DatosMesa {
 }
 
 export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Promise<DatosMesa> {
-  const alc = await alcanceMesa(ctx, mesa.id);
+  const alc = await alcanceMesa(ctx, mesa.id, { sinPrueba: true });
   const partes = [
     ...(alc.clienteIds.length ? [`cliente_id.in.(${alc.clienteIds.join(',')})`] : []),
     ...(alc.proyectoIds.length ? [`proyecto_id.in.(${alc.proyectoIds.join(',')})`] : []),
@@ -391,7 +391,7 @@ export async function calcularSemana(
 ): Promise<{ semana_id: string; metricas: MetricasSemana }> {
   const semana = await ensureSemana(ctx, inicio);
   const ids = new Set(d.tareas.map((t) => t.id));
-  const alc = await alcanceMesa(ctx, d.mesa.id);
+  const alc = await alcanceMesa(ctx, d.mesa.id, { sinPrueba: true });
   const clientes = new Set(alc.clienteIds);
   const { senales: sen, acuerdos: acu, acta } = await datosSemanaMesa(ctx, semana.id, d.mesa.id);
   const senales = ((sen ?? []) as { severidad: string; atendida: boolean; entidad_tipo: string; entidad_id: string }[]).filter(

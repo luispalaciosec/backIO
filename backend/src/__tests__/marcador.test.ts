@@ -49,7 +49,7 @@ describe('resultado de la semana', () => {
 
 describe('racha', () => {
   it('cuenta desde la última hacia atrás; una semana sin tareas no corta', () => {
-    const s = (pct: number | null) => ({ inicio: '', numero: 0, completadas: 0, vigentes: 0, pct });
+    const s = (pct: number | null) => ({ inicio: '', numero: 0, completadas: 0, vigentes: 0, tarde: 0, pct });
     expect(racha([s(90), s(70), s(85), s(null), s(80)])).toBe(2);
     expect(racha([s(90), s(79)])).toBe(0);
   });
@@ -84,7 +84,8 @@ describe('marcador completo', () => {
   ];
   it('plan: compromiso, semana pasada, racha y mejor semana del trimestre (sin la semana 40)', () => {
     const m = calcularMarcador([...historia, ...semana('2026-10-21', 0, 22)], '2026-10-19', { cierre: false });
-    expect(m).toMatchObject({ compromiso: 22, racha: 0, mejor_racha_trimestre: 1, record: null, reconocidos: [] });
+    // La racha de las semanas 40-41 empezó en el trimestre anterior y llegó a este: cuenta entera (2).
+    expect(m).toMatchObject({ compromiso: 22, racha: 0, mejor_racha_trimestre: 2, record: null, reconocidos: [] });
     expect(m.anterior).toMatchObject({ numero: 42, pct: 71 });
     expect(m.mejor_trimestre).toMatchObject({ numero: 41, pct: 86 });
     const md = renderMarcadorPlan(m);
@@ -115,6 +116,28 @@ describe('marcador completo', () => {
     expect(md).toContain('| Récord | Iguala la mejor semana del trimestre (antes: 86 %, semana 41) |');
     expect(md).toContain('- Johanna: 7 de 7 a tiempo');
     expect(md).not.toContain('grace');
+  });
+  it('la mejor racha del trimestre nunca es menor que la racha actual', () => {
+    const m = calcularMarcador(
+      [...semana('2026-09-23', 9, 10), ...semana('2026-09-30', 9, 10), ...semana('2026-10-07', 9, 10)],
+      '2026-10-12',
+      {
+        cierre: false,
+      },
+    );
+    expect(m.racha).toBe(3);
+    expect(m.mejor_racha_trimestre).toBe(3);
+  });
+  it('lo completado después del domingo se dice en el resultado (cuadra con el arrastre)', () => {
+    const m = calcularMarcador([...semana('2026-10-21', 3, 4), t('2026-10-22', { completado_at: '2026-10-26T15:00:00Z' })], '2026-10-19', {
+      cierre: true,
+    });
+    expect(renderMarcadorCierre(m, 0, (id) => id)).toContain(
+      '**3 de 5 completadas en la semana (60 %)**; 1 se completó después del domingo',
+    );
+  });
+  it('una completada sin fecha de cierre (histórica) cuenta como completada', () => {
+    expect(resultadoSemana([t('2026-10-14', { completado_at: null })], '2026-10-12', '2026-10-18').completadas).toBe(1);
   });
   it('sin dos semanas previas en el trimestre no hay récord', () => {
     const m = calcularMarcador([...semana('2026-10-07', 1, 10), ...semana('2026-10-21', 9, 10)], '2026-10-19', { cierre: true });

@@ -1,4 +1,5 @@
 import type { Mesa } from '@backio/shared';
+import { idsClientesDePrueba } from './clientes';
 import { type DbCtx, throwIf, DbError } from './client';
 
 export async function listMesas(ctx: DbCtx): Promise<Mesa[]> {
@@ -44,19 +45,28 @@ export async function updateMesa(
   return data as Mesa;
 }
 
-/** Clientes de una mesa + proyectos con override mesa_id. Devuelve los cliente_id y proyecto_id que caen en la mesa. */
-export async function alcanceMesa(ctx: DbCtx, mesaId: string): Promise<{ clienteIds: string[]; proyectoIds: string[] }> {
-  const [{ data: cl, error: e1 }, { data: pr, error: e2 }] = await Promise.all([
+/**
+ * Clientes de una mesa + proyectos con override mesa_id. Devuelve los cliente_id y proyecto_id que caen en la mesa.
+ * Con `sinPrueba`, deja fuera los clientes de prueba (migración 34) y sus proyectos: así se usa en los rituales (daily,
+ * weekly, informe, evolutivo). El backlog por mesa los sigue mostrando, para poder probar.
+ */
+export async function alcanceMesa(
+  ctx: DbCtx,
+  mesaId: string,
+  opts: { sinPrueba?: boolean } = {},
+): Promise<{ clienteIds: string[]; proyectoIds: string[] }> {
+  const [{ data: cl, error: e1 }, { data: pr, error: e2 }, prueba] = await Promise.all([
     ctx.db.from('clientes').select('id').eq('tenant_id', ctx.tenantId).eq('mesa_id', mesaId).is('deleted_at', null),
     ctx.db.from('proyectos').select('id, cliente_id, mesa_id').eq('tenant_id', ctx.tenantId).is('deleted_at', null),
+    opts.sinPrueba ? idsClientesDePrueba(ctx) : Promise.resolve(new Set<string>()),
   ]);
   throwIf(e1);
   throwIf(e2);
-  const clienteIds = (cl ?? []).map((c) => (c as { id: string }).id);
+  const clienteIds = (cl ?? []).map((c) => (c as { id: string }).id).filter((id) => !prueba.has(id));
   const set = new Set(clienteIds);
   // Proyectos de la mesa: los que la declaran explícitamente, o los de sus clientes sin override a otra mesa.
   const proyectoIds = ((pr ?? []) as { id: string; cliente_id: string; mesa_id: string | null }[])
-    .filter((p) => p.mesa_id === mesaId || (p.mesa_id === null && set.has(p.cliente_id)))
+    .filter((p) => !prueba.has(p.cliente_id) && (p.mesa_id === mesaId || (p.mesa_id === null && set.has(p.cliente_id))))
     .map((p) => p.id);
   return { clienteIds, proyectoIds };
 }

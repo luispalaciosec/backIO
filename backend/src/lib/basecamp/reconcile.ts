@@ -34,6 +34,9 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
     try {
       const raw = await bc.getTodoRaw(bcProject, r.basecamp_todo_id as number);
       const safe = extractSafeTodo(raw);
+      // To-do movido a otro proyecto: Basecamp redirige al nuevo (otro id). Lo resuelve la importación (decidirMovido);
+      // aquí no se compara ni se escribe sobre el to-do de otro proyecto.
+      if (safe && safe.todo_id !== r.basecamp_todo_id) continue;
       const res = safe ? await applyBasecampUpdate(ctx, { ...safe, completed: safe.completed ?? false }) : null;
       if (res?.aplicado) aplicados += 1;
       // La fecha: si alguien la cambió en Basecamp después que en BackIO, applyBasecampUpdate ya la aceptó. Si BackIO la

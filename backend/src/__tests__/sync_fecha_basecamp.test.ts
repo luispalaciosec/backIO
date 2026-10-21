@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const e = vi.hoisted(() => ({
   req: null as Record<string, unknown> | null,
   ultimo: null as { created_at: string; fecha_anterior: string | null } | null,
+  pendiente: null as string | null,
   update: vi.fn(),
   completar: vi.fn(),
   audit: vi.fn(),
@@ -12,6 +13,7 @@ const e = vi.hoisted(() => ({
 vi.mock('../lib/db/requerimientos', () => ({ findByBasecampTodo: async () => e.req, updateRequerimiento: e.update }));
 vi.mock('../lib/db/historial', () => ({
   ultimoCambioDeFechaEnBackio: async () => e.ultimo,
+  fechaPendienteDeEnviar: async () => e.pendiente,
   completarUltimaReprogramacion: e.completar,
 }));
 vi.mock('../lib/db/usuarios', () => ({ usuarioPorBasecampId: e.usuarioPorBasecampId }));
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   e.req = { id: 'r1', tenant_id: 't', estado_operativo: 'en_ejecucion', fecha_entrega: '2026-10-16' };
   e.ultimo = null;
+  e.pendiente = null;
   e.usuarioPorBasecampId.mockResolvedValue('grace');
 });
 
@@ -65,6 +68,19 @@ describe('fecha cambiada en Basecamp', () => {
     const r = await applyBasecampUpdate(ctx, payload({ updated_at: '2026-10-19T16:00:00Z' }));
     expect(r.fecha_aceptada).toBeUndefined();
     expect(e.update).not.toHaveBeenCalled();
+  });
+  // To-do 10288810481 (20/10/2026): el cambio de Grace no llegó (token vencido) y un toque al to-do lo revertía.
+  it('si el último cambio de BackIO no llegó a Basecamp, no se acepta la fecha de Basecamp', async () => {
+    e.ultimo = { created_at: '2026-10-20T20:36:00Z', fecha_anterior: '2026-10-07' };
+    e.pendiente = '2026-10-20T20:36:01Z';
+    const r = await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-20', updated_at: '2026-10-20T20:46:00Z' }));
+    expect(r.fecha_aceptada).toBeUndefined();
+    expect(e.update).not.toHaveBeenCalled();
+  });
+  it('una tarea sin fecha toma la de Basecamp sin tocar reprogramaciones viejas', async () => {
+    e.req = { ...e.req!, fecha_entrega: null };
+    expect((await applyBasecampUpdate(ctx, payload())).fecha_aceptada).toBe(true);
+    expect(e.completar).not.toHaveBeenCalled();
   });
   it('misma fecha, sin fecha o tarea cerrada: no hace nada', async () => {
     await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-16' }));

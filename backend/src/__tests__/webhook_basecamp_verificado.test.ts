@@ -108,6 +108,16 @@ describe('webhook de Basecamp: el estado sale del to-do vivo', () => {
     expect(aplicados).toEqual([]);
   });
 
+  // Revisión del 20/10/2026: el to-do vivo reemplazaba al evento y se perdía quién hizo el cambio (fechas sin autor).
+  it('conserva quién hizo el cambio (creator del evento) aunque el estado salga del to-do vivo', async () => {
+    vivo = todoVivo({ due_on: '2026-10-22' });
+    await app.request('/api/webhooks/basecamp/s3cret', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'todo_changed', creator: { id: 501 }, recording: { id: 42, bucket: { id: 100 } } }),
+    });
+    expect(aplicados[0]).toMatchObject({ due_on: '2026-10-22', actor_basecamp_id: 501 });
+  });
+
   it('si Basecamp no responde, no se aplica nada y se pide reintento', async () => {
     vivo = new Error('Basecamp 500 GET /buckets/100/todos/42.json: error');
     expect((await evento('todo_completed')).status).toBe(503);

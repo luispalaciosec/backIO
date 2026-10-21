@@ -75,7 +75,14 @@ async function estadoVivo(req: Requerimiento, safe: BasecampSyncPayload): Promis
   const status = (raw as { status?: unknown }).status;
   const eliminado =
     status === 'trashed' || status === 'archived' ? true : safe.eliminado === false && status === 'active' ? false : undefined;
-  return { ...vivo, bucket_id: proyecto, completed: vivo.completed ?? false, ...(eliminado !== undefined ? { eliminado } : {}) };
+  // Quién hizo el cambio sale del evento (el to-do vivo no lo dice): sin esto la fecha aceptada quedaba sin autor.
+  return {
+    ...vivo,
+    bucket_id: proyecto,
+    completed: vivo.completed ?? false,
+    ...(safe.actor_basecamp_id !== undefined ? { actor_basecamp_id: safe.actor_basecamp_id } : {}),
+    ...(eliminado !== undefined ? { eliminado } : {}),
+  };
 }
 
 function tokenValido(t: string | undefined): boolean {

@@ -27,6 +27,8 @@ export interface ResultadoSemana {
   numero: number;
   completadas: number;
   vigentes: number;
+  /** Completadas, pero después del corte: no cuentan en el resultado ni pasan al arrastre. */
+  tarde: number;
   pct: number | null;
 }
 
@@ -81,10 +83,17 @@ export function resultadoSemana(tareas: TareaMarcador[], inicio: string, corte: 
   const vigentes = tareas.filter(
     (t) => t.fecha_entrega && t.fecha_entrega >= inicio && t.fecha_entrega <= fin && t.estado_operativo !== 'cancelado',
   );
-  const completadas = vigentes.filter(
-    (t) => t.estado_operativo === 'completado' && (!corte || (diaLocal(t.completado_at) ?? '9999') <= corte),
-  ).length;
-  return { inicio, numero: numeroIso(inicio), completadas, vigentes: vigentes.length, pct: pct(completadas, vigentes.length) };
+  // Una completada sin completado_at (históricas, docs/05) cuenta como completada: no se sabe cuándo, no se castiga.
+  const hechas = vigentes.filter((t) => t.estado_operativo === 'completado');
+  const enSemana = hechas.filter((t) => !corte || !t.completado_at || diaLocal(t.completado_at) <= corte).length;
+  return {
+    inicio,
+    numero: numeroIso(inicio),
+    completadas: enSemana,
+    vigentes: vigentes.length,
+    tarde: hechas.length - enSemana,
+    pct: pct(enSemana, vigentes.length),
+  };
 }
 
 /** Semanas consecutivas, desde la última hacia atrás, en la meta o por encima. Las semanas sin tareas no cortan ni suman. */
@@ -98,13 +107,17 @@ export function racha(semanas: ResultadoSemana[], meta = META_SEMANAL): number {
   return n;
 }
 
-function mejorRacha(semanas: ResultadoSemana[], meta = META_SEMANAL): number {
+/**
+ * La mejor racha que llegó al trimestre: puede haber empezado antes (así nunca es menor que la racha actual, que mira
+ * más atrás). Se cuenta por semanas del historial y solo se registra al pasar por semanas del trimestre.
+ */
+function mejorRacha(semanas: ResultadoSemana[], desde: string, meta = META_SEMANAL): number {
   let mejor = 0,
     n = 0;
   for (const s of semanas) {
     if (s.pct === null) continue;
     n = s.pct >= meta ? n + 1 : 0;
-    mejor = Math.max(mejor, n);
+    if (s.inicio >= desde) mejor = Math.max(mejor, n);
   }
   return mejor;
 }
@@ -164,7 +177,7 @@ export function calcularMarcador(tareas: TareaMarcador[], inicio: string, opts: 
     ya_completadas: actual.completadas,
     anterior: anterior && anterior.inicio === sumarDias(inicio, -7) ? anterior : null,
     racha: racha(conActual),
-    mejor_racha_trimestre: mejorRacha(delTrimestre(conActual)),
+    mejor_racha_trimestre: mejorRacha(conActual, trimestre),
     mejor_trimestre: mejor,
     record,
     reconocidos: opts.cierre ? reconocidos(tareas, inicio) : [],
@@ -191,7 +204,7 @@ export function renderMarcadorPlan(m: Marcador): string {
 export function renderMarcadorCierre(m: Marcador, canceladas: number, nombre: (id: string) => string): string {
   const a = m.actual;
   const filas = [
-    `| Resultado | **${a.completadas} de ${a.vigentes} completadas en la semana (${a.pct ?? 0} %)**${canceladas ? `; ${canceladas} ${canceladas === 1 ? 'cancelada no cuenta' : 'canceladas no cuentan'}` : ''} |`,
+    `| Resultado | **${a.completadas} de ${a.vigentes} completadas en la semana (${a.pct ?? 0} %)**${a.tarde ? `; ${a.tarde} ${a.tarde === 1 ? 'se completó' : 'se completaron'} después del domingo` : ''}${canceladas ? `; ${canceladas} ${canceladas === 1 ? 'cancelada no cuenta' : 'canceladas no cuentan'}` : ''} |`,
     `| Meta de la mesa | ${m.meta} %: **${a.pct !== null && a.pct >= m.meta ? 'cumplida' : 'no cumplida'}** |`,
   ];
   if (m.anterior && a.pct !== null && m.anterior.pct !== null) {

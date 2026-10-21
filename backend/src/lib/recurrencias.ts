@@ -182,7 +182,9 @@ export async function generarPeriodo(
       tipo: 'recurrencia_generada',
       titulo: `Listo el fee de ${periodo}: ${nombre}`,
       cuerpo: pendienteBasecamp
-        ? `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas, pero no lo envió a Basecamp: la ejecutiva no conectó su Basecamp (en BackIO no se escribe a nombre de otra persona). Conéctalo en «Mi Basecamp» y pulsa «Reintentar Basecamp» en el proyecto.`
+        ? rec.owner_ejecutiva
+          ? `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas, pero no lo envió a Basecamp: la ejecutiva no conectó su Basecamp (en BackIO no se escribe a nombre de otra persona). Conéctalo en «Mi Basecamp» y pulsa «Reintentar Basecamp» en el proyecto.`
+          : `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas, pero no lo envió a Basecamp: el fee no tiene ejecutiva y en BackIO no se escribe a nombre de otra persona. Asigna la ejecutiva y pulsa «Reintentar Basecamp» en el proyecto.`
         : `BackIO creó el proyecto "${nombre}" con ${r.requerimientos.length} tareas y lo envió a Basecamp. Revisa fechas, piezas y responsables antes de que arranque el mes.`,
       ruta: `/proyectos/${r.proyecto.id}`,
       entidad_tipo: 'proyecto',
