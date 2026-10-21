@@ -90,6 +90,7 @@ export type Database = {
           cerrado_at: string | null;
           created_at: string;
           created_by: string | null;
+          mesa_id: string | null;
         };
         Insert: {
           id?: string;
@@ -102,6 +103,7 @@ export type Database = {
           cerrado_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          mesa_id?: string | null;
         };
         Update: {
           id?: string;
@@ -114,6 +116,7 @@ export type Database = {
           cerrado_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          mesa_id?: string | null;
         };
         Relationships: [
           {
@@ -142,6 +145,13 @@ export type Database = {
             columns: ['created_by'];
             isOneToOne: false;
             referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'acuerdos_mesa_id_fkey';
+            columns: ['mesa_id'];
+            isOneToOne: false;
+            referencedRelation: 'mesas';
             referencedColumns: ['id'];
           },
         ];
@@ -2336,6 +2346,7 @@ export type Database = {
           primera_respuesta_at: string | null;
           responsables_cierre: string[] | null;
           heredada: boolean;
+          basecamp_due_on_visto: string | null;
         };
         Insert: {
           id?: string;
@@ -2381,6 +2392,7 @@ export type Database = {
           primera_respuesta_at?: string | null;
           responsables_cierre?: string[] | null;
           heredada?: boolean;
+          basecamp_due_on_visto?: string | null;
         };
         Update: {
           id?: string;
@@ -2426,6 +2438,7 @@ export type Database = {
           primera_respuesta_at?: string | null;
           responsables_cierre?: string[] | null;
           heredada?: boolean;
+          basecamp_due_on_visto?: string | null;
         };
         Relationships: [
           {
@@ -2539,6 +2552,8 @@ export type Database = {
           detalle: Json;
           atendida: boolean;
           created_at: string;
+          atendida_por: string | null;
+          atendida_at: string | null;
         };
         Insert: {
           id?: string;
@@ -2552,6 +2567,8 @@ export type Database = {
           detalle?: Json;
           atendida?: boolean;
           created_at?: string;
+          atendida_por?: string | null;
+          atendida_at?: string | null;
         };
         Update: {
           id?: string;
@@ -2565,6 +2582,8 @@ export type Database = {
           detalle?: Json;
           atendida?: boolean;
           created_at?: string;
+          atendida_por?: string | null;
+          atendida_at?: string | null;
         };
         Relationships: [
           {
@@ -2579,6 +2598,13 @@ export type Database = {
             columns: ['semana_id'];
             isOneToOne: false;
             referencedRelation: 'semanas';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'senales_atendida_por_fkey';
+            columns: ['atendida_por'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
             referencedColumns: ['id'];
           },
         ];

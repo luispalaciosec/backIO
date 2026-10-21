@@ -198,6 +198,8 @@ export interface Requerimiento {
   brief_url: string | null;
   entregable_urls: string[] | null;
   basecamp_todo_id: number | null;
+  /** Última fecha de entrega vista o escrita en el to-do de Basecamp (migración 35). Solo la escribe el backend. */
+  basecamp_due_on_visto?: string | null;
   basecamp_todolist_id: number | null;
   basecamp_url: string | null;
   ultima_actualizacion: string;
@@ -257,6 +259,9 @@ export interface Senal {
   titulo: string;
   detalle: Record<string, unknown>;
   atendida: boolean;
+  /** Quién la marcó como atendida y cuándo (migración 35). */
+  atendida_por?: string | null;
+  atendida_at?: string | null;
   created_at: string;
 }
 
@@ -270,6 +275,8 @@ export interface Acuerdo {
   estado: 'pendiente' | 'cumplido' | 'cancelado';
   cerrado_at: string | null;
   created_at: string;
+  /** Mesa en cuyo weekly se acordó (migración 35). Null = weekly de toda la agencia. */
+  mesa_id?: string | null;
 }
 
 export interface Acta {

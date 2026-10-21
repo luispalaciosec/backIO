@@ -194,6 +194,7 @@ Las tareas del backlog: estado, aprobación, prioridad, fechas, responsables, vi
 | `primera_respuesta_at` | fecha y hora |  |  |
 | `responsables_cierre` | uuid[] |  |  |
 | `heredada` | boolean | sí | por defecto `false` |
+| `basecamp_due_on_visto` | date |  |  |
 
 ### plantillas
 
@@ -457,6 +458,8 @@ Alertas calculadas por el motor de señales para una semana.
 | `detalle` | jsonb | sí |  |
 | `atendida` | boolean | sí | por defecto `false` |
 | `created_at` | fecha y hora | sí | por defecto `now()` |
+| `atendida_por` | uuid |  | → [usuarios](#usuarios).id |
+| `atendida_at` | fecha y hora |  |  |
 
 ### acuerdos
 
@@ -474,6 +477,7 @@ Compromisos del weekly con responsable y fecha.
 | `cerrado_at` | fecha y hora |  |  |
 | `created_at` | fecha y hora | sí | por defecto `now()` |
 | `created_by` | uuid |  | → [usuarios](#usuarios).id |
+| `mesa_id` | uuid |  | → [mesas](#mesas).id |
 
 ### actas
 

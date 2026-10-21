@@ -10,6 +10,7 @@ import { CAMPOS_COLABORADOR } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { audit, getRequerimiento, updateRequerimiento } from '../db';
 import { completarUltimaReprogramacion } from '../db/historial';
+import { marcarDueOnVisto } from '../db/requerimientos';
 import { cerrarReproceso, registrarReproceso } from '../cumplimiento';
 import { pushDueDate } from '../basecamp/write';
 import { log } from '../logger';
@@ -118,6 +119,7 @@ export async function actualizarRequerimiento(
     try {
       await pushDueDate(ctx, r, bc);
       basecamp_due_on = 'ok';
+      await marcarDueOnVisto(ctx.tenantId, r.id, r.fecha_entrega);
     } catch (err) {
       basecamp_due_on = 'error';
       log.error('[basecamp] due_on no sincronizado', err);

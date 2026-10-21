@@ -12,7 +12,7 @@ const e = vi.hoisted(() => ({
   responsable: vi.fn(),
 }));
 
-vi.mock('../lib/db/requerimientos', () => ({ listBacklog: async () => e.activos }));
+vi.mock('../lib/db/requerimientos', () => ({ listBacklog: async () => e.activos, marcarDueOnVisto: async () => undefined }));
 vi.mock('../lib/db/clientes', () => ({ getCliente: e.getCliente }));
 vi.mock('../lib/db/audit', () => ({ audit: e.audit }));
 vi.mock('../lib/basecamp/write', () => ({ pushDueDate: e.push }));

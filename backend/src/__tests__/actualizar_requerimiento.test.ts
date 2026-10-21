@@ -18,6 +18,7 @@ vi.mock('../lib/db', () => ({
   audit: async (_c: unknown, e: unknown) => void estado.auditoria.push(e),
 }));
 vi.mock('../lib/db/historial', () => ({ completarUltimaReprogramacion: espias.completarUltimaReprogramacion }));
+vi.mock('../lib/db/requerimientos', () => ({ marcarDueOnVisto: async () => undefined }));
 vi.mock('../lib/cumplimiento', () => ({ registrarReproceso: espias.registrarReproceso, cerrarReproceso: espias.cerrarReproceso }));
 vi.mock('../lib/basecamp/write', () => ({ pushDueDate: espias.pushDueDate }));
 vi.mock('../lib/basecamp/client', async (orig) => ({

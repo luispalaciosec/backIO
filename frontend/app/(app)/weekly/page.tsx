@@ -1,34 +1,50 @@
-import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa, RequerimientoMetricas } from '@backio/shared';
+import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa, RequerimientoMetricas, Cliente } from '@backio/shared';
 import { apiServer } from '@/lib/api.server';
 import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
 import { CausasPendientes } from './CausasPendientes';
+import { SenalesWeekly } from './SenalesWeekly';
 import { meServer, puedeEscribir } from '@/lib/me.server';
 import { hoyLocal, nombrePersona } from '@backio/shared';
 import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
 
 export const dynamic = 'force-dynamic';
 
-const SEV: Record<string, string> = {
-  critica: 'bg-red-100 text-red-800',
-  alta: 'bg-amber-100 text-amber-800',
-  media: 'bg-gray-100 text-gray-700',
-};
-
-export default async function WeeklyPage() {
-  const [semana, me] = await Promise.all([apiServer<Semana>('/semanas/actual'), meServer()]);
+export default async function WeeklyPage({ searchParams: spP }: { searchParams: Promise<{ mesa?: string }> }) {
+  const searchParams = await spP;
+  const [semana, me, { items: mesas }] = await Promise.all([
+    apiServer<Semana>('/semanas/actual'),
+    meServer(),
+    apiServer<{ items: Mesa[] }>('/mesas'),
+  ]);
   const escribe = puedeEscribir(me.rol);
-  const [{ items: senales }, { items: acuerdos }, { items: abiertos }, { items: capacidad }, { items: usuarios }, { items: mesas }] =
-    await Promise.all([
-      apiServer<{ items: Senal[] }>(`/semanas/${semana.id}/senales`),
-      apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
-      apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
-      apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad`),
-      apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
-      apiServer<{ items: Mesa[] }>('/mesas'),
-    ]);
+  // El weekly es de una mesa: señales, acuerdos y compromisos son los suyos (migración 35). «todas» = toda la agencia.
+  const activas = mesas.filter((m) => m.activa);
+  const todas = searchParams.mesa === 'todas';
+  const mesa = todas ? null : (activas.find((m) => m.id === searchParams.mesa) ?? activas[0] ?? null);
+  const deLaMesa = (a: Acuerdo) => !mesa || a.mesa_id === mesa.id;
+  const [
+    { items: senales },
+    { items: acuerdosTodos },
+    { items: abiertosTodos },
+    { items: capacidad },
+    { items: usuarios },
+    { items: clientes },
+  ] = await Promise.all([
+    apiServer<{ items: Senal[] }>(`/semanas/${semana.id}/senales${mesa ? `?mesa=${mesa.id}` : ''}`),
+    apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
+    apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
+    apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad`),
+    apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
+    apiServer<{ items: Pick<Cliente, 'id' | 'nombre'>[] }>('/clientes'),
+  ]);
+  const acuerdos = acuerdosTodos.filter(deLaMesa);
+  const abiertos = abiertosTodos.filter(deLaMesa);
   const { items: reqs } = await apiServer<{ items: RequerimientoMetricas[] }>('/requerimientos?activos=1');
   const titulos = Object.fromEntries(reqs.map((r) => [r.id, r.titulo_interno]));
+  const clienteDeTarea = Object.fromEntries(reqs.map((r) => [r.id, r.cliente_id]));
+  const nombreCliente = Object.fromEntries(clientes.map((c) => [c.id, c.nombre]));
+  const nombres = Object.fromEntries(usuarios.map((u) => [u.id, nombrePersona(u)]));
   const dash = await apiServer<{
     arrastre: {
       requerimiento_id: string;
@@ -52,13 +68,37 @@ export default async function WeeklyPage() {
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Weekly · Semana {semana.numero_iso}</h1>
+          <h1 className="text-2xl font-bold">
+            Weekly · Semana {semana.numero_iso} · {mesa?.nombre ?? 'Toda la agencia'}
+          </h1>
           <p className="text-sm text-gray-500">
             {fecha(semana.fecha_inicio)} – {fecha(semana.fecha_fin)} · agenda generada por el motor de señales
           </p>
+          <nav className="mt-2 flex flex-wrap gap-1.5 text-xs" aria-label="Mesa">
+            {activas.map((m) => (
+              <a
+                key={m.id}
+                href={`/weekly?mesa=${m.id}`}
+                className={`rounded-full px-3 py-1 border ${mesa?.id === m.id ? 'bg-brand text-white border-brand' : 'border-gray-300 hover:bg-gray-50'}`}
+              >
+                {m.nombre}
+              </a>
+            ))}
+            <a
+              href="/weekly?mesa=todas"
+              className={`rounded-full px-3 py-1 border ${todas ? 'bg-brand text-white border-brand' : 'border-gray-300 hover:bg-gray-50'}`}
+            >
+              Toda la agencia
+            </a>
+          </nav>
         </div>
         {escribe ? (
-          <WeeklyActions semanaId={semana.id} mesas={mesas.filter((m) => m.activa).map((m) => ({ id: m.id, nombre: m.nombre }))} />
+          <WeeklyActions
+            key={mesa?.id ?? 'todas'}
+            semanaId={semana.id}
+            mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))}
+            mesaInicial={mesa?.id ?? ''}
+          />
         ) : (
           <span className="text-xs text-gray-400">Solo lectura · los documentos los genera operaciones</span>
         )}
@@ -81,21 +121,14 @@ export default async function WeeklyPage() {
             </ul>
           </section>
 
-          <section className="card">
-            <div className="px-4 py-3 border-b border-gray-200 font-semibold">2. Señales ({senales.length})</div>
-            <ul className="divide-y divide-gray-100">
-              {senales.length === 0 && <li className="p-4 text-sm text-gray-400">Sin señales. Recalcula para generar la agenda.</li>}
-              {senales.map((s) => (
-                <li key={s.id} className={`p-4 text-sm flex items-start gap-3 ${s.atendida ? 'opacity-50' : ''}`}>
-                  <span className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${SEV[s.severidad]}`}>{s.severidad}</span>
-                  <div className="flex-1">
-                    <div>{s.titulo}</div>
-                    <div className="text-xs text-gray-500">{s.tipo.replace(/_/g, ' ')}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <SenalesWeekly
+            senales={senales}
+            semanaId={semana.id}
+            clienteDeTarea={clienteDeTarea}
+            clientes={nombreCliente}
+            nombre={nombres}
+            escribe={escribe}
+          />
 
           <section className="card">
             <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between">
@@ -161,7 +194,12 @@ export default async function WeeklyPage() {
             <div className="font-semibold">Acuerdos de la sesión</div>
             <p className="text-xs text-gray-500">Cada acuerdo lleva responsable y una fecha concreta del calendario.</p>
             {escribe ? (
-              <AcuerdoForm semanaId={semana.id} usuarios={usuarios.filter((u) => u.activo).map((u) => ({ id: u.id, nombre: u.nombre }))} />
+              <AcuerdoForm
+                semanaId={semana.id}
+                mesaId={mesa?.id ?? null}
+                mesaNombre={mesa?.nombre ?? 'toda la agencia'}
+                usuarios={usuarios.filter((u) => u.activo).map((u) => ({ id: u.id, nombre: u.nombre }))}
+              />
             ) : (
               <p className="text-xs text-gray-400">Los acuerdos los registra quien dirige el weekly.</p>
             )}

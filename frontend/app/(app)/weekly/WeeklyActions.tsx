@@ -7,14 +7,22 @@ import { useIA } from '@/lib/useIA';
 import { hrefExterno } from '@/lib/url';
 import { hoyLocal, sumarDias } from '@backio/shared';
 
-export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { id: string; nombre: string }[] }) {
+export function WeeklyActions({
+  semanaId,
+  mesas,
+  mesaInicial,
+}: {
+  semanaId: string;
+  mesas: { id: string; nombre: string }[];
+  mesaInicial: string;
+}) {
   const router = useRouter();
   const ia = useIA();
   const [conIA, setConIA] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [acta, setActa] = useState<Acta | null>(null);
   const [agenda, setAgenda] = useState<WeeklyIA | null>(null);
-  const [mesa, setMesa] = useState<string>(mesas[0]?.id ?? '');
+  const [mesa, setMesa] = useState<string>(mesaInicial);
   const [pub, setPub] = useState<{ url: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const q = `?${mesa ? `mesa=${mesa}&` : ''}${ia && conIA ? 'ia=1' : ''}`;
@@ -182,7 +190,17 @@ export function WeeklyActions({ semanaId, mesas }: { semanaId: string; mesas: { 
   );
 }
 
-export function AcuerdoForm({ semanaId, usuarios }: { semanaId: string; usuarios: { id: string; nombre: string }[] }) {
+export function AcuerdoForm({
+  semanaId,
+  mesaId,
+  mesaNombre,
+  usuarios,
+}: {
+  semanaId: string;
+  mesaId: string | null;
+  mesaNombre: string;
+  usuarios: { id: string; nombre: string }[];
+}) {
   const router = useRouter();
   const [f, setF] = useState({ descripcion: '', responsable_id: '', fecha_compromiso: '' });
   const [err, setErr] = useState<string | null>(null);
@@ -192,7 +210,7 @@ export function AcuerdoForm({ semanaId, usuarios }: { semanaId: string; usuarios
     e.preventDefault();
     setErr(null);
     try {
-      await api(`/semanas/${semanaId}/acuerdos`, { method: 'POST', json: f });
+      await api(`/semanas/${semanaId}/acuerdos`, { method: 'POST', json: { ...f, mesa_id: mesaId } });
       setF({ descripcion: '', responsable_id: '', fecha_compromiso: '' });
       router.refresh();
     } catch (e) {
@@ -225,7 +243,7 @@ export function AcuerdoForm({ semanaId, usuarios }: { semanaId: string; usuarios
         onChange={(e) => setF({ ...f, fecha_compromiso: e.target.value })}
       />
       {err && <p className="text-xs text-red-600">{err}</p>}
-      <button className="btn-primary w-full">Guardar acuerdo</button>
+      <button className="btn-primary w-full">Guardar acuerdo de {mesaNombre}</button>
     </form>
   );
 }

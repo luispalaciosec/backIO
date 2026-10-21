@@ -73,6 +73,7 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
       estado_operativo: 'en_ejecucion',
       fecha_entrega: '2026-09-05',
     } as never);
+    vi.spyOn(reqs, 'marcarDueOnVisto').mockResolvedValue();
     vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, patch) => {
       escrituras.push(patch);
       return {} as never;
@@ -100,6 +101,7 @@ describe('Defensa 1 · extracción estricta de Basecamp', () => {
       estado_operativo: 'completado',
       fecha_entrega: '2026-09-05',
     } as never);
+    vi.spyOn(reqs, 'marcarDueOnVisto').mockResolvedValue();
     vi.spyOn(reqs, 'updateRequerimiento').mockImplementation(async (_c, _id, p) => {
       patch = p;
       return {} as never;

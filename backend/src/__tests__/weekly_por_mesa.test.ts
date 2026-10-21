@@ -6,6 +6,7 @@ const e = vi.hoisted(() => ({
   guardadas: [] as Record<string, unknown>[],
   acuerdos: [] as Record<string, unknown>[],
   prueba: new Set<string>(),
+  atendidas: new Map<string, { severidad: 'critica' | 'alta' | 'media'; atendida_por: string | null; atendida_at: string | null }>(),
 }));
 
 vi.mock('../lib/db/requerimientos', () => ({
@@ -27,7 +28,7 @@ vi.mock('../lib/db/mesas', () => ({
   getMesa: async () => ({ id: 'm-omega', nombre: 'Mesa Omega' }),
   alcanceMesa: async () => ({ clienteIds: ['omega', 'acme'], proyectoIds: [] }),
 }));
-vi.mock('../lib/db/semanas', () => ({
+vi.mock('../lib/db/semanas', async () => ({
   listSenales: async () => e.guardadas,
   listAcuerdosAbiertos: async () => e.acuerdos,
   listAcuerdosSemana: async () => [],
@@ -35,6 +36,8 @@ vi.mock('../lib/db/semanas', () => ({
   getSemana: async () => null,
   replaceSenales: async () => [],
   insertActa: async () => null,
+  atendidasRecientes: async () => e.atendidas,
+  atendidaVigente: (await vi.importActual<typeof import('../lib/db/semanas')>('../lib/db/semanas')).atendidaVigente,
 }));
 vi.mock('../lib/db/historial', () => ({ listSinMotivo: async () => ({ reprogramaciones: [], reprocesos: [] }) }));
 vi.mock('../lib/db/rituales', () => ({ getUmbralesSenales: async () => ({}), listCompletadosRecientes: async () => [] }));
@@ -84,12 +87,27 @@ describe('weekly y actas por mesa', () => {
     e.guardadas = [{ id: 'g', titulo: 'x' }];
     expect(await senalesDeMesa(ctx, semana, null)).toEqual(e.guardadas);
   });
-  it('los acuerdos de una mesa son los de quienes trabajan en ella', async () => {
+  // Migración 35: el acuerdo es de la mesa en cuyo weekly se acordó, no de las mesas donde trabaja el responsable.
+  it('los acuerdos de una mesa son los acordados en ella (aunque el responsable trabaje en otra o en ninguna)', async () => {
     e.acuerdos = [
-      { id: 'a1', responsable_id: 'elias' },
-      { id: 'a2', responsable_id: 'alguien-de-orion' },
+      { id: 'a1', responsable_id: 'elias', mesa_id: 'm-omega' },
+      { id: 'a2', responsable_id: 'elias', mesa_id: 'm-orion' },
+      { id: 'a3', responsable_id: 'directora-sin-tareas', mesa_id: 'm-omega' },
+      { id: 'a4', responsable_id: 'elias', mesa_id: null },
     ];
-    expect((await acuerdosAbiertosDeMesa(ctx, 'm-omega')).map((a) => a.id)).toEqual(['a1']);
+    expect((await acuerdosAbiertosDeMesa(ctx, 'm-omega')).map((a) => a.id)).toEqual(['a1', 'a3']);
+    expect((await acuerdosAbiertosDeMesa(ctx, null)).map((a) => a.id)).toEqual(['a1', 'a2', 'a3', 'a4']);
+  });
+  it('una señal atendida la semana pasada sigue atendida si no empeoró; si empeoró, vuelve', async () => {
+    e.activos = [tarea('omega', { id: 'r1' })];
+    e.guardadas = [];
+    const [s] = await senalesDeMesa(ctx, semana, 'm-omega');
+    e.atendidas = new Map([[`${s!.tipo}:r1`, { severidad: s!.severidad, atendida_por: 'luis', atendida_at: '2026-10-09T15:00:00Z' }]]);
+    const [mismo] = await senalesDeMesa(ctx, semana, 'm-omega');
+    expect(mismo).toMatchObject({ atendida: true, atendida_por: 'luis' });
+    e.atendidas = new Map([[`${s!.tipo}:r1`, { severidad: 'media', atendida_por: 'luis', atendida_at: '2026-10-09T15:00:00Z' }]]);
+    if (s!.severidad !== 'media') expect((await senalesDeMesa(ctx, semana, 'm-omega'))[0]).toMatchObject({ atendida: false });
+    e.atendidas = new Map();
   });
 });
 

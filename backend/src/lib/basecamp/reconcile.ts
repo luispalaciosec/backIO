@@ -4,7 +4,7 @@
  * Lee el to-do crudo y lo pasa por extractSafeTodo: nunca guarda texto.
  */
 import type { DbCtx } from '../db/client';
-import { listBacklog } from '../db/requerimientos';
+import { listBacklog, marcarDueOnVisto } from '../db/requerimientos';
 import { getCliente } from '../db/clientes';
 import { pushDueDate } from './write';
 import { BasecampClient } from './client';
@@ -54,6 +54,7 @@ export async function reconcileTenant(ctx: DbCtx): Promise<{ revisados: number; 
           }
           fechas += 1;
           await pushDueDate(ctx, r, suyo);
+          await marcarDueOnVisto(ctx.tenantId, r.id, r.fecha_entrega);
           await audit(ctx, {
             accion: 'basecamp_fecha_reenviada',
             entidad: 'requerimiento',

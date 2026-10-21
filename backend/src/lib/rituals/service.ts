@@ -7,7 +7,17 @@ import { listBacklog } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
 import { listClientes, idsClientesDePrueba } from '../db/clientes';
 import { getMesa, alcanceMesa } from '../db/mesas';
-import { ensureSemana, getSemana, listAcuerdosAbiertos, listAcuerdosSemana, listSenales, replaceSenales, insertActa } from '../db/semanas';
+import {
+  atendidaVigente,
+  atendidasRecientes,
+  ensureSemana,
+  getSemana,
+  insertActa,
+  listAcuerdosAbiertos,
+  listAcuerdosSemana,
+  listSenales,
+  replaceSenales,
+} from '../db/semanas';
 import { listSinMotivo } from '../db/historial';
 import { calcularSenales } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
@@ -98,42 +108,42 @@ export async function senalesDeMesa(ctx: DbCtx, semana: Semana, mesaId?: string 
     completadosRecientes: completados as { cliente_id: string; completado_at: string | null }[],
     usuarios,
     clientes,
-    acuerdosAbiertos: acuerdosDeLaMesa(acuerdos, personasDeLaMesa(deLaMesa)),
+    acuerdosAbiertos: acuerdosDeLaMesa(acuerdos, mesaId),
     umbrales: u,
     sinMotivo,
   });
   const previa = new Map(guardadas.map((s) => [`${s.tipo}|${s.entidad_id}`, s]));
+  const atendidas = await atendidasRecientes(ctx);
   return calculadas.map((s, i) => {
     const g = previa.get(`${s.tipo}|${s.entidad_id}`);
+    // Atendida esta semana o la anterior, sin haber empeorado (migración 35).
+    const a = g?.atendida ? g : atendidaVigente(atendidas, s);
     return {
       ...s,
       id: g?.id ?? `mesa-${i}`,
       tenant_id: ctx.tenantId,
       semana_id: semana.id,
-      atendida: g?.atendida ?? false,
+      atendida: !!a,
+      atendida_por: a?.atendida_por ?? null,
+      atendida_at: a?.atendida_at ?? null,
       created_at: g?.created_at ?? new Date().toISOString(),
     };
   });
 }
 
-/** Quienes trabajan en la mesa: responsables de sus tareas activas. */
-function personasDeLaMesa(activos: { owner_agencia: string[] }[]): Set<string> {
-  return new Set(activos.flatMap((r) => r.owner_agencia));
-}
-
 /**
- * Los acuerdos del weekly no tienen mesa: en el documento de una mesa entran los de quienes trabajan en ella.
+ * Acuerdos que van en el weekly de una mesa: los que se acordaron en esa mesa (`acuerdos.mesa_id`, migración 35). Antes
+ * se adivinaba por las tareas del responsable: quien trabaja en dos mesas veía su acuerdo en las dos actas, y el de
+ * alguien sin tareas en la mesa no salía en ninguna.
  */
-function acuerdosDeLaMesa<A extends Pick<Acuerdo, 'responsable_id'>>(acuerdos: A[], personas: Set<string>): A[] {
-  return acuerdos.filter((a) => personas.has(a.responsable_id));
+export function acuerdosDeLaMesa<A extends Pick<Acuerdo, 'mesa_id'>>(acuerdos: A[], mesaId: string): A[] {
+  return acuerdos.filter((a) => a.mesa_id === mesaId);
 }
 
 /** Acuerdos abiertos que van en el weekly de una mesa (todos, si no hay mesa). */
 export async function acuerdosAbiertosDeMesa(ctx: DbCtx, mesaId?: string | null): Promise<Acuerdo[]> {
   const abiertos = await listAcuerdosAbiertos(ctx);
-  if (!mesaId) return abiertos;
-  const activos = await listBacklog(ctx, { solo_activos: true, mesa: await alcanceMesa(ctx, mesaId, { sinPrueba: true }) });
-  return acuerdosDeLaMesa(abiertos, personasDeLaMesa(activos));
+  return mesaId ? acuerdosDeLaMesa(abiertos, mesaId) : abiertos;
 }
 
 async function filtroMesa(ctx: DbCtx, mesaId?: string | null) {
@@ -188,11 +198,7 @@ export async function generarPlanOperativo(ctx: DbCtx, semanaId: string, mesaId?
   ]);
   const prioridades = prioridadesTodas.filter((r) => !prueba.has(r.cliente_id));
   const riesgos = senales.filter((s) => ['bloqueo_cliente', 'sobrecarga_proyectada', 'concentracion_carga'].includes(s.tipo));
-  // Personas de la mesa: con tareas activas en ella, no solo con entrega esta semana (igual que el acta; revisión 20/10).
-  const activosMesa = alcance
-    ? (await listBacklog(ctx, { solo_activos: true, mesa: alcance })).filter((r) => !prueba.has(r.cliente_id))
-    : [];
-  const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, personasDeLaMesa([...prioridades, ...activosMesa])) : pendientesTodos;
+  const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, mesa.id) : pendientesTodos;
   const marcador = await marcadorDeMesa(ctx, semana, alcance, prueba, false);
   const data = {
     semana,
@@ -218,7 +224,7 @@ export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: s
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
   const { mesa, alcance } = await filtroMesa(ctx, mesaId);
-  const [prioridadesTodas, usuarios, clientes, pendientesTodos, senales, acuerdosTodos, prueba, activosMesa] = await Promise.all([
+  const [prioridadesTodas, usuarios, clientes, pendientesTodos, senales, acuerdosTodos, prueba] = await Promise.all([
     listBacklog(ctx, { desde: semana.fecha_inicio, hasta: semana.fecha_fin, mesa: alcance }),
     listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx),
@@ -226,12 +232,10 @@ export async function generarActaCierre(ctx: DbCtx, semanaId: string, mesaId?: s
     senalesDeMesa(ctx, semana, mesa?.id ?? null),
     listAcuerdosSemana(ctx, semanaId),
     idsClientesDePrueba(ctx),
-    alcance ? listBacklog(ctx, { solo_activos: true, mesa: alcance }) : Promise.resolve([]),
   ]);
   const prioridades = prioridadesTodas.filter((r) => !prueba.has(r.cliente_id));
-  const personas = personasDeLaMesa([...prioridades, ...activosMesa]);
-  const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, personas) : pendientesTodos;
-  const acuerdos = mesa ? acuerdosDeLaMesa(acuerdosTodos, personas) : acuerdosTodos;
+  const pendientes = mesa ? acuerdosDeLaMesa(pendientesTodos, mesa.id) : pendientesTodos;
+  const acuerdos = mesa ? acuerdosDeLaMesa(acuerdosTodos, mesa.id) : acuerdosTodos;
   const marcador = await marcadorDeMesa(ctx, semana, alcance, prueba, true);
   const data = {
     semana,

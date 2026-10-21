@@ -14,7 +14,7 @@ import {
   getActa,
   audit,
 } from '../../lib/db';
-import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre } from '../../lib/rituals/service';
+import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre, senalesDeMesa } from '../../lib/rituals/service';
 import { getDaily } from '../../lib/rituals/daily';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
@@ -40,8 +40,16 @@ semanas.get('/:id', requireScope('read:senales'), async (c) => {
   return s ? c.json(s) : c.json({ error: 'No encontrada' }, 404);
 });
 
+// ?mesa= devuelve las señales de esa mesa (calculadas con sus clientes y proyectos), como el plan y el acta.
 semanas.get('/:id/senales', requireScope('read:senales'), async (c) => {
-  const items = await listSenales(ctxOf(c), c.req.param('id'));
+  const ctx = ctxOf(c);
+  const mesa = c.req.query('mesa');
+  let items;
+  if (mesa) {
+    const s = await getSemana(ctx, c.req.param('id'));
+    if (!s) return c.json({ error: 'No encontrada' }, 404);
+    items = await senalesDeMesa(ctx, s, mesa);
+  } else items = await listSenales(ctx, c.req.param('id'));
   return c.json({ items, total: items.length });
 });
 
@@ -53,8 +61,29 @@ semanas.post('/:id/senales/recalcular', requireScope('write:actas'), async (c) =
   return c.json({ items, total: items.length });
 });
 
-semanas.patch('/:id/senales/:senalId', requireScope('write:actas'), zValidator('json', z.object({ atendida: z.boolean() })), async (c) => {
-  await marcarSenalAtendida(ctxOf(c), c.req.param('senalId'), c.req.valid('json').atendida);
+// Botón «Atendida» del weekly (migración 35): por clave (tipo + entidad), porque la señal de una mesa puede no tener
+// fila guardada; guarda quién y cuándo.
+export const atenderSenalSchema = z.object({
+  atendida: z.boolean(),
+  senal: z.object({
+    tipo: z.string().min(1),
+    severidad: z.enum(['critica', 'alta', 'media']),
+    entidad_tipo: z.enum(['requerimiento', 'usuario', 'cliente', 'proyecto', 'acuerdo']),
+    entidad_id: z.string().uuid(),
+    titulo: z.string().min(1).max(500),
+    detalle: z.record(z.unknown()).default({}),
+  }),
+});
+semanas.post('/:id/senales/atender', requireScope('write:actas'), zValidator('json', atenderSenalSchema), async (c) => {
+  const ctx = ctxOf(c);
+  const { atendida, senal } = c.req.valid('json');
+  await marcarSenalAtendida(ctx, c.req.param('id'), senal as never, atendida);
+  await audit(ctx, {
+    accion: atendida ? 'senal_atendida' : 'senal_reabierta',
+    entidad: 'senal',
+    entidad_id: senal.entidad_id,
+    detalle: { tipo: senal.tipo },
+  });
   return c.body(null, 204);
 });
 
@@ -70,6 +99,8 @@ export const crearAcuerdoSchema = z.object({
   descripcion: z.string().min(3),
   responsable_id: z.string().uuid(),
   fecha_compromiso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** Mesa en cuyo weekly se acordó (migración 35). Sin mesa: weekly de toda la agencia. */
+  mesa_id: z.string().uuid().nullable().optional(),
 });
 
 // Tres campos: acuerdo, responsable, fecha. La fecha es un date picker real: sin "próxima weekly".

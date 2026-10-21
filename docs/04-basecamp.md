@@ -201,18 +201,21 @@ Los webhooks de Basecamp fallan ocasionalmente. El job `reconcile` corre cada 30
 (`backend/src/lib/basecamp/reconcile.ts`). Recorre los requerimientos activos que tienen to-do enlazado, lee cada
 to-do vivo y aplica las diferencias de estado con la misma lógica del webhook.
 
-También corrige fechas, y gana el cambio más reciente (decisión de Luis, 19/10/2026):
+También corrige fechas. Para saber quién la cambió, BackIO guarda en cada tarea **la última fecha que vio (o
+escribió) en el to-do de Basecamp** (`requerimientos.basecamp_due_on_visto`, migración 35; decisión de Luis, 21/10/2026):
 
-- **Si alguien cambió la fecha en Basecamp** después del último cambio hecho en BackIO, BackIO la acepta: queda como
-  reprogramación con origen «basecamp», sin motivo (aparece en Causas pendientes para completarla), a nombre de quien
-  la cambió si el webhook lo informa, y en la auditoría como `basecamp_fecha_aceptada`. Lo mismo hace el webhook al
-  instante. Antes la reconciliación la revertía con la cuenta de la organización y en Basecamp aparecía otra persona
-  cambiando la fecha.
-- **Si BackIO la cambió después** y no llegó a Basecamp, se reenvía con la cuenta de quien la cambió
-  (`basecamp_fecha_reenviada`). Si esa persona no conectó su Basecamp, no se reenvía. Si Basecamp todavía tiene la
-  fecha anterior a ese cambio, tampoco cuenta como un cambio hecho en Basecamp (un comentario en el to-do mueve su
-  fecha de actualización). Y mientras el último envío de BackIO haya fallado (`basecamp_due_on_error` sin un
-  `basecamp_fecha_reenviada` después), manda BackIO: no se acepta ninguna fecha de Basecamp hasta que llegue.
+| Basecamp tiene… | Significa | BackIO hace |
+|---|---|---|
+| La misma fecha que BackIO | Están en sincronía | Solo guarda esa fecha como vista |
+| La misma que BackIO vio la última vez, pero distinta de la de BackIO | Nadie la tocó en Basecamp; el cambio de BackIO no llegó | Manda BackIO: la reconciliación la reenvía con la cuenta de quien la cambió (`basecamp_fecha_reenviada`); si esa persona no conectó su Basecamp, queda pendiente |
+| Otra distinta de la que BackIO vio | Alguien la cambió en Basecamp | La acepta como reprogramación con origen «basecamp», sin motivo (aparece en Causas pendientes), a nombre de quien la cambió si el webhook lo informa (`basecamp_fecha_aceptada`). Si BackIO también la cambió y su cambio es posterior, gana BackIO |
+
+No se comparan horas del to-do: un comentario en Basecamp mueve su hora y antes eso llegó a revertir un cambio hecho en
+BackIO (to-do 10288810481, 20/10/2026). Cada envío exitoso de BackIO guarda la fecha enviada como vista. Las tareas que
+todavía no tienen fecha vista (anteriores a la migración 35, hasta su primera lectura en sincronía) se deciden como
+antes: si BackIO la cambió después, si Basecamp sigue con la fecha anterior a ese cambio o si ese envío falló, manda
+BackIO.
+
 - **Quién la cambió** sale del evento del webhook (`creator`), aunque el estado se lea del to-do vivo. La reconciliación
   no lo sabe: lo que acepta queda sin autor.
 - Un to-do **movido** a otro proyecto (Basecamp responde con otro id) no se compara en la reconciliación: lo resuelve

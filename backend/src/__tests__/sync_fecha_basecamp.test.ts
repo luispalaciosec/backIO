@@ -8,9 +8,14 @@ const e = vi.hoisted(() => ({
   completar: vi.fn(),
   audit: vi.fn(),
   usuarioPorBasecampId: vi.fn(),
+  visto: vi.fn(),
 }));
 
-vi.mock('../lib/db/requerimientos', () => ({ findByBasecampTodo: async () => e.req, updateRequerimiento: e.update }));
+vi.mock('../lib/db/requerimientos', () => ({
+  findByBasecampTodo: async () => e.req,
+  updateRequerimiento: e.update,
+  marcarDueOnVisto: e.visto,
+}));
 vi.mock('../lib/db/historial', () => ({
   ultimoCambioDeFechaEnBackio: async () => e.ultimo,
   fechaPendienteDeEnviar: async () => e.pendiente,
@@ -88,5 +93,41 @@ describe('fecha cambiada en Basecamp', () => {
     e.req = { ...e.req!, estado_operativo: 'completado' };
     await applyBasecampUpdate(ctx, payload({ completed: true }));
     expect(e.update).not.toHaveBeenCalled();
+  });
+});
+
+// Migración 35: con la última fecha vista en Basecamp no se comparan horas (un comentario ya no revierte nada).
+describe('fecha vista en Basecamp', () => {
+  it('Basecamp sigue con la fecha que BackIO vio: nadie la tocó allá, manda BackIO aunque el to-do sea más nuevo', async () => {
+    e.req = { ...e.req!, fecha_entrega: '2026-10-22', basecamp_due_on_visto: '2026-10-20' };
+    const r = await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-20', updated_at: '2026-10-25T10:00:00Z' }));
+    expect(r.fecha_aceptada).toBeUndefined();
+    expect(e.update).not.toHaveBeenCalled();
+  });
+  it('Basecamp tiene otra fecha que la vista: alguien la cambió allá, se acepta y se guarda como vista', async () => {
+    e.req = { ...e.req!, fecha_entrega: '2026-10-16', basecamp_due_on_visto: '2026-10-16' };
+    expect((await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-19' }))).fecha_aceptada).toBe(true);
+    expect(e.visto).toHaveBeenCalledWith('t', 'r1', '2026-10-19');
+    expect(e.update).toHaveBeenCalledWith(expect.anything(), 'r1', { fecha_entrega: '2026-10-19' });
+  });
+  it('si cambiaron los dos y el cambio de BackIO es posterior, gana BackIO', async () => {
+    e.req = { ...e.req!, fecha_entrega: '2026-10-22', basecamp_due_on_visto: '2026-10-16' };
+    e.ultimo = { created_at: '2026-10-19T16:00:00Z', fecha_anterior: '2026-10-16' };
+    expect(
+      (await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-19', updated_at: '2026-10-19T14:47:00Z' }))).fecha_aceptada,
+    ).toBeUndefined();
+    expect(e.update).not.toHaveBeenCalled();
+  });
+  it('en sincronía: solo se guarda la fecha como vista', async () => {
+    e.req = { ...e.req!, fecha_entrega: '2026-10-19', basecamp_due_on_visto: null };
+    await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-19' }));
+    expect(e.visto).toHaveBeenCalledWith('t', 'r1', '2026-10-19');
+    expect(e.update).not.toHaveBeenCalled();
+  });
+  it('tarea cerrada: se guarda la fecha vista pero no se reprograma', async () => {
+    e.req = { ...e.req!, estado_operativo: 'cancelado', basecamp_due_on_visto: '2026-10-16' };
+    await applyBasecampUpdate(ctx, payload({ due_on: '2026-10-19' }));
+    expect(e.visto).toHaveBeenCalled();
+    expect(e.update).not.toHaveBeenCalledWith(expect.anything(), 'r1', { fecha_entrega: '2026-10-19' });
   });
 });

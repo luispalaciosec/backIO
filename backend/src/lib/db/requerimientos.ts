@@ -5,7 +5,7 @@ import type {
   CrearRequerimientoInput,
   ActualizarRequerimientoInput,
 } from '@backio/shared';
-import { type DbCtx, throwIf, DbError } from './client';
+import { type DbCtx, throwIf, DbError, serviceClient } from './client';
 
 export interface FiltroBacklog {
   cliente_id?: string;
@@ -161,4 +161,17 @@ export async function tenantDeRequerimiento(ctx: DbCtx, id: string): Promise<str
   const { data, error } = await ctx.db.from('requerimientos').select('tenant_id').eq('id', id).maybeSingle();
   throwIf(error);
   return data?.tenant_id ?? null;
+}
+
+/**
+ * Guarda la última fecha que BackIO vio (o escribió) en el to-do de Basecamp (migración 35). Con service role: la escribe
+ * el backend aunque el cambio lo haya hecho un colaborador, y no mueve «días sin movimiento».
+ */
+export async function marcarDueOnVisto(tenantId: string, requerimientoId: string, fecha: string | null): Promise<void> {
+  const { error } = await serviceClient()
+    .from('requerimientos')
+    .update({ basecamp_due_on_visto: fecha })
+    .eq('tenant_id', tenantId)
+    .eq('id', requerimientoId);
+  throwIf(error);
 }

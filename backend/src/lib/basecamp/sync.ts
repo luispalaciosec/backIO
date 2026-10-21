@@ -8,7 +8,7 @@
  */
 import type { DbCtx } from '../db/client';
 import { registrarReproceso, cerrarReproceso } from '../cumplimiento';
-import { findByBasecampTodo, updateRequerimiento } from '../db/requerimientos';
+import { findByBasecampTodo, marcarDueOnVisto, updateRequerimiento } from '../db/requerimientos';
 import { audit } from '../db/audit';
 import { completarUltimaReprogramacion, fechaPendienteDeEnviar, ultimoCambioDeFechaEnBackio } from '../db/historial';
 import { usuarioPorBasecampId } from '../db/usuarios';
@@ -105,26 +105,43 @@ export interface SyncResult {
 }
 
 /**
- * Fecha cambiada en Basecamp (decisión de Luis, 19/10/2026): si el cambio en Basecamp es posterior al último cambio
- * hecho desde BackIO, BackIO la acepta como reprogramación «desde Basecamp», sin motivo (queda en Causas pendientes),
- * a nombre de quien la cambió si se sabe. Antes la reconciliación la revertía con la cuenta de la integración y
- * Basecamp mostraba «Luis cambió la fecha». Si BackIO la cambió después, manda BackIO (la reconciliación la reenvía).
+ * ¿La fecha distinta que tiene Basecamp la puso alguien allá? Sin `basecamp_due_on_visto` (tareas anteriores a la
+ * migración 35, hasta la primera lectura en sincronía) se decide con el historial: si BackIO la cambió después, si
+ * Basecamp sigue con la fecha anterior a ese cambio o si ese envío falló, manda BackIO.
+ */
+async function cambioSegunHistorial(ctx: DbCtx, req: Requerimiento, safe: BasecampSyncPayload): Promise<boolean> {
+  const ultimoEnBackio = await ultimoCambioDeFechaEnBackio(ctx, req.id);
+  if (!ultimoEnBackio) return true;
+  if (Date.parse(ultimoEnBackio.created_at) >= Date.parse(safe.updated_at)) return false;
+  if (ultimoEnBackio.fecha_anterior === safe.due_on) return false;
+  const pendiente = await fechaPendienteDeEnviar(ctx, req.id);
+  return !(pendiente && Date.parse(pendiente) >= Date.parse(ultimoEnBackio.created_at));
+}
+
+/**
+ * Fecha cambiada en Basecamp (decisiones de Luis, 19 y 21/10/2026). BackIO guarda la última fecha que vio en Basecamp
+ * (`basecamp_due_on_visto`, migración 35):
+ *  - Basecamp tiene la misma que BackIO vio → nadie la tocó allá: manda BackIO (la reconciliación reenvía la suya).
+ *  - Basecamp tiene otra → alguien la cambió allá: se acepta como reprogramación «desde Basecamp», sin motivo (queda en
+ *    Causas pendientes), a nombre de quien la cambió si el webhook lo dice. Si BackIO también la cambió y su cambio es
+ *    posterior, gana BackIO.
+ * Sin comparar horas del to-do: un comentario en Basecamp mueve su hora y antes eso revertía cambios de BackIO.
  */
 async function aceptarFechaDeBasecamp(ctx: DbCtx, req: Requerimiento, safe: BasecampSyncPayload): Promise<boolean> {
-  if (!safe.due_on || safe.due_on === req.fecha_entrega) return false;
-  if (req.estado_operativo === 'completado' || req.estado_operativo === 'cancelado') return false;
-  const ultimoEnBackio = await ultimoCambioDeFechaEnBackio(ctx, req.id);
-  if (ultimoEnBackio) {
-    // BackIO la cambió después que Basecamp: manda BackIO.
-    if (Date.parse(ultimoEnBackio.created_at) >= Date.parse(safe.updated_at)) return false;
-    // Basecamp sigue con la fecha de antes del último cambio de BackIO: ese cambio aún no llegó (p. ej., quien lo hizo no
-    // conectó su Basecamp) y el to-do se tocó por otra cosa (un comentario mueve updated_at). No es un cambio en Basecamp.
-    if (ultimoEnBackio.fecha_anterior === safe.due_on) return false;
-    // El último cambio de BackIO no llegó a Basecamp (token vencido, Basecamp caído): manda BackIO hasta que llegue.
-    // Sin esto, cualquier toque al to-do (un comentario mueve updated_at) revertía el cambio (to-do 10288810481, 20/10).
-    const pendiente = await fechaPendienteDeEnviar(ctx, req.id);
-    if (pendiente && Date.parse(pendiente) >= Date.parse(ultimoEnBackio.created_at)) return false;
+  if (!safe.due_on) return false;
+  const visto = req.basecamp_due_on_visto ?? null;
+  if (safe.due_on === req.fecha_entrega) {
+    if (visto !== safe.due_on) await marcarDueOnVisto(ctx.tenantId, req.id, safe.due_on);
+    return false;
   }
+  const cambioEnBasecamp = visto ? safe.due_on !== visto : await cambioSegunHistorial(ctx, req, safe);
+  if (!cambioEnBasecamp) return false;
+  if (visto) {
+    const ultimoEnBackio = await ultimoCambioDeFechaEnBackio(ctx, req.id);
+    if (ultimoEnBackio && Date.parse(ultimoEnBackio.created_at) >= Date.parse(safe.updated_at)) return false;
+  }
+  await marcarDueOnVisto(ctx.tenantId, req.id, safe.due_on);
+  if (req.estado_operativo === 'completado' || req.estado_operativo === 'cancelado') return false;
   const actor = safe.actor_basecamp_id ? await usuarioPorBasecampId(ctx, safe.actor_basecamp_id) : null;
   // El trigger de la base registra la reprogramación (y cuenta veces_reprogramado) con updated_by como autor.
   const ctxActor = { ...ctx, usuarioId: actor };

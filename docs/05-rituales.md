@@ -179,11 +179,22 @@ pantalla del weekly, que llama a `POST /semanas/:id/plan` y `POST /semanas/:id/a
   calcula la capacidad por persona.
 - **Con `?mesa=`, todo es de esa mesa** (19/10/2026): tareas, números, **señales** y **acuerdos**. Las señales se
   calculan con los clientes y proyectos de la mesa (`senalesDeMesa`), respetando las que ya se marcaron como atendidas;
-  los acuerdos, que no tienen mesa, entran si su responsable trabaja en ella. Antes las señales y los acuerdos eran los
+  los acuerdos son los acordados en el weekly de esa mesa (`acuerdos.mesa_id`, migración 35; antes se adivinaba por las tareas del responsable y quien trabajaba en dos mesas veía su acuerdo en las dos actas). Antes las señales y los acuerdos eran los
   de toda la agencia: en el cierre de Omega de la semana 42 aparecieron AB-Inbev (Orión) y Acme (prueba).
 - En el acta, el **resultado** y el **arrastre** no cuentan las tareas canceladas (no pasan a la semana siguiente).
 - Los **clientes de prueba** (`clientes.es_prueba`, migración 34; hoy Acme EC S.A.S, el del sandbox de Basecamp) no
   generan señales ni cuentan en actas, dashboard, personas ni KPIs. Siguen en el backlog para poder probar.
+
+### Pantalla del weekly por mesa (21/10/2026)
+
+- **Mesa arriba.** La pantalla del weekly se abre en una mesa (o «Toda la agencia»): señales, acuerdos y compromisos
+  vencidos son los de esa mesa, y un acuerdo nuevo queda en ella.
+- **Señales agrupadas por cliente** (lo que no es de un cliente va en «Equipo»), ordenadas por críticas pendientes. Los
+  grupos con críticas se abren solos.
+- **Botón «Atendida»** en cada señal: guarda quién y cuándo (`senales.atendida_por`, `atendida_at`, migración 35). Una
+  señal atendida esta semana o la anterior sigue atendida mientras no empeore su severidad; si empeora, vuelve. Las
+  atendidas se pueden ocultar y reabrir. Antes no había botón y las 457 señales generadas hasta el 20/10 seguían todas
+  pendientes.
 
 ### Marcador (20/10/2026)
 
