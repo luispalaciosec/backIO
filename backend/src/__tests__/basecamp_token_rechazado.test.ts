@@ -4,6 +4,8 @@ process.env.SUPABASE_URL = 'https://test.supabase.co';
 process.env.SUPABASE_ANON_KEY = 'anon';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
 process.env.BASECAMP_ACCOUNT_ID = '1';
+process.env.BASECAMP_CLIENT_ID = 'id';
+process.env.BASECAMP_CLIENT_SECRET = 'secreto-de-prueba';
 
 const e = vi.hoisted(() => ({ borrar: vi.fn(), actualizar: vi.fn() }));
 const tokens = { access_token: 'a', refresh_token: 'r', expires_at: '2099-01-01T00:00:00Z' };
