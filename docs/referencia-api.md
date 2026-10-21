@@ -533,6 +533,7 @@ Las tres señales del daily
 | `descripcion` | string | sí | largo 3–∞ |
 | `responsable_id` | string (uuid) | sí |  |
 | `fecha_compromiso` | string | sí |  |
+| `mesa_id` | string (uuid) |  | admite null |
 
 ### ResumenCliente
 
