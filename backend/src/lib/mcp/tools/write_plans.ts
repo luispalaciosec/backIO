@@ -38,9 +38,9 @@ export function registrarPlanes({ server, auth, ctx, guard }: Herramientas): voi
               bloque_id: z.string().uuid(),
               activo: z.boolean().default(true),
               owner: z.string().nullable().optional().describe('nombre o id'),
-              piezas_por_canal: z.record(z.number().int().min(0)).default({}),
+              piezas_por_canal: z.record(z.string(), z.number().int().min(0)).default({}),
               piezas: z
-                .record(z.number().int().min(0))
+                .record(z.string(), z.number().int().min(0))
                 .default({})
                 .describe('cantidades por tipo de pieza: {"reel": 4, "post": 8, "carrusel": 2}'),
             }),

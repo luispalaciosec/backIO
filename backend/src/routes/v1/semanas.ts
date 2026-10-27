@@ -71,7 +71,7 @@ export const atenderSenalSchema = z.object({
     entidad_tipo: z.enum(['requerimiento', 'usuario', 'cliente', 'proyecto', 'acuerdo']),
     entidad_id: z.string().uuid(),
     titulo: z.string().min(1).max(500),
-    detalle: z.record(z.unknown()).default({}),
+    detalle: z.record(z.string(), z.unknown()).default({}),
   }),
 });
 semanas.post('/:id/senales/atender', requireScope('write:actas'), zValidator('json', atenderSenalSchema), async (c) => {
