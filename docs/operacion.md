@@ -6,6 +6,7 @@ Esta página es para mantener BackIO andando: dónde mirar, qué corre solo y qu
 
 | Lugar | Qué muestra | Cuándo |
 |---|---|---|
+| **Monitor externo** sobre `GET /health/profundo` | Si la base responde y la reconciliación con Basecamp corre. Avisa por su cuenta, sin depender de Supabase ni de Railway | Llega solo cuando algo se cae |
 | **Admin → Servicios** | Si responden Railway, Vercel, Supabase, Basecamp, Resend, la IA y PrometIO, con latencia. Debajo, **Tareas programadas**: la última corrida de cada una y si está al día | Siempre, como primer vistazo |
 | **Sentry** (org `geeksec`, proyectos `backio-backend` y `backio-frontend`) | Los errores del servidor y del navegador, sin datos de personas ni de clientes | Cuando algo «falla» y no sabes dónde |
 | **Logs de Railway** (servicio `@backio/backend`) | Una línea por petición y por evento, con su nivel (`INFO`, `WARN`, `ERROR`) | Para seguir lo que pasó minuto a minuto |
@@ -45,7 +46,49 @@ Si una tarea de hora fija no corrió en su ventana, o una periódica lleva tres 
 un error en Sentry y manda un correo a las personas admin, con enlace a Admin → Servicios. Avisa **una sola vez por
 problema**. No vuelve a avisar una corrida que terminó con errores: ese error ya quedó registrado cuando ocurrió.
 
+### Lo que el vigía no ve
+
+El vigía guarda su registro y encola sus correos **en la misma base de Supabase**. Si la base o su API se caen, no puede
+avisar. Por eso existe además un **monitor externo** (ver abajo) que no depende de nada de BackIO.
+
+## Monitor externo y chequeo profundo
+
+`GET https://backiobackend-production.up.railway.app/health/profundo` responde:
+
+| Respuesta | Significa |
+|---|---|
+| `200` con `"ok": true` | La base responde y la reconciliación con Basecamp corrió hace menos de 75 min |
+| `503` con `"base": "caida"` | La base (o su API) no respondió en 5 s |
+| `503` con `"tareas": "atrasadas"` | La base responde, pero las tareas programadas dejaron de correr (servidor trabado o caído) |
+| `"base": "lenta"` | Respondió, pero tardó más de 2 s (sigue en `200`) |
+
+No devuelve detalle interno y guarda el resultado 30 s, así que un monitor consultando cada minuto no carga la base.
+`/health` solo dice que el proceso está prendido: el 27/10/2026 respondió «ok» durante las 14 horas de la caída.
+
+**Configurarlo:** en un servicio de monitoreo externo (Better Stack o UptimeRobot, plan gratuito), crear un monitor
+HTTP a esa URL cada 1 a 3 min, que alerte si la respuesta no es `200` dos veces seguidas, con aviso por correo y por SMS
+o app a admin.
+
+**Sentry:** además, una regla de alerta en el proyecto `backio-backend` que avise por correo si un mismo error aparece
+más de 20 veces en 5 minutos.
+
 ## Síntomas y qué hacer
+
+### BackIO no carga nada («Credenciales inválidas», pantallas en «Cargando…»)
+
+Pasó el 27/10/2026, entre las 04:30 y las 18:45 UTC: la API de la base de Supabase dejó de dar conexiones
+(`PGRST003 · Timed out acquiring connection from connection pool`, respuestas `504` tras 60 s). La base estaba sana y
+sin consultas activas; el backend y Vercel funcionaban. «Credenciales inválidas» aparece porque el backend no puede
+leer al usuario.
+
+1. Abre `/health/profundo`. Si dice `"base": "caida"`, el problema es Supabase.
+2. En Supabase, el editor de tablas puede seguir funcionando aunque la API no: no prueba que esté bien.
+3. **Reinicia el proyecto:** Supabase → Project Settings → General → **Restart project**. Tarda unos minutos y no
+   pierde datos. Eso lo resolvió el 27/10.
+4. Si sigue igual, abre un ticket en Supabase Support con los logs de la API exportados (Logs → API, filtrando `504`).
+5. Después: la reconciliación y la estructura traen solas lo que cambió en Basecamp. Las tareas de hora fija que
+   perdieron su ventana corren al día siguiente (los fees recurrentes revisan «día alcanzado y mes no generado»). Lo
+   que alguien intentó guardar en BackIO durante la caída no quedó guardado: hay que avisar al equipo.
 
 ### Una tarea programada no corrió
 

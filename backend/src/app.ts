@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { saludProfunda } from './lib/salud';
 import { cors } from 'hono/cors';
 import { logPeticiones, redactarRuta } from './lib/log';
 import { bodyLimit } from 'hono/body-limit';
@@ -53,6 +54,11 @@ export function createApp(): Hono {
   );
 
   app.get('/health', (c) => c.json({ ok: true, servicio: 'backio-backend', ts: new Date().toISOString() }));
+  // Para el monitor externo: 503 si la base no responde o la reconciliación dejó de correr (caída del 27/10/2026).
+  app.get('/health/profundo', async (c) => {
+    const s = await saludProfunda();
+    return c.json(s, s.ok ? 200 : 503);
+  });
   app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /api/portal/\n'));
 
   // Webhooks públicos ANTES de /api/v1: el router v1 exige auth en '*' y se tragaba estas rutas.

@@ -4,7 +4,7 @@
  */
 import { env, frontendOrigins } from '../config/env';
 import { MODELO_IA } from './ia';
-import { pingTenant } from './db/salud';
+import { pingBase, pingTenant, ultimaCorridaDe } from './db/salud';
 import { getStatus } from './basecamp/oauth';
 import { BasecampClient } from './basecamp/client';
 import { JOBS } from './jobs';
@@ -84,8 +84,8 @@ export async function verificarSalud(
       await esperar(await fetch(`${url}/login`, { signal, redirect: 'manual' }));
       return url;
     }),
-    medir('supabase_db', 'Supabase DB', async () => {
-      await pingTenant(tenantId);
+    medir('supabase_db', 'Supabase DB', async (signal) => {
+      await pingTenant(tenantId, signal);
     }),
     medir('supabase_auth', 'Supabase Auth', async (signal) => {
       await esperar(await fetch(`${e.SUPABASE_URL}/auth/v1/health`, { signal, headers: { apikey: e.SUPABASE_ANON_KEY } }));
@@ -131,4 +131,65 @@ export async function verificarSalud(
     servicios,
     jobs,
   };
+}
+
+/**
+ * Chequeo profundo para un monitor externo (`GET /health/profundo`). `/health` solo dice que el proceso está prendido:
+ * el 27/10/2026 respondió «ok» durante 14 horas mientras la API de la base de Supabase no daba conexiones (PGRST003) y
+ * BackIO no cargaba nada. El vigía no avisó porque registra y encola sus correos en esa misma base.
+ *
+ * Mira dos cosas, cada una con límite de tiempo: que la base responda y que la reconciliación con Basecamp (cada 30
+ * min) haya corrido hace menos de 75 min. Es público: no devuelve detalle interno. Se guarda 30 s para que un monitor
+ * consultando cada minuto no cargue la base.
+ */
+export interface SaludProfunda {
+  ok: boolean;
+  base: 'ok' | 'lenta' | 'caida';
+  tareas: 'ok' | 'atrasadas' | 'desconocido';
+  ts: string;
+}
+export const LIMITE_BASE_MS = 5000;
+export const RECONCILIACION_MAX_MIN = 75;
+let cache: { valor: SaludProfunda; hasta: number } | null = null;
+
+export async function saludProfunda(ahoraMs = Date.now(), deps = { pingBase, ultimaCorridaDe }): Promise<SaludProfunda> {
+  if (cache && cache.hasta > ahoraMs) return cache.valor;
+  const conLimite = async <T>(fn: (s: AbortSignal) => Promise<T>): Promise<T> => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), LIMITE_BASE_MS);
+    try {
+      return await Promise.race([
+        fn(ctl.signal),
+        new Promise<never>((_, rej) => ctl.signal.addEventListener('abort', () => rej(new Error('timeout')))),
+      ]);
+    } finally {
+      clearTimeout(t);
+    }
+  };
+  let base: SaludProfunda['base'] = 'ok';
+  const t0 = Date.now();
+  try {
+    await conLimite((s) => deps.pingBase(s));
+    if (Date.now() - t0 > 2000) base = 'lenta';
+  } catch (err) {
+    base = 'caida';
+    log.error('[salud profunda] la base no responde', err instanceof Error ? err.message : err);
+  }
+  let tareas: SaludProfunda['tareas'] = 'desconocido';
+  if (base !== 'caida') {
+    try {
+      const ultima = await conLimite((s) => deps.ultimaCorridaDe('reconcile', s));
+      tareas = ultima && ahoraMs - Date.parse(ultima) <= RECONCILIACION_MAX_MIN * 60_000 ? 'ok' : 'atrasadas';
+    } catch {
+      tareas = 'desconocido';
+    }
+  }
+  const valor: SaludProfunda = { ok: base !== 'caida' && tareas !== 'atrasadas', base, tareas, ts: new Date(ahoraMs).toISOString() };
+  cache = { valor, hasta: ahoraMs + 30_000 };
+  return valor;
+}
+
+/** Solo para tests. */
+export function limpiarCacheSalud(): void {
+  cache = null;
 }
