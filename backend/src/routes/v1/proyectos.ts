@@ -19,8 +19,8 @@ const bloqueSchema = z.object({
   bloque_id: z.string().uuid(),
   activo: z.boolean(),
   owner_id: z.string().uuid().nullable(),
-  piezas_por_canal: z.record(z.number().int().min(0)).default({}),
-  piezas_por_tipo: z.record(z.number().int().min(0)).default({}),
+  piezas_por_canal: z.record(z.string(), z.number().int().min(0)).default({}),
+  piezas_por_tipo: z.record(z.string(), z.number().int().min(0)).default({}),
   una_tarea_por_pieza: z.boolean().default(false),
 });
 

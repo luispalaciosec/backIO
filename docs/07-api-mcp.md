@@ -198,7 +198,7 @@ cuando el scope no es interno.**
 | **PrometIO** | Webhook + consulta REST | Ver [08-prometio.md](./08-prometio.md) |
 
 Para Gemini, la spec OpenAPI 3.1 se sirve en `/api/openapi.json` y se arma en `backend/src/routes/openapi.ts`
-con `zod-to-json-schema`. Las entradas usan los mismos esquemas zod con los que validan las rutas; las
+con `z.toJSONSchema` de zod 4. Las entradas usan los mismos esquemas zod con los que validan las rutas; las
 respuestas se describen en ese archivo. No se mantiene a mano.
 
 ---

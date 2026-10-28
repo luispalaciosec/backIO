@@ -35,7 +35,7 @@ const empresa = z.object({
 const envelope = z.object({
   evento: z.string(),
   timestamp: z.string().optional(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const cotizacionAprobada = z.object({

@@ -64,7 +64,7 @@ const patchSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
   logo_url: urlHttps().nullable().optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
   mesa_id: z.string().uuid().nullable().optional(),
   activo: z.boolean().optional(),
   /** PIN del portal: 4 a 6 dígitos para fijarlo, null para quitarlo; ausente = sin cambios. Se guarda con hash. */

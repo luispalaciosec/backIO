@@ -5,7 +5,6 @@
  */
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { actualizarRequerimientoSchema, crearRequerimientoSchema } from './v1/requerimientos';
 import { crearProyectoSchema } from './v1/proyectos';
 import { crearAcuerdoSchema } from './v1/semanas';
@@ -75,7 +74,7 @@ export const schemas = {
     severidad: z.enum(['critica', 'alta', 'media']),
     titulo: z.string(),
     atendida: z.boolean(),
-    detalle: z.record(z.unknown()),
+    detalle: z.record(z.string(), z.unknown()),
   }),
   Acuerdo: crearAcuerdoSchema,
   ResumenCliente: z.object({
@@ -112,7 +111,19 @@ const okOne = (name: keyof typeof schemas) => ({
 export function buildSpec(base: string) {
   const components: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(schemas)) {
-    const js = zodToJsonSchema(v, { target: 'openApi3', $refStrategy: 'none' }) as Record<string, unknown>;
+    // zod 4 agrega a cada uuid su expresión regular y a cada .int() los límites de entero seguro: ruido para quien lee
+    // la spec (el formato ya lo dice), así que se quitan. Y como zod 3, los objetos declaran que no admiten campos extra.
+    const js = z.toJSONSchema(v, {
+      target: 'openapi-3.0',
+      io: 'input',
+      unrepresentable: 'any',
+      override: ({ jsonSchema: s }) => {
+        if (s.format === 'uuid' || s.format === 'email') delete s.pattern;
+        if (s.minimum === Number.MIN_SAFE_INTEGER) delete s.minimum;
+        if (s.maximum === Number.MAX_SAFE_INTEGER) delete s.maximum;
+        if (s.type === 'object' && s.properties && !('additionalProperties' in s)) s.additionalProperties = false;
+      },
+    }) as Record<string, unknown>;
     delete js.$schema;
     components[k] = js;
   }
