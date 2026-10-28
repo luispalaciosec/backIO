@@ -13,23 +13,23 @@
   },
   "dependencies": {
     "@backio/shared": "workspace:*",
-    "@sentry/nextjs": "^11.6.0",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.47.10",
-    "canvas-confetti": "1.9.3",
+    "@sentry/nextjs": "^11.9.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
+    "canvas-confetti": "1.9.4",
     "next": "15.5.28",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/canvas-confetti": "1.6.4",
+    "@types/canvas-confetti": "1.9.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.6.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.28",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.31",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3",
     "vitest": "2.1.9"
