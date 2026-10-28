@@ -24,6 +24,9 @@ export async function recorrerTodos(
   const todosetId = await bc.getTodosetId(projectId);
   const listas: ListaRecorrida[] = [];
   for (const lista of await bc.listTodolists(projectId, todosetId)) {
+    // Una lista completada no tiene trabajo abierto: se salta (Dermage tiene 116 listas). Si se reabre un to-do en
+    // Basecamp, la lista deja de estar completada y vuelve a recorrerse.
+    if (lista.completed) continue;
     const grupos = await bc.listGroups(projectId, lista.id);
     const todos: TodoPlano[] = [];
     for (const t of await bc.listTodosSafe(projectId, lista.id, incluirCompletados)) todos.push({ ...t, bloque: null, grupoId: null });
