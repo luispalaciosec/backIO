@@ -6,6 +6,7 @@ import type {
   ActualizarRequerimientoInput,
 } from '@backio/shared';
 import { type DbCtx, throwIf, DbError, serviceClient } from './client';
+import { paginar } from './paginar';
 
 export interface FiltroBacklog {
   cliente_id?: string;
@@ -23,7 +24,24 @@ export interface FiltroBacklog {
   mesa?: { clienteIds: string[]; proyectoIds: string[] };
 }
 
+/**
+ * Requerimientos con sus métricas, con todas las páginas. Antes era una sola consulta y PostgREST corta en 1000 filas:
+ * con 2.586 requerimientos el backlog completo y los completados de una mesa (cierre del daily) quedaban incompletos
+ * sin aviso, y como se ordena por fecha ascendente se perdían justo los más recientes (revisión del 28/10/2026).
+ */
 export async function listBacklog(ctx: DbCtx, f: FiltroBacklog = {}): Promise<RequerimientoMetricas[]> {
+  if (f.mesa && f.mesa.clienteIds.length === 0 && f.mesa.proyectoIds.length === 0) return [];
+  const filas = await paginar<RequerimientoMetricas>((desde, hasta) =>
+    consultaBacklog(ctx, f)
+      .order('fecha_entrega', { ascending: true, nullsFirst: false })
+      .order('prioridad')
+      .order('id')
+      .range(desde, hasta),
+  );
+  return filas.map((r) => ({ ...r, peso: Number(r.peso) }));
+}
+
+function consultaBacklog(ctx: DbCtx, f: FiltroBacklog) {
   let q = ctx.db.from('v_requerimientos_metricas').select('*').eq('tenant_id', ctx.tenantId);
   if (f.cliente_id) q = q.eq('cliente_id', f.cliente_id);
   if (f.proyecto_id) q = q.eq('proyecto_id', f.proyecto_id);
@@ -40,13 +58,9 @@ export async function listBacklog(ctx: DbCtx, f: FiltroBacklog = {}): Promise<Re
     const partes: string[] = [];
     if (f.mesa.clienteIds.length) partes.push(`cliente_id.in.(${f.mesa.clienteIds.join(',')})`);
     if (f.mesa.proyectoIds.length) partes.push(`proyecto_id.in.(${f.mesa.proyectoIds.join(',')})`);
-    if (partes.length === 0) return [];
     q = q.or(partes.join(','));
   }
-  q = q.order('fecha_entrega', { ascending: true, nullsFirst: false }).order('prioridad');
-  const { data, error } = await q;
-  throwIf(error);
-  return ((data ?? []) as RequerimientoMetricas[]).map((r) => ({ ...r, peso: Number(r.peso) }));
+  return q;
 }
 
 export async function getRequerimiento(ctx: DbCtx, id: string): Promise<Requerimiento | null> {

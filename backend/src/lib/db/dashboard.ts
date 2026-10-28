@@ -2,7 +2,8 @@
  * Consultas del dashboard (lib/dashboard.ts) y de personas (lib/personas.ts) sobre la vista de métricas.
  */
 import type { RequerimientoMetricas } from '@backio/shared';
-import { type DbCtx, throwIf } from './client';
+import { type DbCtx } from './client';
+import { paginar } from './paginar';
 
 /** Completados desde `desdeIso`, opcionalmente acotados al alcance de una mesa (mesa sin alcance: ninguno). */
 export async function listCompletadosDesde(
@@ -10,22 +11,24 @@ export async function listCompletadosDesde(
   desdeIso: string,
   mesa?: { clienteIds: string[]; proyectoIds: string[] },
 ): Promise<RequerimientoMetricas[]> {
-  let q = ctx.db
-    .from('v_requerimientos_metricas')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('estado_operativo', 'completado')
-    .gte('completado_at', desdeIso);
+  const partes: string[] = [];
   if (mesa) {
-    const partes: string[] = [];
     if (mesa.clienteIds.length) partes.push(`cliente_id.in.(${mesa.clienteIds.join(',')})`);
     if (mesa.proyectoIds.length) partes.push(`proyecto_id.in.(${mesa.proyectoIds.join(',')})`);
     if (!partes.length) return [];
-    q = q.or(partes.join(','));
   }
-  const { data, error } = await q;
-  throwIf(error);
-  return ((data ?? []) as RequerimientoMetricas[]).map((r) => ({ ...r, peso: Number(r.peso) }));
+  // Paginado: 56 días de completados ya rozan las 1000 filas (934 el 28/10/2026).
+  const filas = await paginar<RequerimientoMetricas>((a, b) => {
+    let q = ctx.db
+      .from('v_requerimientos_metricas')
+      .select('*')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('estado_operativo', 'completado')
+      .gte('completado_at', desdeIso);
+    if (partes.length) q = q.or(partes.join(','));
+    return q.order('id').range(a, b);
+  });
+  return filas.map((r) => ({ ...r, peso: Number(r.peso) }));
 }
 
 /** Huérfanos de Basecamp sin resolver (solo el conteo; el error se ignora). */
@@ -40,7 +43,7 @@ export async function contarHuerfanosPendientes(ctx: DbCtx): Promise<number | nu
 
 /** Horas del timesheet desde `desde` (fecha local). */
 export async function listHorasDesde(ctx: DbCtx, desde: string) {
-  const { data, error } = await ctx.db.from('horas').select('usuario_id, fecha, horas').eq('tenant_id', ctx.tenantId).gte('fecha', desde);
-  throwIf(error);
-  return data ?? [];
+  return paginar<{ usuario_id: string | null; fecha: string; horas: number }>((a, b) =>
+    ctx.db.from('horas').select('usuario_id, fecha, horas').eq('tenant_id', ctx.tenantId).gte('fecha', desde).order('id').range(a, b),
+  );
 }

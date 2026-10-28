@@ -32,15 +32,16 @@ export interface FilaHoras {
 
 /** Horas desde una fecha (YYYY-MM-DD), con el proyecto de su requerimiento; opcionalmente de ciertos clientes. */
 export async function listHorasDesde(ctx: DbCtx, desde: string, clienteIds?: string[]): Promise<FilaHoras[]> {
-  let q = ctx.db
-    .from('horas')
-    .select('cliente_id, usuario_id, requerimiento_id, horas, requerimientos(proyecto_id)')
-    .eq('tenant_id', ctx.tenantId)
-    .gte('fecha', desde);
-  if (clienteIds?.length) q = q.in('cliente_id', clienteIds);
-  const { data, error } = await q;
-  throwIf(error);
-  return (data ?? []) as unknown as FilaHoras[];
+  // Paginado: 30 días de horas de todo el equipo pasan pronto de 1000 filas y los totales salían bajos sin aviso.
+  return paginar<FilaHoras>((a, b) => {
+    let q = ctx.db
+      .from('horas')
+      .select('cliente_id, usuario_id, requerimiento_id, horas, requerimientos(proyecto_id)')
+      .eq('tenant_id', ctx.tenantId)
+      .gte('fecha', desde);
+    if (clienteIds?.length) q = q.in('cliente_id', clienteIds);
+    return q.order('id').range(a, b);
+  });
 }
 
 /** Horas de un requerimiento desde una fecha (YYYY-MM-DD). Si la consulta falla devuelve []. */

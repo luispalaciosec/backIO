@@ -3,6 +3,7 @@
  * usuarios y clientes filtran por tenant_id; requerimientos y proyectos se buscan por ids ya acotados al tenant.
  */
 import { type DbCtx, serviceClient, throwIf } from './client';
+import { enLotes } from './paginar';
 
 /** Acciones de usuarios en audit_log entre `desde` y `hasta` (más recientes primero, tope 1000). */
 export async function listAuditDelDia(ctx: DbCtx, desde: string, hasta: string, usuarioId?: string | null) {
@@ -51,10 +52,17 @@ export async function nombresActividad(ctx: DbCtx, requerimientoIds: string[], p
   const db = serviceClient();
   const [us, rq, pr, cl] = await Promise.all([
     db.from('usuarios').select('id, nombre, avatar_url, rol').eq('tenant_id', ctx.tenantId),
-    requerimientoIds.length
-      ? db.from('requerimientos').select('id, titulo_interno, cliente_id, proyecto_id').in('id', requerimientoIds)
-      : Promise.resolve({ data: [] }),
-    proyectoIds.length ? db.from('proyectos').select('id, nombre, cliente_id').in('id', proyectoIds) : Promise.resolve({ data: [] }),
+    // Por lotes: con cientos de ids la URL fallaba y la línea de tiempo quedaba sin nombres.
+    enLotes(requerimientoIds, async (lote) => {
+      const { data, error } = await db.from('requerimientos').select('id, titulo_interno, cliente_id, proyecto_id').in('id', lote);
+      throwIf(error);
+      return data ?? [];
+    }).then((data) => ({ data })),
+    enLotes(proyectoIds, async (lote) => {
+      const { data, error } = await db.from('proyectos').select('id, nombre, cliente_id').in('id', lote);
+      throwIf(error);
+      return data ?? [];
+    }).then((data) => ({ data })),
     db.from('clientes').select('id, nombre').eq('tenant_id', ctx.tenantId),
   ]);
   return {

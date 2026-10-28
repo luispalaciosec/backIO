@@ -178,14 +178,16 @@ export async function listCumplimientoDesde(
   desdeIso: string,
 ): Promise<{ reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] }> {
   const [a, b] = await Promise.all([
-    ctx.db.from('reprogramaciones').select('*').eq('tenant_id', ctx.tenantId).gte('created_at', desdeIso),
-    ctx.db.from('reprocesos').select('*').eq('tenant_id', ctx.tenantId).gte('abierto_at', desdeIso),
+    paginar<Reprogramacion>((x, y) =>
+      ctx.db.from('reprogramaciones').select('*').eq('tenant_id', ctx.tenantId).gte('created_at', desdeIso).order('id').range(x, y),
+    ),
+    paginar<Reproceso>((x, y) =>
+      ctx.db.from('reprocesos').select('*').eq('tenant_id', ctx.tenantId).gte('abierto_at', desdeIso).order('id').range(x, y),
+    ),
   ]);
-  throwIf(a.error);
-  throwIf(b.error);
   return {
-    reprogramaciones: (a.data ?? []) as Reprogramacion[],
-    reprocesos: ((b.data ?? []) as Reproceso[]).map((r) => ({
+    reprogramaciones: a,
+    reprocesos: b.map((r) => ({
       ...r,
       horas_reproceso: r.horas_reproceso === null ? null : Number(r.horas_reproceso),
     })),
@@ -213,7 +215,22 @@ export async function ultimoQueReprogramo(ctx: DbCtx, requerimientoId: string): 
     .limit(1)
     .maybeSingle();
   throwIf(error);
-  return data?.usuario_id ?? null;
+  if (data) return data.usuario_id ?? null;
+  // Sin reprogramaciones: la fecha se puso en BackIO a una tarea que no tenía (no es reprogramar). El autor sale de la
+  // auditoría (28/10/2026).
+  const { data: a, error: ea } = await ctx.db
+    .from('audit_log')
+    .select('usuario_id')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('entidad', 'requerimiento')
+    .eq('entidad_id', requerimientoId)
+    .eq('accion', 'actualizar')
+    .not('detalle->fecha_entrega', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIf(ea);
+  return a?.usuario_id ?? null;
 }
 
 /** El último cambio de fecha de una tarea hecho DESDE BackIO (pantalla, API o agente; no desde Basecamp). */

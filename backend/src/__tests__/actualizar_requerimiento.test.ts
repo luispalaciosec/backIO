@@ -112,6 +112,16 @@ describe('actualizarRequerimiento (REST y MCP)', () => {
     await actualizarRequerimiento(ctx, 'r1', { estado_aprobacion: 'rechazado' }, opts);
     expect(espias.registrarReproceso).toHaveBeenLastCalledWith(ctx, 'r1', expect.objectContaining({ origen: 'cliente' }));
   });
+  // Auditoría del 28/10/2026: dos tareas de AB-Inbev llegaron de Basecamp sin fecha, se la pusieron en BackIO y nunca bajó.
+  it('poner fecha a una tarea que no tenía la lleva a Basecamp, sin contarla como reprogramación', async () => {
+    estado.req = { ...base, fecha_entrega: null };
+    const r = await actualizarRequerimiento(ctx, 'r1', { fecha_entrega: '2026-10-30' }, opts);
+    expect(espias.pushDueDate).toHaveBeenCalledOnce();
+    expect(espias.forActor).toHaveBeenCalledOnce();
+    expect(espias.completarUltimaReprogramacion).not.toHaveBeenCalled();
+    expect(r.basecamp_due_on).toBe('ok');
+    expect(estado.auditoria[0]).toMatchObject({ accion: 'actualizar' });
+  });
   it('requerimiento inexistente: 404', async () => {
     estado.req = null;
     expect(await regla(actualizarRequerimiento(ctx, 'r1', { piezas: 1 }, opts))).toEqual([404, 'No encontrado']);

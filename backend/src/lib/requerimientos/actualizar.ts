@@ -37,6 +37,13 @@ export type ResultadoBasecampDueOn = 'ok' | 'error' | 'sin_todo';
 
 const esReprogramacion = (previo: Requerimiento, patch: ActualizarRequerimientoInput) =>
   patch.fecha_entrega !== undefined && patch.fecha_entrega !== previo.fecha_entrega && previo.fecha_entrega !== null;
+/**
+ * La fecha cambió y hay que llevarla a Basecamp: también cuando la tarea no tenía fecha (llegó de Basecamp sin
+ * `due_on` y se la ponen en BackIO). Eso no es reprogramar (no cuenta en métricas), pero antes por eso tampoco bajaba
+ * a Basecamp y quedaba sin fecha allá (dos tareas de AB-Inbev, auditoría del 28/10/2026).
+ */
+const fechaParaBasecamp = (previo: Requerimiento, patch: ActualizarRequerimientoInput) =>
+  patch.fecha_entrega !== undefined && patch.fecha_entrega !== null && patch.fecha_entrega !== previo.fecha_entrega;
 
 /** Reglas que no dependen de escribir: sirven también para el preview del MCP. Lanza ReglaError. */
 export function validarActualizacion(
@@ -87,7 +94,8 @@ export async function actualizarRequerimiento(
     patch.estado_operativo !== 'cancelado';
   // Lo que baja a Basecamp va con la cuenta de quien hace el cambio. Se pide ANTES de guardar nada: si la persona no
   // conectó su Basecamp, el cambio no se aplica a medias (migración 33).
-  const bc = previo.basecamp_todo_id && (reprogramado || rechazo || reapertura) ? await BasecampClient.forActor(ctx) : undefined;
+  const fechaNueva = fechaParaBasecamp(previo, patch);
+  const bc = previo.basecamp_todo_id && (fechaNueva || rechazo || reapertura) ? await BasecampClient.forActor(ctx) : undefined;
   const { motivo_reprogramacion, observacion_reprogramacion, ...cambios } = patch;
   const r = await updateRequerimiento(ctx, id, cambios);
   if (reprogramado)
@@ -115,7 +123,7 @@ export async function actualizarRequerimiento(
 
   // La fecha baja a Basecamp de inmediato; el resultado se informa y, si falla, queda en la auditoría.
   let basecamp_due_on: ResultadoBasecampDueOn = 'sin_todo';
-  if (reprogramado && r.basecamp_todo_id) {
+  if (fechaNueva && r.basecamp_todo_id) {
     try {
       await pushDueDate(ctx, r, bc);
       basecamp_due_on = 'ok';

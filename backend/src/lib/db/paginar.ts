@@ -14,3 +14,13 @@ export async function paginar<T>(
   }
   return out;
 }
+
+/**
+ * Corre una consulta por lotes de ids (para `.in()`): con cientos de UUID la URL se vuelve demasiado larga y la consulta
+ * falla. Junta los resultados de todos los lotes.
+ */
+export async function enLotes<T>(ids: string[], consulta: (lote: string[]) => Promise<T[]>, tam = 200): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += tam) out.push(...(await consulta(ids.slice(i, i + tam))));
+  return out;
+}

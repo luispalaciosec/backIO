@@ -47,21 +47,28 @@ export async function ultimaBitacoraPorRequerimiento(
 ): Promise<Record<string, Bitacora>> {
   const out: Record<string, Bitacora> = {};
   const desde = opts.dias ? new Date(Date.now() - opts.dias * 86_400_000).toISOString() : null;
-  for (let from = 0; ; from += 1000) {
-    let q = ctx.db
-      .from('bitacora')
-      .select('*')
-      .eq('tenant_id', ctx.tenantId)
-      .order('created_at', { ascending: false })
-      .range(from, from + 999);
-    if (opts.ids?.length) q = q.in('requerimiento_id', opts.ids.slice(0, 1000));
-    if (opts.hasta) q = q.lte('created_at', opts.hasta);
-    if (desde) q = q.gte('created_at', desde);
-    const { data, error } = await q;
-    throwIf(error);
-    const filas = (data ?? []) as Bitacora[];
-    for (const b of filas) if (!out[b.requerimiento_id]) out[b.requerimiento_id] = b;
-    if (filas.length < 1000) break;
+  // Con ids, por lotes de 200: antes se cortaba en 1000 ids y la URL podía fallar por larga.
+  const lotes = opts.ids?.length
+    ? Array.from({ length: Math.ceil(opts.ids.length / 200) }, (_, i) => opts.ids!.slice(i * 200, i * 200 + 200))
+    : [null];
+  for (const lote of lotes) {
+    for (let from = 0; ; from += 1000) {
+      let q = ctx.db
+        .from('bitacora')
+        .select('*')
+        .eq('tenant_id', ctx.tenantId)
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, from + 999);
+      if (lote) q = q.in('requerimiento_id', lote);
+      if (opts.hasta) q = q.lte('created_at', opts.hasta);
+      if (desde) q = q.gte('created_at', desde);
+      const { data, error } = await q;
+      throwIf(error);
+      const filas = (data ?? []) as Bitacora[];
+      for (const b of filas) if (!out[b.requerimiento_id]) out[b.requerimiento_id] = b;
+      if (filas.length < 1000) break;
+    }
   }
   return out;
 }

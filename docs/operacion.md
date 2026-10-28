@@ -110,6 +110,8 @@ leer al usuario.
 
 ### Una fecha cambiada en BackIO no llegó a Basecamp
 
+- También baja la fecha que se pone en BackIO a una tarea que llegó de Basecamp sin fecha. No cuenta como reprogramación, pero se envía igual, a nombre de quien la puso (desde el 28/10/2026).
+
 - La pantalla avisa si Basecamp rechazó la fecha, y en `audit_log` queda `basecamp_due_on_error`.
 - La reconciliación la reintenta cada 30 min con la cuenta de quien la cambió y deja `basecamp_fecha_reenviada`. Si
   esa persona no conectó su Basecamp, no se reenvía: que la conecte en «Mi Basecamp».

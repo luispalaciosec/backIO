@@ -373,6 +373,8 @@ export class BasecampClient {
       const m = /<([^>]+)>;\s*rel="next"/.exec(link);
       url = m ? m[1]! : null;
     }
+    // Se agotó el tope de páginas y Basecamp todavía tenía más: se avisa en vez de cortar en silencio.
+    if (url) log.warn('[basecamp] requestAll cortó en el tope de páginas; faltan datos', path, maxPages);
     return out;
   }
 
