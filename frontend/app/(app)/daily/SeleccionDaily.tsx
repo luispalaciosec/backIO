@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { RequerimientoMetricas, Cliente } from '@backio/shared';
+import type { RequerimientoMetricas, Cliente, Usuario } from '@backio/shared';
+import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
@@ -22,7 +23,11 @@ export function SeleccionDaily({
   const [abierto, setAbierto] = useState(false);
   const [items, setItems] = useState<RequerimientoMetricas[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [proyectos, setProyectos] = useState<{ id: string; nombre: string }[]>([]);
+  const [personas, setPersonas] = useState<Usuario[]>([]);
   const [q, setQ] = useState('');
+  const [fCliente, setFCliente] = useState('');
+  const [fProyecto, setFProyecto] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
@@ -30,16 +35,39 @@ export function SeleccionDaily({
     Promise.all([
       api<{ items: RequerimientoMetricas[] }>(`/requerimientos?activos=1${mesa ? `&mesa=${mesa}` : ''}`),
       api<{ items: Cliente[] }>('/clientes?todos=1'),
+      api<{ items: { id: string; nombre: string }[] }>('/proyectos').catch(() => ({ items: [] })),
+      api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS).catch(() => ({ items: [] as Usuario[] })),
     ])
-      .then(([r, c]) => {
+      .then(([r, c, p, u]) => {
         setItems(r.items);
         setClientes(c.items);
+        setProyectos(p.items);
+        setPersonas(conNombrePersona(u.items));
       })
       .catch((e) => setErr(e instanceof ApiError ? e.message : 'Error'));
   }, [abierto, mesa]);
   const nc = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '';
+  const np = (id: string | null) => (id ? (proyectos.find((p) => p.id === id)?.nombre ?? '') : '');
+  const responsables = (r: RequerimientoMetricas) =>
+    r.owner_agencia.map((id) => personas.find((u) => u.id === id)?.nombre ?? '').filter(Boolean);
+  // Filtros: cliente → proyecto (solo los que tienen tareas activas en la mesa), y el buscador mira también el
+  // proyecto y los responsables (pedido de Carolina, 28/10/2026: «auto» no encontraba la tarea KV de Autoplan).
+  const clientesConTareas = [...new Set(items.map((r) => r.cliente_id))]
+    .map((id) => ({ id, nombre: nc(id) }))
+    .filter((c) => c.nombre)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const proyectosConTareas = [
+    ...new Set(items.filter((r) => r.proyecto_id && (!fCliente || r.cliente_id === fCliente)).map((r) => r.proyecto_id as string)),
+  ]
+    .map((id) => ({ id, nombre: np(id) }))
+    .filter((p) => p.nombre)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const texto = (r: RequerimientoMetricas) =>
+    `${r.titulo_interno} ${nc(r.cliente_id)} ${np(r.proyecto_id)} ${responsables(r).join(' ')}`.toLowerCase();
   const visibles = items
-    .filter((r) => !q || `${r.titulo_interno} ${nc(r.cliente_id)}`.toLowerCase().includes(q.toLowerCase()))
+    .filter((r) => !fCliente || r.cliente_id === fCliente)
+    .filter((r) => !fProyecto || r.proyecto_id === fProyecto)
+    .filter((r) => !q || texto(r).includes(q.toLowerCase()))
     .sort(
       (a, b) =>
         (b.daily_fecha === hoy ? 1 : 0) - (a.daily_fecha === hoy ? 1 : 0) ||
@@ -66,12 +94,41 @@ export function SeleccionDaily({
       </button>
       {abierto && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50" onClick={() => setAbierto(false)}>
-          <div className="card w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="card w-full max-w-5xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2 flex-wrap">
               <div className="font-semibold flex-1">
                 Qué se trabaja hoy · {fecha(hoy)} · <span className="text-brand-dark">{mesaNombre}</span>
               </div>
-              <input className="input w-56" placeholder="Buscar tarea o cliente…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <select
+                className="input w-48"
+                value={fCliente}
+                onChange={(e) => {
+                  setFCliente(e.target.value);
+                  setFProyecto('');
+                }}
+                aria-label="Cliente"
+              >
+                <option value="">Todos los clientes</option>
+                {clientesConTareas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+              <select className="input w-56" value={fProyecto} onChange={(e) => setFProyecto(e.target.value)} aria-label="Proyecto">
+                <option value="">Todos los proyectos</option>
+                {proyectosConTareas.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input w-56"
+                placeholder="Buscar tarea, proyecto o persona…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
               <button className="btn-primary" onClick={() => setAbierto(false)}>
                 Listo
               </button>
@@ -96,7 +153,12 @@ export function SeleccionDaily({
                   />
                   <span className="flex-1 min-w-0">
                     <span className="font-medium">{r.titulo_interno}</span>
-                    <span className="text-xs text-gray-500"> · {nc(r.cliente_id)}</span>
+                    <span className="text-xs text-gray-500">
+                      {' '}
+                      · {nc(r.cliente_id)}
+                      {np(r.proyecto_id) ? ` · ${np(r.proyecto_id)}` : ''}
+                    </span>
+                    {responsables(r).length > 0 && <span className="block text-xs text-gray-600">👤 {responsables(r).join(', ')}</span>}
                   </span>
                   <span className={`text-xs whitespace-nowrap ${r.dias_atraso > 0 ? 'text-red-700' : 'text-gray-500'}`}>
                     {fecha(r.fecha_entrega)}
@@ -118,7 +180,12 @@ export function SeleccionDaily({
                   )}
                 </label>
               ))}
-              {visibles.length === 0 && <p className="p-4 text-sm text-gray-400">Sin tareas activas de {mesaNombre} con ese filtro.</p>}
+              {visibles.length === 0 && (
+                <p className="p-4 text-sm text-gray-400">
+                  Sin tareas activas de {mesaNombre} con ese filtro. Si una tarea de Basecamp no aparece, revisa que su lista esté en el
+                  proyecto de Basecamp del cliente y espera la sincronización (cada 15 min).
+                </p>
+              )}
             </div>
             <p className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">
               Las marcadas salen en la columna «Hoy se trabaja» y en la apertura publicada en Basecamp. Una tarea sin responsable no puede

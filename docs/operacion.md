@@ -105,6 +105,8 @@ leer al usuario.
   1. Revisa que el cliente tenga su proyecto de Basecamp y el webhook activo (Admin → Clientes).
   2. Revisa en `audit_log` la acción `basecamp_importar` de ese cliente.
   3. Revisa si el to-do fue ignorado como huérfano: los ignorados no vuelven a importarse.
+  4. Si falta una lista entera, revisa que no esté completada en Basecamp (las completadas no se recorren) y que esté
+     en el proyecto de Basecamp del cliente, no en otro.
 
 ### Una fecha cambiada en BackIO no llegó a Basecamp
 

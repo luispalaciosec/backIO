@@ -230,20 +230,21 @@ export class BasecampClient {
   }
 
   /** Listas de to-dos del proyecto: solo id y nombre (para reutilizar por nombre). */
-  async listTodolists(projectId: number, todosetId: number): Promise<{ id: number; name: string }[]> {
-    const out: { id: number; name: string }[] = [];
-    for (const status of ['active']) {
-      const r = await this.request<{ id: number; name: string }[]>(
-        'GET',
-        `/buckets/${projectId}/todosets/${todosetId}/todolists.json?status=${status}`,
-      );
-      out.push(...r.map((l) => ({ id: l.id, name: l.name })));
-    }
-    return out;
+  /**
+   * Todas las listas activas del proyecto, con todas sus páginas. Antes se pedía solo la primera página (15 listas):
+   * lo que quedaba más abajo nunca entraba a BackIO (Campaña Factoring y Neo cuenta de Banco Amazonas, 28/10/2026).
+   */
+  async listTodolists(projectId: number, todosetId: number): Promise<{ id: number; name: string; completed: boolean }[]> {
+    const r = await this.requestAll<{ id: number; name: string; completed?: boolean }>(
+      `/buckets/${projectId}/todosets/${todosetId}/todolists.json?status=active`,
+      100,
+    );
+    return r.map((l) => ({ id: l.id, name: l.name, completed: l.completed === true }));
   }
 
+  /** Grupos de una lista, con todas sus páginas. */
   async listGroups(projectId: number, todolistId: number): Promise<{ id: number; name: string }[]> {
-    const r = await this.request<{ id: number; name: string }[]>('GET', `/buckets/${projectId}/todolists/${todolistId}/groups.json`);
+    const r = await this.requestAll<{ id: number; name: string }>(`/buckets/${projectId}/todolists/${todolistId}/groups.json`, 50);
     return r.map((g) => ({ id: g.id, name: g.name }));
   }
 
