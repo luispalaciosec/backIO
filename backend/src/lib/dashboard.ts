@@ -2,7 +2,7 @@
  * Fase 4 · Dashboards. Agregados calculados sobre la vista de métricas; sin tablas nuevas.
  * Todo por tenant, con filtro opcional por mesa. Nunca texto de Basecamp (no existe en la base).
  */
-import type { Proyecto, Usuario, Cliente, Mesa, Semana } from '@backio/shared';
+import type { Proyecto, Usuario, Cliente, Mesa, Semana, Salud } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { contarHuerfanosPendientes, listCompletadosDesde } from './db/dashboard';
 import { listBacklog } from './db/requerimientos';
@@ -14,7 +14,18 @@ import { listMesas, alcanceMesa } from './db/mesas';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento, labelMotivoReprogramacion, labelMotivoReproceso, aTiempoOriginal, aTiempoVigente } from './cumplimiento';
 import { resumenHoras } from './horas';
-import { diaLocal, hoyLocal, inicioDiaLocal, lunesDe, nombrePersona, responsablesDe, responsablesEn } from '@backio/shared';
+import {
+  diaLocal,
+  hoyLocal,
+  inicioDiaLocal,
+  lunesDe,
+  nombrePersona,
+  responsablesDe,
+  responsablesEn,
+  saludCliente,
+  reprocesoDelEquipo,
+  SALUD_DIAS_ENTREGAS,
+} from '@backio/shared';
 
 export interface DashboardKpis {
   activos: number;
@@ -54,7 +65,9 @@ export interface FilaCliente {
   piezas_activas: number;
   proyectos: number;
   avance_promedio: number;
-  salud: 'verde' | 'amarillo' | 'rojo';
+  salud: Salud;
+  /** Por qué no está en verde (saludCliente). */
+  salud_motivos: string[];
   horas_30d: number;
   valor_cotizado_activo: number;
   pct_a_tiempo_original_30d: number | null;
@@ -123,6 +136,8 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   const lunes = lunesDe(hoy);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const hace56 = new Date(Date.now() - 56 * 86_400_000).toISOString();
+  // La salud de cada cliente mira las entregas de 90 días (saludCliente, igual que la ficha del cliente).
+  const hace90 = new Date(Date.now() - SALUD_DIAS_ENTREGAS * 86_400_000).toISOString();
 
   const [mesas, usuarios, clientes, proyectos] = await Promise.all([
     listMesas(ctx),
@@ -134,21 +149,23 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   const alcance = mesa ? await alcanceMesa(ctx, mesa.id) : undefined;
   const [activosTodos, completadosTodos, horas, cumpl, prueba] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
-    listCompletadosDesde(ctx, hace56, alcance),
+    listCompletadosDesde(ctx, hace90, alcance),
     resumenHoras(ctx, hace30, alcance ? { clienteIds: alcance.clienteIds } : {}),
-    listCumplimientoDesde(ctx, hace30),
+    listCumplimientoDesde(ctx, hace90),
     idsClientesDePrueba(ctx),
   ]);
   // Los clientes de prueba (migración 34) no cuentan en el dashboard.
   const activos = activosTodos.filter((r) => !prueba.has(r.cliente_id));
-  const completados56 = completadosTodos.filter((r) => !prueba.has(r.cliente_id));
+  const completados90 = completadosTodos.filter((r) => !prueba.has(r.cliente_id));
+  const completados56 = completados90.filter((r) => r.completado_at && r.completado_at >= hace56);
   const huerfanosPend = await contarHuerfanosPendientes(ctx);
   const completados30 = completados56.filter((r) => r.completado_at && r.completado_at >= hace30);
   // Reprogramaciones/reprocesos 30d acotados al alcance (por requerimiento visible en activos o completados).
-  const reqIdsAlcance = new Set([...activos, ...completados56].map((r) => r.id));
-  const reqPorId = new Map([...activos, ...completados56].map((r) => [r.id, r]));
-  const reprogs30 = cumpl.reprogramaciones.filter((x) => reqIdsAlcance.has(x.requerimiento_id));
-  const reprocs30 = cumpl.reprocesos.filter((x) => reqIdsAlcance.has(x.requerimiento_id));
+  const reqIdsAlcance = new Set([...activos, ...completados90].map((r) => r.id));
+  const reqPorId = new Map([...activos, ...completados90].map((r) => [r.id, r]));
+  const reprocs90 = cumpl.reprocesos.filter((x) => reqIdsAlcance.has(x.requerimiento_id));
+  const reprogs30 = cumpl.reprogramaciones.filter((x) => reqIdsAlcance.has(x.requerimiento_id) && x.created_at >= hace30);
+  const reprocs30 = reprocs90.filter((x) => x.abierto_at >= hace30);
   const cumplTotal = resumirCumplimiento(completados30, reprogs30, reprocs30);
 
   const nombreU = (id?: string) => {
@@ -205,8 +222,15 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
       const proys = proyectosActivos.filter((p) => p.cliente_id === id);
       const atrasados = act.filter((r) => r.dias_atraso > 0).length;
       const sinMov = act.length ? Math.max(...act.map((r) => r.dias_sin_movimiento)) : 0;
-      const salud: FilaCliente['salud'] =
-        atrasados > 2 || sinMov > 14 || act.some((r) => r.dias_atraso > 30) ? 'rojo' : atrasados > 0 || sinMov > 7 ? 'amarillo' : 'verde';
+      const comp90 = completados90.filter((r) => r.cliente_id === id);
+      const { salud, motivos: salud_motivos } = saludCliente({
+        atrasados,
+        atraso_max: act.length ? Math.max(...act.map((r) => r.dias_atraso)) : 0,
+        sin_movimiento_max: sinMov,
+        entregas: comp90.length,
+        pct_a_tiempo: resumirCumplimiento(comp90, [], []).pct_original,
+        reprocesos_equipo: reprocs90.filter((x) => reqPorId.get(x.requerimiento_id)?.cliente_id === id && reprocesoDelEquipo(x)).length,
+      });
       return {
         cliente_id: id,
         cliente: c?.nombre ?? id,
@@ -220,6 +244,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
         proyectos: proys.length,
         avance_promedio: proys.length ? Math.round(proys.reduce((s, p) => s + p.avance, 0) / proys.length) : 0,
         salud,
+        salud_motivos,
         horas_30d: horas.por_cliente[id] ?? 0,
         valor_cotizado_activo: proys.reduce((s, p) => s + (Number(p.valor_cotizado) || 0), 0),
         pct_a_tiempo_original_30d: resumirCumplimiento(comp, [], []).pct_original,

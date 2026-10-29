@@ -5,7 +5,7 @@ import type { DailyView, Requerimiento } from '@backio/shared';
 import { hoyLocal, sumarDias } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { listBacklog } from '../db/requerimientos';
-import { alcanceMesa } from '../db/mesas';
+import { alcanceMesa, alcanceEjecutiva } from '../db/mesas';
 import { listEventosBloqueo, listReprogramacionesDesde } from '../db/evolutivo';
 
 type FilaDaily = Pick<Requerimiento, 'id' | 'daily_fecha' | 'fecha_entrega' | 'estado_operativo' | 'ultima_actualizacion'>;
@@ -49,9 +49,16 @@ export async function seccionesDaily<R extends FilaDaily>(ctx: DbCtx, activos: R
   };
 }
 
-/** Daily acotado a una mesa (clientes y proyectos de la mesa). Sin mesa: toda la agencia. */
-export async function getDaily(ctx: DbCtx, opts: { mesaId?: string } = {}): Promise<DailyView> {
-  const mesa = opts.mesaId ? await alcanceMesa(ctx, opts.mesaId, { sinPrueba: true }) : undefined;
+/**
+ * Daily acotado a una mesa (clientes y proyectos de la mesa) o a las cuentas de una ejecutiva («Mis cuentas», de
+ * cualquier mesa; solo lectura: se publica por mesa). Sin ninguno: toda la agencia.
+ */
+export async function getDaily(ctx: DbCtx, opts: { mesaId?: string; ejecutivaId?: string } = {}): Promise<DailyView> {
+  const mesa = opts.ejecutivaId
+    ? await alcanceEjecutiva(ctx, opts.ejecutivaId)
+    : opts.mesaId
+      ? await alcanceMesa(ctx, opts.mesaId, { sinPrueba: true })
+      : undefined;
   const activos = await listBacklog(ctx, { solo_activos: true, mesa });
   const s = await seccionesDaily(ctx, activos);
   return {

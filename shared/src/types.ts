@@ -46,6 +46,11 @@ export interface Cliente {
   empresa_id?: string | null;
   /** Cliente de prueba (migración 34): fuera de señales, actas, dashboard, KPIs y del daily. */
   es_prueba?: boolean;
+  /**
+   * Ejecutiva de cuenta (migración 37): dueña de la relación con el cliente, aunque no lidere su mesa. La mesa es el
+   * equipo que produce; la ejecutiva puede tener cuentas en varias mesas.
+   */
+  ejecutiva_id?: string | null;
   nombre: string;
   slug: string;
   logo_url: string | null;
@@ -581,4 +586,79 @@ export interface KpiDetalleTarea {
   basecamp_url: string | null;
   cuenta_en_a: boolean;
   nota: string | null;
+}
+
+// ---------------------------------------------------------------- Ficha de cliente (docs/21)
+export interface PersonaFicha {
+  id: string;
+  nombre: string;
+  avatar_url: string | null;
+  email: string | null;
+}
+export interface TareaFicha {
+  id: string;
+  titulo_interno: string;
+  proyecto: string | null;
+  responsables: string[];
+  estado_operativo: EstadoOperativo;
+  fecha_entrega: string | null;
+  dias_atraso: number;
+  dias_sin_movimiento: number;
+  completado_at: string | null;
+  /** Solo en las completadas: si se entregó a tiempo según la fecha original (null: sin fecha). */
+  a_tiempo: boolean | null;
+  basecamp_url: string | null;
+}
+export interface IndicadoresCliente {
+  activos: number;
+  atrasados: number;
+  esperando_cliente: number;
+  bloqueadas: number;
+  sin_movimiento_max: number;
+  entregas_90d: number;
+  pct_a_tiempo_90d: number | null;
+  pct_a_tiempo_vigente_90d: number | null;
+  desvio_mediana_dias: number | null;
+  reprocesos_90d: number;
+  reprocesos_equipo_90d: number;
+  reprogramaciones_90d: number;
+  reprogramaciones_cliente_90d: number;
+  motivo_reproceso_dominante: string | null;
+  motivo_reprogramacion_dominante: string | null;
+  horas_30d: number;
+}
+export interface FichaCliente {
+  cliente: Pick<Cliente, 'id' | 'nombre' | 'logo_url' | 'color_primario' | 'mesa_id' | 'ejecutiva_id' | 'activo'>;
+  mesa: { id: string; nombre: string; lider: PersonaFicha | null } | null;
+  ejecutiva: PersonaFicha | null;
+  salud: { salud: 'verde' | 'amarillo' | 'rojo'; motivos: string[] };
+  indicadores: IndicadoresCliente;
+  /** Últimos 6 meses, del más antiguo al actual. */
+  mensual: { mes: string; entregas: number; pct_a_tiempo: number | null; reprocesos: number }[];
+  proyectos: {
+    id: string;
+    nombre: string;
+    estado: string;
+    avance: number;
+    fecha_entrega: string | null;
+    valor_cotizado: number | null;
+    activos: number;
+    atrasados: number;
+    horas_30d: number;
+  }[];
+  tareas: {
+    atrasadas: TareaFicha[];
+    esperando_cliente: TareaFicha[];
+    bloqueadas: TareaFicha[];
+    sin_movimiento: TareaFicha[];
+    ultimas_completadas: TareaFicha[];
+  };
+  senales: Senal[];
+}
+export interface SugerenciaCliente {
+  titulo: string;
+  /** El dato de la ficha que la justifica. */
+  dato: string;
+  /** Qué hacer y quién. */
+  accion: string;
 }

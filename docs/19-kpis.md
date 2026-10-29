@@ -24,7 +24,8 @@ consejo concreto para mejorarlo (`frontend/components/kpis/ComoSeCalcula.tsx`).
 
 ## Cómo se mide
 
-- **Persona**: tareas donde es responsable; en Cuentas también las de proyectos donde es `owner_ejecutiva`. Lo
+- **Persona**: tareas donde es responsable; en Cuentas también las de sus cuentas: proyectos donde es `owner_ejecutiva`
+  y, si el proyecto no tiene ejecutiva, clientes donde es `ejecutiva_id` (migración 37, [Clientes](./21-clientes.md)). Lo
   completado cuenta para quienes eran responsables **al cerrar** (`responsables_cierre`, migración 30), aunque
   después la tarea cambie de manos o la persona se vaya.
 - **Integrantes de un periodo**: los activos del área, más quien se fue durante ese periodo o después (con «(ex)»).

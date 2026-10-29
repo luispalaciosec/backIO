@@ -16,6 +16,7 @@ const GRUPOS: Grupo[] = [
     icon: '☰',
     items: [
       { href: '/backlog', label: 'Backlog', icon: '☰' },
+      { href: '/clientes', label: 'Clientes', icon: '◉' },
       { href: '/proyectos', label: 'Proyectos', icon: '▦' },
       { href: '/huerfanos', label: 'Entradas Basecamp', icon: '⇣' },
     ],
@@ -204,7 +205,7 @@ export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
                 : {
                     ...g,
                     items: g.items
-                      .filter((i) => i.href !== '/evolutivo' && i.href !== '/personas')
+                      .filter((i) => i.href !== '/evolutivo' && i.href !== '/personas' && i.href !== '/clientes')
                       .map((i) => (i.href === '/kpis' ? { ...i, label: 'Mis KPIs' } : i)),
                   }
             }

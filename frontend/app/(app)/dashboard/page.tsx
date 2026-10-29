@@ -27,6 +27,7 @@ interface Dashboard {
     proyectos: number;
     avance_promedio: number;
     salud: 'verde' | 'amarillo' | 'rojo';
+    salud_motivos?: string[];
     horas_30d: number;
     valor_cotizado_activo: number;
     pct_a_tiempo_original_30d: number | null;
@@ -210,10 +211,10 @@ export default function DashboardPage() {
                 {d.por_cliente.map((c) => (
                   <tr key={c.cliente_id} className="hover:bg-gray-50">
                     <td className="td">
-                      <Semaforo salud={c.salud} />
+                      <Semaforo salud={c.salud} motivos={c.salud_motivos} />
                     </td>
                     <td className="td">
-                      <Link className="hover:underline" href={`/backlog`}>
+                      <Link className="hover:underline" href={`/clientes/${c.cliente_id}`}>
                         {c.cliente}
                       </Link>
                       {c.mesa && <div className="text-[10px] text-gray-400">{c.mesa}</div>}

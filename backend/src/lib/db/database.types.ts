@@ -597,6 +597,7 @@ export type Database = {
           mesa_id: string | null;
           basecamp_importado_at: string | null;
           es_prueba: boolean;
+          ejecutiva_id: string | null;
         };
         Insert: {
           id: string;
@@ -616,6 +617,7 @@ export type Database = {
           mesa_id?: string | null;
           basecamp_importado_at?: string | null;
           es_prueba?: boolean;
+          ejecutiva_id?: string | null;
         };
         Update: {
           id?: string;
@@ -635,6 +637,7 @@ export type Database = {
           mesa_id?: string | null;
           basecamp_importado_at?: string | null;
           es_prueba?: boolean;
+          ejecutiva_id?: string | null;
         };
         Relationships: [
           {
@@ -663,6 +666,13 @@ export type Database = {
             columns: ['mesa_id'];
             isOneToOne: false;
             referencedRelation: 'mesas';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'clientes_ejecutiva_id_fkey';
+            columns: ['ejecutiva_id'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
             referencedColumns: ['id'];
           },
         ];

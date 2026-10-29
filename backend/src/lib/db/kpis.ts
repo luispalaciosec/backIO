@@ -109,6 +109,8 @@ export interface DatosKpi {
   reprogramaciones: Reprogramacion[];
   eventos: { requerimiento_id: string; estado_a: string; ronda: number; created_at: string }[];
   ejecutivaProyecto: Map<string, string>;
+  /** Ejecutiva de cuenta del cliente (migración 37): vale cuando el proyecto no tiene una propia. */
+  ejecutivaCliente?: Map<string, string>;
   clientes: Map<string, string>;
 }
 
@@ -183,7 +185,7 @@ export async function cargarDatosKpi(ctx: DbCtx, desdeIso: string, hastaIso: str
   }
   const [{ data: pr, error: e3 }, { data: cl, error: e4 }] = await Promise.all([
     db.from('proyectos').select('id, owner_ejecutiva').eq('tenant_id', T).not('owner_ejecutiva', 'is', null),
-    db.from('clientes').select('id, nombre').eq('tenant_id', T),
+    db.from('clientes').select('id, nombre, ejecutiva_id').eq('tenant_id', T),
   ]);
   throwIf(e3);
   throwIf(e4);
@@ -198,6 +200,9 @@ export async function cargarDatosKpi(ctx: DbCtx, desdeIso: string, hastaIso: str
     reprogramaciones,
     eventos,
     ejecutivaProyecto: new Map(((pr ?? []) as { id: string; owner_ejecutiva: string }[]).map((p) => [p.id, p.owner_ejecutiva])),
+    ejecutivaCliente: new Map(
+      ((cl ?? []) as { id: string; ejecutiva_id: string | null }[]).filter((c) => c.ejecutiva_id).map((c) => [c.id, c.ejecutiva_id!]),
+    ),
     clientes: new Map(((cl ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre])),
   };
 }

@@ -22,10 +22,13 @@ export async function actualizarUsuario(ctx: DbCtx, id: string, patch: FilaUpdat
   return data;
 }
 
-export async function usuarioDelTenant(ctx: DbCtx, id: string): Promise<{ id: string; nombre: string; email: string } | null> {
+export async function usuarioDelTenant(
+  ctx: DbCtx,
+  id: string,
+): Promise<{ id: string; nombre: string; email: string; activo: boolean } | null> {
   const { data, error } = await serviceClient()
     .from('usuarios')
-    .select('id, nombre, email')
+    .select('id, nombre, email, activo')
     .eq('tenant_id', ctx.tenantId)
     .eq('id', id)
     .maybeSingle();

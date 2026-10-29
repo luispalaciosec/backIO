@@ -1,5 +1,5 @@
 import { BasecampClient } from '../../lib/basecamp/client';
-import { alcanceMesa } from '../../lib/db/mesas';
+import { alcanceMesa, alcanceEjecutiva } from '../../lib/db/mesas';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '../../lib/validacion';
@@ -58,7 +58,7 @@ requerimientos.get('/', requireScope('read:backlog'), async (c) => {
     desde: q.desde || undefined,
     hasta: q.hasta || undefined,
     query: q.q || undefined,
-    mesa: q.mesa ? await alcanceMesa(ctxOf(c), q.mesa) : undefined,
+    mesa: q.ejecutiva ? await alcanceEjecutiva(ctxOf(c), q.ejecutiva) : q.mesa ? await alcanceMesa(ctxOf(c), q.mesa) : undefined,
   });
   return c.json({ items, total: items.length });
 });

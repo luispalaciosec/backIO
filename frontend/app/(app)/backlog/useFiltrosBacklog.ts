@@ -12,7 +12,7 @@ export type Vista = 'tabla' | 'kanban';
 export function useFiltrosBacklog() {
   const router = useRouter();
   const sp = useSearchParams();
-  const FILTRO0 = { cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', planificacion: '' };
+  const FILTRO0 = { cliente: '', owner: '', estado: '', activos: true, q: '', proyecto: '', mesa: '', ejecutiva: '', planificacion: '' };
   const leerInicial = () => {
     const desdeUrl = sp.toString() ? Object.fromEntries(sp.entries()) : null;
     let guardado: Record<string, string> | null = null;
@@ -32,6 +32,7 @@ export function useFiltrosBacklog() {
         estado: src.estado ?? '',
         proyecto: src.proyecto ?? '',
         mesa: src.mesa ?? '',
+        ejecutiva: src.ejecutiva ?? '',
         planificacion: src.planificacion ?? '',
         q: src.q ?? '',
         activos: src.activos === undefined ? true : src.activos !== '0',

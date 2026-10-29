@@ -40,6 +40,8 @@ function BacklogInner() {
       const qs = new URLSearchParams();
       if (filtro.cliente) qs.set('cliente', filtro.cliente);
       if (filtro.owner) qs.set('owner', filtro.owner);
+      // «Mis cuentas»: los clientes de la ejecutiva, de cualquier mesa (migración 37).
+      if (filtro.ejecutiva) qs.set('ejecutiva', filtro.ejecutiva);
       if (filtro.estado) qs.set('estado', filtro.estado);
       if (filtro.activos) qs.set('activos', '1');
       if (filtro.q) qs.set('q', filtro.q);
@@ -240,6 +242,7 @@ function BacklogInner() {
           <span className="flex items-center gap-2 flex-wrap">
             <span className="font-medium">{panel ? '▾' : '▸'} Buscar, filtrar y ordenar</span>
             {filtro.mesa && <Chip>Mesa {mesas.find((m) => m.id === filtro.mesa)?.nombre}</Chip>}
+            {filtro.ejecutiva && <Chip>Cuentas de {nombres[filtro.ejecutiva]}</Chip>}
             {filtro.cliente && <Chip>{clientes.find((c) => c.id === filtro.cliente)?.nombre}</Chip>}
             {filtro.owner && <Chip>{nombres[filtro.owner]}</Chip>}
             {filtro.estado && <Chip>{ESTADO_LABEL[filtro.estado]}</Chip>}
@@ -269,11 +272,28 @@ function BacklogInner() {
               </select>
             </div>
             <div className="min-w-44">
+              <label className="label">Ejecutiva de cuenta</label>
+              <select
+                className="input"
+                value={filtro.ejecutiva}
+                onChange={(e) => setFiltro({ ...filtro, ejecutiva: e.target.value, cliente: '' })}
+              >
+                <option value="">Todas</option>
+                {usuarios
+                  .filter((u) => u.id === filtro.ejecutiva || clientes.some((c) => c.ejecutiva_id === u.id))
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nombre}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="min-w-44">
               <label className="label">Cliente</label>
               <select className="input" value={filtro.cliente} onChange={(e) => setFiltro({ ...filtro, cliente: e.target.value })}>
                 <option value="">Todos</option>
                 {clientes
-                  .filter((c) => !filtro.mesa || c.mesa_id === filtro.mesa)
+                  .filter((c) => (!filtro.mesa || c.mesa_id === filtro.mesa) && (!filtro.ejecutiva || c.ejecutiva_id === filtro.ejecutiva))
                   .map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nombre}

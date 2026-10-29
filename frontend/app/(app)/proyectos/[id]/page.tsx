@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ProyectoDetalle, ClientSafeProject } from '@backio/shared';
 import { apiServer } from '@/lib/api.server';
@@ -33,7 +34,9 @@ export default async function ProyectoPage({ params: paramsP }: { params: Promis
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-gray-500">{p.cliente_nombre}</div>
+          <Link className="text-sm text-gray-500 hover:underline" href={`/clientes/${p.cliente_id}`}>
+            {p.cliente_nombre}
+          </Link>
           <h1 className="text-2xl font-bold">{p.nombre}</h1>
           <div className="text-sm text-gray-500 mt-1">
             Inicio {fecha(p.fecha_inicio)} · Entrega {fecha(p.fecha_entrega)} · <EstadoChip estado={p.estado} />

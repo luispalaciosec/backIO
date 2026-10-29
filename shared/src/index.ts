@@ -4,3 +4,4 @@ export * from './visibility/sanitize';
 export * from './fechas';
 export * from './metricas';
 export * from './etiquetas';
+export * from './salud';

@@ -92,6 +92,13 @@ export function BacklogTable({
                 </span>
               </button>
               <Link
+                href={`/clientes/${cliente.id}`}
+                className="btn-ghost text-xs py-1"
+                title="Ficha del cliente: salud, ejecutiva, proyectos y atrasos"
+              >
+                Ficha
+              </Link>
+              <Link
                 href={`/informes/estatus?cliente=${cliente.id}`}
                 className="btn-ghost text-xs py-1"
                 title="Hoja de estatus para la reunión con el cliente: tareas, estado y última observación"

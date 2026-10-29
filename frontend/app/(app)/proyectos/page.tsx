@@ -361,7 +361,11 @@ export default function ProyectosPage() {
                         </span>
                       )}
                     </td>
-                    <td className="td text-gray-600">{p.cliente_nombre}</td>
+                    <td className="td text-gray-600">
+                      <Link className="hover:underline" href={`/clientes/${p.cliente_id}`}>
+                        {p.cliente_nombre}
+                      </Link>
+                    </td>
                     <td className="td text-gray-600">{nombreU(p.owner_ejecutiva)}</td>
                     <td className="td">
                       <EstadoChip estado={p.estado} />

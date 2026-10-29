@@ -36,7 +36,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
     apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
     apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad${mesa ? `?mesa=${mesa.id}` : ''}`),
     apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
-    apiServer<{ items: Pick<Cliente, 'id' | 'nombre'>[] }>('/clientes'),
+    apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id'>[] }>('/clientes'),
   ]);
   const acuerdos = acuerdosTodos.filter(deLaMesa);
   const abiertos = abiertosTodos.filter(deLaMesa);
@@ -44,6 +44,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
   const titulos = Object.fromEntries(reqs.map((r) => [r.id, r.titulo_interno]));
   const clienteDeTarea = Object.fromEntries(reqs.map((r) => [r.id, r.cliente_id]));
   const nombreCliente = Object.fromEntries(clientes.map((c) => [c.id, c.nombre]));
+  const ejecutivaDeCliente = Object.fromEntries(clientes.filter((c) => c.ejecutiva_id).map((c) => [c.id, c.ejecutiva_id!]));
   const nombres = Object.fromEntries(usuarios.map((u) => [u.id, nombrePersona(u)]));
   const dash = await apiServer<{
     arrastre: {
@@ -122,6 +123,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
             semanaId={semana.id}
             clienteDeTarea={clienteDeTarea}
             clientes={nombreCliente}
+            ejecutivas={ejecutivaDeCliente}
             nombre={nombres}
             escribe={escribe}
           />

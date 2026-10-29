@@ -9,6 +9,11 @@ import { registrarWebhookCliente, diagnosticoWebhookCliente, actualizarWebhooksT
 import { importarBasecampCliente } from '../../lib/basecamp/importar';
 import { guardarPin, clientesConPin, migrarPinesEnClaro } from '../../lib/portal/pin';
 import { clienteDuplicado, insertCliente } from '../../lib/db/clientes';
+import { usuarioDelTenant } from '../../lib/db/admin';
+import { fichaCliente } from '../../lib/clientes/ficha';
+import { sugerenciasCliente } from '../../lib/ia/cliente';
+import { iaDisponible } from '../../lib/ia';
+import { esColaborador } from '../../lib/auth/roles';
 
 export const clientes = new Hono();
 
@@ -33,6 +38,27 @@ clientes.get('/', requireScope('read:proyectos'), async (c) => {
 clientes.get('/:id', requireScope('read:proyectos'), async (c) => {
   const cl = await getCliente(ctxOf(c), c.req.param('id'));
   return cl ? c.json(sinConfig(c, cl)) : c.json({ error: 'No encontrado' }, 404);
+});
+
+/**
+ * Ficha del cliente (docs/21): salud, indicadores, proyectos, tareas y señales. Pantalla de gestión: un colaborador no
+ * la ve (trae horas, valor cotizado y el estado de toda la cuenta).
+ */
+clientes.get('/:id/ficha', requireScope('read:proyectos'), async (c) => {
+  if (esColaborador(c.get('auth'))) return c.json({ error: 'La ficha del cliente es para gestión' }, 403);
+  const f = await fichaCliente(ctxOf(c), c.req.param('id'));
+  return f ? c.json(f) : c.json({ error: 'No encontrado' }, 404);
+});
+
+/** Sugerencias de la IA sobre la ficha (docs/15: redacta, no cambia nada). Caché de 6 h por ficha idéntica. */
+clientes.post('/:id/sugerencias', requireScope('write:proyectos'), async (c) => {
+  const ctx = ctxOf(c);
+  if (!iaDisponible()) return c.json({ error: 'La capa de IA no está configurada' }, 503);
+  const f = await fichaCliente(ctx, c.req.param('id'));
+  if (!f) return c.json({ error: 'No encontrado' }, 404);
+  const sugerencias = await sugerenciasCliente(ctx, f);
+  await audit(ctx, { accion: 'ia_sugerencias_cliente', entidad: 'cliente', entidad_id: f.cliente.id });
+  return c.json({ sugerencias });
 });
 
 /** Widget para la ficha de cliente en PrometIO (docs/08 · Flujo 2). */
@@ -66,6 +92,8 @@ const patchSchema = z.object({
   logo_url: urlHttps().nullable().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   mesa_id: z.string().uuid().nullable().optional(),
+  /** Ejecutiva de cuenta (migración 37); null la quita. */
+  ejecutiva_id: z.string().uuid().nullable().optional(),
   activo: z.boolean().optional(),
   /** PIN del portal: 4 a 6 dígitos para fijarlo, null para quitarlo; ausente = sin cambios. Se guarda con hash. */
   portal_pin: z
@@ -140,6 +168,10 @@ clientes.patch('/:id', requireScope('admin'), zValidator('json', patchSchema), a
     patch.config = resto;
   }
   if (!(await getCliente(ctx, c.req.param('id')))) return c.json({ error: 'No encontrado' }, 404);
+  if (patch.ejecutiva_id) {
+    const u = await usuarioDelTenant(ctx, patch.ejecutiva_id);
+    if (!u?.activo) return c.json({ error: 'La ejecutiva debe ser un usuario activo de la agencia' }, 422);
+  }
   const cl = Object.keys(patch).length
     ? await updateClienteConfig(ctx, c.req.param('id'), patch)
     : (await getCliente(ctx, c.req.param('id')))!;

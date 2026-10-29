@@ -103,6 +103,8 @@ export interface DailyItem {
   fecha: string | null;
   url: string | null;
   atraso_dias?: number;
+  /** Ejecutiva de la cuenta (migración 37): se menciona en lo que vence y en los bloqueos, aunque no esté en la mesa. */
+  cuenta?: string;
 }
 export interface DailyMensaje {
   tipo: 'apertura' | 'cierre';
@@ -209,7 +211,8 @@ export function cuerpoDaily(m: DailyMensaje, men?: Menciones): string {
   const item = (i: DailyItem) => {
     const titulo = i.url ? `<a href="${esc(i.url)}">${esc(i.titulo)}</a>` : esc(i.titulo);
     const atraso = i.atraso_dias ? ` <span style="color:#c0392b">(${i.atraso_dias} d de atraso)</span>` : '';
-    return `<li><strong>${esc(i.cliente)}</strong> · ${titulo} · ${(i.owners?.length ? i.owners : [i.owner]).map((o) => mencion(o, men)).join(', ')}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}${atraso}</li>`;
+    const cuenta = i.cuenta ? ` · Cuenta: ${mencion(i.cuenta, men)}` : '';
+    return `<li><strong>${esc(i.cliente)}</strong> · ${titulo} · ${(i.owners?.length ? i.owners : [i.owner]).map((o) => mencion(o, men)).join(', ')}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}${atraso}${cuenta}</li>`;
   };
   const li = (xs: DailyItem[]) => (xs.length ? `<ul>${xs.map(item).join('')}</ul>` : '<p><em>Nada.</em></p>');
   return [

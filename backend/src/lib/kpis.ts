@@ -85,8 +85,9 @@ export interface CalculoResultado {
 function miembros(r: ReqKpi, d: DatosKpi, incluirEjecutiva: boolean): string[] {
   // Lo completado cuenta para quienes la tenían al cerrar, aunque después alguien se haya ido o se haya editado.
   const s = new Set(responsablesDe(r));
-  if (incluirEjecutiva && r.proyecto_id) {
-    const e = d.ejecutivaProyecto.get(r.proyecto_id);
+  if (incluirEjecutiva) {
+    // Ejecutiva efectiva: la del proyecto o, si no tiene, la del cliente (migración 37).
+    const e = (r.proyecto_id ? d.ejecutivaProyecto.get(r.proyecto_id) : undefined) ?? d.ejecutivaCliente?.get(r.cliente_id);
     if (e) s.add(e);
   }
   return [...s];

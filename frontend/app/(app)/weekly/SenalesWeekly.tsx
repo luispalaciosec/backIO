@@ -30,6 +30,7 @@ export function SenalesWeekly({
   semanaId,
   clienteDeTarea,
   clientes,
+  ejecutivas = {},
   nombre,
   escribe,
 }: {
@@ -37,6 +38,8 @@ export function SenalesWeekly({
   semanaId: string;
   clienteDeTarea: Record<string, string>;
   clientes: Record<string, string>;
+  /** cliente → ejecutiva de cuenta (migración 37): entra al bloque de su cuenta aunque no sea de la mesa. */
+  ejecutivas?: Record<string, string>;
   nombre: Record<string, string>;
   escribe: boolean;
 }) {
@@ -45,6 +48,7 @@ export function SenalesWeekly({
   const [abierto, setAbierto] = useState<Record<string, boolean>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cuentasDe, setCuentasDe] = useState('');
 
   const grupos = useMemo(() => {
     const m = new Map<string, Grupo>();
@@ -76,7 +80,8 @@ export function SenalesWeekly({
   }, [senales, clienteDeTarea, clientes]);
 
   const pendientes = senales.filter((s) => !s.atendida).length;
-  const visibles = grupos.filter((g) => !ocultarAtendidas || g.pendientes > 0);
+  const conEjecutiva = [...new Set(Object.values(ejecutivas))].filter((id) => grupos.some((g) => ejecutivas[g.clave] === id));
+  const visibles = grupos.filter((g) => (!ocultarAtendidas || g.pendientes > 0) && (!cuentasDe || ejecutivas[g.clave] === cuentasDe));
 
   async function marcar(s: Senal, atendida: boolean) {
     const clave = `${s.tipo}|${s.entidad_id}`;
@@ -111,6 +116,21 @@ export function SenalesWeekly({
         <span className="font-semibold">
           2. Señales · {pendientes} por atender{senales.length > pendientes ? ` de ${senales.length}` : ''}
         </span>
+        {conEjecutiva.length > 0 && (
+          <select
+            className="input w-44 text-xs"
+            value={cuentasDe}
+            onChange={(e) => setCuentasDe(e.target.value)}
+            title="Recorrer la agenda por cuentas"
+          >
+            <option value="">Todas las cuentas</option>
+            {conEjecutiva.map((id) => (
+              <option key={id} value={id}>
+                Cuentas de {nombre[id] ?? '—'}
+              </option>
+            ))}
+          </select>
+        )}
         <label className="text-xs text-gray-500 flex items-center gap-1.5">
           <input type="checkbox" checked={ocultarAtendidas} onChange={(e) => setOcultar(e.target.checked)} />
           Ocultar atendidas
@@ -134,6 +154,7 @@ export function SenalesWeekly({
               >
                 <span className="font-medium text-sm">
                   {ver ? '▾' : '▸'} {g.nombre}
+                  {ejecutivas[g.clave] && <span className="font-normal text-gray-500"> · {nombre[ejecutivas[g.clave]!] ?? '—'}</span>}
                 </span>
                 <span className="flex items-center gap-2 text-xs">
                   {g.criticas > 0 && <span className={`rounded px-2 py-0.5 font-semibold ${SEV.critica}`}>{g.criticas} críticas</span>}

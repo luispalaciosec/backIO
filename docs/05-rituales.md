@@ -119,6 +119,12 @@ Solo tres señales:
 | Bloqueo nuevo | está `bloqueado` y pasó a ese estado en las últimas 24 h (según la auditoría; si no hay registro del paso, cuenta su último movimiento) |
 | Fecha cambiada | su `fecha_entrega` cambió en las últimas 24 h (tabla `reprogramaciones`, que incluye los cambios hechos en Basecamp) |
 
+**Ejecutiva de otra mesa (29/10/2026).** El daily es de la mesa que produce. Si la ejecutiva de una cuenta lidera otra
+mesa (Grace con Torres & Torres, que produce Omega), entra solo al bloque de su cuenta cuando algo vence o está
+bloqueado, y el mensaje publicado la menciona en esas tareas («Cuenta: @Grace»). Para seguir sus cuentas de todas las
+mesas usa «Mis cuentas» en el paso 1, que es solo de lectura. En el weekly, cada grupo de señales de un cliente
+muestra a su ejecutiva y se puede filtrar por «Cuentas de…». Ver [Clientes](./21-clientes.md).
+
 **Una sola regla (29/10/2026).** El tablero, el mensaje publicado y el borrador de la IA salen de la misma función,
 `seccionesDaily` (`backend/src/lib/rituals/daily.ts`). Antes cada uno tenía la suya: el tablero no veía las fechas
 cambiadas en Basecamp, el mensaje mostraba como «fecha cambiada» cualquier movimiento de una tarea reprogramada

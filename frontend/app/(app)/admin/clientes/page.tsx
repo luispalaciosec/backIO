@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { Cliente, Mesa } from '@backio/shared';
+import type { Cliente, Mesa, Usuario } from '@backio/shared';
+import { USUARIOS_CON_INACTIVOS, elegibles, conNombrePersona } from '@/lib/personas';
 import { api, ApiError } from '@/lib/api';
 import { Alert } from '@/components/ui/Alert';
 import { useAvisosCarga } from '@/lib/useAvisosCarga';
@@ -11,6 +12,7 @@ export default function AdminClientesPage() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [mesasAlta, setMesasAlta] = useState<Mesa[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const { fallos, avisar } = useAvisosCarga();
   const [nuevo, setNuevo] = useState({ nombre: '', basecamp_project_id: '', mesa_id: '', grupo: '' });
   const [creando, setCreando] = useState(false);
@@ -18,6 +20,9 @@ export default function AdminClientesPage() {
     api<{ items: Mesa[] }>('/mesas')
       .then((r) => setMesasAlta(r.items.filter((m) => m.activa)))
       .catch(avisar('las mesas'));
+    api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS)
+      .then((r) => setUsuarios(conNombrePersona(r.items).filter((u) => u.rol !== 'colaborador')))
+      .catch(avisar('las personas'));
   }, [avisar]);
   const [diag, setDiag] = useState<Record<string, unknown> | null>(null);
   const cargar = () =>
@@ -42,6 +47,7 @@ export default function AdminClientesPage() {
           basecamp_project_id: bc ? Number(bc) : null,
           color_primario: String(form.get('color_primario') || '#0073EA'),
           logo_url: String(form.get('logo_url') || '') || null,
+          ejecutiva_id: String(form.get('ejecutiva_id') || '') || null,
           ...(quitarPin ? { portal_pin: null } : pin ? { portal_pin: pin } : {}),
         },
       });
@@ -166,8 +172,9 @@ export default function AdminClientesPage() {
       <div className="space-y-3">
         {items.map((c) => (
           <form
-            key={c.id}
-            className="card p-4 grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_0.7fr_0.6fr_auto] items-end"
+            // Con la lista de personas cargada se vuelve a montar: el select de ejecutiva toma su valor solo al montar.
+            key={`${c.id}-${usuarios.length}`}
+            className="card p-4 grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_1fr_0.7fr_0.6fr_auto] items-end"
             action={(fd) => guardar(c, fd)}
           >
             <div>
@@ -175,6 +182,17 @@ export default function AdminClientesPage() {
                 {c.nombre} {!c.activo && <span className="text-xs text-gray-400">(inactivo)</span>}
               </div>
               <div className="text-xs text-gray-400 font-mono">{c.id}</div>
+            </div>
+            <div>
+              <label className="label">Ejecutiva de cuenta</label>
+              <select name="ejecutiva_id" className="input" defaultValue={c.ejecutiva_id ?? ''}>
+                <option value="">Sin asignar</option>
+                {elegibles(usuarios, [c.ejecutiva_id]).map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="label">Basecamp project id</label>

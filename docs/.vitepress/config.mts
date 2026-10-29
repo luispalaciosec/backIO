@@ -35,6 +35,7 @@ export default withMermaid(
             { text: 'Cumplimiento: reprogramaciones y reprocesos', link: '/16-cumplimiento' },
             { text: 'KPIs por persona y equipo', link: '/19-kpis' },
             { text: 'Cuando alguien se va', link: '/20-salida' },
+            { text: 'Clientes: ejecutiva y ficha', link: '/21-clientes' },
             { text: 'Builder de proyectos', link: '/03-builder' },
             { text: 'Portal del cliente', link: '/06-portal-cliente' },
             { text: 'Capa de IA', link: '/15-ia' },

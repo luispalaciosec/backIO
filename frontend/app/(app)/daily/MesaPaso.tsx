@@ -4,8 +4,21 @@ import { useRouter } from 'next/navigation';
 
 const KEY = 'backio:daily:mesa';
 
-/** Paso 1 del daily: elegir la mesa. La mesa vive en la URL (?mesa=) y se recuerda en el navegador. */
-export function MesaPaso({ mesas, mesa, todas }: { mesas: { id: string; nombre: string }[]; mesa: string; todas: boolean }) {
+/**
+ * Paso 1 del daily: elegir la mesa. La mesa vive en la URL (?mesa=) y se recuerda en el navegador. «Mis cuentas»
+ * (?mesa=cuentas) muestra los clientes de la ejecutiva en cualquier mesa, solo para leer (migración 37).
+ */
+export function MesaPaso({
+  mesas,
+  mesa,
+  todas,
+  misCuentas = false,
+}: {
+  mesas: { id: string; nombre: string }[];
+  mesa: string;
+  todas: boolean;
+  misCuentas?: boolean;
+}) {
   const router = useRouter();
   const ir = (id: string) => {
     try {
@@ -24,9 +37,9 @@ export function MesaPaso({ mesas, mesa, todas }: { mesas: { id: string; nombre: 
     } catch {
       /* sin storage */
     }
-    if (ultima && (ultima === '' || mesas.some((m) => m.id === ultima)))
+    if (ultima && (ultima === '' || (ultima === 'cuentas' && misCuentas) || mesas.some((m) => m.id === ultima)))
       router.replace(ultima ? `/daily?mesa=${ultima}` : '/daily?mesa=todas');
-  }, [mesa, todas, mesas, router]);
+  }, [mesa, todas, mesas, misCuentas, router]);
   if (!mesa && !todas) {
     return (
       <div className="card p-8 max-w-2xl mx-auto text-center space-y-4">
@@ -42,6 +55,11 @@ export function MesaPaso({ mesas, mesa, todas }: { mesas: { id: string; nombre: 
               {m.nombre}
             </button>
           ))}
+          {misCuentas && (
+            <button className="btn-secondary px-6 py-3 text-base" onClick={() => ir('cuentas')}>
+              Mis cuentas
+            </button>
+          )}
         </div>
         <button className="text-xs text-gray-400 underline" onClick={() => ir('')}>
           Ver toda la agencia sin filtrar
@@ -57,6 +75,7 @@ export function MesaPaso({ mesas, mesa, todas }: { mesas: { id: string; nombre: 
           {m.nombre}
         </option>
       ))}
+      {misCuentas && <option value="cuentas">Mis cuentas</option>}
     </select>
   );
 }

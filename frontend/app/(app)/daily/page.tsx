@@ -1,4 +1,4 @@
-import type { DailyView, Usuario, Mesa } from '@backio/shared';
+import type { DailyView, Usuario, Mesa, Cliente } from '@backio/shared';
 import { DailyPublicar } from './DailyPublicar';
 import { SeleccionDaily } from './SeleccionDaily';
 import { MesaPaso } from './MesaPaso';
@@ -18,26 +18,32 @@ export const dynamic = 'force-dynamic';
  */
 export default async function DailyPage({ searchParams: spP }: { searchParams: Promise<{ mesa?: string }> }) {
   const searchParams = await spP;
-  const [{ items: usuarios }, { items: mesas }, me] = await Promise.all([
+  const [{ items: usuarios }, { items: mesas }, { items: clientes }, me] = await Promise.all([
     apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     apiServer<{ items: Mesa[] }>('/mesas'),
+    apiServer<{ items: Cliente[] }>('/clientes'),
     meServer(),
   ]);
   const activas = mesas.filter((m) => m.activa);
+  // «Mis cuentas»: para quien es ejecutiva de algún cliente, sus cuentas de cualquier mesa (solo lectura).
+  const misCuentas = !!me.usuario_id && clientes.some((c) => c.ejecutiva_id === me.usuario_id);
+  const cuentas = misCuentas && searchParams.mesa === 'cuentas';
   const todas = searchParams.mesa === 'todas';
   const mesa =
     !todas && searchParams.mesa && activas.some((m) => m.id === searchParams.mesa)
       ? activas.find((m) => m.id === searchParams.mesa)!
       : null;
-  const elegida = !!mesa || todas;
-  const d = elegida ? await apiServer<DailyView>(`/semanas/daily${mesa ? `?mesa=${mesa.id}` : ''}`) : null;
+  const elegida = !!mesa || todas || cuentas;
+  const d = elegida
+    ? await apiServer<DailyView>(`/semanas/daily${cuentas ? `?ejecutiva=${me.usuario_id}` : mesa ? `?mesa=${mesa.id}` : ''}`)
+    : null;
   const nombre = (id?: string) => {
     const u = usuarios.find((x) => x.id === id);
     return u ? nombrePersona(u) : '—';
   };
   const hoy = hoyLocal();
   const escribe = puedeEscribir(me.rol);
-  const mesaNombre = mesa?.nombre ?? 'Toda la agencia';
+  const mesaNombre = cuentas ? 'Mis cuentas' : (mesa?.nombre ?? 'Toda la agencia');
   // Regla del daily: ninguna tarea entra sin responsable. Se avisa aquí y el backend bloquea la publicación.
   const sinResponsable = d
     ? [
@@ -90,9 +96,14 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
         {elegida && (
           <div className="flex items-center gap-5 flex-wrap">
             <Paso n={1} titulo="Mesa">
-              <MesaPaso mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))} mesa={mesa?.id ?? ''} todas={todas} />
+              <MesaPaso
+                mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))}
+                mesa={cuentas ? 'cuentas' : (mesa?.id ?? '')}
+                todas={todas}
+                misCuentas={misCuentas}
+              />
             </Paso>
-            {escribe && (
+            {escribe && !cuentas && (
               <Paso n={2} titulo="Hoy">
                 <SeleccionDaily
                   key={mesa?.id ?? 'todas'}
@@ -106,7 +117,7 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
           </div>
         )}
       </header>
-      {!elegida && <MesaPaso mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))} mesa="" todas={false} />}
+      {!elegida && <MesaPaso mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))} mesa="" todas={false} misCuentas={misCuentas} />}
       {elegida && d && (
         <>
           {sinResponsable.length > 0 && (
@@ -141,7 +152,11 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
             <Col titulo="Fechas cambiadas desde ayer" items={d.fechas_cambiadas} vacio="Sin cambios de fecha." />
           </div>
           <footer className="card p-3">
-            {escribe ? (
+            {cuentas ? (
+              <span className="text-xs text-gray-400">
+                Mis cuentas es para leer: la apertura y el cierre se publican desde el daily de cada mesa.
+              </span>
+            ) : escribe ? (
               <Paso n={3} titulo="Publicar">
                 <DailyPublicar
                   key={mesa?.id ?? 'todas'}

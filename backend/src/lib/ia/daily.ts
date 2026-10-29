@@ -43,6 +43,11 @@ export async function armarDailyMensaje(
     return u ? nombrePersona(u) : 'sin asignar';
   };
   const cliente = (id: string) => clientes.find((x) => x.id === id)?.nombre ?? '';
+  // Ejecutiva de la cuenta: va en lo que vence y en los bloqueos, que es lo que ella destraba con el cliente.
+  const conCuenta = (i: DailyItem, clienteId: string): DailyItem => {
+    const e = clientes.find((x) => x.id === clienteId)?.ejecutiva_id;
+    return e ? { ...i, cuenta: nombre(e) } : i;
+  };
   const linea = (r: {
     titulo_interno: string;
     cliente_id: string;
@@ -89,8 +94,8 @@ export async function armarDailyMensaje(
     notas,
     ...(tipo === 'cierre' ? { completadas, completadas_fuera: completadasFuera, kpis } : {}),
     hoy: s.hoy.map(linea),
-    vencen: s.vencen.map(linea),
-    bloqueos: s.bloqueos.map(linea),
+    vencen: s.vencen.map((r) => conCuenta(linea(r), r.cliente_id)),
+    bloqueos: s.bloqueos.map((r) => conCuenta(linea(r), r.cliente_id)),
     cambios: s.cambios.map(linea),
   };
 }

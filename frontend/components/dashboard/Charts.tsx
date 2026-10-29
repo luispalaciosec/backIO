@@ -75,7 +75,15 @@ export function Kpi({
   );
 }
 
-export function Semaforo({ salud }: { salud: 'verde' | 'amarillo' | 'rojo' }) {
-  const c = { verde: '#00C875', amarillo: '#FDAB3D', rojo: '#E2445C' }[salud];
-  return <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: c }} title={salud} />;
+export const COLOR_SALUD = { verde: '#00C875', amarillo: '#FDAB3D', rojo: '#E2445C' } as const;
+
+/** Punto de salud del cliente; el porqué (saludCliente) va en el título. */
+export function Semaforo({ salud, motivos }: { salud: 'verde' | 'amarillo' | 'rojo'; motivos?: string[] }) {
+  return (
+    <span
+      className="inline-block w-3 h-3 rounded-full"
+      style={{ backgroundColor: COLOR_SALUD[salud] }}
+      title={motivos?.length ? `${salud}: ${motivos.join(' · ')}` : salud}
+    />
+  );
 }

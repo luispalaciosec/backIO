@@ -32,7 +32,7 @@ export const semanas = new Hono();
 semanas.get('/actual', requireScope('read:senales'), async (c) => c.json(await ensureSemana(ctxOf(c), hoyLocal())));
 
 semanas.get('/daily', requireScope('read:backlog'), async (c) =>
-  c.json(await getDaily(ctxOf(c), { mesaId: c.req.query('mesa') || undefined })),
+  c.json(await getDaily(ctxOf(c), { mesaId: c.req.query('mesa') || undefined, ejecutivaId: c.req.query('ejecutiva') || undefined })),
 );
 
 semanas.get('/acuerdos/abiertos', requireScope('read:senales'), async (c) => c.json({ items: await listAcuerdosAbiertos(ctxOf(c)) }));

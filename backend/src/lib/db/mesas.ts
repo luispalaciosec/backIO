@@ -70,3 +70,28 @@ export async function alcanceMesa(
     .map((p) => p.id);
   return { clienteIds, proyectoIds };
 }
+
+/**
+ * Cuentas de una ejecutiva («Mis cuentas», migración 37): sus clientes y los proyectos donde es `owner_ejecutiva`, de
+ * cualquier mesa y sin clientes de prueba. Misma forma que `alcanceMesa`, así sirve para el backlog y el daily.
+ */
+export async function alcanceEjecutiva(ctx: DbCtx, usuarioId: string): Promise<{ clienteIds: string[]; proyectoIds: string[] }> {
+  const [{ data: cl, error: e1 }, { data: pr, error: e2 }, prueba] = await Promise.all([
+    ctx.db.from('clientes').select('id').eq('tenant_id', ctx.tenantId).eq('ejecutiva_id', usuarioId).is('deleted_at', null),
+    ctx.db
+      .from('proyectos')
+      .select('id, cliente_id, owner_ejecutiva')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('owner_ejecutiva', usuarioId)
+      .is('deleted_at', null),
+    idsClientesDePrueba(ctx),
+  ]);
+  throwIf(e1);
+  throwIf(e2);
+  const clienteIds = (cl ?? []).map((c) => (c as { id: string }).id).filter((id) => !prueba.has(id));
+  // Sus clientes traen todas sus tareas; aparte, los proyectos que tiene asignados en clientes de otra ejecutiva.
+  const proyectoIds = ((pr ?? []) as { id: string; cliente_id: string; owner_ejecutiva: string | null }[])
+    .filter((p) => p.owner_ejecutiva === usuarioId && !prueba.has(p.cliente_id))
+    .map((p) => p.id);
+  return { clienteIds, proyectoIds };
+}

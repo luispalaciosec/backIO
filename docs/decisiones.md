@@ -91,6 +91,8 @@ mezcle datos entre organizaciones.
 | — | Cancelar una tarea en BackIO archiva su to-do en Basecamp, a nombre de quien la cancela; reabrirla lo vuelve a activar | «Briefing Pasaportes» se canceló en BackIO y siguió abierto en Basecamp | 28/10/2026 · Luis |
 | — | Cambiar responsables en BackIO actualiza los asignados del to-do en Basecamp, a nombre de quien reasigna; los externos asignados (como Audela) se conservan. Juan Chancay (comercial) y Samuel Viez (Audela) no tienen usuario en BackIO; lo de Carlos Parra (ex director creativo) pasa a Julio Lucio | Reasignar en BackIO no llegaba a Basecamp y la sincronización lo deshacía | 28/10/2026 · Luis |
 | — | **Acme EC S.A.S es cliente de prueba**: no cuenta en señales, actas, dashboard, personas ni KPIs | Es el cliente del sandbox de Basecamp; sus tareas de prueba ensuciaban el weekly de las mesas | 19/10/2026 · Luis |
+| — | **Mesa y ejecutiva de cuenta son cosas distintas**: la mesa es el equipo que produce (daily y weekly); la ejecutiva de cuenta se asigna por cliente y puede tener cuentas en varias mesas. Un cliente se queda en la mesa que lo produce | Grace lleva Grupo Torres & Torres, que produce Omega, sin pertenecer a esa mesa ([Clientes](./21-clientes.md)) | 29/10/2026 · Luis |
+| — | **Ficha de cliente** con la ejecutiva, proyectos, atrasos, salud por entregas y reprocesos, y sugerencias de la IA. La salud del dashboard y la de la ficha son la misma regla | — | 29/10/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 
 ## Decisiones técnicas
