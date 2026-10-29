@@ -36,7 +36,9 @@ Para recibir las menciones del daily, la ejecutiva tiene que ser miembro del pro
 
 ## Ficha del cliente (`/clientes/:id`)
 
-La lista `/clientes` muestra cada cliente con su salud, ejecutiva (con foto), mesa, tareas activas y atrasadas, lo
+La lista `/clientes` muestra solo cuentas reales: con mesa, con ejecutiva o con trabajo en BackIO. Las empresas que
+PrometIO manda y todavía son contactos del CRM (sin mesa, proyectos ni tareas) no aparecen; entran solas cuando se les
+asigna una mesa o reciben su primer proyecto. Para cada cliente muestra su salud, ejecutiva (con foto), mesa, tareas activas y atrasadas, lo
 que espera al cliente y el % a tiempo de 30 días. El nombre del cliente lleva a su ficha desde el backlog
 («Ficha»), los proyectos y el dashboard. La ven los roles de gestión; un colaborador no (`GET /clientes/:id/ficha`
 responde 403).

@@ -35,7 +35,10 @@ export default async function ClientesPage({ searchParams: spP }: { searchParams
     apiServer<{ items: Mesa[] }>('/mesas'),
     apiServer<{ por_cliente: FilaSalud[] }>('/dashboard'),
   ]);
-  const reales = clientes.filter((c) => !c.es_prueba);
+  const conTrabajo = new Set(dash.por_cliente.map((f) => f.cliente_id));
+  // Solo cuentas reales: con mesa, con ejecutiva o con trabajo en BackIO. Las demás son empresas de PrometIO que todavía
+  // son contactos del CRM (sin mesa, proyectos ni tareas) y no se muestran (pedido de Luis, 29/10/2026).
+  const reales = clientes.filter((c) => !c.es_prueba && (c.mesa_id || c.ejecutiva_id || conTrabajo.has(c.id)));
   const esEjecutiva = !!me.usuario_id && reales.some((c) => c.ejecutiva_id === me.usuario_id);
   // Una ejecutiva abre en sus cuentas; «todas» las muestra todas.
   const ejecutiva = sp.ejecutiva === 'todas' ? '' : (sp.ejecutiva ?? (esEjecutiva ? me.usuario_id! : ''));
