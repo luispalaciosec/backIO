@@ -214,7 +214,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
       ...completados30.map((r) => r.cliente_id),
       ...proyectosActivos.map((p) => p.cliente_id),
     ]),
-  ];
+  ].filter((id) => !prueba.has(id)); // Acme y otros de prueba entraban por sus proyectos activos.
   const por_cliente: FilaCliente[] = clientesIds
     .map((id) => {
       const c = clienteDe(id);
