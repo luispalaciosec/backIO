@@ -19,6 +19,7 @@ import { getMesa } from '../db/mesas';
 import { getSemana } from '../db/semanas';
 import { listUsuarios } from '../db/usuarios';
 import { log } from '../logger';
+import { horaLocal } from '@backio/shared';
 
 const fmtFecha = (iso: string) => iso.slice(0, 10);
 const fmtCorta = (iso: string) => {
@@ -190,7 +191,15 @@ export function mencionarEnHtml(html: string, men?: Menciones): string {
     .map((parte) => {
       if (parte.startsWith('<')) return parte;
       let t = parte;
-      for (const n of nombres) t = t.split(esc(n)).join(mencion(n, men));
+      // Solo la palabra completa: «Ana» no se menciona dentro de «Mariana» (revisión del 29/10/2026). La mención ya
+      // puesta es una etiqueta, así que un nombre más corto no la vuelve a tocar.
+      for (const n of nombres) {
+        const re = new RegExp(`(?<![\\p{L}\\p{N}])${esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu');
+        t = t
+          .split(/(<bc-attachment[^>]*><\/bc-attachment>)/)
+          .map((x) => (x.startsWith('<') ? x : x.replace(re, () => mencion(n, men))))
+          .join('');
+      }
       return t;
     })
     .join('');
@@ -204,7 +213,8 @@ export function cuerpoDaily(m: DailyMensaje, men?: Menciones): string {
   };
   const li = (xs: DailyItem[]) => (xs.length ? `<ul>${xs.map(item).join('')}</ul>` : '<p><em>Nada.</em></p>');
   return [
-    `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${m.tipo === 'apertura' ? '9H00 AM' : '6H00 PM'}</p>`,
+    // La hora real de la publicación (antes era fija: «9H00 AM» o «6H00 PM» aunque se publicara a otra hora).
+    `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${horaLocal(new Date().toISOString()).replace(':', 'H')}</p>`,
     ...(m.narrativa ? [mencionarEnHtml(markdownBasico(m.narrativa, { saltos: true }), men), SALTO] : []),
     `<p>📌 <strong>Notas clave del día</strong></p>`,
     m.notas.length ? `<ul>${m.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>',
@@ -309,10 +319,16 @@ const esc = (s: string) =>
 
 /** Conversión mínima markdown → HTML (títulos, listas, tablas, negritas). Basecamp acepta HTML simple. */
 export function markdownBasico(md: string, opts: { saltos?: boolean } = {}): string {
-  const inline = (s: string) =>
-    esc(s)
+  // `\|`, `\*`, `\_` y `\\` son literales (mdTexto en rituals/documents.ts). La cursiva no toma el «_» dentro de una
+  // palabra (archivo_final_v2).
+  const inline = (s: string) => {
+    const literales: string[] = [];
+    const t = s.replace(/\\([\\|*_])/g, (_m, c: string) => `\uE000${literales.push(c) - 1}\uE000`);
+    return esc(t)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/_(.+?)_/g, '<em>$1</em>');
+      .replace(/(?<![\p{L}\p{N}])_(.+?)_(?![\p{L}\p{N}])/gu, '<em>$1</em>')
+      .replace(/\uE000(\d+)\uE000/g, (_m, n: string) => esc(literales[Number(n)]!));
+  };
   const out: string[] = [];
   const lineas = md.split('\n');
   for (let i = 0; i < lineas.length; i++) {
@@ -326,7 +342,7 @@ export function markdownBasico(md: string, opts: { saltos?: boolean } = {}): str
       i--;
       const celdas = (f: string) =>
         f
-          .split('|')
+          .split(/(?<!\\)\|/)
           .slice(1, -1)
           .map((c) => c.trim());
       const [head, , ...body] = filas;

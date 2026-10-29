@@ -174,10 +174,37 @@ export async function cerrarAcuerdo(ctx: DbCtx, id: string, estado: 'cumplido' |
   throwIf(error);
 }
 
+/**
+ * Guarda un acta generada. Si la semana ya tiene una sin publicar del mismo tipo y mesa, la reemplaza: antes cada clic
+ * en «Generar» dejaba un acta nueva (revisión del 29/10/2026). Una ya publicada no se toca; entonces se crea otra.
+ */
 export async function insertActa(
   ctx: DbCtx,
   a: { semana_id: string; tipo: Acta['tipo']; mesa_id?: string | null; contenido: unknown; markdown: string },
 ): Promise<Acta> {
+  let previa = ctx.db
+    .from('actas')
+    .select('id')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('semana_id', a.semana_id)
+    .eq('tipo', a.tipo)
+    .is('publicado_at', null);
+  previa = a.mesa_id ? previa.eq('mesa_id', a.mesa_id) : previa.is('mesa_id', null);
+  const { data: borrador, error: e1 } = await previa.order('created_at', { ascending: false }).limit(1).maybeSingle();
+  throwIf(e1);
+  if (borrador) {
+    // Condicional: si alguien la publicó entre la lectura y ahora, no se pisa y se crea una nueva.
+    const { data, error } = await ctx.db
+      .from('actas')
+      .update({ contenido: a.contenido, markdown: a.markdown, created_at: new Date().toISOString() })
+      .eq('tenant_id', ctx.tenantId)
+      .eq('id', borrador.id)
+      .is('publicado_at', null)
+      .select()
+      .maybeSingle();
+    throwIf(error);
+    if (data) return data as Acta;
+  }
   const { data, error } = await ctx.db
     .from('actas')
     .insert({ ...a, tenant_id: ctx.tenantId })

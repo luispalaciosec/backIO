@@ -174,7 +174,8 @@ del evolutivo (`fotoDeDia`): antes se calculaban aparte y el cierre publicado no
 **Una publicación por mesa, día y tipo (29/10/2026).** Si la apertura (o el cierre) de la mesa ya salió hoy,
 `POST /semanas/daily/publicar` responde 409 con la hora de la anterior, y la pantalla pregunta antes de publicarla
 otra vez (`repetir: true`). Dos clics simultáneos, dos pestañas o un reintento ya no la duplican: las llamadas de la
-misma mesa y tipo se atienden de una en una.
+misma mesa y tipo se atienden de una en una. El encabezado del mensaje lleva la hora real de la publicación (antes decía siempre
+«9H00 AM» o «6H00 PM») y las @menciones marcan solo el nombre completo («Ana» ya no se marca dentro de «Mariana»).
 
 ---
 
@@ -183,6 +184,9 @@ misma mesa y tipo se atienden de una en una.
 El Plan Operativo y el Acta de Cierre se generan a pedido, no por calendario. Alguien los dispara desde la
 pantalla del weekly, que llama a `POST /semanas/:id/plan` y `POST /semanas/:id/acta`. Ambas rutas aceptan
 `?mesa=` para acotar el documento a una mesa, y `?ia=1` para anteponer el resumen redactado por la IA.
+La mesa es la elegida en las pestañas de la pantalla. Generar otra vez reemplaza el documento de la semana, tipo y
+mesa que aún no se publicó; uno ya publicado no se toca y se crea otro (29/10/2026). Los títulos de tareas, acuerdos y
+señales se escapan en el markdown, así que un `|` o un `_` en un título ya no rompe la tabla ni pone cursiva.
 
 - `backend/src/lib/rituals/service.ts` reúne los datos (`generarPlanOperativo`, `generarActaCierre`): tareas
   de la semana, capacidad, señales de riesgo, acuerdos abiertos y, en el acta, las señales y acuerdos de la

@@ -94,12 +94,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
           </nav>
         </div>
         {escribe ? (
-          <WeeklyActions
-            key={mesa?.id ?? 'todas'}
-            semanaId={semana.id}
-            mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))}
-            mesaInicial={mesa?.id ?? ''}
-          />
+          <WeeklyActions key={mesa?.id ?? 'todas'} semanaId={semana.id} mesa={mesa?.id ?? ''} />
         ) : (
           <span className="text-xs text-gray-400">Solo lectura · los documentos los genera operaciones</span>
         )}

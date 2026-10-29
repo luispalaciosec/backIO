@@ -7,22 +7,14 @@ import { useIA } from '@/lib/useIA';
 import { hrefExterno } from '@/lib/url';
 import { hoyLocal, sumarDias } from '@backio/shared';
 
-export function WeeklyActions({
-  semanaId,
-  mesas,
-  mesaInicial,
-}: {
-  semanaId: string;
-  mesas: { id: string; nombre: string }[];
-  mesaInicial: string;
-}) {
+/** Documentos y agenda del weekly. La mesa es la de las pestañas de arriba (antes había un segundo selector aquí). */
+export function WeeklyActions({ semanaId, mesa }: { semanaId: string; mesa: string }) {
   const router = useRouter();
   const ia = useIA();
   const [conIA, setConIA] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [acta, setActa] = useState<Acta | null>(null);
   const [agenda, setAgenda] = useState<WeeklyIA | null>(null);
-  const [mesa, setMesa] = useState<string>(mesaInicial);
   const [pub, setPub] = useState<{ url: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const q = `?${mesa ? `mesa=${mesa}&` : ''}${ia && conIA ? 'ia=1' : ''}`;
@@ -40,14 +32,6 @@ export function WeeklyActions({
   }
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      <select className="input w-44" value={mesa} onChange={(e) => setMesa(e.target.value)} title="Mesa para los documentos">
-        <option value="">Toda la agencia</option>
-        {mesas.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.nombre}
-          </option>
-        ))}
-      </select>
       <button
         className="btn-secondary"
         disabled={!!busy}

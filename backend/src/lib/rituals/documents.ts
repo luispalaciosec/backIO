@@ -43,10 +43,16 @@ const ESTADO: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
+/**
+ * Texto de la base dentro del markdown: escapa `|`, `*`, `_` y `\` y junta las líneas. Un título con «|» partía la
+ * fila de la tabla y uno con «_» se volvía cursiva (revisión del 29/10/2026).
+ */
+export const mdTexto = (s: string | null | undefined) => (s ?? '').replace(/[\\|*_]/g, '\\$&').replace(/\s*\n\s*/g, ' ');
+
 /** Nombre de una persona (con «(ex)» si ya no está), o «—». */
 function nombreEn(usuarios: Usuario[], id: string | null | undefined): string {
   const u = id ? usuarios.find((x) => x.id === id) : undefined;
-  return u ? nombrePersona(u) : '—';
+  return u ? mdTexto(nombrePersona(u)) : '—';
 }
 
 export function calcularCapacidad(reqs: RequerimientoMetricas[], usuarios: Usuario[]): CapacidadPersona[] {
@@ -69,12 +75,12 @@ export function calcularCapacidad(reqs: RequerimientoMetricas[], usuarios: Usuar
 
 function tablaTareas(reqs: RequerimientoMetricas[], d: PlanOperativoData, conEstado: boolean): string {
   const nombre = (id: string | undefined) => nombreEn(d.usuarios, id);
-  const cliente = (id: string) => d.clientes.find((c) => c.id === id)?.nombre ?? '—';
+  const cliente = (id: string) => mdTexto(d.clientes.find((c) => c.id === id)?.nombre) || '—';
   const head = conEstado
     ? '| # | Cliente | Tarea | Responsable | Prioridad | Fecha | Estado |\n|---|---|---|---|---|---|---|'
     : '| # | Cliente | Tarea | Responsable | Prioridad | Fecha |\n|---|---|---|---|---|---|';
   const rows = reqs.map((r, i) => {
-    const base = `| ${i + 1} | ${cliente(r.cliente_id)} | ${r.titulo_interno} | ${nombre(r.owner_agencia[0])} | ${PRIO[r.prioridad]} | ${fmt(r.fecha_entrega)} |`;
+    const base = `| ${i + 1} | ${cliente(r.cliente_id)} | ${mdTexto(r.titulo_interno)} | ${nombre(r.owner_agencia[0])} | ${PRIO[r.prioridad]} | ${fmt(r.fecha_entrega)} |`;
     return conEstado
       ? `${base} ${ESTADO[r.estado_operativo] ?? r.estado_operativo}${r.dias_atraso > 0 ? ` (+${r.dias_atraso}d)` : ''} |`
       : base;
@@ -86,7 +92,7 @@ export function renderPlanOperativo(d: PlanOperativoData): string {
   const s = d.semana;
   const lineas: string[] = [];
   lineas.push(
-    `# Plan Operativo Semanal${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
+    `# Plan Operativo Semanal${d.mesa ? ` · ${mdTexto(d.mesa)}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
     '',
   );
   if (d.marcador) lineas.push(renderMarcadorPlan(d.marcador), '');
@@ -94,19 +100,19 @@ export function renderPlanOperativo(d: PlanOperativoData): string {
   lineas.push(
     d.pendientes_anteriores.length
       ? d.pendientes_anteriores
-          .map((a) => `- [ ] ${a.descripcion} — **${nombreEn(d.usuarios, a.responsable_id)}** · ${fmt(a.fecha_compromiso)}`)
+          .map((a) => `- [ ] ${mdTexto(a.descripcion)} — **${nombreEn(d.usuarios, a.responsable_id)}** · ${fmt(a.fecha_compromiso)}`)
           .join('\n')
       : '_Sin pendientes._',
   );
   lineas.push('', '## 2. Capacidad por persona', '');
   lineas.push('| Persona | Tareas | % del total | Capacidad (h) |', '|---|---|---|---|');
-  lineas.push(...d.capacidad.map((c) => `| ${c.nombre} | ${c.tareas} | ${c.pct_del_total}% | ${c.capacidad_semanal} |`));
+  lineas.push(...d.capacidad.map((c) => `| ${mdTexto(c.nombre)} | ${c.tareas} | ${c.pct_del_total}% | ${c.capacidad_semanal} |`));
   lineas.push('', `## 3. Prioridades de la semana (${d.prioridades.length} tareas)`, '');
   lineas.push(tablaTareas(d.prioridades, d, false));
   lineas.push('', '## 4. Riesgos y dependencias', '');
   lineas.push(
     d.riesgos.length
-      ? d.riesgos.map((r) => `- **${r.severidad.toUpperCase()}** · ${r.titulo} → _${temaAgenda(r.tipo)}_`).join('\n')
+      ? d.riesgos.map((r) => `- **${r.severidad.toUpperCase()}** · ${mdTexto(r.titulo)} → _${temaAgenda(r.tipo)}_`).join('\n')
       : '_Sin riesgos detectados._',
   );
   lineas.push('', '---', `_Generado por BackIO el ${fmt(hoyLocal())}._`);
@@ -123,7 +129,7 @@ export function renderActaCierre(d: ActaCierreData): string {
   const canceladas = d.prioridades.length - vigentes.length;
   const lineas: string[] = [];
   lineas.push(
-    `# Acta de Cierre${d.mesa ? ` · ${d.mesa}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
+    `# Acta de Cierre${d.mesa ? ` · ${mdTexto(d.mesa)}` : ''} · Semana ${s.numero_iso} (${fmt(s.fecha_inicio)} – ${fmt(s.fecha_fin)})`,
     '',
   );
   if (d.marcador)
@@ -141,20 +147,22 @@ export function renderActaCierre(d: ActaCierreData): string {
   lineas.push('', `## 2. Arrastre a la siguiente semana (${noCompletadas.length})`, '');
   lineas.push(
     noCompletadas.length
-      ? noCompletadas.map((r) => `- ${r.titulo_interno} · ${ESTADO[r.estado_operativo]} · reprogramado ${r.veces_reprogramado}×`).join('\n')
+      ? noCompletadas
+          .map((r) => `- ${mdTexto(r.titulo_interno)} · ${ESTADO[r.estado_operativo]} · reprogramado ${r.veces_reprogramado}×`)
+          .join('\n')
       : '_Sin arrastre._',
   );
   lineas.push('', '## 3. Señales de la semana', '');
   lineas.push(
     d.senales.length
-      ? d.senales.map((x) => `- ${x.atendida ? '✅' : '⚠️'} **${x.severidad.toUpperCase()}** · ${x.titulo}`).join('\n')
+      ? d.senales.map((x) => `- ${x.atendida ? '✅' : '⚠️'} **${x.severidad.toUpperCase()}** · ${mdTexto(x.titulo)}`).join('\n')
       : '_Sin señales._',
   );
   lineas.push('', '## 4. Acuerdos', '');
   lineas.push('| Acuerdo | Responsable | Fecha compromiso | Estado |', '|---|---|---|---|');
   lineas.push(
     ...d.acuerdos_semana.map(
-      (a) => `| ${a.descripcion} | ${nombreEn(d.usuarios, a.responsable_id)} | ${fmt(a.fecha_compromiso)} | ${a.estado} |`,
+      (a) => `| ${mdTexto(a.descripcion)} | ${nombreEn(d.usuarios, a.responsable_id)} | ${fmt(a.fecha_compromiso)} | ${a.estado} |`,
     ),
   );
   lineas.push('', '---', `_Generado por BackIO el ${fmt(hoyLocal())}._`);
