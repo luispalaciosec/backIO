@@ -12,6 +12,7 @@ import {
   nombrePersona,
   reprocesoDelEquipo,
   saludCliente,
+  esTrabajoMedido,
 } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { getCliente } from '../db/clientes';
@@ -85,7 +86,9 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
   const comp90 = completados.filter((r) => r.completado_at && r.completado_at >= hace90);
   const reprogs90 = reprogs.filter((x) => x.created_at >= hace90);
   const reprocs90 = reprocs.filter((x) => x.abierto_at >= hace90);
-  const c90 = resumirCumplimiento(comp90, reprogs90, reprocs90);
+  // El % a tiempo mide solo lo pedido desde que se opera en BackIO; lo importado es historia (esTrabajoMedido).
+  const medidas90 = comp90.filter(esTrabajoMedido);
+  const c90 = resumirCumplimiento(medidas90, reprogs90, reprocs90);
   const reprocesosEquipo = reprocs90.filter(reprocesoDelEquipo).length;
 
   const atrasadas = activos.filter((r) => r.dias_atraso > 0).sort((a, b) => b.dias_atraso - a.dias_atraso);
@@ -94,7 +97,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     atrasados: atrasadas.length,
     atraso_max: atrasadas[0]?.dias_atraso ?? 0,
     sin_movimiento_max: sinMovMax,
-    entregas: comp90.length,
+    entregas: medidas90.length,
     pct_a_tiempo: c90.pct_original,
     reprocesos_equipo: reprocesosEquipo,
   });
@@ -104,7 +107,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     return {
       mes,
       entregas: delMes.length,
-      pct_a_tiempo: resumirCumplimiento(delMes, [], []).pct_original,
+      pct_a_tiempo: resumirCumplimiento(delMes.filter(esTrabajoMedido), [], []).pct_original,
       reprocesos: reprocs.filter((x) => diaLocal(x.abierto_at).startsWith(mes)).length,
     };
   });
@@ -137,6 +140,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
       bloqueadas: activos.filter((r) => r.estado_operativo === 'bloqueado').length,
       sin_movimiento_max: sinMovMax,
       entregas_90d: comp90.length,
+      entregas_medidas_90d: medidas90.length,
       pct_a_tiempo_90d: c90.pct_original,
       pct_a_tiempo_vigente_90d: c90.pct_vigente,
       desvio_mediana_dias: c90.desvio_mediana_dias,

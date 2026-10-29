@@ -156,3 +156,12 @@ describe('salud del cliente (dashboard y ficha)', () => {
     expect(reprocesoDelEquipo({ atribuible: null, motivo: null })).toBe(false);
   });
 });
+
+describe('trabajo medido en la salud', () => {
+  it('cuenta lo pedido desde el 21/09/2026; lo importado de antes es historia', async () => {
+    const { esTrabajoMedido } = await import('@backio/shared');
+    expect(esTrabajoMedido({ fecha_pedido: '2026-06-02', created_at: '2026-10-28T15:00:00Z' })).toBe(false);
+    expect(esTrabajoMedido({ fecha_pedido: '2026-09-22', created_at: '2026-09-22T15:00:00Z' })).toBe(true);
+    expect(esTrabajoMedido({ fecha_pedido: null, created_at: '2026-09-21T15:00:00Z' })).toBe(true);
+  });
+});

@@ -76,6 +76,8 @@ const tarea = (id: string, p: Record<string, unknown>) => ({
   dias_atraso: 0,
   dias_sin_movimiento: 1,
   basecamp_url: null,
+  fecha_pedido: '2026-10-01',
+  created_at: '2026-10-01T15:00:00Z',
   ...p,
 });
 
@@ -89,6 +91,13 @@ beforeEach(() => {
       tarea(`ok${i}`, { estado_operativo: 'completado', fecha_entrega_original: '2026-10-20', completado_at: '2026-10-19T15:00:00Z' }),
     ),
     tarea('tarde', { estado_operativo: 'completado', fecha_entrega_original: '2026-10-10', completado_at: '2026-10-15T15:00:00Z' }),
+    // Importada de antes del 21/09: entra en las entregas, no en el % a tiempo.
+    tarea('vieja', {
+      estado_operativo: 'completado',
+      fecha_pedido: '2026-05-02',
+      fecha_entrega_original: '2026-05-10',
+      completado_at: '2026-09-02T15:00:00Z',
+    }),
   ];
   // Un reproceso de una tarea de otro cliente no cuenta.
   m.reprocesos = [
@@ -136,7 +145,8 @@ describe('ficha del cliente', () => {
     expect(f.ejecutiva).toMatchObject({ nombre: 'Grace Franco', avatar_url: 'https://bc/grace.png' });
     expect(f.mesa).toMatchObject({ nombre: 'Mesa Omega', lider: { nombre: 'Elias Plazarte' } });
     expect(f.indicadores).toMatchObject({
-      entregas_90d: 5,
+      entregas_90d: 6,
+      entregas_medidas_90d: 5,
       pct_a_tiempo_90d: 80,
       reprocesos_90d: 1,
       reprocesos_equipo_90d: 1,

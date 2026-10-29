@@ -24,6 +24,7 @@ import {
   responsablesEn,
   saludCliente,
   reprocesoDelEquipo,
+  esTrabajoMedido,
   SALUD_DIAS_ENTREGAS,
 } from '@backio/shared';
 
@@ -222,7 +223,8 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
       const proys = proyectosActivos.filter((p) => p.cliente_id === id);
       const atrasados = act.filter((r) => r.dias_atraso > 0).length;
       const sinMov = act.length ? Math.max(...act.map((r) => r.dias_sin_movimiento)) : 0;
-      const comp90 = completados90.filter((r) => r.cliente_id === id);
+      // El % a tiempo de la salud mide solo lo pedido desde que se opera en BackIO (esTrabajoMedido).
+      const comp90 = completados90.filter((r) => r.cliente_id === id && esTrabajoMedido(r));
       const { salud, motivos: salud_motivos } = saludCliente({
         atrasados,
         atraso_max: act.length ? Math.max(...act.map((r) => r.dias_atraso)) : 0,

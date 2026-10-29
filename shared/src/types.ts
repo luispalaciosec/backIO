@@ -616,6 +616,8 @@ export interface IndicadoresCliente {
   bloqueadas: number;
   sin_movimiento_max: number;
   entregas_90d: number;
+  /** Las que entran en el % a tiempo: pedidas desde que se opera en BackIO (INICIO_MEDICION). */
+  entregas_medidas_90d: number;
   pct_a_tiempo_90d: number | null;
   pct_a_tiempo_vigente_90d: number | null;
   desvio_mediana_dias: number | null;

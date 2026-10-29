@@ -4,11 +4,24 @@
  * original y reprocesos atribuibles a Geeks). Devuelve el color y el porqué.
  */
 import { MOTIVOS_REPROCESO, type Reproceso } from './types';
+import { diaLocal } from './fechas';
 
 export type Salud = 'verde' | 'amarillo' | 'rojo';
 
 /** Ventana de las métricas de entrega que usa la salud. */
 export const SALUD_DIAS_ENTREGAS = 90;
+
+/**
+ * Desde cuándo se mide el % a tiempo de la salud: el trabajo pedido desde que se opera en BackIO (el evolutivo también
+ * arranca el 21/09/2026). Lo pedido antes es historia importada de Basecamp: en septiembre se cerraron en bloque cientos
+ * de to-dos viejos con meses de atraso y el % a tiempo no medía el trabajo actual (decisión de Luis, 29/10/2026).
+ */
+export const INICIO_MEDICION = '2026-09-21';
+
+/** ¿La tarea es trabajo pedido desde que se opera en BackIO? Lo importado trae `fecha_pedido` = creación en Basecamp. */
+export function esTrabajoMedido(r: { fecha_pedido?: string | null; created_at: string }): boolean {
+  return (r.fecha_pedido ?? diaLocal(r.created_at)) >= INICIO_MEDICION;
+}
 
 export const UMBRALES_SALUD = {
   rojo: { atrasados: 2, atraso_dias: 30, sin_movimiento_dias: 14, pct_a_tiempo: 60 },
@@ -22,7 +35,7 @@ export interface DatosSalud {
   /** Días de atraso de la tarea más atrasada. */
   atraso_max: number;
   sin_movimiento_max: number;
-  /** Entregas (completadas) en los últimos SALUD_DIAS_ENTREGAS días. */
+  /** Entregas medidas (completadas en los últimos SALUD_DIAS_ENTREGAS días y pedidas desde INICIO_MEDICION). */
   entregas: number;
   pct_a_tiempo: number | null;
   /** Reprocesos atribuibles a Geeks (no al cliente) en la misma ventana. */

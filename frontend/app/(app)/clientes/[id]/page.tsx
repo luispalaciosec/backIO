@@ -190,7 +190,7 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
         <Indicador
           etiqueta="A tiempo · 90 días"
           valor={pct(i.pct_a_tiempo_90d)}
-          sub={`${i.entregas_90d} entregas · fecha vigente ${pct(i.pct_a_tiempo_vigente_90d)}${i.desvio_mediana_dias ? ` · ${i.desvio_mediana_dias} d de desvío` : ''}`}
+          sub={`${i.entregas_medidas_90d} de ${i.entregas_90d} entregas medidas (pedidas desde el 21/09) · fecha vigente ${pct(i.pct_a_tiempo_vigente_90d)}${i.desvio_mediana_dias ? ` · ${i.desvio_mediana_dias} d de desvío` : ''}`}
         />
         <Indicador
           etiqueta="Atrasadas"
