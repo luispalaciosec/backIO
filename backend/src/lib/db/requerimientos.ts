@@ -138,19 +138,6 @@ export async function softDeleteRequerimiento(ctx: DbCtx, id: string): Promise<v
   await updateRequerimiento(ctx, id, { deleted_at: new Date().toISOString() });
 }
 
-/** Cambios de fecha_entrega en las últimas 24h (para el Daily). Usa audit_log. */
-export async function requerimientosConFechaCambiadaDesde(ctx: DbCtx, desdeIso: string): Promise<string[]> {
-  const { data, error } = await ctx.db
-    .from('audit_log')
-    .select('entidad_id')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('entidad', 'requerimiento')
-    .eq('accion', 'reprogramar')
-    .gte('created_at', desdeIso);
-  throwIf(error);
-  return [...new Set((data ?? []).map((r) => (r as { entidad_id: string }).entidad_id))];
-}
-
 /** Marca (o desmarca) la primera respuesta al cliente. Devuelve el error de la base sin lanzar, para el mensaje de la ruta. */
 export async function setPrimeraRespuesta(ctx: DbCtx, id: string, valor: string | null): Promise<{ message: string } | null> {
   const { error } = await ctx.db.from('requerimientos').update({ primera_respuesta_at: valor }).eq('tenant_id', ctx.tenantId).eq('id', id);

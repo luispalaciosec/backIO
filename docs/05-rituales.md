@@ -116,8 +116,13 @@ Solo tres señales:
 | Señal | Condición |
 |---|---|
 | Vence hoy o mañana sin iniciar | `fecha_entrega <= mañana` y `estado = 'priorizado'` |
-| Bloqueo nuevo | `estado_operativo = 'bloqueado'` en últimas 24h |
-| Fecha cambiada | `fecha_entrega` modificada desde ayer |
+| Bloqueo nuevo | está `bloqueado` y pasó a ese estado en las últimas 24 h (según la auditoría; si no hay registro del paso, cuenta su último movimiento) |
+| Fecha cambiada | su `fecha_entrega` cambió en las últimas 24 h (tabla `reprogramaciones`, que incluye los cambios hechos en Basecamp) |
+
+**Una sola regla (29/10/2026).** El tablero, el mensaje publicado y el borrador de la IA salen de la misma función,
+`seccionesDaily` (`backend/src/lib/rituals/daily.ts`). Antes cada uno tenía la suya: el tablero no veía las fechas
+cambiadas en Basecamp, el mensaje mostraba como «fecha cambiada» cualquier movimiento de una tarea reprogramada
+alguna vez, y un bloqueo viejo salía como nuevo cuando alguien tocaba la tarea.
 
 Si el daily muestra más que eso, se convierte en un weekly y muere en tres semanas. Los
 rituales no fallan por falta de contenido, fallan por exceso.
@@ -163,7 +168,13 @@ porque son el formato que el equipo ya usa en Basecamp.
 (cerradas / planificadas con `daily_fecha = hoy`, % en color), cerradas fuera del daily y total, nuevas de hoy
 fuera de planificación (no planificadas + urgentes), reprocesos abiertos hoy, reprogramaciones 24 h, bloqueos
 nuevos, vencidas que siguen abiertas, y detalle por persona (cerradas / planificadas · % · fuera del daily).
-La IA recibe `kpis` para el balance del día.
+La IA recibe `kpis` para el balance del día. Desde el 29/10/2026 estos indicadores son los mismos que guarda la foto
+del evolutivo (`fotoDeDia`): antes se calculaban aparte y el cierre publicado no coincidía con el evolutivo.
+
+**Una publicación por mesa, día y tipo (29/10/2026).** Si la apertura (o el cierre) de la mesa ya salió hoy,
+`POST /semanas/daily/publicar` responde 409 con la hora de la anterior, y la pantalla pregunta antes de publicarla
+otra vez (`repetir: true`). Dos clics simultáneos, dos pestañas o un reintento ya no la duplican: las llamadas de la
+misma mesa y tipo se atienden de una en una.
 
 ---
 

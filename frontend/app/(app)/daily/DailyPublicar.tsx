@@ -11,7 +11,6 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
   const [narrativa, setNarrativa] = useState<string | null>(null);
   // De qué es el borrador: el de apertura no puede salir dentro del cierre (revisión del 28/10/2026).
   const [narrativaTipo, setNarrativaTipo] = useState<'apertura' | 'cierre' | null>(null);
-  const [publicados, setPublicados] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'info'; texto: string; url?: string } | null>(null);
   if (!mesa) return <span className="text-xs text-gray-400">Elige una mesa arriba para redactar y publicar su apertura o cierre.</span>;
@@ -46,7 +45,7 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
     }
     setBusy(null);
   }
-  async function publicar(tipo: 'apertura' | 'cierre') {
+  async function publicar(tipo: 'apertura' | 'cierre', repetir = false) {
     if (narrativa !== null && narrativaTipo && narrativaTipo !== tipo) {
       setMsg({
         tipo: 'error',
@@ -54,11 +53,6 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
       });
       return;
     }
-    if (
-      publicados[tipo] &&
-      !window.confirm(`Ya publicaste la ${tipo} de ${mesaNombre} desde esta pantalla. ¿Publicarla otra vez en Basecamp?`)
-    )
-      return;
     setBusy(tipo);
     setMsg(null);
     try {
@@ -67,7 +61,7 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
         resumen: { hoy: number; vencen: number; bloqueos: number; cambios: number; completadas?: number };
       }>('/semanas/daily/publicar', {
         method: 'POST',
-        json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined },
+        json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined, repetir },
       });
       setMsg({
         tipo: 'ok',
@@ -77,8 +71,13 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
       setNotas('');
       setNarrativa(null);
       setNarrativaTipo(null);
-      setPublicados((p) => ({ ...p, [tipo]: true }));
     } catch (e) {
+      // El servidor no deja publicar dos veces el mismo día sin confirmarlo (dos pestañas, dos personas, un reintento).
+      if (e instanceof ApiError && e.status === 409 && !repetir) {
+        setBusy(null);
+        if (window.confirm(`${e.message} ¿Publicarla otra vez en Basecamp?`)) return publicar(tipo, true);
+        return;
+      }
       setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo publicar' });
     }
     setBusy(null);

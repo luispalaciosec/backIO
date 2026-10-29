@@ -8,7 +8,8 @@ import { listBacklog } from '../db/requerimientos';
 import { listUsuarios } from '../db/usuarios';
 import { listClientes } from '../db/clientes';
 import { alcanceMesa } from '../db/mesas';
-import { listReprocesosDelDia } from '../db/ia';
+import { seccionesDaily } from '../rituals/daily';
+import { cargarMesa, fotoDeDia } from '../evolutivo';
 import { dailyItemTexto, type DailyItem, type DailyMensaje, type DailyKpis } from '../mcp/publish';
 import { generarTexto } from './index';
 import { hoyLocal, inicioDiaLocal, sumarDias, nombrePersona } from '@backio/shared';
@@ -35,9 +36,8 @@ export async function armarDailyMensaje(
     listClientes(ctx, { incluirInactivos: true }),
   ]);
   const activos = await listBacklog(ctx, { solo_activos: true, mesa: alcance });
+  const s = await seccionesDaily(ctx, activos);
   const hoy = hoyLocal();
-  const mananaIso = sumarDias(hoy, 1);
-  const hace24h = new Date(Date.now() - 86_400_000).toISOString();
   const nombre = (id?: string) => {
     const u = usuarios.find((x) => x.id === id);
     return u ? nombrePersona(u) : 'sin asignar';
@@ -59,13 +59,8 @@ export async function armarDailyMensaje(
     url: r.basecamp_url,
     atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
   });
-  const sinResp = activos.filter(
-    (r) =>
-      r.owner_agencia.length === 0 &&
-      (r.daily_fecha === hoy ||
-        (r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado') ||
-        (r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h) ||
-        (r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h)),
+  const sinResp = [...new Map([...s.hoy, ...s.vencen, ...s.bloqueos, ...s.cambios].map((r) => [r.id, r])).values()].filter(
+    (r) => r.owner_agencia.length === 0,
   );
   if (sinResp.length) throw new DailySinResponsable(sinResp.map((r) => `${r.titulo_interno} (${cliente(r.cliente_id)})`));
   // Cierre: qué se completó hoy (completado_at desde las 00:00 de Guayaquil), separando lo que estaba en el daily de lo que no.
@@ -79,43 +74,12 @@ export async function armarDailyMensaje(
     );
     completadas = hechas.filter((r) => r.daily_fecha === hoy).map(linea);
     completadasFuera = hechas.filter((r) => r.daily_fecha !== hoy).map(linea);
-    // Métricas del día: plan (daily_fecha = hoy) vs cerradas, entradas fuera de planificación, reprocesos, etc.
-    const todas = [...activos, ...hechas];
-    const planificadas = todas.filter((r) => r.daily_fecha === hoy);
-    const nuevas = todas.filter((r) => r.created_at >= inicioDia);
-    const rep = await listReprocesosDelDia(
-      ctx,
-      inicioDia,
-      todas.map((r) => r.id),
-    );
-    const porPersona = new Map<string, { nombre: string; planificadas: number; cerradas: number; fuera: number }>();
-    const pp = (id: string) => {
-      const n = nombre(id);
-      if (!porPersona.has(n)) porPersona.set(n, { nombre: n, planificadas: 0, cerradas: 0, fuera: 0 });
-      return porPersona.get(n)!;
-    };
-    for (const r of planificadas)
-      for (const o of r.owner_agencia) {
-        const x = pp(o);
-        x.planificadas += 1;
-        if (r.estado_operativo === 'completado') x.cerradas += 1;
-      }
-    for (const r of hechas.filter((r) => r.daily_fecha !== hoy)) for (const o of r.owner_agencia) pp(o).fuera += 1;
-    const cerradasPlan = planificadas.filter((r) => r.estado_operativo === 'completado').length;
+    // Indicadores del día: los mismos que guarda la foto del evolutivo al publicar el cierre (antes se calculaban aparte
+    // y no coincidían; revisión del 29/10/2026).
+    const foto = fotoDeDia(await cargarMesa(ctx, mesa, inicioDiaLocal(sumarDias(hoy, -1))), hoy, false);
     kpis = {
-      planificadas: planificadas.length,
-      cerradas_planificadas: cerradasPlan,
-      cumplimiento_pct: planificadas.length ? Math.round((cerradasPlan / planificadas.length) * 100) : null,
-      cerradas_fuera: completadasFuera.length,
-      cerradas_total: hechas.length,
-      nuevas_hoy: nuevas.length,
-      nuevas_no_planificadas: nuevas.filter((r) => r.planificacion === 'no_planificado').length,
-      nuevas_urgentes: nuevas.filter((r) => r.planificacion === 'urgente').length,
-      reprocesos_hoy: rep.length,
-      reprogramaciones_24h: activos.filter((r) => r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h).length,
-      bloqueos_nuevos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).length,
-      vencidas_abiertas: activos.filter((r) => r.dias_atraso > 0).length,
-      por_persona: [...porPersona.values()].sort((a, b) => b.planificadas - a.planificadas || a.nombre.localeCompare(b.nombre, 'es')),
+      ...foto.metricas,
+      por_persona: foto.por_persona.map(({ nombre, planificadas, cerradas, fuera }) => ({ nombre, planificadas, cerradas, fuera })),
     };
   }
   return {
@@ -124,10 +88,10 @@ export async function armarDailyMensaje(
     fecha: hoy,
     notas,
     ...(tipo === 'cierre' ? { completadas, completadas_fuera: completadasFuera, kpis } : {}),
-    hoy: activos.filter((r) => r.daily_fecha === hoy).map(linea),
-    vencen: activos.filter((r) => r.fecha_entrega && r.fecha_entrega <= mananaIso && r.estado_operativo === 'priorizado').map(linea),
-    bloqueos: activos.filter((r) => r.estado_operativo === 'bloqueado' && r.ultima_actualizacion >= hace24h).map(linea),
-    cambios: activos.filter((r) => r.veces_reprogramado > 0 && r.ultima_actualizacion >= hace24h).map(linea),
+    hoy: s.hoy.map(linea),
+    vencen: s.vencen.map(linea),
+    bloqueos: s.bloqueos.map(linea),
+    cambios: s.cambios.map(linea),
   };
 }
 

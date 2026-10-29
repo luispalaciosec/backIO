@@ -21,8 +21,10 @@ import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 import { fotoDaily } from '../../lib/evolutivo';
+import { listPublicacionesDaily } from '../../lib/db/evolutivo';
+import { conCandado } from '../../lib/candado';
 import { serviceClient } from '../../lib/db/client';
-import { hoyLocal } from '@backio/shared';
+import { hoyLocal, inicioDiaLocal, horaLocal } from '@backio/shared';
 import { log } from '../../lib/logger';
 
 export const semanas = new Hono();
@@ -174,6 +176,8 @@ semanas.post(
       notas: z.array(z.string()).default([]),
       responsable: z.string().optional(),
       narrativa: z.string().max(4000).optional(),
+      // Publicar otra vez lo que ya salió hoy (la pantalla lo pide tras confirmar).
+      repetir: z.boolean().default(false),
     }),
   ),
   async (c) => {
@@ -181,36 +185,48 @@ semanas.post(
     const b = c.req.valid('json');
     const mesa = await getMesa(ctx, b.mesa_id);
     if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
-    let m: DailyMensaje;
-    try {
-      m = {
-        ...(await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, b.responsable ?? c.get('auth').nombre)),
-        narrativa: b.narrativa?.trim() || undefined,
-      };
-    } catch (err) {
-      if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422);
-      throw err;
-    }
-    try {
-      const r = await publicarDailyEnBasecamp(ctx, mesa, m);
-      await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });
-      // Evolutivo: el cierre publicado deja la foto del día (no bloquea la respuesta si falla).
-      if (b.tipo === 'cierre')
-        await fotoDaily({ ...ctx, db: serviceClient() }, mesa, undefined, 'cierre').catch((e: Error) =>
-          log.error('[evolutivo] foto del cierre', e.message),
-        );
-      return c.json({
-        ...r,
-        resumen: {
-          hoy: m.hoy.length,
-          vencen: m.vencen.length,
-          bloqueos: m.bloqueos.length,
-          cambios: m.cambios.length,
-          completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0),
-        },
-      });
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
-    }
+    // Una publicación por mesa, día y tipo: dos pestañas o un reintento ya no la duplican (revisión del 29/10/2026).
+    // El candado ordena las llamadas simultáneas; la auditoría dice si ya salió hoy.
+    return conCandado(`daily|${ctx.tenantId}|${mesa.id}|${b.tipo}`, async () => {
+      const hoy = hoyLocal();
+      const previas = (await listPublicacionesDaily(ctx, mesa.id, inicioDiaLocal(hoy))).filter(
+        (x) => x.accion === `publicar_daily_${b.tipo}`,
+      );
+      if (previas.length && !b.repetir) {
+        const hora = horaLocal(previas[previas.length - 1]!.created_at);
+        return c.json({ error: `La ${b.tipo} de ${mesa.nombre} ya se publicó hoy a las ${hora}.`, ya_publicado: true, hora }, 409);
+      }
+      let m: DailyMensaje;
+      try {
+        m = {
+          ...(await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, b.responsable ?? c.get('auth').nombre)),
+          narrativa: b.narrativa?.trim() || undefined,
+        };
+      } catch (err) {
+        if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422);
+        throw err;
+      }
+      try {
+        const r = await publicarDailyEnBasecamp(ctx, mesa, m);
+        await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });
+        // Evolutivo: el cierre publicado deja la foto del día (no bloquea la respuesta si falla).
+        if (b.tipo === 'cierre')
+          await fotoDaily({ ...ctx, db: serviceClient() }, mesa, undefined, 'cierre').catch((e: Error) =>
+            log.error('[evolutivo] foto del cierre', e.message),
+          );
+        return c.json({
+          ...r,
+          resumen: {
+            hoy: m.hoy.length,
+            vencen: m.vencen.length,
+            bloqueos: m.bloqueos.length,
+            cambios: m.cambios.length,
+            completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0),
+          },
+        });
+      } catch (err) {
+        return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
+      }
+    });
   },
 );

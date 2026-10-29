@@ -44,3 +44,10 @@ export function inicioDiaLocal(dia: string): string {
 export function finDiaLocal(dia: string): string {
   return new Date(`${dia}T23:59:59${OFFSET}`).toISOString();
 }
+
+const formatoHora = new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+/** Hora local (HH:MM) de un instante ISO. */
+export function horaLocal(iso: string): string {
+  return formatoHora.format(new Date(iso));
+}
