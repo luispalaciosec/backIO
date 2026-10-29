@@ -14,7 +14,7 @@
 | `completed` / `completed_at` | **Basecamp** | Basecamp → BackIO |
 | Existencia del to-do | BackIO lo crea; desde el 23/09/2026 también entra lo creado en Basecamp | Ambas |
 | `due_on` | El cambio más reciente | BackIO → Basecamp (al crear y al reprogramar). Si alguien la cambia en Basecamp después, BackIO la acepta como reprogramación (19/10/2026) |
-| Asignaciones | BackIO | BackIO → Basecamp |
+| Asignaciones | BackIO | BackIO → Basecamp: al crear la tarea y al cambiar sus responsables (desde el 28/10/2026, con la cuenta de quien reasigna; se conservan los externos asignados que no tienen usuario en BackIO). Lo que se asigna directamente en Basecamp también entra a BackIO en la sincronización |
 | Estado operativo, aprobación, prioridad, peso | **BackIO** | No sale |
 | Comentarios, adjuntos, descripciones | **Basecamp** | **No entra jamás** |
 
@@ -260,6 +260,7 @@ Basecamp → BackIO, automático:
 |---|---|---|
 | To-do completado / reabierto | Estado completado / en proceso (+ reproceso) | Webhook, segundos |
 | To-do enviado a la papelera o archivado | Requerimiento **cancelado** (auditoría `basecamp_eliminado`); si se restaura, vuelve a En proceso | Webhook, segundos; verificación cada 15 min |
+| Tarea **cancelada en BackIO** | El to-do se **archiva** en Basecamp con la cuenta de quien canceló (se puede deshacer); si después se saca de «cancelado», vuelve a quedar activo. Si la persona no conectó su Basecamp, no se cancela (428). Si Basecamp falla, la cancelación queda y se audita `basecamp_archivar_error` | Al instante (28/10/2026) |
 | Título del to-do editado | `titulo_interno` (excepción D1, solo por la lectura de listas; el webhook sigue sin extraer texto) | Cada 15 min o con ↻ Sincronizar |
 | To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada 15 min |
 | To-do movido a **otro proyecto de Basecamp** (otro cliente) | Basecamp crea un to-do nuevo y el id viejo redirige a él. Si el nuevo ya entró a BackIO, la tarea vieja se da de baja (no queda duplicada); si no, la tarea vieja pasa al to-do nuevo y a su cliente, oculta en el portal. Queda `basecamp_movido` en la auditoría | Cada 15 min |

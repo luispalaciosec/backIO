@@ -114,9 +114,12 @@ export function Step2Brief({
       )}
       <div>
         <label className="label">Cliente *</label>
+        {s.empresa_cotizacion && (
+          <p className="text-xs text-amber-800 mb-1">Cotización de {s.empresa_cotizacion.nombre}: elige en cuál de sus fees se trabaja.</p>
+        )}
         <select className="input" value={s.cliente_id} onChange={(e) => set({ cliente_id: e.target.value })}>
           <option value="">Selecciona…</option>
-          {clientes.map((c) => (
+          {(s.empresa_cotizacion ? clientes.filter((c) => c.empresa_id === s.empresa_cotizacion!.id) : clientes).map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}
               {!c.basecamp_project_id ? ' (sin Basecamp)' : ''}

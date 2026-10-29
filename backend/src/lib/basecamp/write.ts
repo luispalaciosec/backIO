@@ -195,6 +195,60 @@ export async function reabrirTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
   });
 }
 
+/**
+ * Cancelar en BackIO archiva el to-do en Basecamp, a nombre de quien cancela; reabrir lo vuelve a dejar activo
+ * (decisión de Luis, 28/10/2026: «Briefing Pasaportes» se canceló en BackIO y siguió abierto en Basecamp). Archivar,
+ * no mandar a la papelera: se puede deshacer. El webhook todo_archived que vuelve no hace nada (la tarea ya está
+ * cancelada).
+ */
+export async function archivarTodo(ctx: DbCtx, req: Requerimiento, archivar: boolean, bc?: BasecampClient): Promise<void> {
+  if (!req.basecamp_todo_id) return;
+  const cliente = await getCliente(ctx, req.cliente_id);
+  if (!cliente?.basecamp_project_id) return;
+  const client = bc ?? (await BasecampClient.forActor(ctx));
+  await client.cambiarEstadoTodo(cliente.basecamp_project_id, req.basecamp_todo_id, archivar ? 'archived' : 'active');
+  await audit(ctx, {
+    accion: archivar ? 'basecamp_archivar_todo' : 'basecamp_restaurar_todo',
+    entidad: 'requerimiento',
+    entidad_id: req.id,
+    detalle: { todo_id: req.basecamp_todo_id },
+  });
+}
+
+/**
+ * Asignados nuevos de un to-do cuando cambian los responsables en BackIO: la gente de Geeks (quienes tienen usuario en
+ * BackIO, activos o no) se reemplaza por los responsables nuevos; los externos asignados que no existen en BackIO
+ * (p. ej. el planner de Audela) se conservan.
+ */
+export function asignadosNuevos(vivos: number[], owners: string[], usuarios: Pick<Usuario, 'id' | 'basecamp_user_id'>[]): number[] {
+  const deGeeks = new Set(usuarios.map((u) => u.basecamp_user_id).filter((n): n is number => typeof n === 'number'));
+  return [...new Set([...vivos.filter((id) => !deGeeks.has(id)), ...mapUsuariosABasecamp(owners, usuarios)])];
+}
+
+/**
+ * Responsables cambiados en BackIO → asignados del to-do en Basecamp, con la cuenta de quien hace el cambio
+ * (decisión de Luis, 28/10/2026). Antes solo se enviaban al crear la tarea, y la sincronización cada 15 min volvía a
+ * poner en BackIO los de Basecamp: reasignar en BackIO se deshacía solo. Lee los asignados vivos y reenvía el to-do
+ * completo con updateTodo (incidente 22/09).
+ */
+export async function pushResponsables(ctx: DbCtx, req: Requerimiento, bc?: BasecampClient): Promise<void> {
+  if (!req.basecamp_todo_id) return;
+  const cliente = await getCliente(ctx, req.cliente_id);
+  if (!cliente?.basecamp_project_id) return;
+  const client = bc ?? (await BasecampClient.forActor(ctx));
+  const usuarios = await listUsuarios(ctx, { incluirInactivos: true });
+  const vivo = (await client.getTodoRaw(cliente.basecamp_project_id, req.basecamp_todo_id)) as { assignees?: { id: number }[] } | null;
+  const vivos = (vivo?.assignees ?? []).map((a) => a.id);
+  const nuevos = asignadosNuevos(vivos, req.owner_agencia, usuarios);
+  await client.updateTodo(cliente.basecamp_project_id, req.basecamp_todo_id, { assignee_ids: nuevos });
+  await audit(ctx, {
+    accion: 'basecamp_responsables',
+    entidad: 'requerimiento',
+    entidad_id: req.id,
+    detalle: { todo_id: req.basecamp_todo_id, antes: vivos, despues: nuevos },
+  });
+}
+
 export interface CambioResponsableBasecamp {
   requerimientoId: string;
   projectId: number;

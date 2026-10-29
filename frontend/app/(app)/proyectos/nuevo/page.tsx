@@ -66,8 +66,12 @@ export default function NuevoProyectoPage() {
   /** Desde un borrador de PrometIO: cliente, cotización, nombre y plantilla sugerida ya vienen; la ejecutiva completa el brief. */
   async function usarBorrador(b: Borrador) {
     const p = b.payload;
+    // Si la empresa de la cotización lleva su trabajo en varios fees, el cliente se elige entre ellos en el paso 2.
+    const fees = cat.clientes.filter((c) => c.empresa_id === b.cliente_id);
+    const empresa = cat.clientes.find((c) => c.id === b.cliente_id);
     const extra: Partial<WizardState> = {
-      cliente_id: b.cliente_id,
+      cliente_id: fees.length ? '' : b.cliente_id,
+      empresa_cotizacion: fees.length ? { id: b.cliente_id, nombre: empresa?.nombre ?? p.empresa?.nombre ?? 'la empresa' } : null,
       prometio_cotizacion_id: b.prometio_cotizacion_id,
       nombre: p.lineas?.[0]?.servicio
         ? `${p.lineas[0].servicio} - ${p.empresa?.nombre ?? ''}`.trim()

@@ -8,6 +8,11 @@ export interface WizardState {
   brief: CrearProyectoInput['brief'];
   fecha_entrega: string;
   prometio_cotizacion_id: string | null;
+  /**
+   * Empresa de la cotización cuando su trabajo se lleva en varios clientes (fees). Entonces el cliente se elige entre
+   * sus fees (migración 36): una cotización de Cervecería Nacional C.N. va a uno de los fees «AB-Inbev ||…».
+   */
+  empresa_cotizacion?: { id: string; nombre: string } | null;
   bloques: Record<string, BloqueAlcanceInput>; // por bloque_id
   /** Piezas por tipo detectadas por la IA en el brief pegado (solo un recordatorio para el paso 3). */
   piezas_sugeridas?: Record<string, number>;

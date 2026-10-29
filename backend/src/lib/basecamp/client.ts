@@ -325,6 +325,11 @@ export class BasecampClient {
     await this.request('DELETE', `/buckets/${projectId}/todos/${todoId}/completion.json`);
   }
 
+  /** Archiva un to-do (se puede deshacer) o lo vuelve a dejar activo. Basecamp 3: PUT recordings/:id/status/:estado. */
+  async cambiarEstadoTodo(projectId: number, todoId: number, estado: 'archived' | 'active'): Promise<void> {
+    await this.request('PUT', `/buckets/${projectId}/recordings/${todoId}/status/${estado}.json`);
+  }
+
   /** GET paginado (Link: rel="next"). Devuelve la unión de páginas. */
   /** Personas de la cuenta Basecamp: solo id, nombre y email (para enlazar usuarios). */
   async listPeopleSafe(): Promise<

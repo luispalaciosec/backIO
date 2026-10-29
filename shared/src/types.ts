@@ -42,6 +42,8 @@ export interface Cliente {
   id: string; // MISMO id que PrometIO
   tenant_id: string;
   mesa_id: string | null;
+  /** Empresa dueña (migración 36): p. ej. los fees «AB-Inbev ||…» son de Cervecería Nacional C.N. en PrometIO. */
+  empresa_id?: string | null;
   nombre: string;
   slug: string;
   logo_url: string | null;

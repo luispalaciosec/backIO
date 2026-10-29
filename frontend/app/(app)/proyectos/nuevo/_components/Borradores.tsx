@@ -42,12 +42,14 @@ export function Borradores({
       <ul className="divide-y divide-amber-200">
         {items.map((b) => {
           const cliente = clientes.find((c) => c.id === b.cliente_id)?.nombre ?? b.payload.empresa?.nombre ?? 'Cliente';
+          const fees = clientes.filter((c) => c.empresa_id === b.cliente_id).length;
           const plantilla = plantillas.find((p) => p.id === b.plantilla_sugerida_id)?.nombre;
           return (
             <li key={b.id} className="py-2 flex items-center justify-between gap-3 text-sm">
               <div>
                 <div className="font-medium">
-                  {cliente} · {b.payload.numero ?? 'sin número'}
+                  {cliente}
+                  {fees ? ` (eliges entre sus ${fees} fees)` : ''} · {b.payload.numero ?? 'sin número'}
                   {b.payload.valor ? ` · USD ${b.payload.valor}` : ''}
                 </div>
                 <div className="text-xs text-gray-600">

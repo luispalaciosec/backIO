@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const estado = vi.hoisted(() => ({ req: null as Record<string, unknown> | null, auditoria: [] as unknown[], updates: [] as unknown[] }));
 const espias = vi.hoisted(() => ({
   pushDueDate: vi.fn(),
+  archivarTodo: vi.fn(),
+  pushResponsables: vi.fn(),
   registrarReproceso: vi.fn(),
   cerrarReproceso: vi.fn(),
   completarUltimaReprogramacion: vi.fn(),
@@ -20,7 +22,11 @@ vi.mock('../lib/db', () => ({
 vi.mock('../lib/db/historial', () => ({ completarUltimaReprogramacion: espias.completarUltimaReprogramacion }));
 vi.mock('../lib/db/requerimientos', () => ({ marcarDueOnVisto: async () => undefined }));
 vi.mock('../lib/cumplimiento', () => ({ registrarReproceso: espias.registrarReproceso, cerrarReproceso: espias.cerrarReproceso }));
-vi.mock('../lib/basecamp/write', () => ({ pushDueDate: espias.pushDueDate }));
+vi.mock('../lib/basecamp/write', () => ({
+  pushDueDate: espias.pushDueDate,
+  archivarTodo: espias.archivarTodo,
+  pushResponsables: espias.pushResponsables,
+}));
 vi.mock('../lib/basecamp/client', async (orig) => ({
   ...(await orig<object>()),
   BasecampClient: { forActor: espias.forActor },
@@ -121,6 +127,52 @@ describe('actualizarRequerimiento (REST y MCP)', () => {
     expect(espias.completarUltimaReprogramacion).not.toHaveBeenCalled();
     expect(r.basecamp_due_on).toBe('ok');
     expect(estado.auditoria[0]).toMatchObject({ accion: 'actualizar' });
+  });
+  // 28/10/2026 (decisión de Luis): «Briefing Pasaportes» se canceló en BackIO y siguió abierto en Basecamp.
+  it('cancelar archiva el to-do en Basecamp con la cuenta de quien cancela', async () => {
+    await actualizarRequerimiento(ctx, 'r1', { estado_operativo: 'cancelado' }, opts);
+    expect(espias.forActor).toHaveBeenCalledWith(ctx);
+    expect(espias.archivarTodo).toHaveBeenCalledWith(ctx, expect.objectContaining({ id: 'r1' }), true, { cuenta: 'de u1' });
+  });
+  it('sacar una tarea de cancelado vuelve a dejar activo el to-do', async () => {
+    estado.req = { ...base, estado_operativo: 'cancelado' };
+    await actualizarRequerimiento(ctx, 'r1', { estado_operativo: 'en_ejecucion' }, opts);
+    expect(espias.archivarTodo).toHaveBeenCalledWith(ctx, expect.objectContaining({ id: 'r1' }), false, { cuenta: 'de u1' });
+  });
+  it('si Basecamp falla al archivar, la cancelación queda y el error se audita', async () => {
+    espias.archivarTodo.mockRejectedValueOnce(new Error('Basecamp 500'));
+    await actualizarRequerimiento(ctx, 'r1', { estado_operativo: 'cancelado' }, opts);
+    expect(estado.updates[0]).toMatchObject({ estado_operativo: 'cancelado' });
+    expect(estado.auditoria).toContainEqual(expect.objectContaining({ accion: 'basecamp_archivar_error' }));
+  });
+  it('sin Basecamp conectado no se cancela a medias (428 antes de guardar)', async () => {
+    espias.forActor.mockRejectedValueOnce(new BasecampSinConectar());
+    await expect(actualizarRequerimiento(ctx, 'r1', { estado_operativo: 'cancelado' }, opts)).rejects.toBeInstanceOf(BasecampSinConectar);
+    expect(estado.updates).toEqual([]);
+  });
+  it('cancelar una tarea sin to-do no pide Basecamp', async () => {
+    estado.req = { ...base, basecamp_todo_id: null };
+    await actualizarRequerimiento(ctx, 'r1', { estado_operativo: 'cancelado' }, opts);
+    expect(espias.forActor).not.toHaveBeenCalled();
+    expect(espias.archivarTodo).not.toHaveBeenCalled();
+  });
+  // 28/10/2026: reasignar en BackIO no llegaba a Basecamp y la sincronización lo deshacía.
+  it('cambiar responsables los lleva a Basecamp con la cuenta de quien reasigna', async () => {
+    await actualizarRequerimiento(ctx, 'r1', { owner_agencia: ['julio'] }, opts);
+    expect(espias.forActor).toHaveBeenCalledWith(ctx);
+    expect(espias.pushResponsables).toHaveBeenCalledWith(ctx, expect.objectContaining({ owner_agencia: ['julio'] }), { cuenta: 'de u1' });
+  });
+  it('los mismos responsables en otro orden no escriben en Basecamp', async () => {
+    estado.req = { ...base, owner_agencia: ['u1', 'u2'] };
+    await actualizarRequerimiento(ctx, 'r1', { owner_agencia: ['u2', 'u1'] }, opts);
+    expect(espias.pushResponsables).not.toHaveBeenCalled();
+    expect(espias.forActor).not.toHaveBeenCalled();
+  });
+  it('si Basecamp falla, la reasignación queda y el error se audita', async () => {
+    espias.pushResponsables.mockRejectedValueOnce(new Error('Basecamp 500'));
+    await actualizarRequerimiento(ctx, 'r1', { owner_agencia: ['julio'] }, opts);
+    expect(estado.updates[0]).toMatchObject({ owner_agencia: ['julio'] });
+    expect(estado.auditoria).toContainEqual(expect.objectContaining({ accion: 'basecamp_responsables_error' }));
   });
   it('requerimiento inexistente: 404', async () => {
     estado.req = null;

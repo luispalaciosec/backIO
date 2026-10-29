@@ -12,7 +12,7 @@ import { audit, getRequerimiento, updateRequerimiento } from '../db';
 import { completarUltimaReprogramacion } from '../db/historial';
 import { marcarDueOnVisto } from '../db/requerimientos';
 import { cerrarReproceso, registrarReproceso } from '../cumplimiento';
-import { pushDueDate } from '../basecamp/write';
+import { archivarTodo, pushDueDate, pushResponsables } from '../basecamp/write';
 import { log } from '../logger';
 
 export class ReglaError extends Error {
@@ -95,7 +95,17 @@ export async function actualizarRequerimiento(
   // Lo que baja a Basecamp va con la cuenta de quien hace el cambio. Se pide ANTES de guardar nada: si la persona no
   // conectó su Basecamp, el cambio no se aplica a medias (migración 33).
   const fechaNueva = fechaParaBasecamp(previo, patch);
-  const bc = previo.basecamp_todo_id && (fechaNueva || rechazo || reapertura) ? await BasecampClient.forActor(ctx) : undefined;
+  // Cancelar archiva el to-do en Basecamp; sacar una tarea de «cancelado» lo vuelve a dejar activo (28/10/2026).
+  const cancelacion = patch.estado_operativo === 'cancelado' && previo.estado_operativo !== 'cancelado';
+  // Responsables cambiados en BackIO → asignados en Basecamp (28/10/2026; antes la sincronización los deshacía).
+  const responsables =
+    patch.owner_agencia !== undefined &&
+    (patch.owner_agencia.length !== previo.owner_agencia.length || patch.owner_agencia.some((u) => !previo.owner_agencia.includes(u)));
+  const reactivacion = previo.estado_operativo === 'cancelado' && !!patch.estado_operativo && patch.estado_operativo !== 'cancelado';
+  const bc =
+    previo.basecamp_todo_id && (fechaNueva || rechazo || reapertura || cancelacion || reactivacion || responsables)
+      ? await BasecampClient.forActor(ctx)
+      : undefined;
   const { motivo_reprogramacion, observacion_reprogramacion, ...cambios } = patch;
   const r = await updateRequerimiento(ctx, id, cambios);
   if (reprogramado)
@@ -136,6 +146,32 @@ export async function actualizarRequerimiento(
         entidad: 'requerimiento',
         entidad_id: id,
         detalle: { error: err instanceof Error ? err.message : String(err) },
+      });
+    }
+  }
+  if (responsables && r.basecamp_todo_id) {
+    try {
+      await pushResponsables(ctx, r, bc);
+    } catch (err) {
+      log.error('[basecamp] no se pudieron actualizar los responsables del to-do', err);
+      await audit(ctx, {
+        accion: 'basecamp_responsables_error',
+        entidad: 'requerimiento',
+        entidad_id: id,
+        detalle: { error: err instanceof Error ? err.message : String(err) },
+      });
+    }
+  }
+  if ((cancelacion || reactivacion) && r.basecamp_todo_id) {
+    try {
+      await archivarTodo(ctx, r, cancelacion, bc);
+    } catch (err) {
+      log.error('[basecamp] no se pudo archivar o restaurar el to-do', err);
+      await audit(ctx, {
+        accion: 'basecamp_archivar_error',
+        entidad: 'requerimiento',
+        entidad_id: id,
+        detalle: { error: err instanceof Error ? err.message : String(err), archivar: cancelacion },
       });
     }
   }
