@@ -36,7 +36,7 @@ minuto. Cada corrida queda en `cron_runs`. Las de hora fija se recuperan si un d
 | Diario 08:05 | Genera los fees recurrentes cuyo día llegó |
 | Lunes a viernes 19:30 | Foto del día de cada mesa (evolutivo) |
 | Domingo 17:55 | Foto de la semana de cada mesa (evolutivo) |
-| Domingo 18:00 | Calcula las señales del weekly y manda la agenda por correo |
+| Domingo 18:00 | Calcula las señales del weekly **de la semana que empieza el lunes** y manda por correo las que faltan atender |
 | Día 1, 08:00 | Redacta el informe mensual por mesa, si la IA está configurada; operaciones lo revisa y publica |
 | Día 1, 08:10 | Congela los KPIs del mes anterior (y del trimestre, si cerró) |
 

@@ -44,6 +44,8 @@ export interface Cliente {
   mesa_id: string | null;
   /** Empresa dueña (migración 36): p. ej. los fees «AB-Inbev ||…» son de Cervecería Nacional C.N. en PrometIO. */
   empresa_id?: string | null;
+  /** Cliente de prueba (migración 34): fuera de señales, actas, dashboard, KPIs y del daily. */
+  es_prueba?: boolean;
   nombre: string;
   slug: string;
   logo_url: string | null;

@@ -178,7 +178,13 @@ export async function datosSemanaMesa(ctx: DbCtx, semanaId: string, mesaId: stri
   const db = serviceClient();
   const [{ data: sen }, { data: acu }, { data: acta }] = await Promise.all([
     db.from('senales').select('severidad, atendida, entidad_tipo, entidad_id').eq('tenant_id', ctx.tenantId).eq('semana_id', semanaId),
-    db.from('acuerdos').select('estado, fecha_compromiso, cerrado_at').eq('tenant_id', ctx.tenantId).eq('semana_id', semanaId),
+    // Solo los acuerdos de esta mesa (migración 35): antes cada mesa sumaba los de toda la agencia.
+    db
+      .from('acuerdos')
+      .select('estado, fecha_compromiso, cerrado_at')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('semana_id', semanaId)
+      .eq('mesa_id', mesaId),
     db
       .from('actas')
       .select('contenido')

@@ -2,7 +2,7 @@
  * Generación de Plan Operativo (lunes) y Acta de Cierre (viernes).
  * El markdown replica el formato actual de las actas de Geeks.
  */
-import { nombrePersona } from '@backio/shared';
+import { hoyLocal, nombrePersona } from '@backio/shared';
 import { renderMarcadorCierre, renderMarcadorPlan, type Marcador } from './marcador';
 import type { RequerimientoMetricas, Semana, Senal, Acuerdo, Usuario, Cliente, CapacidadPersona } from '@backio/shared';
 import { temaAgenda } from './signals';
@@ -109,7 +109,7 @@ export function renderPlanOperativo(d: PlanOperativoData): string {
       ? d.riesgos.map((r) => `- **${r.severidad.toUpperCase()}** · ${r.titulo} → _${temaAgenda(r.tipo)}_`).join('\n')
       : '_Sin riesgos detectados._',
   );
-  lineas.push('', '---', `_Generado por BackIO el ${fmt(new Date().toISOString())}._`);
+  lineas.push('', '---', `_Generado por BackIO el ${fmt(hoyLocal())}._`);
   return lineas.join('\n');
 }
 
@@ -157,6 +157,6 @@ export function renderActaCierre(d: ActaCierreData): string {
       (a) => `| ${a.descripcion} | ${nombreEn(d.usuarios, a.responsable_id)} | ${fmt(a.fecha_compromiso)} | ${a.estado} |`,
     ),
   );
-  lineas.push('', '---', `_Generado por BackIO el ${fmt(new Date().toISOString())}._`);
+  lineas.push('', '---', `_Generado por BackIO el ${fmt(hoyLocal())}._`);
   return lineas.join('\n');
 }

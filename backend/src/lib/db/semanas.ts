@@ -63,15 +63,19 @@ export async function replaceSenales(
 const ORDEN_SEVERIDAD = { critica: 0, alta: 1, media: 2 } as const;
 type Atendida = { severidad: Senal['severidad']; atendida_por: string | null; atendida_at: string | null };
 
-/** Señales marcadas como atendidas en los últimos 14 días, la más reciente por (tipo, entidad). */
+/**
+ * Señales marcadas como atendidas en los últimos 14 días, la más reciente por (tipo, entidad). Cuenta desde que se
+ * marcó (`atendida_at`), no desde que se creó la fila: cada recálculo vuelve a insertar las señales y con `created_at`
+ * la atención no vencía nunca (revisión del 28/10/2026).
+ */
 export async function atendidasRecientes(ctx: DbCtx): Promise<Map<string, Atendida>> {
   const { data, error } = await ctx.db
     .from('senales')
-    .select('tipo, entidad_id, severidad, atendida_por, atendida_at, created_at')
+    .select('tipo, entidad_id, severidad, atendida_por, atendida_at')
     .eq('tenant_id', ctx.tenantId)
     .eq('atendida', true)
-    .gte('created_at', new Date(Date.now() - 14 * 86_400_000).toISOString())
-    .order('created_at');
+    .gte('atendida_at', new Date(Date.now() - 14 * 86_400_000).toISOString())
+    .order('atendida_at');
   throwIf(error);
   return new Map(
     (data ?? []).map((s) => [
@@ -109,7 +113,19 @@ export async function marcarSenalAtendida(
     .eq('entidad_id', s.entidad_id)
     .select('id');
   throwIf(error);
-  if ((data ?? []).length > 0 || !atendida) return;
+  // Reabrir vale para todas las semanas: si no, la atención de la semana anterior la volvía a mostrar atendida.
+  if (!atendida) {
+    const { error: er } = await ctx.db
+      .from('senales')
+      .update(marca)
+      .eq('tenant_id', ctx.tenantId)
+      .eq('tipo', s.tipo)
+      .eq('entidad_id', s.entidad_id)
+      .eq('atendida', true);
+    throwIf(er);
+    return;
+  }
+  if ((data ?? []).length > 0) return;
   const { error: ei } = await ctx.db.from('senales').insert({ ...s, ...marca, tenant_id: ctx.tenantId, semana_id: semanaId });
   throwIf(ei);
 }

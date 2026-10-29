@@ -7,6 +7,7 @@
  * (nunca spread del objeto recibido).
  */
 import type { DbCtx } from '../db/client';
+import { fechaDeCierre } from './campos';
 import { registrarReproceso, cerrarReproceso } from '../cumplimiento';
 import { findByBasecampTodo, marcarDueOnVisto, updateRequerimiento } from '../db/requerimientos';
 import { audit } from '../db/audit';
@@ -84,7 +85,14 @@ export function extractSafeTodo(recording: unknown): BasecampSyncPayload | null 
     todo_id: r.id,
     completed: typeof r.completed === 'boolean' ? r.completed : null,
     bucket_id: typeof bucket === 'number' ? bucket : null,
-    completed_at: typeof r.completed_at === 'string' ? r.completed_at : null,
+    completed_at: fechaDeCierre({
+      completed: r.completed === true,
+      completed_at: typeof r.completed_at === 'string' ? r.completed_at : null,
+      completion:
+        r.completion && typeof r.completion === 'object' && typeof (r.completion as { created_at?: unknown }).created_at === 'string'
+          ? { created_at: (r.completion as { created_at: string }).created_at }
+          : null,
+    }),
     due_on: typeof r.due_on === 'string' ? r.due_on : null,
     assignee_ids: assignees,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : new Date().toISOString(),

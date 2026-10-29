@@ -64,14 +64,20 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
   return replaceSenales(ctx, semana.id, senales);
 }
 
-export async function capacidadSemana(ctx: DbCtx, semanaId: string): Promise<CapacidadPersona[]> {
+/** Capacidad de la semana; con mesa, solo con sus clientes y proyectos (sin clientes de prueba), igual que el plan. */
+export async function capacidadSemana(ctx: DbCtx, semanaId: string, mesaId?: string | null): Promise<CapacidadPersona[]> {
   const semana = await getSemana(ctx, semanaId);
   if (!semana) throw new Error('Semana no encontrada');
-  const [reqs, usuarios] = await Promise.all([
-    listBacklog(ctx, { solo_activos: true, desde: semana.fecha_inicio, hasta: semana.fecha_fin }),
+  const { alcance } = await filtroMesa(ctx, mesaId);
+  const [reqs, usuarios, prueba] = await Promise.all([
+    listBacklog(ctx, { solo_activos: true, desde: semana.fecha_inicio, hasta: semana.fecha_fin, mesa: alcance }),
     listUsuarios(ctx, { incluirInactivos: true }),
+    idsClientesDePrueba(ctx),
   ]);
-  return calcularCapacidad(reqs, usuarios);
+  return calcularCapacidad(
+    reqs.filter((r) => !prueba.has(r.cliente_id)),
+    usuarios,
+  );
 }
 
 /** Inserta la narrativa de la IA después del título del documento. */

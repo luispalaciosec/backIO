@@ -7,6 +7,7 @@
  *    refresh automático (credenciales.ts).
  * Las respuestas se tipan SOLO con los campos que BackIO necesita. Nunca se guardan enteras.
  */
+import { fechaDeCierre } from './campos';
 import { log } from '../logger';
 import { env } from '../../config/env';
 import { DbError } from '../db/client';
@@ -412,6 +413,8 @@ export class BasecampClient {
       due_on?: string | null;
       completed?: boolean;
       completed_at?: string | null;
+      /** Basecamp 3 no tiene `completed_at`: la fecha de cierre viene en `completion.created_at`. */
+      completion?: { created_at?: string } | null;
       assignees?: { id: number }[];
       creator?: { id: number; name?: string };
       app_url?: string;
@@ -432,7 +435,7 @@ export class BasecampClient {
           .slice(0, 200),
         due_on: t.due_on ?? null,
         completed: t.completed === true,
-        completed_at: t.completed_at ?? null,
+        completed_at: fechaDeCierre(t),
         assignee_ids: (t.assignees ?? []).map((a) => a.id),
         creator_id: t.creator?.id ?? null,
         creator_nombre: t.creator?.name ?? null,

@@ -88,7 +88,7 @@ semanas.post('/:id/senales/atender', requireScope('write:actas'), zValidator('js
 });
 
 semanas.get('/:id/capacidad', requireScope('read:capacidad'), async (c) =>
-  c.json({ items: await capacidadSemana(ctxOf(c), c.req.param('id')) }),
+  c.json({ items: await capacidadSemana(ctxOf(c), c.req.param('id'), c.req.query('mesa') || null) }),
 );
 
 semanas.get('/:id/acuerdos', requireScope('read:senales'), async (c) =>

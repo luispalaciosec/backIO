@@ -34,7 +34,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
     apiServer<{ items: Senal[] }>(`/semanas/${semana.id}/senales${mesa ? `?mesa=${mesa.id}` : ''}`),
     apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
     apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
-    apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad`),
+    apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad${mesa ? `?mesa=${mesa.id}` : ''}`),
     apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     apiServer<{ items: Pick<Cliente, 'id' | 'nombre'>[] }>('/clientes'),
   ]);
@@ -56,7 +56,8 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
       fecha_actual: string | null;
       dias_arrastre: number;
     }[];
-  }>('/dashboard');
+    arrastre_total?: number;
+  }>(`/dashboard${mesa ? `?mesa=${mesa.id}` : ''}`);
   const nombre = (id: string) => {
     const u = usuarios.find((x) => x.id === id);
     return u ? nombrePersona(u) : '—';
@@ -132,7 +133,10 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
 
           <section className="card">
             <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between">
-              <span>3. Arrastre ({dash.arrastre.length})</span>
+              <span>
+                3. Arrastre ({dash.arrastre_total ?? dash.arrastre.length}
+                {(dash.arrastre_total ?? dash.arrastre.length) > 15 ? ', se muestran los 15 más reprogramados' : ''})
+              </span>
               <span className="text-xs font-normal text-gray-500">se hace, se reasigna o se mata</span>
             </div>
             <ul className="divide-y divide-gray-100">

@@ -196,6 +196,11 @@ pantalla del weekly, que llama a `POST /semanas/:id/plan` y `POST /semanas/:id/a
   señal atendida esta semana o la anterior sigue atendida mientras no empeore su severidad; si empeora, vuelve. Las
   atendidas se pueden ocultar y reabrir. Antes no había botón y las 457 señales generadas hasta el 20/10 seguían todas
   pendientes.
+- La atención vale **14 días desde que se marcó** (`atendida_at`) y se mantiene mientras la señal no empeore; reabrirla
+  la reabre en todas las semanas (revisión del 28/10/2026: antes no vencía nunca y «Reabrir» no se mantenía).
+- **Arrastre y capacidad son de la mesa elegida** (antes salían de toda la agencia). El arrastre dice el total real y
+  muestra los 15 más reprogramados.
+- Las señales del domingo se guardan en la semana que empieza el lunes, y el correo trae solo las que faltan atender.
 
 ### Marcador (20/10/2026)
 

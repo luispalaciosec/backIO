@@ -9,6 +9,9 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
   const ia = useIA();
   const [notas, setNotas] = useState('');
   const [narrativa, setNarrativa] = useState<string | null>(null);
+  // De qué es el borrador: el de apertura no puede salir dentro del cierre (revisión del 28/10/2026).
+  const [narrativaTipo, setNarrativaTipo] = useState<'apertura' | 'cierre' | null>(null);
+  const [publicados, setPublicados] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error' | 'info'; texto: string; url?: string } | null>(null);
   if (!mesa) return <span className="text-xs text-gray-400">Elige una mesa arriba para redactar y publicar su apertura o cierre.</span>;
@@ -33,6 +36,7 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
         resumen: { hoy: number; vencen: number; bloqueos: number; cambios: number; completadas?: number };
       }>('/ia/daily', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr() } });
       setNarrativa(r.texto);
+      setNarrativaTipo(tipo);
       setMsg({
         tipo: 'info',
         texto: `Borrador de ${tipo} listo: ${tipo === 'cierre' ? `${r.resumen.completadas ?? 0} completadas hoy, ${r.resumen.hoy} quedaron abiertas` : `${r.resumen.hoy} para hoy`}, ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios. Edítalo y luego publica.`,
@@ -43,6 +47,18 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
     setBusy(null);
   }
   async function publicar(tipo: 'apertura' | 'cierre') {
+    if (narrativa !== null && narrativaTipo && narrativaTipo !== tipo) {
+      setMsg({
+        tipo: 'error',
+        texto: `El borrador de la IA es de ${narrativaTipo}. Redacta el de ${tipo} o descarta el borrador antes de publicar.`,
+      });
+      return;
+    }
+    if (
+      publicados[tipo] &&
+      !window.confirm(`Ya publicaste la ${tipo} de ${mesaNombre} desde esta pantalla. ¿Publicarla otra vez en Basecamp?`)
+    )
+      return;
     setBusy(tipo);
     setMsg(null);
     try {
@@ -60,6 +76,8 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
       });
       setNotas('');
       setNarrativa(null);
+      setNarrativaTipo(null);
+      setPublicados((p) => ({ ...p, [tipo]: true }));
     } catch (e) {
       setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo publicar' });
     }
@@ -99,8 +117,14 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
       {narrativa !== null && (
         <div className="card p-3 space-y-2">
           <div className="flex justify-between items-center text-xs text-gray-500">
-            <span>Borrador de la IA · edítalo antes de publicar</span>
-            <button className="link-danger" onClick={() => setNarrativa(null)}>
+            <span>Borrador de {narrativaTipo ?? 'la IA'} · edítalo antes de publicar</span>
+            <button
+              className="link-danger"
+              onClick={() => {
+                setNarrativa(null);
+                setNarrativaTipo(null);
+              }}
+            >
               Descartar
             </button>
           </div>

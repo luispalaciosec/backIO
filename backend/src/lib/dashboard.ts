@@ -111,6 +111,8 @@ export interface Dashboard {
   por_estado: { estado: string; n: number }[];
   ultimas_8_semanas: SerieSemana[];
   arrastre: Arrastre[];
+  /** Total real del arrastre (la lista se corta en 50). */
+  arrastre_total: number;
 }
 
 const dias = (a: string, b: string) =>
@@ -307,7 +309,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     });
   }
 
-  const arrastre: Arrastre[] = activos
+  const arrastreTodo: Arrastre[] = activos
     .filter((r) => r.veces_reprogramado > 0 || r.dias_atraso > 0)
     .map((r) => ({
       requerimiento_id: r.id,
@@ -323,8 +325,8 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
           : r.dias_atraso,
       estado: r.estado_operativo,
     }))
-    .sort((a, b) => b.veces_reprogramado - a.veces_reprogramado || b.dias_arrastre - a.dias_arrastre)
-    .slice(0, 50);
+    .sort((a, b) => b.veces_reprogramado - a.veces_reprogramado || b.dias_arrastre - a.dias_arrastre);
+  const arrastre = arrastreTodo.slice(0, 50);
 
   return {
     generado_at: new Date().toISOString(),
@@ -335,6 +337,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     por_estado,
     ultimas_8_semanas: semanas,
     arrastre,
+    arrastre_total: arrastreTodo.length,
   };
 }
 export type { Proyecto, Usuario, Mesa, Semana };

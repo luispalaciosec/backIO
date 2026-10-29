@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { Reprogramacion, Reproceso, MotivoReprogramacion, MotivoReproceso } from '@backio/shared';
-import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO } from '@backio/shared';
+import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO, diaLocal } from '@backio/shared';
 import { api } from '@/lib/api';
 import { fecha } from '@/lib/format';
 
@@ -31,7 +31,7 @@ export function CausasPendientes({ titulos, escribe }: { titulos: Record<string,
             <span className="flex-1 min-w-48">
               <b>{t(x.requerimiento_id)}</b> · fecha {fecha(x.fecha_anterior)} → {fecha(x.fecha_nueva)}{' '}
               <span className="text-xs text-gray-500">
-                ({x.origen}, {fecha(x.created_at.slice(0, 10))})
+                ({x.origen}, {fecha(diaLocal(x.created_at))})
               </span>
             </span>
             {escribe ? (

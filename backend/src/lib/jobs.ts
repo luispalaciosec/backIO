@@ -6,12 +6,13 @@
  * lo perdía, y con dos réplicas corría dos veces. Ahora un job corre si «ahora ≥ objetivo» dentro de una tolerancia
  * y su ventana (día, semana, mes o tramo de intervalo) no figura en cron_runs; la fila única hace de candado.
  */
-import { ZONA } from '@backio/shared';
+import { ZONA, hoyLocal, sumarDias } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { serviceClient } from './db';
 import { clientesConBasecamp, cerrarVentana, limpiarCronRuns, reclamarVentana, tenantsActivos } from './db/cron_runs';
 import { reconcileTenant } from './basecamp/reconcile';
 import { recalcularSenales } from './rituals/service';
+import { ensureSemana } from './db/semanas';
 import { notificar, procesarPendientes } from './notificaciones';
 import { temaAgenda } from './rituals/signals';
 import { iaDisponible } from './ia';
@@ -239,15 +240,21 @@ export const JOBS: Job[] = [
     ventana: aLas(18, 0, { cuando: esDomingo }),
     ejecutar: () =>
       porTenant(async (ctx) => {
-        const s = await recalcularSenales(ctx);
+        // El domingo pertenece a la semana que termina: las señales son para la que empieza el lunes (28/10/2026; antes
+        // quedaban guardadas en la semana que se cerraba y el weekly del lunes abría sin señales).
+        const lunes = await ensureSemana(ctx, sumarDias(hoyLocal(), 1));
+        const todas = await recalcularSenales(ctx, lunes.id);
+        // El correo trae solo lo que falta atender, y dice cuántas quedan fuera de las 15 que muestra.
+        const s = todas.filter((x) => !x.atendida);
         const criticas = s.filter((x) => x.severidad === 'critica');
         const lineas = s.slice(0, 15).map((x) => `• [${x.severidad.toUpperCase()}] ${x.titulo} → ${temaAgenda(x.tipo)}`);
+        if (s.length > 15) lineas.push(`… y ${s.length - 15} más en BackIO → Weekly.`);
         await notificar(
           { tenantId: ctx.tenantId },
           {
             tipo: 'agenda_weekly',
-            titulo: `Agenda del weekly: ${s.length} señales (${criticas.length} críticas)`,
-            cuerpo: lineas.length ? lineas.join('\n') : 'Sin señales esta semana.',
+            titulo: `Agenda del weekly: ${s.length} señales por atender (${criticas.length} críticas)`,
+            cuerpo: lineas.length ? lineas.join('\n') : 'Sin señales por atender esta semana.',
             ruta: '/weekly',
           },
           { roles: ['operaciones', 'admin'] },

@@ -39,7 +39,9 @@ export function SeleccionDaily({
       api<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS).catch(() => ({ items: [] as Usuario[] })),
     ])
       .then(([r, c, p, u]) => {
-        setItems(r.items);
+        // Los clientes de prueba no entran a los rituales: el tablero del daily no los muestra (migración 34).
+        const prueba = new Set(c.items.filter((x) => x.es_prueba).map((x) => x.id));
+        setItems(r.items.filter((x) => !prueba.has(x.cliente_id)));
         setClientes(c.items);
         setProyectos(p.items);
         setPersonas(conNombrePersona(u.items));

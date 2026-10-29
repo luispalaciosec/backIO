@@ -363,8 +363,10 @@ async function guardarDia(
     message_id: f.message_id,
   };
   const e = await getDailySnapshot(ctx, mesaId, dia);
-  // Una foto tomada en vivo (cierre/cron) no se reemplaza por una reconstruida.
+  // Una foto tomada en vivo (cierre/cron) no se reemplaza por una reconstruida, y la del cierre publicado no la pisa la
+  // tarea programada de las 19:30 (que es solo para los días sin cierre; revisión del 28/10/2026).
   if (e && origen === 'reconstruido' && e.origen !== 'reconstruido') return;
+  if (e && origen === 'cron' && e.origen === 'cierre') return;
   await guardarDailySnapshot(e?.id ?? null, { ...fila, origen: f.publicado && origen !== 'reconstruido' ? 'cierre' : origen });
 }
 

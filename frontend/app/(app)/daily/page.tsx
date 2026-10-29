@@ -94,7 +94,13 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
             </Paso>
             {escribe && (
               <Paso n={2} titulo="Hoy">
-                <SeleccionDaily hoy={hoy} mesa={mesa?.id ?? ''} mesaNombre={mesaNombre} seleccionadasHoy={d?.hoy_se_trabaja.length ?? 0} />
+                <SeleccionDaily
+                  key={mesa?.id ?? 'todas'}
+                  hoy={hoy}
+                  mesa={mesa?.id ?? ''}
+                  mesaNombre={mesaNombre}
+                  seleccionadasHoy={d?.hoy_se_trabaja.length ?? 0}
+                />
               </Paso>
             )}
           </div>
@@ -137,7 +143,12 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
           <footer className="card p-3">
             {escribe ? (
               <Paso n={3} titulo="Publicar">
-                <DailyPublicar mesa={mesa?.id ?? ''} mesaNombre={mesaNombre} tieneBoard={!!mesa?.basecamp_board_daily_id} />
+                <DailyPublicar
+                  key={mesa?.id ?? 'todas'}
+                  mesa={mesa?.id ?? ''}
+                  mesaNombre={mesaNombre}
+                  tieneBoard={!!mesa?.basecamp_board_daily_id}
+                />
               </Paso>
             ) : (
               <span className="text-xs text-gray-400">Solo lectura · la apertura y el cierre los publica quien lleva la mesa</span>

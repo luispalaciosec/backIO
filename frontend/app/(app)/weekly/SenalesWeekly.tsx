@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Senal } from '@backio/shared';
+import { diaLocal } from '@backio/shared';
 import { api } from '@/lib/api';
 import { fecha } from '@/lib/format';
 
@@ -153,7 +154,7 @@ export function SenalesWeekly({
                           <div className="text-xs text-gray-500">
                             {s.tipo.replace(/_/g, ' ')}
                             {s.atendida && s.atendida_at
-                              ? ` · atendida${s.atendida_por ? ` por ${nombre[s.atendida_por] ?? '—'}` : ''} el ${fecha(s.atendida_at.slice(0, 10))}`
+                              ? ` · atendida${s.atendida_por ? ` por ${nombre[s.atendida_por] ?? '—'}` : ''} el ${fecha(diaLocal(s.atendida_at))}`
                               : ''}
                           </div>
                         </div>

@@ -11,7 +11,7 @@
 
 | Dato | Fuente de verdad | Dirección |
 |---|---|---|
-| `completed` / `completed_at` | **Basecamp** | Basecamp → BackIO |
+| `completed` / fecha de cierre | **Basecamp** | Basecamp → BackIO. La fecha de cierre viene en `completion.created_at` (Basecamp 3 no tiene `completed_at`; hasta el 28/10/2026 se leía ese campo y quedaba vacía) |
 | Existencia del to-do | BackIO lo crea; desde el 23/09/2026 también entra lo creado en Basecamp | Ambas |
 | `due_on` | El cambio más reciente | BackIO → Basecamp (al crear y al reprogramar). Si alguien la cambia en Basecamp después, BackIO la acepta como reprogramación (19/10/2026) |
 | Asignaciones | BackIO | BackIO → Basecamp: al crear la tarea y al cambiar sus responsables (desde el 28/10/2026, con la cuenta de quien reasigna; se conservan los externos asignados que no tienen usuario en BackIO). Lo que se asigna directamente en Basecamp también entra a BackIO en la sincronización |
