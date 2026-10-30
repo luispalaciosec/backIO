@@ -25,6 +25,7 @@ import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
 import { vigilar } from './vigia';
 import { fotoSaludClientes } from './salud_clientes';
+import { avisarRiesgoSemana } from './carga';
 import { miDia, resumenMiDia } from './mi_dia';
 import { listClientes } from './db/clientes';
 import { usuariosParaMiDia } from './db/usuarios';
@@ -92,6 +93,7 @@ export function cada(minutos: number): Ventana {
 
 const esLaborable = (m: Momento) => m.dia >= 1 && m.dia <= 5;
 const esDomingo = (m: Momento) => m.dia === 0;
+const esLunes = (m: Momento) => m.dia === 1;
 const esPrimeroDeMes = (m: Momento) => m.clave.endsWith('-01');
 /** Primer día del correo «Mi día» (docs/22). */
 export const MI_DIA_DESDE = '2026-11-02';
@@ -274,6 +276,14 @@ export const JOBS: Job[] = [
     descripcion: 'Salud de los clientes y aviso si cambia de color, L-V 07:30',
     ventana: aLas(7, 30, { cuando: esLaborable }),
     ejecutar: () => porTenant((ctx) => fotoSaludClientes(ctx)),
+  },
+  {
+    // Riesgo de la semana (docs/05): tareas que no entran en la capacidad de su responsable; aviso al líder de la mesa
+    // y a la ejecutiva de la cuenta para repartir, recortar o avisar al cliente a tiempo.
+    nombre: 'riesgo_semana',
+    descripcion: 'Tareas en riesgo de la semana y aviso a líderes y ejecutivas, lunes 07:35',
+    ventana: aLas(7, 35, { cuando: esLunes }),
+    ejecutar: () => porTenant((ctx) => avisarRiesgoSemana(ctx)),
   },
   {
     // «Mi día» (docs/22): un correo por persona con lo suyo de hoy; quien lo desactivó lo recibe solo en la campana.

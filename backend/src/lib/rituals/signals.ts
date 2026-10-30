@@ -5,6 +5,7 @@
  */
 import { nombrePersona } from '@backio/shared';
 import type { RequerimientoMetricas, Usuario, Acuerdo, Cliente, TipoSenal, SeveridadSenal } from '@backio/shared';
+import type { CargaPersona } from '../carga';
 
 export interface SignalThresholds {
   arrastre_reincidente_min: number;
@@ -42,6 +43,11 @@ export interface WeekContext {
    * dato se usa «días sin movimiento», que se reinicia con cualquier cambio de la tarea.
    */
   esperaCliente?: Map<string, number>;
+  /**
+   * Carga de la semana con horas estimadas del timesheet (lib/carga.ts). Sin ella, la sobrecarga asume 4 h por tarea
+   * (compatibilidad).
+   */
+  carga?: CargaPersona[];
 }
 
 export interface SignalOut {
@@ -175,7 +181,25 @@ export const REGLAS: SignalRule[] = [
     severidad: 'alta',
     tema_agenda: 'Recortar alcance de la semana',
     detectar: (ctx) => {
-      // Capacidad declarada en horas/semana; se asume 4h promedio por tarea (calibrable).
+      if (ctx.carga) {
+        return ctx.carga
+          .filter((c) => c.exceso > 0)
+          .map((c) => ({
+            tipo: 'sobrecarga_proyectada' as const,
+            severidad: 'alta' as const,
+            entidad_tipo: 'usuario' as const,
+            entidad_id: c.usuario_id,
+            titulo: `${c.nombre}: ~${Math.round(c.horas)}h estimadas sobre ${Math.round(c.capacidad_restante)}h disponibles esta semana (${c.en_riesgo.length} en riesgo)`,
+            detalle: {
+              tareas: c.tareas.length,
+              horas_estimadas: c.horas,
+              capacidad: c.capacidad_semanal,
+              capacidad_restante: c.capacidad_restante,
+              en_riesgo: c.en_riesgo.map((t) => t.id),
+            },
+          }));
+      }
+      // Sin estimación: capacidad declarada en horas/semana y 4h promedio por tarea.
       const HORAS_POR_TAREA = 4;
       const semana = ctx.activos.filter((r) => enSemana(ctx, r));
       return ctx.usuarios

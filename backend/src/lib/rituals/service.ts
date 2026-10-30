@@ -34,6 +34,7 @@ import {
   type ReprogramacionMarcador,
 } from './marcador';
 import { listReprogramacionesMarcador, listEventosAprobacion } from '../db/historial';
+import { cargaDelEquipo } from '../carga';
 
 /** Días enteros que cada tarea «pendiente del cliente» lleva esperando, según aprobacion_eventos. */
 export async function diasEsperandoCliente(ctx: DbCtx, activos: { id: string; estado_aprobacion: string }[]): Promise<Map<string, number>> {
@@ -69,6 +70,7 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
     umbrales: u,
     sinMotivo,
     esperaCliente: await diasEsperandoCliente(ctx, activos),
+    carga: await cargaDelEquipo(ctx, semana, hoy),
   });
   return replaceSenales(ctx, semana.id, senales);
 }
@@ -83,10 +85,30 @@ export async function capacidadSemana(ctx: DbCtx, semanaId: string, mesaId?: str
     listUsuarios(ctx, { incluirInactivos: true }),
     idsClientesDePrueba(ctx),
   ]);
-  return calcularCapacidad(
+  const base = calcularCapacidad(
     reqs.filter((r) => !prueba.has(r.cliente_id)),
     usuarios,
   );
+  // Horas estimadas y tareas en riesgo: la carga de la persona en todas sus mesas, contra lo que le queda de la semana.
+  const carga = new Map((await cargaDelEquipo(ctx, semana)).map((c) => [c.usuario_id, c]));
+  return base.map((c) => {
+    const k = carga.get(c.usuario_id);
+    return k
+      ? {
+          ...c,
+          horas_estimadas: k.horas,
+          capacidad_restante: k.capacidad_restante,
+          capacidad_base: k.capacidad_base,
+          en_riesgo: k.en_riesgo.map(({ id, titulo, cliente_id, fecha_entrega, horas }) => ({
+            id,
+            titulo,
+            cliente_id,
+            fecha_entrega,
+            horas,
+          })),
+        }
+      : c;
+  });
 }
 
 /** Inserta la narrativa de la IA después del título del documento. */
@@ -127,6 +149,8 @@ export async function senalesDeMesa(ctx: DbCtx, semana: Semana, mesaId?: string 
     umbrales: u,
     sinMotivo,
     esperaCliente: await diasEsperandoCliente(ctx, activos),
+    // La carga de cada persona incluye todas sus mesas; la señal sale en la mesa donde tiene tareas en riesgo.
+    carga: (await cargaDelEquipo(ctx, semana)).filter((c) => c.en_riesgo.some((t) => deLaMesa.some((r) => r.id === t.id))),
   });
   const previa = new Map(guardadas.map((s) => [`${s.tipo}|${s.entidad_id}`, s]));
   const atendidas = await atendidasRecientes(ctx);

@@ -119,6 +119,14 @@ export interface CapacidadPersona {
   capacidad_semanal: number;
   tareas: number;
   pct_del_total: number;
+  /** Horas estimadas de lo que le queda esta semana, en todas sus mesas (timesheet real; docs/05, riesgo de la semana). */
+  horas_estimadas?: number;
+  /** Capacidad de los días hábiles que quedan, en horas de timesheet. */
+  capacidad_restante?: number;
+  /** De dónde sale: su ritmo del timesheet, el del equipo o la declarada. */
+  capacidad_base?: 'ritmo' | 'equipo' | 'declarada';
+  /** Tareas que no entran en la capacidad que queda, por fecha. */
+  en_riesgo?: { id: string; titulo: string; cliente_id: string; fecha_entrega: string; horas: number }[];
 }
 
 export interface DailyView {

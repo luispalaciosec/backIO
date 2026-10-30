@@ -47,7 +47,7 @@ Se calculan el domingo a las 18:00 y se persisten en `senales`. Hay 11 reglas, t
 | `bloqueo_cliente` | `estado_aprobacion = 'pendiente_cliente'` y `dias_sin_movimiento > 5` | Alta | "Escalamiento a ejecutiva de cuenta" |
 | `cuenta_silenciosa` | Cliente sin requerimientos completados en 14 días | Alta | "Revisión de estado de cuenta" |
 | `compromiso_vencido` | `acuerdos.fecha_compromiso < hoy` y estado pendiente | Crítica | "Rendición de cuentas" |
-| `sobrecarga_proyectada` | Tareas de la semana del owner × 4 h > su `capacidad_semanal` | Alta | "Recortar alcance de la semana" |
+| `sobrecarga_proyectada` | Las horas estimadas de lo que le queda a una persona esta semana superan las que tiene disponibles (ver [Riesgo de la semana](#riesgo-de-la-semana)) | Alta | "Recortar alcance de la semana" |
 | `sin_movimiento` | `dias_sin_movimiento > 14` en requerimiento activo que no está en `pendiente_cliente` | Media | "Requerimiento huérfano" |
 | `atraso_critico` | `dias_atraso > 30` | Crítica | "Atraso material — decisión de cuenta" |
 
@@ -61,7 +61,8 @@ severidad. La carga de datos y el guardado en `senales` están en `backend/src/l
 (`recalcularSenales`).
 
 Los umbrales viven en `tenants.config.signal_thresholds` y se pueden cambiar sin deploy. Los valores por
-defecto están en `UMBRALES_DEFAULT`. Las horas por tarea de `sobrecarga_proyectada` (4) están fijas en el código.
+defecto están en `UMBRALES_DEFAULT`. Las horas de `sobrecarga_proyectada` salen del timesheet (`lib/carga.ts`); sin
+timesheet, la regla vuelve a asumir 4 h por tarea contra la capacidad declarada.
 
 ### Ejemplo real: semana del 03/08/2026
 
@@ -89,7 +90,7 @@ con las 15 primeras señales y su tema de agenda.
 Estructura:
 1. Compromisos vencidos de la semana anterior (señales `compromiso_vencido`)
 2. Señales críticas ordenadas por severidad
-3. Capacidad por equipo (calculada, no declarada)
+3. Capacidad y riesgo de la semana (calculada, no declarada)
 4. Backlog candidato a priorizar
 5. Riesgos y dependencias
 
@@ -302,6 +303,39 @@ se sobrescribía cada día. Ahora queda una **foto por mesa y día hábil** y un
 - **Semanas cerradas congeladas**: `POST /semanas/:id/senales/recalcular` devuelve 409 si la semana ya cerró.
 - **Pantalla**: Rituales → Evolutivo (gestión): resumen del mes con comparación vs mes anterior, gráficas día a
   día, tabla con detalle por persona, tabla semanal y CSV.
+
+## Riesgo de la semana
+
+Desde el 30/10/2026, el weekly muestra cuántas horas le quedan a cada persona y qué tareas no le alcanzan, y el lunes a
+las 07:35 la tarea `riesgo_semana` avisa (correo y campana) al líder de la mesa y a la ejecutiva de cada cuenta afectada,
+para repartir, recortar o avisar al cliente a tiempo. El cálculo está en `backend/src/lib/carga.ts`.
+
+**Qué entra en la carga.** Las tareas abiertas de la persona que vencen hasta el domingo y no esperan al cliente. Las
+atrasadas cuentan solo si se movieron en los últimos 7 días; las quietas seguramente ya se entregaron y se preguntan en
+[Mi día](./22-avisos.md). La carga de una persona incluye todas sus mesas.
+
+**Horas por tarea.** Lo que de verdad se tarda, según el timesheet de Basecamp de las últimas 12 semanas (tareas
+completadas, mínimo 5 para confiar en la mediana), en este orden:
+
+1. la mediana del tipo de pieza;
+2. el esfuerzo del tipo de pieza × la mediana general;
+3. la mediana de la persona;
+4. la mediana general;
+5. sin datos, 4 h.
+
+A cada tarea se le resta lo que la persona ya registró en ella (siempre queda al menos media hora). Hoy ninguna tarea
+abierta tiene tipo de pieza, así que se usa la mediana de cada persona.
+
+**Capacidad.** Se mide en la misma unidad: lo que la persona registra en una semana fuerte, el percentil 75 de sus
+últimas 12 semanas con horas. Con menos de 6 semanas, la mediana de las del equipo. Sin ningún dato, la capacidad
+declarada. Se multiplica por los días hábiles que quedan de la semana.
+
+Contra las 40 h declaradas el riesgo nunca saltaba: el timesheet recoge unas 13 h por persona y semana, porque no
+todo el trabajo se registra. Comparar horas de timesheet con horas de timesheet sí detecta a quien tiene más que una
+semana fuerte.
+
+**En riesgo.** Las tareas se ordenan por fecha. Las que ya no entran en la capacidad que queda son las que están en
+riesgo. Sin días hábiles por delante no se marca riesgo.
 
 ## Otras tareas programadas
 

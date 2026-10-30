@@ -140,6 +140,7 @@ El backend tiene su propio programador de tareas (`backend/src/lib/jobs.ts`, tab
 | `informe_mensual` | Día 1, 08:00 |
 | `kpis_congelar` | Día 1, 08:10 |
 | `salud_clientes` | Lunes a viernes 07:30 (salud de los clientes y aviso si cambia) |
+| `riesgo_semana` | Lunes 07:35 (tareas en riesgo de la semana y aviso a líderes y ejecutivas) |
 | `mi_dia` | Lunes a viernes 07:45 (correo «Mi día», desde el 2/11/2026) |
 | `foto_daily` | Lunes a viernes 19:30 |
 | `foto_semana` | Domingo 17:55 |

@@ -41,6 +41,8 @@ vi.mock('../lib/db/semanas', async () => ({
 }));
 vi.mock('../lib/db/historial', () => ({ listSinMotivo: async () => ({ reprogramaciones: [], reprocesos: [] }) }));
 vi.mock('../lib/db/rituales', () => ({ getUmbralesSenales: async () => ({}), listCompletadosRecientes: async () => [] }));
+// La carga estimada (timesheet) tiene sus propios tests en carga.test.ts.
+vi.mock('../lib/carga', () => ({ cargaDelEquipo: async () => [] }));
 
 const { senalesDeMesa, acuerdosAbiertosDeMesa } = await import('../lib/rituals/service');
 

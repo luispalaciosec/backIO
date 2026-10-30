@@ -1,4 +1,5 @@
 import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa, RequerimientoMetricas, Cliente } from '@backio/shared';
+import { Fragment } from 'react';
 import { apiServer } from '@/lib/api.server';
 import { fecha } from '@/lib/format';
 import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
@@ -9,6 +10,12 @@ import { hoyLocal, nombrePersona } from '@backio/shared';
 import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
 
 export const dynamic = 'force-dynamic';
+
+const BASE_CAPACIDAD = {
+  ritmo: 'Su semana fuerte en el timesheet (12 semanas)',
+  equipo: 'Sin timesheet suficiente: la semana fuerte del equipo',
+  declarada: 'Capacidad declarada (no hay timesheet)',
+} as const;
 
 export default async function WeeklyPage({ searchParams: spP }: { searchParams: Promise<{ mesa?: string }> }) {
   const searchParams = await spP;
@@ -158,34 +165,78 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
           </section>
 
           <section className="card">
-            <div className="px-4 py-3 border-b border-gray-200 font-semibold">4. Capacidad (calculada, no declarada)</div>
-            <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="th">Persona</th>
-                  <th className="th text-right">Tareas</th>
-                  <th className="th text-right">% total</th>
-                  <th className="th text-right">Capacidad h</th>
-                </tr>
-              </thead>
-              <tbody>
-                {capacidad.map((c) => (
-                  <tr key={c.usuario_id}>
-                    <td className="td">{c.nombre}</td>
-                    <td className="td text-right">{c.tareas}</td>
-                    <td className={`td text-right ${c.pct_del_total > 30 ? 'text-red-600 font-semibold' : ''}`}>{c.pct_del_total}%</td>
-                    <td className="td text-right">{c.capacidad_semanal}</td>
-                  </tr>
-                ))}
-                {capacidad.length === 0 && (
+            <div className="px-4 py-3 border-b border-gray-200">
+              <div className="font-semibold">4. Capacidad y riesgo de la semana</div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Horas estimadas con lo que cada persona tarda de verdad en una tarea (timesheet de las últimas 12 semanas), en todas sus
+                mesas. Disponibles: lo que registra en una semana fuerte, por los días hábiles que quedan (sin timesheet suficiente, lo del
+                equipo). Lo que no entra, por fecha, queda en riesgo.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
                   <tr>
-                    <td className="td text-gray-400" colSpan={4}>
-                      Sin tareas esta semana.
-                    </td>
+                    <th className="th">Persona</th>
+                    <th className="th text-right">Tareas</th>
+                    <th className="th text-right">% total</th>
+                    <th className="th text-right">Horas estimadas</th>
+                    <th className="th text-right">Disponibles</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {capacidad.map((c) => {
+                    const exceso =
+                      c.horas_estimadas !== undefined && c.capacidad_restante !== undefined && c.horas_estimadas > c.capacidad_restante;
+                    return (
+                      <Fragment key={c.usuario_id}>
+                        <tr>
+                          <td className="td">{c.nombre}</td>
+                          <td className="td text-right">{c.tareas}</td>
+                          <td className={`td text-right ${c.pct_del_total > 30 ? 'text-red-600 font-semibold' : ''}`}>
+                            {c.pct_del_total}%
+                          </td>
+                          <td className={`td text-right tabular-nums ${exceso ? 'text-red-600 font-semibold' : ''}`}>
+                            {c.horas_estimadas !== undefined ? `${Math.round(c.horas_estimadas)} h` : '—'}
+                          </td>
+                          <td
+                            className="td text-right tabular-nums"
+                            title={c.capacidad_base ? BASE_CAPACIDAD[c.capacidad_base] : 'Capacidad declarada'}
+                          >
+                            {c.capacidad_restante !== undefined ? `${Math.round(c.capacidad_restante)} h` : `${c.capacidad_semanal} h`}
+                          </td>
+                        </tr>
+                        {!!c.en_riesgo?.length && (
+                          <tr>
+                            <td className="td pt-0 pb-3" colSpan={5}>
+                              <div className="rounded-md bg-red-50 px-3 py-2 text-xs">
+                                <div className="font-semibold text-red-700">
+                                  En riesgo ({c.en_riesgo.length}): no entran en lo que le queda de la semana
+                                </div>
+                                <ul className="mt-1 space-y-0.5 text-gray-700">
+                                  {c.en_riesgo.map((t) => (
+                                    <li key={t.id}>
+                                      {t.titulo} · {nombreCliente[t.cliente_id] ?? ''} · vence el {fecha(t.fecha_entrega)} · ~{t.horas} h
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                  {capacidad.length === 0 && (
+                    <tr>
+                      <td className="td text-gray-400" colSpan={5}>
+                        Sin tareas esta semana.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         </div>
 

@@ -54,3 +54,24 @@ export async function listHorasRequerimientoDesde(ctx: DbCtx, requerimientoId: s
     .gte('fecha', desde);
   return (horas ?? []) as { horas: number }[];
 }
+
+export interface FilaHorasTarea {
+  usuario_id: string | null;
+  requerimiento_id: string | null;
+  fecha: string;
+  horas: number;
+  requerimientos: { estado_operativo: string; tipo_pieza_id: string | null } | null;
+}
+
+/** Horas desde una fecha (YYYY-MM-DD) con su día y, si tienen tarea, su estado y tipo de pieza (riesgo de la semana). */
+export async function listHorasConTarea(ctx: DbCtx, desde: string): Promise<FilaHorasTarea[]> {
+  return paginar<FilaHorasTarea>((a, b) =>
+    ctx.db
+      .from('horas')
+      .select('usuario_id, requerimiento_id, fecha, horas, requerimientos(estado_operativo, tipo_pieza_id)')
+      .eq('tenant_id', ctx.tenantId)
+      .gte('fecha', desde)
+      .order('id')
+      .range(a, b),
+  );
+}
