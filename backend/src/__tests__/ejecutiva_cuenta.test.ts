@@ -165,3 +165,16 @@ describe('trabajo medido en la salud', () => {
     expect(esTrabajoMedido({ fecha_pedido: null, created_at: '2026-09-21T15:00:00Z' })).toBe(true);
   });
 });
+
+describe('lo que espera al cliente no cuenta para la salud', () => {
+  it('su atraso y su quietud quedan fuera; las demás sí cuentan', async () => {
+    const { operacionParaSalud } = await import('@backio/shared');
+    expect(
+      operacionParaSalud([
+        { dias_atraso: 44, dias_sin_movimiento: 31, estado_aprobacion: 'pendiente_cliente' },
+        { dias_atraso: 9, dias_sin_movimiento: 10, estado_aprobacion: 'no_aplica' },
+        { dias_atraso: 0, dias_sin_movimiento: 2, estado_aprobacion: 'pendiente_interno' },
+      ]),
+    ).toEqual({ atrasados: 1, atraso_max: 9, sin_movimiento_max: 10 });
+  });
+});

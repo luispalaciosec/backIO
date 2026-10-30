@@ -113,7 +113,10 @@ function ListaTareas({
               ) : (
                 <span className="font-medium break-words">{t.titulo_interno}</span>
               )}
-              <span className="text-xs text-gray-500 shrink-0 tabular-nums">{detalle(t)}</span>
+              <span className="text-xs text-gray-500 shrink-0 tabular-nums text-right">
+                {detalle(t)}
+                {t.esperando_cliente && <span className="block text-amber-700">esperando al cliente</span>}
+              </span>
             </div>
             <div className="text-xs text-gray-500 mt-0.5">
               {[t.proyecto, t.responsables.join(', ') || 'Sin responsable'].filter(Boolean).join(' · ')}
@@ -186,6 +189,28 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
         </div>
       </header>
 
+      {f.tareas.esperando_cliente.length > 0 && (
+        <section className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-sm space-y-2">
+          <div className="font-semibold">
+            {f.tareas.esperando_cliente.length === 1
+              ? '1 tarea espera feedback del cliente'
+              : `${f.tareas.esperando_cliente.length} tareas esperan feedback del cliente`}
+            {f.ejecutiva ? ` · ${f.ejecutiva.nombre}, pide la respuesta` : ''}
+          </div>
+          <ul className="space-y-1">
+            {f.tareas.esperando_cliente.slice(0, 8).map((t) => (
+              <li key={t.id} className="flex flex-wrap justify-between gap-x-3">
+                <span className="break-words">{t.titulo_interno}</span>
+                <span className="text-xs tabular-nums">
+                  {t.dias_sin_movimiento} d esperando{t.dias_atraso ? ` · ${t.dias_atraso} d sobre la fecha` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs">Su atraso es del cliente: no cuenta para la salud de la cuenta.</p>
+        </section>
+      )}
+
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Indicador
           etiqueta="A tiempo · 90 días"
@@ -196,7 +221,7 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
           etiqueta="Atrasadas"
           valor={i.atrasados}
           alerta={i.atrasados > 0}
-          sub={`${i.activos} activas · ${i.esperando_cliente} esperando al cliente · ${i.bloqueadas} bloqueadas`}
+          sub={`${i.atrasados_esperando_cliente ? `${i.atrasados_esperando_cliente} esperando al cliente (no cuentan para la salud) · ` : ''}${i.activos} activas · ${i.bloqueadas} bloqueadas`}
         />
         <Indicador
           etiqueta="Reprocesos · 90 días"
@@ -217,6 +242,10 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
             <span className="text-xs text-gray-500">% a tiempo según la fecha original</span>
           </div>
           <Mensual serie={f.mensual} />
+          <p className="text-xs text-gray-500">
+            El % a tiempo se mide desde el 21/09/2026, cuando empezó la operación en BackIO. Lo pedido antes es historia importada de
+            Basecamp: cuenta en las entregas, pero no en el porcentaje (barra gris).
+          </p>
         </section>
         <Sugerencias clienteId={f.cliente.id} />
       </div>
@@ -269,18 +298,12 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <ListaTareas
           titulo="Atrasadas"
           items={f.tareas.atrasadas}
           vacio="Nada atrasado."
           detalle={(t) => `${t.dias_atraso} d · ${fecha(t.fecha_entrega)}`}
-        />
-        <ListaTareas
-          titulo="Esperando al cliente"
-          items={f.tareas.esperando_cliente}
-          vacio="Nada esperando al cliente."
-          detalle={(t) => fecha(t.fecha_entrega)}
         />
         <ListaTareas titulo="Bloqueadas" items={f.tareas.bloqueadas} vacio="Sin bloqueos." detalle={(t) => fecha(t.fecha_entrega)} />
         <ListaTareas

@@ -23,6 +23,7 @@ import {
   responsablesDe,
   responsablesEn,
   saludCliente,
+  operacionParaSalud,
   reprocesoDelEquipo,
   esTrabajoMedido,
   SALUD_DIAS_ENTREGAS,
@@ -225,10 +226,9 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
       const sinMov = act.length ? Math.max(...act.map((r) => r.dias_sin_movimiento)) : 0;
       // El % a tiempo de la salud mide solo lo pedido desde que se opera en BackIO (esTrabajoMedido).
       const comp90 = completados90.filter((r) => r.cliente_id === id && esTrabajoMedido(r));
+      // Lo que espera al cliente no cuenta para la salud (operacionParaSalud), igual que en la ficha.
       const { salud, motivos: salud_motivos } = saludCliente({
-        atrasados,
-        atraso_max: act.length ? Math.max(...act.map((r) => r.dias_atraso)) : 0,
-        sin_movimiento_max: sinMov,
+        ...operacionParaSalud(act),
         entregas: comp90.length,
         pct_a_tiempo: resumirCumplimiento(comp90, [], []).pct_original,
         reprocesos_equipo: reprocs90.filter((x) => reqPorId.get(x.requerimiento_id)?.cliente_id === id && reprocesoDelEquipo(x)).length,

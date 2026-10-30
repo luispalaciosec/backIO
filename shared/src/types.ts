@@ -601,6 +601,8 @@ export interface TareaFicha {
   proyecto: string | null;
   responsables: string[];
   estado_operativo: EstadoOperativo;
+  /** Espera aprobación o insumos del cliente: su atraso no cuenta para la salud. */
+  esperando_cliente: boolean;
   fecha_entrega: string | null;
   dias_atraso: number;
   dias_sin_movimiento: number;
@@ -613,6 +615,8 @@ export interface IndicadoresCliente {
   activos: number;
   atrasados: number;
   esperando_cliente: number;
+  /** Atrasadas que esperan al cliente: se muestran, pero no cuentan para la salud. */
+  atrasados_esperando_cliente: number;
   bloqueadas: number;
   sin_movimiento_max: number;
   entregas_90d: number;

@@ -69,3 +69,20 @@ export function reprocesoDelEquipo(r: Pick<Reproceso, 'motivo' | 'atribuible'>):
   const resp = MOTIVOS_REPROCESO.find((m) => m.valor === r.motivo)?.responsable;
   return !!resp && resp !== 'cliente';
 }
+
+/**
+ * Atrasos y movimiento que cuentan para la salud. Una tarea esperando al cliente (aprobación «pendiente del cliente»)
+ * no cuenta: ese atraso es del cliente, y lo que corresponde es que la ejecutiva pida el feedback (alerta en la ficha y
+ * señal «bloqueo_cliente» en el weekly). Decisión de Luis, 29/10/2026.
+ */
+export function operacionParaSalud(
+  activos: { dias_atraso: number; dias_sin_movimiento: number; estado_aprobacion: string }[],
+): Pick<DatosSalud, 'atrasados' | 'atraso_max' | 'sin_movimiento_max'> {
+  const nuestras = activos.filter((r) => r.estado_aprobacion !== 'pendiente_cliente');
+  const atrasadas = nuestras.filter((r) => r.dias_atraso > 0);
+  return {
+    atrasados: atrasadas.length,
+    atraso_max: atrasadas.length ? Math.max(...atrasadas.map((r) => r.dias_atraso)) : 0,
+    sin_movimiento_max: nuestras.length ? Math.max(...nuestras.map((r) => r.dias_sin_movimiento)) : 0,
+  };
+}

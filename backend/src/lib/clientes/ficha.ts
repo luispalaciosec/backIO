@@ -12,6 +12,7 @@ import {
   nombrePersona,
   reprocesoDelEquipo,
   saludCliente,
+  operacionParaSalud,
   esTrabajoMedido,
 } from '@backio/shared';
 import type { DbCtx } from '../db/client';
@@ -72,6 +73,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     proyecto: r.proyecto_id ? (nombreProyecto.get(r.proyecto_id) ?? null) : null,
     responsables: r.owner_agencia.map((id) => (u(id) ? nombrePersona(u(id)!) : '—')),
     estado_operativo: r.estado_operativo,
+    esperando_cliente: r.estado_aprobacion === 'pendiente_cliente',
     fecha_entrega: r.fecha_entrega,
     dias_atraso: r.dias_atraso,
     dias_sin_movimiento: r.dias_sin_movimiento,
@@ -93,10 +95,9 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
 
   const atrasadas = activos.filter((r) => r.dias_atraso > 0).sort((a, b) => b.dias_atraso - a.dias_atraso);
   const sinMovMax = activos.length ? Math.max(...activos.map((r) => r.dias_sin_movimiento)) : 0;
+  // Lo que espera al cliente no cuenta para la salud (operacionParaSalud): es una alerta para pedir el feedback.
   const salud = saludCliente({
-    atrasados: atrasadas.length,
-    atraso_max: atrasadas[0]?.dias_atraso ?? 0,
-    sin_movimiento_max: sinMovMax,
+    ...operacionParaSalud(activos),
     entregas: medidas90.length,
     pct_a_tiempo: c90.pct_original,
     reprocesos_equipo: reprocesosEquipo,
@@ -137,6 +138,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
       activos: activos.length,
       atrasados: atrasadas.length,
       esperando_cliente: activos.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length,
+      atrasados_esperando_cliente: atrasadas.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length,
       bloqueadas: activos.filter((r) => r.estado_operativo === 'bloqueado').length,
       sin_movimiento_max: sinMovMax,
       entregas_90d: comp90.length,
@@ -182,7 +184,11 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
       ),
     tareas: {
       atrasadas: atrasadas.slice(0, 20).map(tarea),
-      esperando_cliente: activos.filter((r) => r.estado_aprobacion === 'pendiente_cliente').map(tarea),
+      // Lo que más tiempo lleva esperando, primero: es lo que la ejecutiva tiene que empujar.
+      esperando_cliente: activos
+        .filter((r) => r.estado_aprobacion === 'pendiente_cliente')
+        .sort((a, b) => b.dias_sin_movimiento - a.dias_sin_movimiento)
+        .map(tarea),
       bloqueadas: activos.filter((r) => r.estado_operativo === 'bloqueado').map(tarea),
       sin_movimiento: activos
         .filter((r) => r.dias_sin_movimiento > SIN_MOVIMIENTO_DIAS && r.dias_atraso === 0)

@@ -94,6 +94,7 @@ mezcle datos entre organizaciones.
 | — | **Mesa y ejecutiva de cuenta son cosas distintas**: la mesa es el equipo que produce (daily y weekly); la ejecutiva de cuenta se asigna por cliente y puede tener cuentas en varias mesas. Un cliente se queda en la mesa que lo produce | Grace lleva Grupo Torres & Torres, que produce Omega, sin pertenecer a esa mesa ([Clientes](./21-clientes.md)) | 29/10/2026 · Luis |
 | — | **Ficha de cliente** con la ejecutiva, proyectos, atrasos, salud por entregas y reprocesos, y sugerencias de la IA. La salud del dashboard y la de la ficha son la misma regla | — | 29/10/2026 · Luis |
 | — | La salud del cliente mide el % a tiempo **solo con el trabajo pedido desde el 21/09/2026**; lo importado de antes es historia | En septiembre se cerraron en bloque cientos de to-dos viejos de Basecamp con meses de atraso: Banco Amazonas daba 12 % a tiempo y 14 de 15 clientes salían en rojo ([Clientes](./21-clientes.md#salud)) | 29/10/2026 · Luis |
+| — | Una tarea **esperando al cliente** no cuenta como atraso nuestro en la salud del cliente: es una alerta para que la ejecutiva pida el feedback | El atraso es del cliente; contarlo pintaba en rojo cuentas por algo que no depende del equipo (Torres & Torres: la landing esperaba al cliente hacía 44 días) | 29/10/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 
 ## Decisiones técnicas
