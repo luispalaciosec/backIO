@@ -49,6 +49,8 @@ const GRUPOS: Grupo[] = [
       { href: '/informes', label: 'Informes mensuales', icon: '◈' },
       { href: '/informes/canal', label: 'Informe por canal', icon: '▥' },
       { href: '/informes/estatus', label: 'Estatus por cliente', icon: '📝' },
+      // Solo gerencia y admin (sueldos y fees, migración 41).
+      { href: '/rentabilidad', label: 'Rentabilidad', icon: '$' },
     ],
   },
 ];
@@ -93,6 +95,7 @@ const KEY = 'backio:sidebar:colapsado'; // preferencia de UI, no dato de negocio
 export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
   const esAdmin = rol === 'admin';
   const escribe = puedeEscribir(rol);
+  const veRentabilidad = rol === 'admin' || rol === 'gerencia';
   const [colapsado, setColapsado] = useState(false);
   const pathname = usePathname();
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
@@ -197,7 +200,7 @@ export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
         <Item href="/mi-dia" label="Mi día" icon="☀" />
         <Item href="/dashboard" label="Dashboard" icon="◧" />
         {/* KPIs: gestión ve el tablero; un colaborador ve «Mis KPIs» (solo lo suyo, lo acota el backend). */}
-        {GRUPOS.map((g) => (
+        {GRUPOS.map((g0) => ({ ...g0, items: g0.items.filter((i) => veRentabilidad || i.href !== '/rentabilidad') })).map((g) => (
           <GrupoNav
             key={g.id}
             g={

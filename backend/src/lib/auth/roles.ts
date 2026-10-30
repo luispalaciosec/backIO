@@ -13,3 +13,10 @@ export const esColaboradorHumano = (a: AuthInfo): boolean => esColaborador(a) &&
 
 /** Persona de gestión (admin, gerencia, operaciones, ejecutiva, líder), por la UI o por OAuth. */
 export const esGestion = (a: AuthInfo): boolean => a.tipo === 'usuario' && !!a.rol && ROLES_INTERNOS_GESTION.includes(a.rol);
+
+/**
+ * Sueldos, fees y rentabilidad (migración 41): solo personas de gerencia o admin con sesión de la UI. Ni API keys ni
+ * agentes OAuth, aunque actúen en nombre de alguien con ese rol.
+ */
+export const esGerenciaOAdmin = (a: AuthInfo): boolean =>
+  a.tipo === 'usuario' && a.perfil !== 'oauth' && (a.rol === 'admin' || a.rol === 'gerencia');

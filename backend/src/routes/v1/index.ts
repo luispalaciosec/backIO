@@ -20,6 +20,7 @@ import { actividad } from './actividad';
 import { kpis } from './kpis';
 import { evolutivo } from './evolutivo';
 import { miDiaRutas } from './mi_dia';
+import { rentabilidad } from './rentabilidad';
 
 export const v1 = new Hono();
 v1.use('*', requireAuth);
@@ -43,3 +44,4 @@ v1.route('/actividad', actividad);
 v1.route('/kpis', kpis);
 v1.route('/evolutivo', evolutivo);
 v1.route('/', miDiaRutas);
+v1.route('/', rentabilidad);

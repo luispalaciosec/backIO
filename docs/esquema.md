@@ -937,6 +937,20 @@ Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
 | `motivos` | jsonb | sí |  |
 | `created_at` | fecha y hora | sí | por defecto `now()` |
 
+### fees_cliente
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | uuid | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `cliente_id` | uuid | sí | → [clientes](#clientes).id |
+| `fee_mensual` | numeric | sí |  |
+| `desde` | date | sí |  |
+| `created_by` | uuid |  | → [usuarios](#usuarios).id |
+| `created_at` | fecha y hora | sí | por defecto `now()` |
+
 ### requerimiento_responsables
 
 Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
@@ -963,3 +977,17 @@ Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
 | `datos` | jsonb | sí |  |
 | `conectado_at` | fecha y hora | sí | por defecto `now()` |
 | `updated_at` | fecha y hora | sí | por defecto `now()` |
+
+### costos_personal
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | uuid | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `usuario_id` | uuid | sí | → [usuarios](#usuarios).id |
+| `sueldo_mensual` | numeric | sí |  |
+| `desde` | date | sí |  |
+| `created_by` | uuid |  | → [usuarios](#usuarios).id |
+| `created_at` | fecha y hora | sí | por defecto `now()` |

@@ -75,3 +75,21 @@ export async function listHorasConTarea(ctx: DbCtx, desde: string): Promise<Fila
       .range(a, b),
   );
 }
+
+/** Horas por persona y cliente entre dos fechas (YYYY-MM-DD, inclusive), para repartir sueldos (rentabilidad). */
+export async function listHorasEntre(
+  ctx: DbCtx,
+  desde: string,
+  hasta: string,
+): Promise<{ cliente_id: string | null; usuario_id: string | null; horas: number }[]> {
+  return paginar<{ cliente_id: string | null; usuario_id: string | null; horas: number }>((a, b) =>
+    ctx.db
+      .from('horas')
+      .select('cliente_id, usuario_id, horas')
+      .eq('tenant_id', ctx.tenantId)
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('id')
+      .range(a, b),
+  );
+}

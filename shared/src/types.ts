@@ -672,6 +672,50 @@ export interface FichaCliente {
   };
   senales: Senal[];
 }
+/** Sueldo mensual de una persona desde una fecha (migración 41). Solo gerencia y admin. */
+export interface CostoPersonal {
+  id: string;
+  usuario_id: string;
+  sueldo_mensual: number;
+  desde: string;
+  created_at: string;
+}
+
+/** Lo que paga un cliente al mes desde una fecha (migración 41). Solo gerencia y admin. */
+export interface FeeCliente {
+  id: string;
+  cliente_id: string;
+  fee_mensual: number;
+  desde: string;
+  created_at: string;
+}
+
+/** Rentabilidad de un cliente en un mes (docs/21): fee − sueldos repartidos por horas registradas. */
+export interface RentabilidadCliente {
+  cliente_id: string;
+  cliente: string;
+  fee: number | null;
+  costo: number;
+  margen: number | null;
+  /** Margen sobre el fee (0-100); null sin fee o con fee 0. */
+  margen_pct: number | null;
+  horas: number;
+  /** Costo por persona en este cliente. */
+  personas: { usuario_id: string; nombre: string; horas: number; costo: number }[];
+}
+
+export interface RentabilidadMes {
+  mes: string;
+  clientes: RentabilidadCliente[];
+  totales: { fee: number; costo: number; margen: number };
+  /** Sueldos de personas sin horas registradas en el mes: no se pueden repartir entre clientes. */
+  sin_repartir: { total: number; personas: { usuario_id: string; nombre: string; sueldo: number }[] };
+  /** Horas del mes sin persona o sin cliente (no tienen costo asignado). */
+  horas_sin_costo: number;
+  /** Personas con horas en el mes pero sin sueldo cargado: sus horas no tienen costo. */
+  sin_sueldo: { usuario_id: string; nombre: string; horas: number }[];
+}
+
 /** Informe para el cliente (migración 40, docs/21): lo redacta la IA con datos aptos para el cliente y lo envía la ejecutiva. */
 export interface InformeCliente {
   id: string;

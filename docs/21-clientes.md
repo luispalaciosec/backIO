@@ -137,3 +137,35 @@ entregó]» o «[completa: qué viene]», y la pantalla avisa cuántos quedan an
 quién lo generó y quién lo editó. Lo ven y lo editan los roles de gestión; un colaborador no. Rutas:
 `GET /clientes/:id/informes`, `POST /clientes/:id/informes` y `PATCH /clientes/:id/informes/:informeId`. El código
 está en `backend/src/lib/clientes/informe.ts`.
+
+## Rentabilidad (`/rentabilidad`)
+
+Desde el 30/10/2026, gerencia y admin ven cuánto deja cada cliente al mes. Nadie más: ni otros roles, ni agentes, ni
+API keys. Lo exigen la RLS de las tablas (migración 41, función `auth_es_gerencia_o_admin`) y cada ruta
+(`esGerenciaOAdmin`). Los montos no se escriben en esta documentación ni en la auditoría.
+
+**Qué se carga** (en `/rentabilidad/costos`):
+- el sueldo mensual de cada persona (`costos_personal`);
+- el fee mensual de cada cliente (`fees_cliente`).
+
+Cada cambio es una fila nueva con su fecha «desde»: vale el último que no pase del fin del mes, y queda la historia.
+
+**Cómo se calcula el margen de un cliente en un mes:**
+- **Costo:** el sueldo de cada persona se reparte entre sus clientes según las horas que registró en cada uno ese mes
+  (timesheet de Basecamp).
+- **Margen:** fee del cliente menos su costo.
+
+No se usa horas × costo por hora: el timesheet recoge unas 13 de las 40 horas semanales, y así quedaban fuera dos
+tercios de los sueldos.
+
+**Lo que el cálculo muestra aparte:**
+- sueldos de personas sin horas en el mes, que no se pueden repartir;
+- personas con horas pero sin sueldo cargado;
+- horas sin persona o sin cliente;
+- clientes con costo pero sin fee.
+
+Quien salió antes del mes ya no cuesta. Los clientes de prueba no cuentan.
+
+**Dónde se ve:** `/rentabilidad` (mes por cliente) y la sección «Rentabilidad» de la ficha (últimos 6 meses), solo
+para esos roles. Rutas: `GET /rentabilidad`, `GET /rentabilidad/clientes/:id`, `GET /costos`,
+`PUT /costos/sueldos` y `PUT /costos/fees`. El cálculo está en `backend/src/lib/rentabilidad.ts`.

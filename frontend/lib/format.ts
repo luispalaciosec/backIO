@@ -59,3 +59,9 @@ export function iniciales(nombre: string): string {
     .map((p) => p[0]?.toUpperCase() ?? '')
     .join('');
 }
+
+const formatoDinero = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+/** Monto en dólares sin centavos («$1.250»); «—» si no hay. */
+export function dinero(n: number | null | undefined): string {
+  return n === null || n === undefined ? '—' : formatoDinero.format(n);
+}

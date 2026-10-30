@@ -722,6 +722,58 @@ export type Database = {
           },
         ];
       };
+      costos_personal: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          usuario_id: string;
+          sueldo_mensual: number;
+          desde: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          usuario_id: string;
+          sueldo_mensual: number;
+          desde: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          usuario_id?: string;
+          sueldo_mensual?: number;
+          desde?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'costos_personal_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'costos_personal_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'costos_personal_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       cron_runs: {
         Row: {
           job: string;
@@ -808,6 +860,58 @@ export type Database = {
             columns: ['mesa_id'];
             isOneToOne: false;
             referencedRelation: 'mesas';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      fees_cliente: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          cliente_id: string;
+          fee_mensual: number;
+          desde: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          cliente_id: string;
+          fee_mensual: number;
+          desde: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          cliente_id?: string;
+          fee_mensual?: number;
+          desde?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'fees_cliente_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'fees_cliente_cliente_id_fkey';
+            columns: ['cliente_id'];
+            isOneToOne: false;
+            referencedRelation: 'clientes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'fees_cliente_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
             referencedColumns: ['id'];
           },
         ];
@@ -3213,6 +3317,10 @@ export type Database = {
         Returns: Json;
       };
       auth_es_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      auth_es_gerencia_o_admin: {
         Args: Record<PropertyKey, never>;
         Returns: Json;
       };
