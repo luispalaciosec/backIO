@@ -672,6 +672,21 @@ export interface FichaCliente {
   };
   senales: Senal[];
 }
+/** Informe para el cliente (migración 40, docs/21): lo redacta la IA con datos aptos para el cliente y lo envía la ejecutiva. */
+export interface InformeCliente {
+  id: string;
+  cliente_id: string;
+  periodo: 'semanal' | 'mensual';
+  desde: string;
+  hasta: string;
+  asunto: string;
+  cuerpo: string;
+  generado_por: string | null;
+  editado_por: string | null;
+  editado_at: string | null;
+  created_at: string;
+}
+
 export interface SugerenciaCliente {
   titulo: string;
   /** El dato de la ficha que la justifica. */

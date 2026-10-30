@@ -902,6 +902,27 @@ Avance de cada proyecto según el peso de sus tareas completadas.
 
 ## Sin clasificar
 
+### informes_cliente
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | uuid | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `cliente_id` | uuid | sí | → [clientes](#clientes).id |
+| `periodo` | texto | sí |  |
+| `desde` | date | sí |  |
+| `hasta` | date | sí |  |
+| `asunto` | texto | sí |  |
+| `cuerpo` | texto | sí |  |
+| `datos` | jsonb | sí |  |
+| `generado_por` | uuid |  | → [usuarios](#usuarios).id |
+| `editado_por` | uuid |  | → [usuarios](#usuarios).id |
+| `editado_at` | fecha y hora |  |  |
+| `created_at` | fecha y hora | sí | por defecto `now()` |
+| `updated_at` | fecha y hora | sí | por defecto `now()` |
+
 ### cliente_salud
 
 Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.

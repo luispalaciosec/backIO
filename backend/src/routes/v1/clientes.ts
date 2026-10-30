@@ -14,6 +14,8 @@ import { fichaCliente } from '../../lib/clientes/ficha';
 import { sugerenciasCliente } from '../../lib/ia/cliente';
 import { iaDisponible } from '../../lib/ia';
 import { esColaborador } from '../../lib/auth/roles';
+import { generarInformeCliente } from '../../lib/clientes/informe';
+import { listInformesCliente, updateInformeCliente } from '../../lib/db/informes_cliente';
 
 export const clientes = new Hono();
 
@@ -60,6 +62,63 @@ clientes.post('/:id/sugerencias', requireScope('write:proyectos'), async (c) => 
   await audit(ctx, { accion: 'ia_sugerencias_cliente', entidad: 'cliente', entidad_id: f.cliente.id });
   return c.json({ sugerencias });
 });
+
+/**
+ * Informes para el cliente (docs/21, migración 40). La IA los redacta solo con datos aptos para el cliente
+ * (lib/clientes/informe.ts); la ejecutiva los edita y los envía desde su correo. Gestión: un colaborador no los ve.
+ */
+clientes.get('/:id/informes', requireScope('read:proyectos'), async (c) => {
+  if (esColaborador(c.get('auth'))) return c.json({ error: 'Los informes para el cliente son para gestión' }, 403);
+  return c.json({ items: await listInformesCliente(ctxOf(c), c.req.param('id')) });
+});
+
+clientes.post(
+  '/:id/informes',
+  requireScope('write:proyectos'),
+  zValidator(
+    'json',
+    z.object({
+      periodo: z.enum(['semanal', 'mensual']),
+      mes: z
+        .string()
+        .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+        .optional(),
+    }),
+  ),
+  async (c) => {
+    if (esColaborador(c.get('auth'))) return c.json({ error: 'Los informes para el cliente son para gestión' }, 403);
+    if (!iaDisponible()) return c.json({ error: 'La capa de IA no está configurada' }, 503);
+    const ctx = ctxOf(c);
+    const { periodo, mes } = c.req.valid('json');
+    const informe = await generarInformeCliente(ctx, c.req.param('id'), periodo, { mes });
+    await audit(ctx, {
+      accion: 'informe_cliente_generado',
+      entidad: 'cliente',
+      entidad_id: informe.cliente_id,
+      detalle: { periodo, id: informe.id },
+    });
+    return c.json(informe, 201);
+  },
+);
+
+clientes.patch(
+  '/:id/informes/:informeId',
+  requireScope('write:proyectos'),
+  zValidator('json', z.object({ asunto: z.string().trim().min(1).max(300), cuerpo: z.string().trim().min(1).max(20_000) })),
+  async (c) => {
+    if (esColaborador(c.get('auth'))) return c.json({ error: 'Los informes para el cliente son para gestión' }, 403);
+    const ctx = ctxOf(c);
+    const informe = await updateInformeCliente(ctx, c.req.param('id'), c.req.param('informeId'), c.req.valid('json'));
+    if (!informe) return c.json({ error: 'No encontrado' }, 404);
+    await audit(ctx, {
+      accion: 'informe_cliente_editado',
+      entidad: 'cliente',
+      entidad_id: informe.cliente_id,
+      detalle: { id: informe.id },
+    });
+    return c.json(informe);
+  },
+);
 
 /** Widget para la ficha de cliente en PrometIO (docs/08 · Flujo 2). */
 clientes.get('/:id/resumen', requireScope('read:proyectos'), async (c) => {

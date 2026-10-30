@@ -112,3 +112,28 @@ la ficha que la justifica y quién debe hacerla.
   - no aparece en el portal (ver [Capa de IA](./15-ia.md)).
 - **Caché:** 6 horas mientras la ficha no cambie.
 - Sin la API key configurada, el botón no aparece.
+
+### Informe para el cliente
+
+Desde el 30/10/2026, la ejecutiva genera en la ficha un borrador de correo con el informe semanal (últimos 7 días) o
+mensual (el mes que elija), lo edita y **lo envía desde su correo**. BackIO no le escribe al cliente y el informe no se
+publica en el portal, que sigue igual ([Portal del cliente](./06-portal-cliente.md)).
+
+**Qué recibe la IA.** Por cada proyecto con algo que contar:
+- el nombre del proyecto, que es el de la lista de Basecamp y el cliente ya ve en el portal;
+- cuántas tareas se entregaron en el periodo (con la fecha real de entrega, ver [Mi día](./22-avisos.md)), cuántas
+  vencen en las dos semanas siguientes y cuántas esperan al cliente, con los días de la más antigua;
+- el nombre y la fecha **solo de lo visible para el cliente**, tal como sale de `sanitizeForClient`.
+
+El payload pasa por `assertClientSafe` antes de salir, igual que el resumen del portal. La IA nunca recibe títulos
+internos, responsables, horas ni comentarios.
+
+**Por qué números.** Casi nada es visible para el cliente: al 30/10/2026 eran 15 de 2.643 tareas, porque lo importado
+de Basecamp entra oculto y la [regla 2](./02-visibilidad.md) no deja abrirlo. Un informe solo con lo visible salía vacío.
+Los números cuentan todas las tareas del proyecto. Donde no hay detalle visible, la IA deja «[completa: qué se
+entregó]» o «[completa: qué viene]», y la pantalla avisa cuántos quedan antes de copiar.
+
+**Historial.** Cada informe queda en `informes_cliente` (migración 40) con el periodo, los datos que recibió la IA,
+quién lo generó y quién lo editó. Lo ven y lo editan los roles de gestión; un colaborador no. Rutas:
+`GET /clientes/:id/informes`, `POST /clientes/:id/informes` y `PATCH /clientes/:id/informes/:informeId`. El código
+está en `backend/src/lib/clientes/informe.ts`.

@@ -12,6 +12,7 @@ import { COLOR_SALUD } from '@/components/dashboard/Charts';
 import { AvanceBar } from '@/components/ui/AvanceBar';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { Sugerencias } from './Sugerencias';
+import { InformeParaCliente } from './InformeParaCliente';
 import { RecordatorioIA } from '@/components/backlog/RecordatorioIA';
 
 export const dynamic = 'force-dynamic';
@@ -269,6 +270,8 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
         </section>
         <Sugerencias clienteId={f.cliente.id} />
       </div>
+
+      <InformeParaCliente clienteId={f.cliente.id} />
 
       <section className="card">
         <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between">

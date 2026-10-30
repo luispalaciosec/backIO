@@ -949,6 +949,86 @@ export type Database = {
           },
         ];
       };
+      informes_cliente: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          cliente_id: string;
+          periodo: string;
+          desde: string;
+          hasta: string;
+          asunto: string;
+          cuerpo: string;
+          datos: Json;
+          generado_por: string | null;
+          editado_por: string | null;
+          editado_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          cliente_id: string;
+          periodo: string;
+          desde: string;
+          hasta: string;
+          asunto: string;
+          cuerpo: string;
+          datos?: Json;
+          generado_por?: string | null;
+          editado_por?: string | null;
+          editado_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          cliente_id?: string;
+          periodo?: string;
+          desde?: string;
+          hasta?: string;
+          asunto?: string;
+          cuerpo?: string;
+          datos?: Json;
+          generado_por?: string | null;
+          editado_por?: string | null;
+          editado_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'informes_cliente_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'informes_cliente_cliente_id_fkey';
+            columns: ['cliente_id'];
+            isOneToOne: false;
+            referencedRelation: 'clientes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'informes_cliente_generado_por_fkey';
+            columns: ['generado_por'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'informes_cliente_editado_por_fkey';
+            columns: ['editado_por'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       integracion_credenciales: {
         Row: {
           tenant_id: string;
