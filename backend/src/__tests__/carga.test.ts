@@ -59,10 +59,10 @@ describe('Estimación de horas por tarea', () => {
 
   it('separa lo completado (muestras) de lo ya registrado en tareas abiertas, por persona', () => {
     const { muestras: m, registradas } = agruparHoras([
-      { usuario_id: 'oscar', requerimiento_id: 'a', horas: 2, requerimientos: { estado_operativo: 'completado', tipo_pieza_id: null } },
-      { usuario_id: 'oscar', requerimiento_id: 'a', horas: 1.5, requerimientos: { estado_operativo: 'completado', tipo_pieza_id: null } },
-      { usuario_id: 'oscar', requerimiento_id: 'b', horas: 3, requerimientos: { estado_operativo: 'en_ejecucion', tipo_pieza_id: null } },
-      { usuario_id: null, requerimiento_id: 'c', horas: 9, requerimientos: { estado_operativo: 'completado', tipo_pieza_id: null } },
+      { usuario_id: 'oscar', requerimiento_id: 'a', fecha: '2026-10-20', horas: 2, requerimientos: { estado_operativo: 'completado', tipo_pieza_id: null } },
+      { usuario_id: 'oscar', requerimiento_id: 'a', fecha: '2026-10-20', horas: 1.5, requerimientos: { estado_operativo: 'completado', tipo_pieza_id: null } },
+      { usuario_id: 'oscar', requerimiento_id: 'b', fecha: '2026-10-20', horas: 3, requerimientos: { estado_operativo: 'en_ejecucion', tipo_pieza_id: null } },
+      { usuario_id: null, requerimiento_id: 'c', fecha: '2026-10-20', horas: 9, requerimientos: { estado_operativo: 'completado', tipo_pieza_id: null } },
     ]);
     expect(m).toEqual([{ usuario_id: 'oscar', tipo_pieza_id: null, horas: 3.5 }]);
     expect(registradas.get('oscar|b')).toBe(3);
