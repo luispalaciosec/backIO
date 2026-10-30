@@ -24,6 +24,10 @@ import { sincronizarHoras } from './horas';
 import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
 import { vigilar } from './vigia';
+import { fotoSaludClientes } from './salud_clientes';
+import { miDia, resumenMiDia } from './mi_dia';
+import { listClientes } from './db/clientes';
+import { usuariosParaMiDia } from './db/usuarios';
 import { log } from './logger';
 
 /** Instante en hora de Guayaquil. dia: 0 domingo … 6 sábado. clave: YYYY-MM-DD. */
@@ -89,6 +93,8 @@ export function cada(minutos: number): Ventana {
 const esLaborable = (m: Momento) => m.dia >= 1 && m.dia <= 5;
 const esDomingo = (m: Momento) => m.dia === 0;
 const esPrimeroDeMes = (m: Momento) => m.clave.endsWith('-01');
+/** Primer día del correo «Mi día» (docs/22). */
+export const MI_DIA_DESDE = '2026-11-02';
 
 const ctxCron = (tenantId: string): DbCtx => ({ db: serviceClient(), tenantId, usuarioId: null, origen: 'cron' });
 
@@ -260,6 +266,35 @@ export const JOBS: Job[] = [
           { roles: ['operaciones', 'admin'] },
         );
         return s.length;
+      }),
+  },
+  {
+    // Foto diaria del color de cada cliente y aviso a su ejecutiva y al líder de la mesa si cambió (docs/22).
+    nombre: 'salud_clientes',
+    descripcion: 'Salud de los clientes y aviso si cambia de color, L-V 07:30',
+    ventana: aLas(7, 30, { cuando: esLaborable }),
+    ejecutar: () => porTenant((ctx) => fotoSaludClientes(ctx)),
+  },
+  {
+    // «Mi día» (docs/22): un correo por persona con lo suyo de hoy; quien lo desactivó lo recibe solo en la campana.
+    nombre: 'mi_dia',
+    descripcion: 'Mi día por correo a cada persona con tareas, L-V 07:45',
+    // Empieza el lunes 2/11/2026, para que el equipo esté avisado antes del primer correo.
+    ventana: aLas(7, 45, { cuando: (m) => esLaborable(m) && m.clave >= MI_DIA_DESDE }),
+    ejecutar: () =>
+      porTenant(async (ctx) => {
+        const usuarios = await usuariosParaMiDia(ctx.tenantId);
+        const clientes = new Map((await listClientes(ctx, { incluirInactivos: true })).map((c) => [c.id, c.nombre]));
+        let correo = 0,
+          campana = 0;
+        for (const u of usuarios) {
+          const r = resumenMiDia(await miDia(ctx, u.id), (id) => clientes.get(id) ?? '');
+          if (!r) continue;
+          await notificar(ctx, { tipo: 'mi_dia', ...r, ruta: '/mi-dia' }, { usuarioIds: [u.id] }, { soloCampana: !u.avisos_mi_dia });
+          if (u.avisos_mi_dia) correo += 1;
+          else campana += 1;
+        }
+        return { correo, campana };
       }),
   },
   {

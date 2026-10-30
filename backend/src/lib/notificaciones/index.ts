@@ -82,7 +82,17 @@ export function separarRuta(cuerpo: string): { cuerpo: string; ruta: string | un
   return { cuerpo: cuerpo.slice(0, i), ruta: rutaPermitida(cuerpo.slice(i + MARCA_RUTA.length)) };
 }
 
-export async function notificar(ctx: Pick<DbCtx, 'tenantId'>, n: Notificacion, destino: Destino): Promise<number> {
+/**
+ * Guarda el aviso para cada destinatario: aparece en su campana de BackIO y, salvo `soloCampana`, sale por correo
+ * (canal 'email'). `soloCampana` usa el canal 'pendiente', que el envío de correos no toma (p. ej. quien desactivó el
+ * correo de «Mi día»).
+ */
+export async function notificar(
+  ctx: Pick<DbCtx, 'tenantId'>,
+  n: Notificacion,
+  destino: Destino,
+  opts: { soloCampana?: boolean } = {},
+): Promise<number> {
   const destinatarios = await resolverDestinatarios(ctx.tenantId, destino);
   if (destinatarios.length === 0) return 0;
   const data = await insertarNotificaciones(
@@ -90,7 +100,7 @@ export async function notificar(ctx: Pick<DbCtx, 'tenantId'>, n: Notificacion, d
       tenant_id: ctx.tenantId,
       usuario_id: u.id,
       email_destino: u.email,
-      canal: 'email',
+      canal: opts.soloCampana ? 'pendiente' : 'email',
       tipo: n.tipo,
       titulo: sinMarca(n.titulo),
       cuerpo: sinMarca(n.cuerpo) + (rutaPermitida(n.ruta) ? `${MARCA_RUTA}${n.ruta}` : ''),
@@ -99,7 +109,7 @@ export async function notificar(ctx: Pick<DbCtx, 'tenantId'>, n: Notificacion, d
     })),
   );
   // Envío inmediato en segundo plano; los fallos quedan para el reintento.
-  void procesarPendientes(ctx.tenantId).catch(() => undefined);
+  if (!opts.soloCampana) void procesarPendientes(ctx.tenantId).catch(() => undefined);
   return data.length;
 }
 

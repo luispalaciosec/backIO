@@ -170,6 +170,19 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
                 <span className="font-medium">{SALUD_TEXTO[f.salud.salud]}</span>
                 {f.salud.motivos.length > 0 && <span className="text-gray-500">· {f.salud.motivos.join(' · ')}</span>}
               </div>
+              {f.salud_historial.length > 1 && (
+                <div className="flex items-center gap-1.5 mt-2" aria-label="Salud de los últimos 30 días">
+                  <span className="text-[11px] text-gray-500 mr-1">30 días</span>
+                  {f.salud_historial.map((h) => (
+                    <span
+                      key={h.fecha}
+                      className="inline-block w-2 h-4 rounded-sm"
+                      style={{ backgroundColor: COLOR_SALUD[h.salud] }}
+                      title={`${fecha(h.fecha)}: ${SALUD_TEXTO[h.salud]}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <Persona rol="Ejecutiva de cuenta" p={f.ejecutiva} />

@@ -647,6 +647,8 @@ export interface FichaCliente {
   mesa: { id: string; nombre: string; lider: PersonaFicha | null } | null;
   ejecutiva: PersonaFicha | null;
   salud: { salud: 'verde' | 'amarillo' | 'rojo'; motivos: string[] };
+  /** Color de cada día (foto diaria, migración 38), del más antiguo al más reciente. */
+  salud_historial: { fecha: string; salud: 'verde' | 'amarillo' | 'rojo' }[];
   indicadores: IndicadoresCliente;
   /** Últimos 6 meses, del más antiguo al actual. */
   mensual: { mes: string; entregas: number; pct_a_tiempo: number | null; reprocesos: number }[];

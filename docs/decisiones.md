@@ -97,6 +97,7 @@ mezcle datos entre organizaciones.
 | — | Una tarea **esperando al cliente** no cuenta como atraso nuestro en la salud del cliente: es una alerta para que la ejecutiva pida el feedback | El atraso es del cliente; contarlo pintaba en rojo cuentas por algo que no depende del equipo (Torres & Torres: la landing esperaba al cliente hacía 44 días) | 29/10/2026 · Luis |
 | — | **«¿Ya se entregó?»**: a quien tiene una tarea vencida y quieta se le pregunta si la entregó; la fecha que declara manda para «a tiempo» y el to-do se cierra en Basecamp con su cuenta | Las tareas entregadas a tiempo pero cerradas tarde en Basecamp contaban como atrasadas («Cronograma octubre»: 35 días) ([Mi día y avisos](./22-avisos.md)) | 30/10/2026 · Luis |
 | — | La espera del cliente se mide desde que la tarea pasa a «pendiente del cliente»; el portal no cambia y la ejecutiva pide el feedback por su canal | — | 30/10/2026 · Luis |
+| — | Los avisos llegan **por correo y a la campana de BackIO**; «Mi día» es un correo por persona de lunes a viernes, que cada uno puede desactivar (sigue llegando a la campana) | Que nadie tenga que entrar a buscar lo suyo, y que la ejecutiva se entere cuando una cuenta empeora ([Mi día y avisos](./22-avisos.md)) | 30/10/2026 · Luis |
 | — | Los títulos del daily llevan **emojis fijos** (🎯 ⛔ ✅…), y los pone el código, no la IA | Son el formato del equipo en Basecamp y sirven para encontrar cada sección de un vistazo | 11/10/2026 · Luis |
 
 ## Decisiones técnicas

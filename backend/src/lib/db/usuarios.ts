@@ -67,3 +67,31 @@ export async function usuarioPorBasecampId(ctx: DbCtx, basecampUserId: number): 
   throwIf(error);
   return data?.id ?? null;
 }
+
+/** Personas activas con su preferencia de correo de «Mi día» (migración 38). */
+export async function usuariosParaMiDia(tenantId: string): Promise<{ id: string; avisos_mi_dia: boolean }[]> {
+  const { data, error } = await serviceClient().from('usuarios').select('id, avisos_mi_dia').eq('tenant_id', tenantId).eq('activo', true);
+  throwIf(error);
+  return data ?? [];
+}
+
+export async function getAvisosMiDia(ctx: DbCtx, usuarioId: string): Promise<boolean> {
+  const { data, error } = await serviceClient()
+    .from('usuarios')
+    .select('avisos_mi_dia')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', usuarioId)
+    .maybeSingle();
+  throwIf(error);
+  return data?.avisos_mi_dia ?? true;
+}
+
+/** Service role: es la propia preferencia de la persona y la columna no está entre las que edita de sí misma. */
+export async function setAvisosMiDia(ctx: DbCtx, usuarioId: string, correo: boolean): Promise<void> {
+  const { error } = await serviceClient()
+    .from('usuarios')
+    .update({ avisos_mi_dia: correo })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', usuarioId);
+  throwIf(error);
+}

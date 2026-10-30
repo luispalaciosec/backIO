@@ -28,6 +28,7 @@ import { listCumplimientoDesde, listEventosAprobacion } from '../db/historial';
 import { ensureSemana, listSenales } from '../db/semanas';
 import { aTiempoOriginal, labelMotivoReproceso, labelMotivoReprogramacion, resumirCumplimiento } from '../cumplimiento';
 import { resumenHoras } from '../horas';
+import { historialSalud } from '../salud_clientes';
 
 const DIA = 86_400_000;
 const MESES = 6;
@@ -65,7 +66,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     resumenHoras(ctx, hace30, { clienteIds: [clienteId] }),
     ensureSemana(ctx, hoy),
   ]);
-  const senalesSemana = await listSenales(ctx, semana.id);
+  const [senalesSemana, saludHistorial] = await Promise.all([listSenales(ctx, semana.id), historialSalud(ctx, clienteId)]);
 
   const u = (id: string | null | undefined) => (id ? usuarios.find((x) => x.id === id) : undefined);
   const nombreProyecto = new Map(proyectos.map((p) => [p.id, p.nombre]));
@@ -142,6 +143,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     mesa: mesa ? { id: mesa.id, nombre: mesa.nombre, lider } : null,
     ejecutiva: persona(u(cliente.ejecutiva_id)),
     salud,
+    salud_historial: saludHistorial,
     indicadores: {
       activos: activos.length,
       atrasados: atrasadas.length,

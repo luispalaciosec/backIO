@@ -43,3 +43,39 @@ Se usa en tres lugares:
 - **Informe mensual:** columna «Respuesta cliente (días)», con la mediana de las respuestas del mes.
 
 El portal del cliente no cambia (ver [Portal](./06-portal-cliente.md)): la ejecutiva pide el feedback por su canal.
+
+## «Mi día» por correo (desde el 2/11/2026)
+
+De lunes a viernes a las 07:45 cada persona con tareas recibe un correo con lo suyo:
+- lo que trabaja hoy (lo elegido en el daily);
+- lo que vence hoy o mañana;
+- lo atrasado;
+- cuántas tareas tiene por confirmar en «¿ya se entregó?»;
+- lo bloqueado y lo que espera al cliente.
+
+El correo trae solo un resumen. Los botones que cambian algo están en la página **Mi día** (`/mi-dia`), que muestra lo
+mismo en vivo. Quien no tiene nada pendiente no recibe correo.
+
+Cada persona puede desactivar el correo desde Mi día (`usuarios.avisos_mi_dia`, migración 38). Aun así el resumen le
+llega a la campana. La tarea programada es `mi_dia` (`backend/src/lib/jobs.ts`); el resumen lo arma
+`backend/src/lib/mi_dia.ts`.
+
+## Campana de avisos (30/10/2026)
+
+Arriba a la derecha de cada pantalla está la campana. Muestra los avisos de los últimos 30 días: lo mismo que llega por
+correo, más lo que se recibe solo en la campana. Un número marca los no leídos.
+
+- Al abrir un aviso se marca como leído; también se pueden marcar todos.
+- **Rutas:** `GET /notificaciones`, `POST /notificaciones/:id/leida` y `POST /notificaciones/leidas`. Cada persona ve
+  solo los suyos (RLS de `notificaciones`).
+
+## Aviso cuando cambia la salud de un cliente (30/10/2026)
+
+De lunes a viernes a las 07:30, la tarea `salud_clientes` guarda el color de cada cliente en `cliente_salud`
+(migración 38). Es el mismo color de la ficha y del dashboard.
+
+- **Aviso:** si el color cambió respecto del último registrado, avisa a la ejecutiva de la cuenta y al líder de su mesa.
+  - Si empeora, el aviso dice por qué. Ejemplo: «Foligain pasó de verde a amarillo · Por qué: 2 tareas atrasadas».
+  - Si mejora, también avisa.
+- **Primer día:** la primera foto solo sirve de base y no avisa.
+- **En la ficha:** el cliente muestra la tira de colores de sus últimos 30 días.

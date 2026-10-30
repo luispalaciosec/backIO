@@ -1,6 +1,6 @@
 /** Cola de notificaciones por correo (lib/notificaciones). Service role: la usan rutas, cron y el scheduler. */
 import type { Rol } from '@backio/shared';
-import { serviceClient, throwIf, type FilaInsert } from './client';
+import { serviceClient, throwIf, type DbCtx, type FilaInsert } from './client';
 
 /** Usuarios activos del tenant con esos ids. */
 export async function usuariosActivosPorId(tenantId: string, ids: string[]): Promise<{ id: string; email: string }[]> {
@@ -72,4 +72,31 @@ export async function marcarNotificacionEnviada(id: string): Promise<void> {
 
 export async function registrarErrorNotificacion(id: string, ultimoError: string): Promise<void> {
   await serviceClient().from('notificaciones').update({ ultimo_error: ultimoError }).eq('id', id);
+}
+
+/** Avisos de la persona (su campana): los de los últimos 30 días, los nuevos primero. RLS: solo los propios. */
+export async function listarMisNotificaciones(ctx: DbCtx, dias = 30) {
+  const { data, error } = await ctx.db
+    .from('notificaciones')
+    .select('id, tipo, titulo, cuerpo, created_at, leida_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('usuario_id', ctx.usuarioId ?? '')
+    .gte('created_at', new Date(Date.now() - dias * 86_400_000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(50);
+  throwIf(error);
+  return data ?? [];
+}
+
+/** Marca como leídos (uno o todos los no leídos). El trigger notificaciones_solo_leida solo deja tocar leida_at. */
+export async function marcarLeidas(ctx: DbCtx, id?: string): Promise<void> {
+  let q = ctx.db
+    .from('notificaciones')
+    .update({ leida_at: new Date().toISOString() })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('usuario_id', ctx.usuarioId ?? '')
+    .is('leida_at', null);
+  if (id) q = q.eq('id', id);
+  const { error } = await q;
+  throwIf(error);
 }

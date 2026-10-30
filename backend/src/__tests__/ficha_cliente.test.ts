@@ -57,6 +57,7 @@ vi.mock('../lib/db/historial', () => ({
   ],
 }));
 vi.mock('../lib/horas', () => ({ resumenHoras: async () => ({ total: 12.5, por_proyecto: { p1: 12.5 } }) }));
+vi.mock('../lib/salud_clientes', () => ({ historialSalud: async () => [{ fecha: '2026-10-28', salud: 'rojo' }] }));
 vi.mock('../lib/db/semanas', async (orig) => ({
   ...(await orig<object>()),
   ensureSemana: async () => ({ id: 's' }),
