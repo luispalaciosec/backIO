@@ -12,6 +12,8 @@ import {
   nombrePersona,
   reprocesoDelEquipo,
   saludCliente,
+  tramosEsperaCliente,
+  medianaDe,
   operacionParaSalud,
   esTrabajoMedido,
 } from '@backio/shared';
@@ -22,7 +24,7 @@ import { listUsuarios } from '../db/usuarios';
 import { listProyectos } from '../db/proyectos';
 import { listBacklog } from '../db/requerimientos';
 import { listCompletadosDesde } from '../db/dashboard';
-import { listCumplimientoDesde } from '../db/historial';
+import { listCumplimientoDesde, listEventosAprobacion } from '../db/historial';
 import { ensureSemana, listSenales } from '../db/semanas';
 import { aTiempoOriginal, labelMotivoReproceso, labelMotivoReprogramacion, resumirCumplimiento } from '../cumplimiento';
 import { resumenHoras } from '../horas';
@@ -67,6 +69,12 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
 
   const u = (id: string | null | undefined) => (id ? usuarios.find((x) => x.id === id) : undefined);
   const nombreProyecto = new Map(proyectos.map((p) => [p.id, p.nombre]));
+  const ids = new Set([...activos, ...completados].map((r) => r.id));
+  // Cuánto tarda el cliente en responder: tramos en «pendiente del cliente» según aprobacion_eventos.
+  const tramos = tramosEsperaCliente(await listEventosAprobacion(ctx, [...ids]), ahora);
+  const esperando = new Map(tramos.filter((t) => t.hasta === null).map((t) => [t.requerimiento_id, Math.floor(t.dias)]));
+  const respondidos90 = tramos.filter((t) => t.hasta !== null && t.hasta >= hace90);
+  const diasEsperando = (r: RequerimientoMetricas) => esperando.get(r.id) ?? r.dias_sin_movimiento;
   const tarea = (r: RequerimientoMetricas): TareaFicha => ({
     id: r.id,
     titulo_interno: r.titulo_interno,
@@ -74,6 +82,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     responsables: r.owner_agencia.map((id) => (u(id) ? nombrePersona(u(id)!) : '—')),
     estado_operativo: r.estado_operativo,
     esperando_cliente: r.estado_aprobacion === 'pendiente_cliente',
+    dias_esperando_cliente: r.estado_aprobacion === 'pendiente_cliente' ? diasEsperando(r) : null,
     fecha_entrega: r.fecha_entrega,
     dias_atraso: r.dias_atraso,
     dias_sin_movimiento: r.dias_sin_movimiento,
@@ -82,7 +91,6 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
     basecamp_url: r.basecamp_url,
   });
 
-  const ids = new Set([...activos, ...completados].map((r) => r.id));
   const reprogs = cumpl.reprogramaciones.filter((x) => ids.has(x.requerimiento_id));
   const reprocs = cumpl.reprocesos.filter((x) => ids.has(x.requerimiento_id));
   const comp90 = completados.filter((r) => r.completado_at && r.completado_at >= hace90);
@@ -138,6 +146,8 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
       activos: activos.length,
       atrasados: atrasadas.length,
       esperando_cliente: activos.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length,
+      respuesta_cliente_mediana_dias_90d: medianaDe(respondidos90.map((t) => t.dias)),
+      respuestas_cliente_90d: respondidos90.length,
       atrasados_esperando_cliente: atrasadas.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length,
       bloqueadas: activos.filter((r) => r.estado_operativo === 'bloqueado').length,
       sin_movimiento_max: sinMovMax,
@@ -187,7 +197,7 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
       // Lo que más tiempo lleva esperando, primero: es lo que la ejecutiva tiene que empujar.
       esperando_cliente: activos
         .filter((r) => r.estado_aprobacion === 'pendiente_cliente')
-        .sort((a, b) => b.dias_sin_movimiento - a.dias_sin_movimiento)
+        .sort((a, b) => diasEsperando(b) - diasEsperando(a))
         .map(tarea),
       bloqueadas: activos.filter((r) => r.estado_operativo === 'bloqueado').map(tarea),
       sin_movimiento: activos

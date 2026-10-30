@@ -55,6 +55,12 @@ caracteres). Es texto propio de BackIO, no copiado de Basecamp, y nunca llega al
 `20260907000017`, ya aplicada. Mientras no estaba aplicada, el backend guardaba sin observación; ese respaldo ya
 no existe en el código.
 
+## Entrega declarada (30/10/2026)
+
+Para «a tiempo», la fecha real de entrega es la que declara el responsable al responder «¿ya se entregó?»
+(`entregado_el`, migración 38) y, si no la declaró, el día de cierre. Una tarea entregada a tiempo y cerrada tarde en
+Basecamp ya no cuenta como tarde. Ver [Mi día y avisos](./22-avisos.md).
+
 ## Indicadores
 
 | Indicador | Cálculo | Dónde |

@@ -37,6 +37,7 @@ import {
 import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento, getNotaBitacora } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
 import { actualizarRequerimiento, ReglaError } from '../../lib/requerimientos/actualizar';
+import { pendientesDeEntrega, responderEntrega } from '../../lib/entregas';
 import { crearLote, type ProyectoDelLote, type RequerimientoDelLote } from '../../lib/db/lote';
 import { ensureSemana, semanaTienePlan } from '../../lib/db/semanas';
 
@@ -89,6 +90,16 @@ requerimientos.get('/estatus', requireScope('read:backlog'), async (c) => {
   );
   const notas = await ultimaBitacoraPorRequerimiento(ctx, { ids: items.map((r) => r.id), hasta: hastaIso });
   return c.json({ items: items.map((r) => ({ ...r, ultima_nota: notas[r.id] ?? null })) });
+});
+
+// ---------------- «¿Ya se entregó?» (docs/22): antes de '/:id'.
+/** Tareas por las que se le pregunta a la persona si ya se entregaron. Gestión puede pedir las de otra (?usuario=). */
+requerimientos.get('/entregas/pendientes', requireScope('read:backlog'), async (c) => {
+  const ctx = ctxOf(c);
+  const usuario = esColaborador(c.get('auth')) ? ctx.usuarioId : c.req.query('usuario') || ctx.usuarioId;
+  if (!usuario) return c.json({ items: [] });
+  const items = await pendientesDeEntrega(ctx, usuario);
+  return c.json({ items, total: items.length });
 });
 
 requerimientos.get('/:id', requireScope('read:backlog'), async (c) => {
@@ -180,6 +191,28 @@ const escrituraOPropia: MiddlewareHandler = async (c, next) => {
   if (esColaboradorHumano(a)) return next(); // se valida en el handler
   return requireScope('write:requerimientos')(c, next);
 };
+
+/** Respuesta a «¿ya se entregó?»: «entregado» con su fecha o «espera_cliente». «Todavía no» es la reprogramación de siempre. */
+requerimientos.post(
+  '/:id/entrega',
+  escrituraOPropia,
+  zValidator(
+    'json',
+    z.discriminatedUnion('respuesta', [
+      z.object({ respuesta: z.literal('entregado'), fecha: fecha }),
+      z.object({ respuesta: z.literal('espera_cliente') }),
+    ]),
+  ),
+  async (c) => {
+    try {
+      const r = await responderEntrega(ctxOf(c), c.req.param('id'), c.req.valid('json'), { esGestion: !esColaborador(c.get('auth')) });
+      return c.json(r);
+    } catch (e) {
+      if (e instanceof ReglaError) return c.json({ error: e.message }, e.status);
+      throw e;
+    }
+  },
+);
 
 requerimientos.patch('/:id', escrituraOPropia, zValidator('json', actualizarRequerimientoSchema), async (c) => {
   const ctx = ctxOf(c);

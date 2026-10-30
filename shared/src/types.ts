@@ -213,6 +213,10 @@ export interface Requerimiento {
   basecamp_url: string | null;
   ultima_actualizacion: string;
   completado_at: string | null;
+  /** Día en que el responsable dice que entregó («¿ya se entregó?», migración 38). Manda sobre completado_at para «a tiempo». */
+  entregado_el?: string | null;
+  entregado_por?: string | null;
+  entregado_registrado_at?: string | null;
   /** Responsables cuando se completó (migración 30); null si está abierta o es anterior. */
   responsables_cierre?: string[] | null;
   /** Pasó a otra persona por una salida con poco margen: si se cierra tarde, el atraso no cuenta (docs/20). */
@@ -603,6 +607,8 @@ export interface TareaFicha {
   estado_operativo: EstadoOperativo;
   /** Espera aprobación o insumos del cliente: su atraso no cuenta para la salud. */
   esperando_cliente: boolean;
+  /** Días que lleva esperando al cliente desde que pasó a «pendiente del cliente» (null si no espera). */
+  dias_esperando_cliente: number | null;
   fecha_entrega: string | null;
   dias_atraso: number;
   dias_sin_movimiento: number;
@@ -615,6 +621,9 @@ export interface IndicadoresCliente {
   activos: number;
   atrasados: number;
   esperando_cliente: number;
+  /** Mediana de días que tardó el cliente en responder (tramos cerrados en 90 días) y cuántas respuestas hubo. */
+  respuesta_cliente_mediana_dias_90d: number | null;
+  respuestas_cliente_90d: number;
   /** Atrasadas que esperan al cliente: se muestran, pero no cuentan para la salud. */
   atrasados_esperando_cliente: number;
   bloqueadas: number;

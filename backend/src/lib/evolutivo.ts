@@ -12,6 +12,7 @@ import {
   porcentaje,
   sumarDias,
   cerradaATiempo,
+  entregaReal,
   responsablesDe,
   nombrePersona,
 } from '@backio/shared';
@@ -50,6 +51,7 @@ export interface TareaEvo {
   fecha_pedido?: string | null;
   responsables_cierre?: string[] | null;
   heredada?: boolean;
+  entregado_el?: string | null;
 }
 export interface EventoSeleccion {
   requerimiento_id: string;
@@ -223,9 +225,9 @@ export function metricasSemana(p: {
       t.fecha_entrega_original >= p.inicio &&
       t.fecha_entrega_original <= p.fin &&
       // Heredada por una salida y cerrada tarde: ese atraso no cuenta (docs/20).
-      !(t.heredada && cerradaATiempo(t.completado_at, t.fecha_entrega_original, true) === null && !!t.completado_at),
+      !(t.heredada && cerradaATiempo(entregaReal(t), t.fecha_entrega_original, true) === null && !!t.completado_at),
   );
-  const hechaAntes = (t: TareaEvo, fecha: string | null) => cerradaATiempo(t.completado_at, fecha) === true;
+  const hechaAntes = (t: TareaEvo, fecha: string | null) => cerradaATiempo(entregaReal(t), fecha) === true;
   const aOrig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega_original)).length;
   const aVig = comprometidas.filter((t) => hechaAntes(t, t.fecha_entrega)).length;
   const porId = new Map(p.tareas.map((t) => [t.id, t]));

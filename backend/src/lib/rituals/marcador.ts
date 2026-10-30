@@ -3,7 +3,7 @@
  * tiempo, arriba del plan operativo y del acta de cierre de cada mesa. Todo sale de los datos; nada se escribe a mano y
  * nunca se nombra a quien no cumplió.
  */
-import { cerradaATiempo, diaLocal, MOTIVOS_REPROGRAMACION, responsablesDe, sumarDias } from '@backio/shared';
+import { cerradaATiempo, entregaReal, diaLocal, MOTIVOS_REPROGRAMACION, responsablesDe, sumarDias } from '@backio/shared';
 
 /** Meta de la semana: % de tareas vigentes completadas. Igual para todas las mesas. */
 export const META_SEMANAL = 80;
@@ -19,6 +19,7 @@ export interface TareaMarcador {
   fecha_compromiso?: string | null;
   estado_operativo: string;
   completado_at: string | null;
+  entregado_el?: string | null;
   owner_agencia: string[];
   responsables_cierre?: string[] | null;
   heredada?: boolean | null;
@@ -110,7 +111,7 @@ export function resultadoSemana(tareas: TareaMarcador[], inicio: string, corte: 
   });
   // Una completada sin completado_at (históricas, docs/05) cuenta como completada: no se sabe cuándo, no se castiga.
   const hechas = vigentes.filter((t) => t.estado_operativo === 'completado');
-  const enSemana = hechas.filter((t) => !corte || !t.completado_at || diaLocal(t.completado_at) <= corte).length;
+  const enSemana = hechas.filter((t) => !corte || !t.completado_at || diaLocal(entregaReal(t)!) <= corte).length;
   return {
     inicio,
     numero: numeroIso(inicio),
@@ -157,7 +158,7 @@ export function reconocidos(tareas: TareaMarcador[], inicio: string, minimo = RE
   for (const t of tareas) {
     const f = compromiso(t);
     if (!f || f < inicio || f > fin || t.estado_operativo === 'cancelado') continue;
-    const r = cerradaATiempo(t.completado_at, f, !!t.heredada);
+    const r = cerradaATiempo(entregaReal(t), f, !!t.heredada);
     if (r === null && t.completado_at) continue;
     for (const u of responsablesDe(t)) {
       const p = porPersona.get(u) ?? { total: 0, a_tiempo: 0 };

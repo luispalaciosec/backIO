@@ -11,10 +11,10 @@ import { listClientes } from '../db/clientes';
 import { listUsuarios } from '../db/usuarios';
 import { listBacklog } from '../db/requerimientos';
 import { resumenHoras } from '../horas';
-import { listCumplimientoDesde } from '../db/historial';
+import { listCumplimientoDesde, listEventosAprobacion } from '../db/historial';
 import { resumirCumplimiento, labelMotivoReproceso, labelMotivoReprogramacion } from '../cumplimiento';
 import { generarTexto } from './index';
-import { finDiaLocal, inicioDiaLocal, nombrePersona } from '@backio/shared';
+import { finDiaLocal, inicioDiaLocal, medianaDe, nombrePersona, tramosEsperaCliente } from '@backio/shared';
 
 export function rangoMes(mes: string): { desde: string; hasta: string; etiqueta: string } {
   const [y, m] = mes.split('-').map(Number);
@@ -31,7 +31,7 @@ export function rangoMes(mes: string): { desde: string; hasta: string; etiqueta:
 const SYSTEM_INFORME = `Redacta el informe ejecutivo mensual de una mesa de la agencia para la gerencia general.
 Devuelve texto en markdown con estas secciones y nada más:
 ## Lectura del mes
-2 a 3 párrafos: qué se entregó y qué porcentaje llegó a tiempo sobre la fecha ORIGINAL comprometida (distingue del cumplimiento sobre la fecha vigente cuando difieran), cómo cerró cada cliente (salud, atrasos, espera del cliente), dónde se fue el esfuerzo (horas vs. valor cotizado), cuántos reprocesos hubo, qué causa domina y cuántas horas costaron, qué se arrastró y por qué.
+2 a 3 párrafos: qué se entregó y qué porcentaje llegó a tiempo sobre la fecha ORIGINAL comprometida (distingue del cumplimiento sobre la fecha vigente cuando difieran), cómo cerró cada cliente (salud, atrasos, espera del cliente y cuántos días tardó en responder: respuesta_cliente_dias), dónde se fue el esfuerzo (horas vs. valor cotizado), cuántos reprocesos hubo, qué causa domina y cuántas horas costaron, qué se arrastró y por qué.
 ## Lo que hay que decidir
 3 a 5 viñetas, cada una una decisión concreta para el mes siguiente con responsable sugerido si está en los datos.
 Sin cifras inventadas; puedes citar las del JSON.`;
@@ -52,6 +52,10 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
   const reprogsMes = cumpl.reprogramaciones.filter((x) => x.created_at <= finDiaLocal(hasta));
   const reprocsMes = cumpl.reprocesos.filter((x) => x.abierto_at <= finDiaLocal(hasta));
   const sen = await listSenalesEntre(ctx, desde, hasta);
+  // Cuánto tardó cada cliente en responder: tramos en «pendiente del cliente» que cerraron en el mes.
+  const tramosMes = tramosEsperaCliente(
+    await listEventosAprobacion(ctx, [...new Set([...activos, ...completados].map((r) => r.id))]),
+  ).filter((t) => t.hasta !== null && t.hasta >= inicioDiaLocal(desde) && t.hasta <= finDiaLocal(hasta));
   const senales = sen as { tipo: string; severidad: string }[];
   // Proyectos activos, igual que el dashboard. Antes filtraba por un estado «cerrado» que no existe: la consulta
   // fallaba sin revisar el error y el valor cotizado del informe salía siempre en 0 (lo destapó el tipado de la Ola 6).
@@ -91,6 +95,7 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
         activos: act.length,
         atrasados: act.filter((r) => r.dias_atraso > 0).length,
         esperando_cliente: act.filter((r) => r.estado_aprobacion === 'pendiente_cliente').length,
+        respuesta_cliente_dias: medianaDe(tramosMes.filter((t) => idsCli.has(t.requerimiento_id)).map((t) => t.dias)),
         reprogramados_2mas: act.filter((r) => r.veces_reprogramado >= 2).length,
         horas_mes: Math.round((horas.por_cliente[id] ?? 0) * 10) / 10,
         valor_cotizado_activo: cotizado.get(id) ?? 0,
@@ -167,11 +172,11 @@ export async function generarInformeMensual(ctx: DbCtx, mesaId: string, mes: str
     '',
     '## Clientes',
     '',
-    '| Cliente | Entregados | Piezas | A tiempo (orig.) | A tiempo (vig.) | Reprog. | Reprocesos | Activos | Atrasados | Espera cliente | Horas | Cotizado | USD/h |',
-    '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+    '| Cliente | Entregados | Piezas | A tiempo (orig.) | A tiempo (vig.) | Reprog. | Reprocesos | Activos | Atrasados | Espera cliente | Respuesta cliente (días) | Horas | Cotizado | USD/h |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
     ...porCliente.map(
       (c) =>
-        `| ${c.cliente} | ${c.entregados} | ${c.piezas_entregadas} | ${c.pct_a_tiempo_original ?? '—'}% | ${c.pct_a_tiempo_vigente ?? '—'}% | ${c.reprogramaciones} | ${c.reprocesos}${c.causa_reproceso_dominante ? ` (${c.causa_reproceso_dominante})` : ''} | ${c.activos} | ${c.atrasados} | ${c.esperando_cliente} | ${c.horas_mes} | ${c.valor_cotizado_activo ? `$${c.valor_cotizado_activo.toLocaleString('en-US')}` : '—'} | ${c.usd_por_hora ?? '—'} |`,
+        `| ${c.cliente} | ${c.entregados} | ${c.piezas_entregadas} | ${c.pct_a_tiempo_original ?? '—'}% | ${c.pct_a_tiempo_vigente ?? '—'}% | ${c.reprogramaciones} | ${c.reprocesos}${c.causa_reproceso_dominante ? ` (${c.causa_reproceso_dominante})` : ''} | ${c.activos} | ${c.atrasados} | ${c.esperando_cliente} | ${c.respuesta_cliente_dias ?? '—'} | ${c.horas_mes} | ${c.valor_cotizado_activo ? `$${c.valor_cotizado_activo.toLocaleString('en-US')}` : '—'} | ${c.usd_por_hora ?? '—'} |`,
     ),
     '',
     '## Personas',

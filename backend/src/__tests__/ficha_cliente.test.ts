@@ -47,7 +47,15 @@ vi.mock('../lib/db/proyectos', () => ({
 }));
 vi.mock('../lib/db/requerimientos', () => ({ listBacklog: async () => m.activos }));
 vi.mock('../lib/db/dashboard', () => ({ listCompletadosDesde: async () => m.completados }));
-vi.mock('../lib/db/historial', () => ({ listCumplimientoDesde: async () => ({ reprogramaciones: [], reprocesos: m.reprocesos }) }));
+vi.mock('../lib/db/historial', () => ({
+  listCumplimientoDesde: async () => ({ reprogramaciones: [], reprocesos: m.reprocesos }),
+  // «esperando» entró a pendiente del cliente el 19/10 (sigue esperando); «ok1» esperó 3 días en octubre.
+  listEventosAprobacion: async () => [
+    { requerimiento_id: 'esperando', estado_de: 'no_aplica', estado_a: 'pendiente_cliente', created_at: '2026-10-19T15:00:00Z' },
+    { requerimiento_id: 'ok1', estado_de: 'no_aplica', estado_a: 'pendiente_cliente', created_at: '2026-10-10T15:00:00Z' },
+    { requerimiento_id: 'ok1', estado_de: 'pendiente_cliente', estado_a: 'aprobado', created_at: '2026-10-13T15:00:00Z' },
+  ],
+}));
 vi.mock('../lib/horas', () => ({ resumenHoras: async () => ({ total: 12.5, por_proyecto: { p1: 12.5 } }) }));
 vi.mock('../lib/db/semanas', async (orig) => ({
   ...(await orig<object>()),
@@ -156,6 +164,9 @@ describe('ficha del cliente', () => {
     });
     expect(f.salud).toEqual({ salud: 'amarillo', motivos: ['1 tarea atrasada'] });
     expect(f.tareas.atrasadas.map((t) => t.id)).toEqual(['atrasada']);
+    // La espera real cuenta desde que entró a «pendiente del cliente», no desde el último movimiento (1 día).
+    expect(f.tareas.esperando_cliente[0]).toMatchObject({ id: 'esperando', dias_esperando_cliente: 10 });
+    expect(f.indicadores).toMatchObject({ respuesta_cliente_mediana_dias_90d: 3, respuestas_cliente_90d: 1 });
     expect(f.tareas.ultimas_completadas[0]).toMatchObject({ responsables: ['Oscar Borja'] });
     expect(f.tareas.ultimas_completadas.find((t) => t.id === 'tarde')?.a_tiempo).toBe(false);
     expect(f.senales.map((s) => s.id)).toEqual(['s1', 's2']);

@@ -5,7 +5,15 @@
  *  - Lo guardado a mano (manual/ajustado) manda sobre lo calculado; lo calculado de meses cerrados se congela.
  */
 import type { Area, KpiDefinicion, KpiMedicion, KpiValor, KpiTablero, KpiDetalleTarea, Usuario } from '@backio/shared';
-import { AREAS, MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, cerradaATiempo, nombrePersona, responsablesDe } from '@backio/shared';
+import {
+  AREAS,
+  MOTIVOS_REPROCESO,
+  MOTIVOS_REPROGRAMACION,
+  cerradaATiempo,
+  entregaReal,
+  nombrePersona,
+  responsablesDe,
+} from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { listUsuarios } from './db/usuarios';
 import { listDefiniciones, listMediciones, cargarDatosKpi, guardarMedicion, type DatosKpi, type ReqKpi } from './db/kpis';
@@ -127,13 +135,13 @@ export function calcular(def: KpiDefinicion, d: DatosKpi, rango: { desde: string
         items: completadas
           .filter((r) => r.fecha_entrega_original || r.fecha_entrega)
           .flatMap((r) => {
-            const original = cerradaATiempo(r.completado_at, r.fecha_entrega_original) === true;
+            const original = cerradaATiempo(entregaReal(r), r.fecha_entrega_original) === true;
             // Excluye dependencias externas: si todas las reprogramaciones fueron del cliente o neutras, vale la fecha vigente.
             const reprogs = rgPorReq.get(r.id) ?? [];
             const soloExternas =
               reprogs.length > 0 &&
               reprogs.every((g) => MOTIVOS_REPROGRAMACION.find((m) => m.valor === g.motivo)?.atribuible !== 'equipo' && g.motivo !== null);
-            const vigente = cerradaATiempo(r.completado_at, r.fecha_entrega) === true;
+            const vigente = cerradaATiempo(entregaReal(r), r.fecha_entrega) === true;
             const a = original || (soloExternas && vigente);
             // Heredada por una salida (docs/20): si se cerró tarde, ese atraso no cuenta para nadie.
             if (!a && r.heredada) return [];

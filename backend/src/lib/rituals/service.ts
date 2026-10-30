@@ -23,7 +23,7 @@ import { calcularSenales } from './signals';
 import { calcularCapacidad, renderActaCierre, renderPlanOperativo } from './documents';
 import { getUmbralesSenales, listCompletadosRecientes } from '../db/rituales';
 import type { Senal, Acta, Acuerdo, CapacidadPersona, Semana } from '@backio/shared';
-import { hoyLocal, inicioDiaLocal, sumarDias } from '@backio/shared';
+import { hoyLocal, inicioDiaLocal, sumarDias, tramosEsperaCliente } from '@backio/shared';
 import {
   calcularMarcador,
   fechaCompromiso,
@@ -33,7 +33,15 @@ import {
   type Marcador,
   type ReprogramacionMarcador,
 } from './marcador';
-import { listReprogramacionesMarcador } from '../db/historial';
+import { listReprogramacionesMarcador, listEventosAprobacion } from '../db/historial';
+
+/** Días enteros que cada tarea «pendiente del cliente» lleva esperando, según aprobacion_eventos. */
+export async function diasEsperandoCliente(ctx: DbCtx, activos: { id: string; estado_aprobacion: string }[]): Promise<Map<string, number>> {
+  const ids = activos.filter((r) => r.estado_aprobacion === 'pendiente_cliente').map((r) => r.id);
+  if (!ids.length) return new Map();
+  const tramos = tramosEsperaCliente(await listEventosAprobacion(ctx, ids));
+  return new Map(tramos.filter((t) => t.hasta === null).map((t) => [t.requerimiento_id, Math.floor(t.dias)]));
+}
 
 export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<Senal[]> {
   const hoy = hoyLocal();
@@ -60,6 +68,7 @@ export async function recalcularSenales(ctx: DbCtx, semanaId?: string): Promise<
     acuerdosAbiertos,
     umbrales: u,
     sinMotivo,
+    esperaCliente: await diasEsperandoCliente(ctx, activos),
   });
   return replaceSenales(ctx, semana.id, senales);
 }
@@ -117,6 +126,7 @@ export async function senalesDeMesa(ctx: DbCtx, semana: Semana, mesaId?: string 
     acuerdosAbiertos: acuerdosDeLaMesa(acuerdos, mesaId),
     umbrales: u,
     sinMotivo,
+    esperaCliente: await diasEsperandoCliente(ctx, activos),
   });
   const previa = new Map(guardadas.map((s) => [`${s.tipo}|${s.entidad_id}`, s]));
   const atendidas = await atendidasRecientes(ctx);

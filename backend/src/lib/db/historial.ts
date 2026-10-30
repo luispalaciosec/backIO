@@ -1,6 +1,6 @@
 /** Reprogramaciones y reprocesos por requerimiento + agregados de cumplimiento. */
-import type { Reprogramacion, Reproceso, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
-import { paginar } from './paginar';
+import type { EventoAprobacion, Reprogramacion, Reproceso, MotivoReprogramacion, MotivoReproceso, OrigenReproceso } from '@backio/shared';
+import { paginar, enLotes } from './paginar';
 import { type DbCtx, throwIf } from './client';
 
 export async function listReprogramaciones(ctx: DbCtx, requerimientoId: string): Promise<Reprogramacion[]> {
@@ -281,4 +281,17 @@ export async function listReprogramacionesMarcador(ctx: DbCtx, desdeIso: string)
       .order('created_at')
       .range(a, b),
   );
+}
+
+/** Cambios de aprobación de unas tareas (migración 22): para medir cuánto tarda el cliente en responder. */
+export async function listEventosAprobacion(ctx: DbCtx, reqIds: string[]): Promise<EventoAprobacion[]> {
+  return enLotes(reqIds, async (lote) => {
+    const { data, error } = await ctx.db
+      .from('aprobacion_eventos')
+      .select('requerimiento_id, estado_de, estado_a, created_at')
+      .eq('tenant_id', ctx.tenantId)
+      .in('requerimiento_id', lote);
+    throwIf(error);
+    return (data ?? []) as EventoAprobacion[];
+  });
 }

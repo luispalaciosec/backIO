@@ -12,6 +12,7 @@ import { COLOR_SALUD } from '@/components/dashboard/Charts';
 import { AvanceBar } from '@/components/ui/AvanceBar';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { Sugerencias } from './Sugerencias';
+import { RecordatorioIA } from '@/components/backlog/RecordatorioIA';
 
 export const dynamic = 'force-dynamic';
 
@@ -202,12 +203,18 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
               <li key={t.id} className="flex flex-wrap justify-between gap-x-3">
                 <span className="break-words">{t.titulo_interno}</span>
                 <span className="text-xs tabular-nums">
-                  {t.dias_sin_movimiento} d esperando{t.dias_atraso ? ` · ${t.dias_atraso} d sobre la fecha` : ''}
+                  {t.dias_esperando_cliente ?? t.dias_sin_movimiento} d esperando
+                  {t.dias_atraso ? ` · ${t.dias_atraso} d sobre la fecha` : ''} ·{' '}
+                  <RecordatorioIA requerimientoId={t.id} titulo={t.titulo_interno} />
                 </span>
               </li>
             ))}
           </ul>
-          <p className="text-xs">Su atraso es del cliente: no cuenta para la salud de la cuenta.</p>
+          <p className="text-xs">
+            Su atraso es del cliente: no cuenta para la salud de la cuenta.
+            {i.respuesta_cliente_mediana_dias_90d !== null &&
+              ` En los últimos 90 días este cliente tardó ${i.respuesta_cliente_mediana_dias_90d} días en responder (mediana de ${i.respuestas_cliente_90d} respuestas).`}
+          </p>
         </section>
       )}
 
@@ -221,7 +228,7 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
           etiqueta="Atrasadas"
           valor={i.atrasados}
           alerta={i.atrasados > 0}
-          sub={`${i.atrasados_esperando_cliente ? `${i.atrasados_esperando_cliente} esperando al cliente (no cuentan para la salud) · ` : ''}${i.activos} activas · ${i.bloqueadas} bloqueadas`}
+          sub={`${i.atrasados_esperando_cliente ? `${i.atrasados_esperando_cliente} esperando al cliente (no cuentan para la salud) · ` : ''}${i.activos} activas · ${i.bloqueadas} bloqueadas${i.respuesta_cliente_mediana_dias_90d !== null ? ` · el cliente responde en ${i.respuesta_cliente_mediana_dias_90d} d (mediana)` : ''}`}
         />
         <Indicador
           etiqueta="Reprocesos · 90 días"

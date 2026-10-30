@@ -37,6 +37,11 @@ export interface WeekContext {
   umbrales?: Partial<SignalThresholds>;
   /** Reprogramaciones y reprocesos sin causa (últimos 45 días). Opcional para compatibilidad. */
   sinMotivo?: { reprogramaciones: { requerimiento_id: string }[]; reprocesos: { requerimiento_id: string; origen: string }[] };
+  /**
+   * Días que cada tarea lleva esperando al cliente, desde que entró a «pendiente del cliente» (aprobacion_eventos). Sin
+   * dato se usa «días sin movimiento», que se reinicia con cualquier cambio de la tarea.
+   */
+  esperaCliente?: Map<string, number>;
 }
 
 export interface SignalOut {
@@ -132,14 +137,15 @@ export const REGLAS: SignalRule[] = [
     tema_agenda: 'Escalamiento a ejecutiva de cuenta',
     detectar: (ctx, u) =>
       ctx.activos
-        .filter((r) => r.estado_aprobacion === 'pendiente_cliente' && r.dias_sin_movimiento > u.bloqueo_cliente_dias)
-        .map((r) => ({
+        .map((r) => ({ r, dias: ctx.esperaCliente?.get(r.id) ?? r.dias_sin_movimiento }))
+        .filter(({ r, dias }) => r.estado_aprobacion === 'pendiente_cliente' && dias > u.bloqueo_cliente_dias)
+        .map(({ r, dias }) => ({
           tipo: 'bloqueo_cliente',
           severidad: 'alta',
           entidad_tipo: 'requerimiento',
           entidad_id: r.id,
-          titulo: `${clienteDe(ctx, r.cliente_id)} debe "${r.etiqueta_cliente ?? r.titulo_interno}" hace ${r.dias_sin_movimiento} días`,
-          detalle: { dias: r.dias_sin_movimiento, cliente_id: r.cliente_id },
+          titulo: `${clienteDe(ctx, r.cliente_id)} debe "${r.etiqueta_cliente ?? r.titulo_interno}" hace ${dias} días`,
+          detalle: { dias, cliente_id: r.cliente_id },
         })),
   },
   {

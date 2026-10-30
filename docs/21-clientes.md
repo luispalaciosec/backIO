@@ -95,6 +95,12 @@ se miran en los últimos 90 días.
 - La ficha y el dashboard muestran el porqué junto al color, por ejemplo «72 % a tiempo · 1 tarea atrasada».
 - Los umbrales están en `UMBRALES_SALUD`.
 
+### Respuesta del cliente
+
+El aviso «espera feedback del cliente» muestra los días reales que cada tarea lleva esperando, contados desde que pasó
+a «pendiente del cliente», y un botón para redactar el recordatorio. El indicador de atrasadas muestra cuánto tarda
+el cliente en responder: la mediana de 90 días. Ver [Mi día y avisos](./22-avisos.md#cuanto-tarda-el-cliente-en-responder-30-10-2026).
+
 ### Sugerencias de la IA
 
 El botón «✨ Sugerir qué hacer» (`POST /clientes/:id/sugerencias`) pide de 3 a 5 acciones, cada una con el dato de

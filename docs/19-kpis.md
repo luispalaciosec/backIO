@@ -28,6 +28,8 @@ consejo concreto para mejorarlo (`frontend/components/kpis/ComoSeCalcula.tsx`).
   y, si el proyecto no tiene ejecutiva, clientes donde es `ejecutiva_id` (migración 37, [Clientes](./21-clientes.md)). Lo
   completado cuenta para quienes eran responsables **al cerrar** (`responsables_cierre`, migración 30), aunque
   después la tarea cambie de manos o la persona se vaya.
+- **A tiempo**: se compara la fecha comprometida con la entrega real, que es la que declaró el responsable
+  (`entregado_el`, [Mi día y avisos](./22-avisos.md)) o, si no la declaró, el día de cierre.
 - **Integrantes de un periodo**: los activos del área, más quien se fue durante ese periodo o después (con «(ex)»).
   Quien se fue sigue en los meses en que trabajó y no aparece en los siguientes; el día 1 su último mes también se
   congela. Ver [Cuando alguien se va](./20-salida.md).

@@ -51,6 +51,7 @@ Personas con acceso: rol, capacidad semanal, área y su usuario de Basecamp.
 | `area` | texto |  |  |
 | `fecha_salida` | date |  |  |
 | `motivo_salida` | texto |  |  |
+| `avisos_mi_dia` | boolean | sí | por defecto `true` |
 
 ### clientes
 
@@ -196,6 +197,9 @@ Las tareas del backlog: estado, aprobación, prioridad, fechas, responsables, vi
 | `responsables_cierre` | uuid[] |  |  |
 | `heredada` | boolean | sí | por defecto `false` |
 | `basecamp_due_on_visto` | date |  |  |
+| `entregado_el` | date |  |  |
+| `entregado_por` | uuid |  | → [usuarios](#usuarios).id |
+| `entregado_registrado_at` | fecha y hora |  |  |
 
 ### plantillas
 
@@ -873,6 +877,10 @@ Requerimientos con días de atraso y días sin movimiento calculados (hora de Gu
 | `primera_respuesta_at` | fecha y hora |  |  |
 | `responsables_cierre` | uuid[] |  |  |
 | `heredada` | boolean |  |  |
+| `basecamp_due_on_visto` | date |  |  |
+| `entregado_el` | date |  |  |
+| `entregado_por` | uuid |  | → [usuarios](#usuarios).id |
+| `entregado_registrado_at` | fecha y hora |  |  |
 | `dias_atraso` | integer |  |  |
 | `dias_sin_movimiento` | integer |  |  |
 | `peso_completado` | numeric |  |  |
@@ -893,6 +901,20 @@ Avance de cada proyecto según el peso de sus tareas completadas.
 | `esperando_cliente` | bigint |  |  |
 
 ## Sin clasificar
+
+### cliente_salud
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | bigint | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `cliente_id` | uuid | sí | → [clientes](#clientes).id |
+| `fecha` | date | sí |  |
+| `salud` | texto | sí |  |
+| `motivos` | jsonb | sí |  |
+| `created_at` | fecha y hora | sí | por defecto `now()` |
 
 ### requerimiento_responsables
 

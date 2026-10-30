@@ -578,6 +578,51 @@ export type Database = {
           },
         ];
       };
+      cliente_salud: {
+        Row: {
+          id: number;
+          tenant_id: string;
+          cliente_id: string;
+          fecha: string;
+          salud: string;
+          motivos: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          tenant_id: string;
+          cliente_id: string;
+          fecha: string;
+          salud: string;
+          motivos?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          tenant_id?: string;
+          cliente_id?: string;
+          fecha?: string;
+          salud?: string;
+          motivos?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'cliente_salud_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'cliente_salud_cliente_id_fkey';
+            columns: ['cliente_id'];
+            isOneToOne: false;
+            referencedRelation: 'clientes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       clientes: {
         Row: {
           id: string;
@@ -2357,6 +2402,9 @@ export type Database = {
           responsables_cierre: string[] | null;
           heredada: boolean;
           basecamp_due_on_visto: string | null;
+          entregado_el: string | null;
+          entregado_por: string | null;
+          entregado_registrado_at: string | null;
         };
         Insert: {
           id?: string;
@@ -2403,6 +2451,9 @@ export type Database = {
           responsables_cierre?: string[] | null;
           heredada?: boolean;
           basecamp_due_on_visto?: string | null;
+          entregado_el?: string | null;
+          entregado_por?: string | null;
+          entregado_registrado_at?: string | null;
         };
         Update: {
           id?: string;
@@ -2449,6 +2500,9 @@ export type Database = {
           responsables_cierre?: string[] | null;
           heredada?: boolean;
           basecamp_due_on_visto?: string | null;
+          entregado_el?: string | null;
+          entregado_por?: string | null;
+          entregado_registrado_at?: string | null;
         };
         Relationships: [
           {
@@ -2498,6 +2552,13 @@ export type Database = {
             columns: ['tipo_pieza_id'];
             isOneToOne: false;
             referencedRelation: 'tipos_pieza';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'requerimientos_entregado_por_fkey';
+            columns: ['entregado_por'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
             referencedColumns: ['id'];
           },
         ];
@@ -2712,6 +2773,7 @@ export type Database = {
           area: string | null;
           fecha_salida: string | null;
           motivo_salida: string | null;
+          avisos_mi_dia: boolean;
         };
         Insert: {
           id: string;
@@ -2728,6 +2790,7 @@ export type Database = {
           area?: string | null;
           fecha_salida?: string | null;
           motivo_salida?: string | null;
+          avisos_mi_dia?: boolean;
         };
         Update: {
           id?: string;
@@ -2744,6 +2807,7 @@ export type Database = {
           area?: string | null;
           fecha_salida?: string | null;
           motivo_salida?: string | null;
+          avisos_mi_dia?: boolean;
         };
         Relationships: [
           {
@@ -2800,6 +2864,10 @@ export type Database = {
           primera_respuesta_at: string | null;
           responsables_cierre: string[] | null;
           heredada: boolean | null;
+          basecamp_due_on_visto: string | null;
+          entregado_el: string | null;
+          entregado_por: string | null;
+          entregado_registrado_at: string | null;
           dias_atraso: number | null;
           dias_sin_movimiento: number | null;
           peso_completado: number | null;
@@ -2848,6 +2916,10 @@ export type Database = {
           primera_respuesta_at?: string | null;
           responsables_cierre?: string[] | null;
           heredada?: boolean | null;
+          basecamp_due_on_visto?: string | null;
+          entregado_el?: string | null;
+          entregado_por?: string | null;
+          entregado_registrado_at?: string | null;
           dias_atraso?: number | null;
           dias_sin_movimiento?: number | null;
           peso_completado?: number | null;
@@ -2896,6 +2968,10 @@ export type Database = {
           primera_respuesta_at?: string | null;
           responsables_cierre?: string[] | null;
           heredada?: boolean | null;
+          basecamp_due_on_visto?: string | null;
+          entregado_el?: string | null;
+          entregado_por?: string | null;
+          entregado_registrado_at?: string | null;
           dias_atraso?: number | null;
           dias_sin_movimiento?: number | null;
           peso_completado?: number | null;
@@ -2948,6 +3024,13 @@ export type Database = {
             columns: ['tipo_pieza_id'];
             isOneToOne: false;
             referencedRelation: 'tipos_pieza';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'v_requerimientos_metricas_entregado_por_fkey';
+            columns: ['entregado_por'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
             referencedColumns: ['id'];
           },
         ];

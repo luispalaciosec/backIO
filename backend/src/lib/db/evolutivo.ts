@@ -13,7 +13,7 @@ export async function listTareasEvolutivo(ctx: DbCtx, partes: string[]): Promise
     db
       .from('requerimientos')
       .select(
-        'id, owner_agencia, estado_operativo, completado_at, created_at, planificacion, fecha_entrega, fecha_entrega_original, daily_fecha, fecha_pedido, responsables_cierre, heredada',
+        'id, owner_agencia, estado_operativo, completado_at, created_at, planificacion, fecha_entrega, fecha_entrega_original, daily_fecha, fecha_pedido, responsables_cierre, heredada, entregado_el',
       )
       .eq('tenant_id', ctx.tenantId)
       .is('deleted_at', null)

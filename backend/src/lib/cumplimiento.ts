@@ -13,7 +13,7 @@ import type {
   MotivoReproceso,
   OrigenReproceso,
 } from '@backio/shared';
-import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, cerradaATiempo, diaLocal, porcentaje } from '@backio/shared';
+import { MOTIVOS_REPROCESO, MOTIVOS_REPROGRAMACION, cerradaATiempo, entregaReal, diaLocal, porcentaje } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { getRequerimiento, updateRequerimiento } from './db/requerimientos';
 import { insertReproceso, reprocesoAbierto, updateReproceso } from './db/historial';
@@ -28,15 +28,18 @@ import { log } from './logger';
 const dia = diaLocal;
 
 // Una tarea heredada por una salida y cerrada tarde da null: queda fuera del cálculo (docs/20).
-export function aTiempoOriginal(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original' | 'heredada'>): boolean | null {
-  return cerradaATiempo(r.completado_at, r.fecha_entrega_original, r.heredada);
+// La entrega real es la que declaró el responsable, si lo hizo; si no, el cierre (entregaReal, migración 38).
+export function aTiempoOriginal(
+  r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original' | 'heredada' | 'entregado_el'>,
+): boolean | null {
+  return cerradaATiempo(entregaReal(r), r.fecha_entrega_original, r.heredada);
 }
-export function aTiempoVigente(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega' | 'heredada'>): boolean | null {
-  return cerradaATiempo(r.completado_at, r.fecha_entrega, r.heredada);
+export function aTiempoVigente(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega' | 'heredada' | 'entregado_el'>): boolean | null {
+  return cerradaATiempo(entregaReal(r), r.fecha_entrega, r.heredada);
 }
 /** Días entre la fecha original y la entrega real (positivo = tarde). */
-export function desvioDias(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original'>): number | null {
-  const c = dia(r.completado_at);
+export function desvioDias(r: Pick<Requerimiento, 'completado_at' | 'fecha_entrega_original' | 'entregado_el'>): number | null {
+  const c = dia(entregaReal(r));
   const f = r.fecha_entrega_original;
   if (!c || !f) return null;
   return Math.round((new Date(`${c}T12:00:00Z`).getTime() - new Date(`${f}T12:00:00Z`).getTime()) / 86_400_000);

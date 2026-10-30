@@ -117,7 +117,15 @@ export async function updateRequerimiento(
     Partial<
       Pick<
         Requerimiento,
-        'basecamp_todo_id' | 'basecamp_todolist_id' | 'basecamp_url' | 'completado_at' | 'ultima_actualizacion' | 'deleted_at'
+        | 'basecamp_todo_id'
+        | 'basecamp_todolist_id'
+        | 'basecamp_url'
+        | 'completado_at'
+        | 'ultima_actualizacion'
+        | 'deleted_at'
+        | 'entregado_el'
+        | 'entregado_por'
+        | 'entregado_registrado_at'
       >
     >,
 ): Promise<Requerimiento> {

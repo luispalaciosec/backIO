@@ -196,6 +196,26 @@ export async function reabrirTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampC
 }
 
 /**
+ * «¿Ya se entregó?» → «Sí, el día X» (docs/22, decisión de Luis 30/10/2026): completa el to-do en Basecamp con la cuenta
+ * de quien responde. BackIO no marca la tarea como completada: lo hace la sincronización cuando Basecamp lo informa
+ * (regla 3, Basecamp manda sobre completed). Sin to-do enlazado no hace nada.
+ */
+export async function completarTodo(ctx: DbCtx, req: Requerimiento, bc?: BasecampClient): Promise<boolean> {
+  if (!req.basecamp_todo_id) return false;
+  const cliente = await getCliente(ctx, req.cliente_id);
+  if (!cliente?.basecamp_project_id) return false;
+  const client = bc ?? (await BasecampClient.forActor(ctx));
+  await client.completeTodo(cliente.basecamp_project_id, req.basecamp_todo_id);
+  await audit(ctx, {
+    accion: 'basecamp_completar_todo',
+    entidad: 'requerimiento',
+    entidad_id: req.id,
+    detalle: { todo_id: req.basecamp_todo_id },
+  });
+  return true;
+}
+
+/**
  * Cancelar en BackIO archiva el to-do en Basecamp, a nombre de quien cancela; reabrir lo vuelve a dejar activo
  * (decisión de Luis, 28/10/2026: «Briefing Pasaportes» se canceló en BackIO y siguió abierto en Basecamp). Archivar,
  * no mandar a la papelera: se puede deshacer. El webhook todo_archived que vuelve no hace nada (la tarea ya está

@@ -11,6 +11,15 @@ export function formatoFraccion(v: number | null | undefined): string {
 }
 
 /**
+ * Día real de entrega de una tarea completada: el que declaró su responsable («¿ya se entregó?», migración 38) o, si no
+ * lo declaró, el día en que se cerró. Se pasa a `cerradaATiempo` en lugar de `completado_at`: una tarea entregada a
+ * tiempo y cerrada días después en Basecamp ya no cuenta como tarde.
+ */
+export function entregaReal(r: { completado_at: string | null; entregado_el?: string | null }): string | null {
+  return r.entregado_el ?? r.completado_at;
+}
+
+/**
  * ¿Se cerró a tiempo? Compara el día de cierre en hora de Guayaquil con la fecha comprometida (inclusive).
  * null si falta alguno de los dos. Única definición de «a tiempo» para cumplimiento, KPIs, evolutivo, dashboard,
  * personas e informes (auditoría 10/10, B4).
@@ -72,4 +81,52 @@ export function diasHabilesEntre(desde: string, hasta: string): number {
 /** ¿La tarea que se reasigna hoy llega con muy poco margen? Sin fecha de entrega no hay atraso posible: false. */
 export function esHeredada(fechaEntrega: string | null | undefined, hoy: string): boolean {
   return !!fechaEntrega && diasHabilesEntre(hoy, fechaEntrega) < GRACIA_HEREDADA_DIAS;
+}
+
+export interface EventoAprobacion {
+  requerimiento_id: string;
+  estado_de: string | null;
+  estado_a: string;
+  created_at: string;
+}
+export interface TramoEsperaCliente {
+  requerimiento_id: string;
+  desde: string;
+  /** null: sigue esperando. */
+  hasta: string | null;
+  dias: number;
+}
+
+/**
+ * Tramos en que una tarea esperó al cliente: desde que su aprobación pasa a «pendiente del cliente» hasta que sale de
+ * ese estado (aprobación, rechazo o cualquier otro). Sale de `aprobacion_eventos` (migración 22), así un cambio en la
+ * tarea ya no reinicia la cuenta como pasaba con «días sin movimiento». Días con decimales redondeados a uno.
+ */
+export function tramosEsperaCliente(eventos: EventoAprobacion[], ahora = new Date()): TramoEsperaCliente[] {
+  const ordenados = [...eventos].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const abiertos = new Map<string, string>();
+  const tramos: TramoEsperaCliente[] = [];
+  const dias = (a: string, b: number) => Math.round(((b - new Date(a).getTime()) / 86_400_000) * 10) / 10;
+  for (const e of ordenados) {
+    const abierto = abiertos.get(e.requerimiento_id);
+    if (abierto && e.estado_a !== 'pendiente_cliente') {
+      tramos.push({
+        requerimiento_id: e.requerimiento_id,
+        desde: abierto,
+        hasta: e.created_at,
+        dias: dias(abierto, new Date(e.created_at).getTime()),
+      });
+      abiertos.delete(e.requerimiento_id);
+    } else if (!abierto && e.estado_a === 'pendiente_cliente') abiertos.set(e.requerimiento_id, e.created_at);
+  }
+  for (const [id, desde] of abiertos) tramos.push({ requerimiento_id: id, desde, hasta: null, dias: dias(desde, ahora.getTime()) });
+  return tramos;
+}
+
+/** Mediana de una lista de números (null si está vacía), con un decimal. */
+export function medianaDe(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m]! : Math.round(((s[m - 1]! + s[m]!) / 2) * 10) / 10;
 }

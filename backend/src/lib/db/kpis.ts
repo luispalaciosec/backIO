@@ -90,6 +90,7 @@ export interface ReqKpi {
   fecha_entrega: string | null;
   fecha_entrega_original: string | null;
   completado_at: string | null;
+  entregado_el?: string | null;
   created_at: string;
   clase: 'tarea' | 'propuesta' | 'incidencia';
   proactiva: boolean;
@@ -99,7 +100,7 @@ export interface ReqKpi {
   heredada: boolean;
 }
 const CAMPOS =
-  'id, titulo_interno, cliente_id, proyecto_id, owner_agencia, prioridad, estado_operativo, estado_aprobacion, fecha_entrega, fecha_entrega_original, completado_at, created_at, clase, proactiva, primera_respuesta_at, basecamp_url, responsables_cierre, heredada';
+  'id, titulo_interno, cliente_id, proyecto_id, owner_agencia, prioridad, estado_operativo, estado_aprobacion, fecha_entrega, fecha_entrega_original, completado_at, created_at, clase, proactiva, primera_respuesta_at, basecamp_url, responsables_cierre, heredada, entregado_el';
 
 export interface DatosKpi {
   completadas: ReqKpi[];

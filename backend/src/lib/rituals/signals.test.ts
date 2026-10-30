@@ -181,3 +181,13 @@ describe('motor de señales', () => {
     expect(s[s.length - 1]?.severidad).toBe('media');
   });
 });
+
+describe('bloqueo_cliente con la espera real (aprobacion_eventos)', () => {
+  it('usa los días desde que la tarea pasó a «pendiente del cliente», aunque se haya movido ayer', () => {
+    const r = req({ estado_aprobacion: 'pendiente_cliente', dias_sin_movimiento: 1 });
+    const s = calcularSenales({ ...base, activos: [r], esperaCliente: new Map([[r.id, 10]]) }).filter((x) => x.tipo === 'bloqueo_cliente');
+    expect(s).toHaveLength(1);
+    expect(s[0]!.detalle).toMatchObject({ dias: 10 });
+    expect(calcularSenales({ ...base, activos: [r] }).filter((x) => x.tipo === 'bloqueo_cliente')).toHaveLength(0);
+  });
+});

@@ -321,6 +321,11 @@ export class BasecampClient {
     await this.request('PUT', `/buckets/${projectId}/todos/${todoId}.json`, cuerpo);
   }
 
+  /** Marca un to-do como completado (respuesta «sí, ya se entregó», docs/22). */
+  async completeTodo(projectId: number, todoId: number): Promise<void> {
+    await this.request('POST', `/buckets/${projectId}/todos/${todoId}/completion.json`);
+  }
+
   /** Desmarca un to-do completado (reproceso). */
   async uncompleteTodo(projectId: number, todoId: number): Promise<void> {
     await this.request('DELETE', `/buckets/${projectId}/todos/${todoId}/completion.json`);

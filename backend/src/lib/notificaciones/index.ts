@@ -65,6 +65,8 @@ const RUTAS_PERMITIDAS = [
   '/dia-a-dia',
   '/huerfanos',
   '/evolutivo',
+  '/clientes',
+  '/mi-dia',
   '/admin/',
 ];
 const sinMarca = (t: string) => t.replace(/__ruta__:/g, '__ruta:');

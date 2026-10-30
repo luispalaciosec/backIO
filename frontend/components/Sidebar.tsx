@@ -194,6 +194,7 @@ export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
         </Link>
       </div>
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+        <Item href="/mi-dia" label="Mi día" icon="☀" />
         <Item href="/dashboard" label="Dashboard" icon="◧" />
         {/* KPIs: gestión ve el tablero; un colaborador ve «Mis KPIs» (solo lo suyo, lo acota el backend). */}
         {GRUPOS.map((g) => (
