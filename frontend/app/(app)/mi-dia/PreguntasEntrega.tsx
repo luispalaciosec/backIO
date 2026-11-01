@@ -5,6 +5,7 @@ import { MOTIVOS_REPROGRAMACION, hoyLocal } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
 import { hrefExterno } from '@/lib/url';
+import { EVENTO_MI_DIA } from './MiDiaVista';
 
 type Modo = { id: string; tipo: 'entregado' | 'no_aun' } | null;
 
@@ -41,6 +42,7 @@ export function PreguntasEntrega({ clientes }: { clientes: Record<string, string
       setMsg({ tipo: 'ok', texto: await accion() });
       setModo(null);
       await cargar();
+      window.dispatchEvent(new Event(EVENTO_MI_DIA));
     } catch (e) {
       setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo guardar' });
     }
@@ -189,6 +191,17 @@ export function PreguntasEntrega({ clientes }: { clientes: Record<string, string
                   <button className="btn-ghost text-xs" onClick={() => setModo(null)}>
                     Cancelar
                   </button>
+                  {motivo === 'insumos_cliente' && (
+                    // Si el atraso es del cliente, mover la fecha lo deja como atraso nuestro reprogramado; «Espera al
+                    // cliente» lo saca del atraso del equipo y mide cuánto tarda él (revisión del 31/10/2026).
+                    <div className="w-full rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                      Si la tarea está parada esperando al cliente, mejor márcala como <b>Espera al cliente</b>: no cuenta como atraso del
+                      equipo, se mide cuánto tarda el cliente y la ejecutiva recibe el aviso para pedir el feedback.{' '}
+                      <button className="underline font-semibold" disabled={!!busy} onClick={() => esperaCliente(r)}>
+                        Marcar «Espera al cliente»
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </li>

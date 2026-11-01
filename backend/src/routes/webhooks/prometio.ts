@@ -15,6 +15,15 @@ import { notificar } from '../../lib/notificaciones';
 import { tenantPorDefecto } from '../../lib/db/tenants';
 import { ponerLogoSiFalta } from '../../lib/db/clientes';
 import { guardarBorradorPrometio, plantillaParaServicio } from '../../lib/db/proyectos';
+
+const formatoUsd = new Intl.NumberFormat('es-EC', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+/** «USD 3.500,00»: PrometIO manda el valor con decimales de coma flotante («3499.9996199999996», 31/10/2026). */
+export const montoUsd = (valor: number) => `USD ${formatoUsd.format(Number(valor)).replace(/[^\d.,]/g, '')}`;
 import { urlHttps } from '../../lib/validacion';
 
 export const prometioWebhook = new Hono();
@@ -150,12 +159,14 @@ prometioWebhook.post('/', async (c) => {
       {
         tipo: 'borrador_proyecto',
         titulo: `Cotización ganada: ${cliente.nombre}${cot.numero ? ` (${cot.numero})` : ''}`,
-        cuerpo: `PrometIO reporta una cotización aprobada${cot.valor ? ` por USD ${cot.valor}` : ''}.\nLíneas: ${cot.lineas.map((l) => `${l.servicio} ×${l.cantidad}`).join(', ') || 'sin detalle'}.\nHay un borrador de proyecto listo para revisar y confirmar en el Builder.`,
+        cuerpo: `PrometIO reporta una cotización aprobada${cot.valor ? ` por ${montoUsd(cot.valor)}` : ''}.\nLíneas: ${cot.lineas.map((l) => `${l.servicio} ×${l.cantidad}`).join(', ') || 'sin detalle'}.\nHay un borrador de proyecto listo para revisar y confirmar en el Builder.`,
         ruta: '/proyectos/nuevo',
         entidad_tipo: 'proyecto_borrador',
         entidad_id: borrador.id,
       },
-      { roles: ['ejecutiva', 'operaciones'] },
+      // A la ejecutiva de la cuenta (y a operaciones, que arma proyectos). Sin ejecutiva asignada, a todas: antes iba
+      // siempre a todas y a Grace le llegaban las cotizaciones de las cuentas de Carolina (revisión del 31/10/2026).
+      cliente.ejecutiva_id ? { usuarioIds: [cliente.ejecutiva_id], roles: ['operaciones'] } : { roles: ['ejecutiva', 'operaciones'] },
     );
     return c.json({ ok: true, borrador_id: borrador.id });
   }

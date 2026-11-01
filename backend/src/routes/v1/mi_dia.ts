@@ -28,13 +28,20 @@ miDiaRutas.put('/mi-dia/avisos', requireScope('read:backlog'), zValidator('json'
   return c.json({ avisos_mi_dia: correo });
 });
 
+/**
+ * La campana existe desde el 30/10/2026 (Fase 2). Lo creado antes ya llegó por correo: se muestra como leído en lugar de
+ * aparecer el primer día como 7 avisos nuevos de hace dos semanas (revisión del 31/10/2026). No se toca la base.
+ */
+export const CAMPANA_DESDE = '2026-10-30T06:45:00Z';
+
 /** Campana: avisos propios de los últimos 30 días, con su enlace aparte del texto. */
 miDiaRutas.get('/notificaciones', requireScope('read:backlog'), async (c) => {
   const ctx = ctxOf(c);
   if (!ctx.usuarioId) return c.json({ items: [], no_leidas: 0 });
   const items = (await listarMisNotificaciones(ctx)).map((n) => {
     const { cuerpo, ruta } = separarRuta(n.cuerpo ?? '');
-    return { ...n, cuerpo, ruta: ruta ?? null };
+    const leida_at = n.leida_at ?? (Date.parse(n.created_at) < Date.parse(CAMPANA_DESDE) ? n.created_at : null);
+    return { ...n, leida_at, cuerpo, ruta: ruta ?? null };
   });
   return c.json({ items, no_leidas: items.filter((n) => !n.leida_at).length });
 });

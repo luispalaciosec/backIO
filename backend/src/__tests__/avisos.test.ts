@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RequerimientoMetricas } from '@backio/shared';
-import { armarMiDia, resumenMiDia } from '../lib/mi_dia';
+import { armarCuentas, armarMiDia, resumenMiDia } from '../lib/mi_dia';
 import { cambiosDeSalud, textoCambio, type FotoSalud } from '../lib/salud_clientes';
 import { rutaPermitida } from '../lib/notificaciones';
 
@@ -64,5 +64,32 @@ describe('aviso de cambio de salud', () => {
   it('los avisos pueden enlazar a la ficha del cliente y a Mi día', () => {
     expect(rutaPermitida('/clientes/abc')).toBe('/clientes/abc');
     expect(rutaPermitida('/mi-dia')).toBe('/mi-dia');
+  });
+});
+
+// Mi día de Grace del 30/10/2026: siendo ejecutiva, solo veía la única tarea donde era responsable.
+describe('Mi día de una ejecutiva: tus cuentas', () => {
+  const hoy = '2026-10-30';
+  const cuentas = armarCuentas(
+    [
+      r({ id: 'a1', titulo_interno: 'Reel 02', dias_atraso: 2 }),
+      r({ id: 'a2', titulo_interno: 'Reel 07', dias_atraso: 9 }),
+      r({ id: 'e1', titulo_interno: 'Landing', estado_aprobacion: 'pendiente_cliente', dias_atraso: 40, dias_sin_movimiento: 3 }),
+      r({ id: 'e2', titulo_interno: 'Fotos', estado_aprobacion: 'pendiente_cliente', dias_sin_movimiento: 12 }),
+      r({ id: 'ok', titulo_interno: 'Al día' }),
+    ],
+    new Map([['e1', 44]]),
+  );
+  it('atrasado (sin lo que espera al cliente) y lo que espera al cliente, lo más antiguo primero', () => {
+    expect(cuentas.atrasadas.map((x) => x.id)).toEqual(['a2', 'a1']);
+    expect(cuentas.esperando_cliente.map((x) => [x.id, x.dias_esperando])).toEqual([
+      ['e1', 44],
+      ['e2', 12],
+    ]);
+  });
+  it('el correo lo cuenta aunque no tenga tareas propias', () => {
+    const t = resumenMiDia({ ...armarMiDia([], hoy), cuentas }, () => '');
+    expect(t?.titulo).toBe('Tu día: 2 esperan al cliente');
+    expect(t?.cuerpo).toBe('Tus cuentas: 2 tareas atrasadas; 2 esperan al cliente (la más antigua hace 44 d): pide el feedback.');
   });
 });

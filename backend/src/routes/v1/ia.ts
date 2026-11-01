@@ -44,6 +44,7 @@ ia.post(
       resumen: {
         hoy: m.hoy.length,
         vencen: m.vencen.length,
+        atrasadas: m.atrasadas.length,
         bloqueos: m.bloqueos.length,
         cambios: m.cambios.length,
         completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0),

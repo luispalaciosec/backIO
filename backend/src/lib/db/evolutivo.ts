@@ -38,10 +38,16 @@ export async function listReprocesosDesde(ctx: DbCtx, desdeIso: string) {
 
 export async function listReprogramacionesDesde(ctx: DbCtx, desdeIso: string) {
   const db = serviceClient();
-  return paginar<{ requerimiento_id: string; created_at: string; motivo: string | null }>((a, b) =>
+  return paginar<{
+    requerimiento_id: string;
+    created_at: string;
+    motivo: string | null;
+    fecha_anterior: string | null;
+    fecha_nueva: string | null;
+  }>((a, b) =>
     db
       .from('reprogramaciones')
-      .select('requerimiento_id, created_at, motivo')
+      .select('requerimiento_id, created_at, motivo, fecha_anterior, fecha_nueva')
       .eq('tenant_id', ctx.tenantId)
       .gte('created_at', desdeIso)
       .order('created_at')
@@ -85,10 +91,10 @@ export async function listEventosBloqueo(ctx: DbCtx, desdeIso: string) {
 /** Aperturas y cierres del daily publicados para la mesa. */
 export async function listPublicacionesDaily(ctx: DbCtx, mesaId: string, desdeIso: string) {
   const db = serviceClient();
-  return paginar<{ accion: string; created_at: string; detalle: { message_id?: number } }>((a, b) =>
+  return paginar<{ accion: string; created_at: string; usuario_id: string | null; detalle: { message_id?: number } }>((a, b) =>
     db
       .from('audit_log')
-      .select('accion, created_at, detalle')
+      .select('accion, created_at, usuario_id, detalle')
       .eq('tenant_id', ctx.tenantId)
       .eq('entidad_id', mesaId)
       .in('accion', ['publicar_daily_apertura', 'publicar_daily_cierre'])

@@ -32,20 +32,20 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
     try {
       const r = await api<{
         texto: string;
-        resumen: { hoy: number; vencen: number; bloqueos: number; cambios: number; completadas?: number };
+        resumen: { hoy: number; vencen: number; atrasadas?: number; bloqueos: number; cambios: number; completadas?: number };
       }>('/ia/daily', { method: 'POST', json: { mesa_id: mesa, tipo, notas: notasArr() } });
       setNarrativa(r.texto);
       setNarrativaTipo(tipo);
       setMsg({
         tipo: 'info',
-        texto: `Borrador de ${tipo} listo: ${tipo === 'cierre' ? `${r.resumen.completadas ?? 0} completadas hoy, ${r.resumen.hoy} quedaron abiertas` : `${r.resumen.hoy} para hoy`}, ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios. Edítalo y luego publica.`,
+        texto: `Borrador de ${tipo} listo: ${tipo === 'cierre' ? `${r.resumen.completadas ?? 0} completadas hoy, ${r.resumen.hoy} quedaron abiertas` : `${r.resumen.hoy} para hoy`}, ${r.resumen.vencen} vencen, ${r.resumen.atrasadas ?? 0} atrasadas sin iniciar, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios. Edítalo y luego publica.`,
       });
     } catch (e) {
       setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo redactar' });
     }
     setBusy(null);
   }
-  async function publicar(tipo: 'apertura' | 'cierre', repetir = false) {
+  async function publicar(tipo: 'apertura' | 'cierre', confirmado: string[] = []) {
     if (narrativa !== null && narrativaTipo && narrativaTipo !== tipo) {
       setMsg({
         tipo: 'error',
@@ -58,24 +58,27 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
     try {
       const r = await api<{
         url: string;
-        resumen: { hoy: number; vencen: number; bloqueos: number; cambios: number; completadas?: number };
+        resumen: { hoy: number; vencen: number; atrasadas?: number; bloqueos: number; cambios: number; completadas?: number };
       }>('/semanas/daily/publicar', {
         method: 'POST',
-        json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined, repetir },
+        json: { mesa_id: mesa, tipo, notas: notasArr(), narrativa: narrativa ?? undefined, confirmado },
       });
       setMsg({
         tipo: 'ok',
-        texto: `${tipo === 'apertura' ? 'Apertura' : 'Cierre'} publicado en Basecamp: ${tipo === 'cierre' ? `${r.resumen.completadas ?? 0} completadas hoy, ${r.resumen.hoy} quedaron abiertas` : `${r.resumen.hoy} para hoy`}, ${r.resumen.vencen} vencen, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios.`,
+        texto: `${tipo === 'apertura' ? 'Apertura' : 'Cierre'} publicado en Basecamp: ${tipo === 'cierre' ? `${r.resumen.completadas ?? 0} completadas hoy, ${r.resumen.hoy} quedaron abiertas` : `${r.resumen.hoy} para hoy`}, ${r.resumen.vencen} vencen, ${r.resumen.atrasadas ?? 0} atrasadas sin iniciar, ${r.resumen.bloqueos} bloqueos, ${r.resumen.cambios} cambios.`,
         url: r.url,
       });
       setNotas('');
       setNarrativa(null);
       setNarrativaTipo(null);
     } catch (e) {
-      // El servidor no deja publicar dos veces el mismo día sin confirmarlo (dos pestañas, dos personas, un reintento).
-      if (e instanceof ApiError && e.status === 409 && !repetir) {
+      // El servidor pide confirmar antes de avisar a todo el equipo: ya publicada hoy, mesa ajena, apertura tarde o nada
+      // elegido para hoy (apertura de Omega del 30/10/2026). Se confirma y se reenvía con lo ya confirmado.
+      const motivos = (e instanceof ApiError && e.status === 409 && (e.detalle as { motivos?: string[] } | undefined)?.motivos) || null;
+      if (motivos?.length && motivos.some((x) => !confirmado.includes(x))) {
         setBusy(null);
-        if (window.confirm(`${e.message} ¿Publicarla otra vez en Basecamp?`)) return publicar(tipo, true);
+        if (window.confirm(`${(e as ApiError).message}\n\n¿Publicarla igual en Basecamp?`))
+          return publicar(tipo, [...confirmado, ...motivos]);
         return;
       }
       setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudo publicar' });

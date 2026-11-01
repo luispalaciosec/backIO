@@ -103,8 +103,11 @@ export interface DailyItem {
   fecha: string | null;
   url: string | null;
   atraso_dias?: number;
-  /** Ejecutiva de la cuenta (migración 37): se menciona en lo que vence y en los bloqueos, aunque no esté en la mesa. */
+  /** Ejecutiva de la cuenta (migración 37): se menciona una vez por cliente en lo que vence, lo atrasado y los bloqueos. */
   cuenta?: string;
+  /** Solo en «Fechas cambiadas»: la fecha de antes y el motivo (etiqueta legible). */
+  fecha_anterior?: string | null;
+  motivo?: string | null;
 }
 export interface DailyMensaje {
   tipo: 'apertura' | 'cierre';
@@ -113,6 +116,8 @@ export interface DailyMensaje {
   notas: string[];
   hoy: DailyItem[];
   vencen: DailyItem[];
+  /** Priorizadas con la fecha pasada y sin empezar, de la más vieja a la más nueva. */
+  atrasadas: DailyItem[];
   bloqueos: DailyItem[];
   cambios: DailyItem[];
   narrativa?: string;
@@ -168,8 +173,13 @@ export function kpisDaily(k: DailyKpis, men?: Menciones): string {
 }
 
 export function dailyItemTexto(i: DailyItem): string {
-  return `${i.cliente} · ${i.titulo} · ${i.owner}${i.fecha ? ` · ${i.fecha}` : ''}${i.atraso_dias ? ` (${i.atraso_dias} días de atraso)` : ''}`;
+  const cambio =
+    i.fecha_anterior !== undefined ? ` (antes ${i.fecha_anterior ?? 'sin fecha'}${i.motivo ? `; motivo: ${i.motivo}` : ''})` : '';
+  return `${i.cliente} · ${i.titulo} · ${i.owner}${i.fecha ? ` · ${i.fecha}` : ''}${i.atraso_dias ? ` (${i.atraso_dias} días de atraso)` : ''}${cambio}`;
 }
+
+/** Tareas atrasadas sin iniciar que se listan en el mensaje; el resto se cuenta y se ve en BackIO. */
+export const MAX_ATRASADAS_DAILY = 15;
 
 export function tituloDaily(m: DailyMensaje, mesa: Mesa): string {
   return `${m.tipo === 'apertura' ? '🟢APERTURA' : '🔴CIERRE'} DE MESA - ${fmtCorta(m.fecha)} - ${mesa.nombre.toUpperCase()}`;
@@ -208,13 +218,34 @@ export function mencionarEnHtml(html: string, men?: Menciones): string {
 }
 
 export function cuerpoDaily(m: DailyMensaje, men?: Menciones): string {
-  const item = (i: DailyItem) => {
+  const tarea = (i: DailyItem) => {
     const titulo = i.url ? `<a href="${esc(i.url)}">${esc(i.titulo)}</a>` : esc(i.titulo);
     const atraso = i.atraso_dias ? ` <span style="color:#c0392b">(${i.atraso_dias} d de atraso)</span>` : '';
-    const cuenta = i.cuenta ? ` · Cuenta: ${mencion(i.cuenta, men)}` : '';
-    return `<li><strong>${esc(i.cliente)}</strong> · ${titulo} · ${(i.owners?.length ? i.owners : [i.owner]).map((o) => mencion(o, men)).join(', ')}${i.fecha ? ` · ${esc(fmtCorta(i.fecha))}` : ''}${atraso}${cuenta}</li>`;
+    const fecha =
+      i.fecha_anterior !== undefined
+        ? ` · ${i.fecha_anterior ? `${esc(fmtCorta(i.fecha_anterior))} → ` : ''}<strong>${i.fecha ? esc(fmtCorta(i.fecha)) : 'sin fecha'}</strong>${i.motivo ? ` · Motivo: ${esc(i.motivo)}` : ' · <em>sin motivo</em>'}`
+        : i.fecha
+          ? ` · ${esc(fmtCorta(i.fecha))}`
+          : '';
+    return `${titulo} · ${(i.owners?.length ? i.owners : [i.owner]).map((o) => mencion(o, men)).join(', ')}${fecha}${atraso}`;
   };
-  const li = (xs: DailyItem[]) => (xs.length ? `<ul>${xs.map(item).join('')}</ul>` : '<p><em>Nada.</em></p>');
+  const li = (xs: DailyItem[]) =>
+    xs.length ? `<ul>${xs.map((i) => `<li><strong>${esc(i.cliente)}</strong> · ${tarea(i)}</li>`).join('')}</ul>` : '<p><em>Nada.</em></p>';
+  // Por cliente: la ejecutiva de la cuenta se menciona una vez por cliente, no en cada tarea (la apertura del 30/10
+  // mencionaba a Carolina unas 40 veces). Con `max`, se listan las primeras y el resto se cuenta.
+  const porCliente = (xs: DailyItem[], max = Infinity) => {
+    if (!xs.length) return '<p><em>Nada.</em></p>';
+    const visibles = xs.slice(0, max);
+    const grupos = new Map<string, DailyItem[]>();
+    for (const i of visibles) grupos.set(i.cliente, [...(grupos.get(i.cliente) ?? []), i]);
+    const resto = xs.length - visibles.length;
+    return `<ul>${[...grupos.entries()]
+      .map(([cliente, ys]) => {
+        const cuenta = ys.find((y) => y.cuenta)?.cuenta;
+        return `<li><strong>${esc(cliente)}</strong>${cuenta ? ` · Cuenta: ${mencion(cuenta, men)}` : ''}<ul>${ys.map((i) => `<li>${tarea(i)}</li>`).join('')}</ul></li>`;
+      })
+      .join('')}</ul>${resto > 0 ? `<p><em>Y ${resto} más: están en el backlog de BackIO.</em></p>` : ''}`;
+  };
   return [
     // La hora real de la publicación (antes era fija: «9H00 AM» o «6H00 PM» aunque se publicara a otra hora).
     `<p><strong>RESPONSABLE:</strong> ${esc(m.responsable)} · <strong>Hora:</strong> ${horaLocal(new Date().toISOString()).replace(':', 'H')}</p>`,
@@ -244,10 +275,13 @@ export function cuerpoDaily(m: DailyMensaje, men?: Menciones): string {
     li(m.hoy),
     SALTO,
     `<p>⏰ <strong>Vence hoy o mañana sin iniciar</strong></p>`,
-    li(m.vencen),
+    porCliente(m.vencen),
+    SALTO,
+    `<p>⏳ <strong>Atrasado sin iniciar${m.atrasadas.length ? ` (${m.atrasadas.length})` : ''}</strong></p>`,
+    porCliente(m.atrasadas, MAX_ATRASADAS_DAILY),
     SALTO,
     `<p>⛔ <strong>Bloqueos nuevos</strong></p>`,
-    li(m.bloqueos),
+    porCliente(m.bloqueos),
     SALTO,
     `<p>📅 <strong>Fechas cambiadas</strong></p>`,
     li(m.cambios),

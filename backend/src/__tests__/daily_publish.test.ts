@@ -21,7 +21,16 @@ describe('daily · bloque por persona', () => {
     expect(html).toContain('<strong>Board A</strong>');
   });
   it('el cuerpo pone "Por persona" antes de "Por tarea" dentro de Hoy se trabaja, y lo omite si no hay tareas', () => {
-    const base = { tipo: 'apertura' as const, responsable: 'Luis', fecha: '2026-09-22', notas: [], vencen: [], bloqueos: [], cambios: [] };
+    const base = {
+      tipo: 'apertura' as const,
+      responsable: 'Luis',
+      fecha: '2026-09-22',
+      notas: [],
+      vencen: [],
+      atrasadas: [],
+      bloqueos: [],
+      cambios: [],
+    };
     const con = cuerpoDaily({ ...base, hoy: [it1] });
     expect(con.indexOf('Hoy se trabaja')).toBeLessThan(con.indexOf('Por persona'));
     expect(con.indexOf('Por persona')).toBeLessThan(con.indexOf('Por tarea'));
@@ -41,6 +50,7 @@ describe('daily · narrativa con formato', () => {
       notas: [],
       hoy: [],
       vencen: [],
+      atrasadas: [],
       bloqueos: [],
       cambios: [],
       narrativa,
@@ -55,7 +65,7 @@ describe('daily · narrativa con formato', () => {
 
 describe('daily · cierre', () => {
   it('el cierre lleva Completado hoy y Completadas fuera del daily antes de lo que quedó abierto; la apertura no', () => {
-    const base = { responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [it2], vencen: [], bloqueos: [], cambios: [] };
+    const base = { responsable: 'Luis', fecha: '2026-09-22', notas: [], hoy: [it2], vencen: [], atrasadas: [], bloqueos: [], cambios: [] };
     const cierre = cuerpoDaily({ ...base, tipo: 'cierre', completadas: [it1], completadas_fuera: [] });
     expect(cierre.indexOf('Completado hoy')).toBeLessThan(cierre.indexOf('Completadas fuera del daily'));
     expect(cierre.indexOf('Completadas fuera del daily')).toBeLessThan(cierre.indexOf('Quedó abierto'));
@@ -79,6 +89,7 @@ describe('daily · @menciones', () => {
         notas: [],
         hoy: [it1],
         vencen: [],
+        atrasadas: [],
         bloqueos: [],
         cambios: [],
         narrativa: 'Hoy **Ana** cierra y Beto apoya.',
@@ -119,6 +130,7 @@ describe('daily · métricas del cierre', () => {
         notas: [],
         hoy: [],
         vencen: [],
+        atrasadas: [],
         bloqueos: [],
         cambios: [],
         completadas: [],
@@ -141,6 +153,7 @@ describe('daily · métricas del cierre', () => {
         notas: [],
         hoy: [],
         vencen: [],
+        atrasadas: [],
         bloqueos: [],
         cambios: [],
       }),

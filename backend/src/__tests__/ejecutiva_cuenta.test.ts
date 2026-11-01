@@ -123,12 +123,81 @@ describe('daily publicado: mención de la ejecutiva', () => {
         notas: [],
         hoy: [item],
         vencen: [{ ...item, cuenta: 'Grace Franco' }],
+        atrasadas: [],
         bloqueos: [{ ...item, titulo: 'Bloqueada', cuenta: 'Grace Franco' }],
         cambios: [],
       },
       men,
     );
     expect(html.match(/Cuenta: <bc-attachment sgid="sgid-grace"/g)).toHaveLength(2);
+  });
+
+  // Apertura de Omega del 30/10/2026: Carolina salía mencionada unas 40 veces, una por tarea.
+  it('se menciona una vez por cliente y sección, no en cada tarea; lo atrasado va aparte y se corta en 15', () => {
+    const men = new Map([['Carolina Suarez', 'sgid-caro']]);
+    const ba = (n: number, atraso?: number) => ({
+      cliente: 'Banco Amazonas',
+      titulo: `Pieza ${n}`,
+      owner: 'Elias',
+      owners: ['Elias'],
+      fecha: '2026-10-30',
+      url: null,
+      atraso_dias: atraso,
+      cuenta: 'Carolina Suarez',
+    });
+    const html = cuerpoDaily(
+      {
+        tipo: 'apertura',
+        responsable: 'Julio',
+        fecha: '2026-10-30',
+        notas: [],
+        hoy: [],
+        vencen: [ba(1), ba(2), ba(3)],
+        atrasadas: Array.from({ length: 20 }, (_, i) => ba(10 + i, 20 - i)),
+        bloqueos: [],
+        cambios: [],
+      },
+      men,
+    );
+    expect(html.match(/Cuenta: <bc-attachment sgid="sgid-caro"/g)).toHaveLength(2);
+    expect(html).toContain('Atrasado sin iniciar (20)');
+    expect(html).toContain('Y 5 más: están en el backlog de BackIO.');
+    expect(html.match(/Pieza \d+/g)).toHaveLength(3 + 15);
+  });
+
+  it('las fechas cambiadas dicen de cuál a cuál y por qué', () => {
+    const html = cuerpoDaily({
+      tipo: 'apertura',
+      responsable: 'Grace',
+      fecha: '2026-10-30',
+      notas: [],
+      hoy: [],
+      vencen: [],
+      atrasadas: [],
+      bloqueos: [],
+      cambios: [
+        {
+          cliente: 'Grupo Torres & Torres',
+          titulo: 'Proceso de cierre Libro',
+          owner: 'Grace',
+          fecha: '2026-11-30',
+          url: null,
+          fecha_anterior: '2026-09-18',
+          motivo: 'Insumos o aprobación del cliente',
+        },
+        {
+          cliente: 'Grupo Torres & Torres',
+          titulo: 'Post',
+          owner: 'Luis',
+          fecha: '2026-11-04',
+          url: null,
+          fecha_anterior: '2026-10-20',
+          motivo: null,
+        },
+      ],
+    });
+    expect(html).toContain('18/09/2026 → <strong>30/11/2026</strong> · Motivo: Insumos o aprobación del cliente');
+    expect(html).toContain('20/10/2026 → <strong>4/11/2026</strong> · <em>sin motivo</em>');
   });
 });
 

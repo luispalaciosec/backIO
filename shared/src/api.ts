@@ -129,9 +129,19 @@ export interface CapacidadPersona {
   en_riesgo?: { id: string; titulo: string; cliente_id: string; fecha_entrega: string; horas: number }[];
 }
 
+/** Cambio de fecha de las últimas 24 h: de qué fecha a cuál y por qué (el motivo, si se dio). */
+export interface CambioFecha {
+  de: string | null;
+  a: string | null;
+  motivo: string | null;
+}
+
 export interface DailyView {
   hoy_se_trabaja: Requerimiento[];
+  /** Priorizadas que vencen hoy o mañana y no se empezaron. */
   vencen_hoy_o_manana_sin_iniciar: Requerimiento[];
+  /** Priorizadas con la fecha ya pasada y sin empezar (antes iban mezcladas con lo que vence; revisión del 31/10/2026). */
+  atrasadas_sin_iniciar: Requerimiento[];
   bloqueos_nuevos: Requerimiento[];
-  fechas_cambiadas: Requerimiento[];
+  fechas_cambiadas: (Requerimiento & { cambio?: CambioFecha })[];
 }

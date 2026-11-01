@@ -15,7 +15,9 @@ import {
   audit,
 } from '../../lib/db';
 import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre, senalesDeMesa } from '../../lib/rituals/service';
-import { getDaily } from '../../lib/rituals/daily';
+import { getDaily, avisosAntesDePublicar, type MotivoConfirmacion } from '../../lib/rituals/daily';
+import { listClientes, listMesas, listBacklog } from '../../lib/db';
+import { usuarioDelTenant } from '../../lib/db/admin';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
@@ -24,7 +26,7 @@ import { fotoDaily } from '../../lib/evolutivo';
 import { listPublicacionesDaily } from '../../lib/db/evolutivo';
 import { conCandado } from '../../lib/candado';
 import { serviceClient } from '../../lib/db/client';
-import { hoyLocal, inicioDiaLocal, horaLocal } from '@backio/shared';
+import { hoyLocal, inicioDiaLocal, horaLocal, sumarDias } from '@backio/shared';
 import { log } from '../../lib/logger';
 
 export const semanas = new Hono();
@@ -178,6 +180,8 @@ semanas.post(
       narrativa: z.string().max(4000).optional(),
       // Publicar otra vez lo que ya salió hoy (la pantalla lo pide tras confirmar).
       repetir: z.boolean().default(false),
+      // Avisos que la persona ya confirmó en pantalla (otra mesa, apertura tarde, nada elegido para hoy).
+      confirmado: z.array(z.enum(['ya_publicado', 'otra_mesa', 'tarde', 'sin_hoy'])).default([]),
     }),
   ),
   async (c) => {
@@ -192,9 +196,12 @@ semanas.post(
       const previas = (await listPublicacionesDaily(ctx, mesa.id, inicioDiaLocal(hoy))).filter(
         (x) => x.accion === `publicar_daily_${b.tipo}`,
       );
-      if (previas.length && !b.repetir) {
+      if (previas.length && !b.repetir && !b.confirmado.includes('ya_publicado')) {
         const hora = horaLocal(previas[previas.length - 1]!.created_at);
-        return c.json({ error: `La ${b.tipo} de ${mesa.nombre} ya se publicó hoy a las ${hora}.`, ya_publicado: true, hora }, 409);
+        return c.json(
+          { error: `La ${b.tipo} de ${mesa.nombre} ya se publicó hoy a las ${hora}.`, ya_publicado: true, hora, motivos: ['ya_publicado'] },
+          409,
+        );
       }
       let m: DailyMensaje;
       try {
@@ -206,6 +213,52 @@ semanas.post(
         if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422);
         throw err;
       }
+      // Antes de avisar a todo el equipo: ¿es tu mesa?, ¿es hora de apertura?, ¿hay algo elegido para hoy?
+      const auth = c.get('auth');
+      const [clientes, mesas, activosHoy, lider] = await Promise.all([
+        listClientes(ctx, { incluirInactivos: true }),
+        listMesas(ctx),
+        b.tipo === 'apertura' ? listBacklog(ctx, { solo_activos: true }) : Promise.resolve([]),
+        mesa.lider_id ? usuarioDelTenant(ctx, mesa.lider_id) : Promise.resolve(null),
+      ]);
+      const yo = ctx.usuarioId;
+      const mesaDe = new Map(clientes.map((x) => [x.id, x.mesa_id]));
+      const suHoyEnOtrasMesas = [
+        ...new Set(
+          activosHoy
+            .filter(
+              (r) =>
+                r.daily_fecha === hoy &&
+                !!yo &&
+                (r.owner_agencia.includes(yo) || clientes.find((x) => x.id === r.cliente_id)?.ejecutiva_id === yo),
+            )
+            .map((r) => mesaDe.get(r.cliente_id))
+            .filter((id): id is string => !!id && id !== mesa.id),
+        ),
+      ].map((id) => mesas.find((x) => x.id === id)?.nombre ?? 'otra mesa');
+      const publicoAntes = (await listPublicacionesDaily(ctx, mesa.id, inicioDiaLocal(sumarDias(hoy, -30)))).some(
+        (x) => x.usuario_id === yo,
+      );
+      const avisos = avisosAntesDePublicar({
+        tipo: b.tipo,
+        mesa,
+        usuarioId: yo,
+        llevaTodas: auth.tipo !== 'usuario' || ['admin', 'gerencia', 'operaciones'].includes(auth.rol ?? ''),
+        mesasDeSusCuentas: new Set(clientes.filter((x) => yo && x.ejecutiva_id === yo && x.mesa_id).map((x) => x.mesa_id!)),
+        publicoAntes,
+        hora: horaLocal(new Date().toISOString()),
+        hoySeTrabaja: m.hoy.length,
+        suHoyEnOtrasMesas,
+        liderNombre: lider?.nombre ?? null,
+      }).filter((a) => !b.confirmado.includes(a.motivo));
+      if (avisos.length)
+        return c.json(
+          {
+            error: `${avisos.map((a) => a.mensaje).join(' ')} La ${b.tipo} avisa a todo el equipo de ${mesa.nombre}.`,
+            motivos: avisos.map((a) => a.motivo) satisfies MotivoConfirmacion[],
+          },
+          409,
+        );
       try {
         const r = await publicarDailyEnBasecamp(ctx, mesa, m);
         await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });
@@ -219,6 +272,7 @@ semanas.post(
           resumen: {
             hoy: m.hoy.length,
             vencen: m.vencen.length,
+            atrasadas: m.atrasadas.length,
             bloqueos: m.bloqueos.length,
             cambios: m.cambios.length,
             completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0),

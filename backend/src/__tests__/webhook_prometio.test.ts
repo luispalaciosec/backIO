@@ -23,7 +23,7 @@ vi.mock('../lib/db/tenants', () => ({ tenantPorDefecto: async () => 'tenant-geek
 vi.mock('../lib/db/clientes', () => ({ ponerLogoSiFalta: m.logo }));
 vi.mock('../lib/db/proyectos', () => ({ guardarBorradorPrometio: m.borrador, plantillaParaServicio: m.plantilla }));
 
-import { prometioWebhook } from '../routes/webhooks/prometio';
+import { prometioWebhook, montoUsd } from '../routes/webhooks/prometio';
 
 const app = new Hono().route('/', prometioWebhook);
 const enviar = (evento: string, data: unknown, o: { firma?: string; timestamp?: string } = {}) => {
@@ -92,6 +92,17 @@ describe('webhook de PrometIO', () => {
       expect.objectContaining({ tipo: 'borrador_proyecto', ruta: '/proyectos/nuevo' }),
       { roles: ['ejecutiva', 'operaciones'] },
     );
+  });
+  // 31/10/2026: a Grace le llegaban las cotizaciones de Banco Amazonas (de Carolina), con «USD 3499.9996199999996».
+  it('con ejecutiva asignada, el aviso va a ella y a operaciones; el monto sale redondeado', async () => {
+    m.getCliente.mockResolvedValue({ id: empresa.id, nombre: 'Banco Amazonas', ejecutiva_id: 'carolina' });
+    await enviar('cotizacion.aprobada', { cotizacion_id: randomUUID(), empresa, valor: 3499.9996199999996, lineas: [] });
+    expect(m.notificar).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ cuerpo: expect.stringContaining('por USD 3.500,00.') }),
+      { usuarioIds: ['carolina'], roles: ['operaciones'] },
+    );
+    expect(montoUsd(250)).toBe('USD 250,00');
   });
   it('cotización de un cliente nuevo: lo crea con el id de PrometIO antes del borrador', async () => {
     m.getCliente.mockResolvedValue(null);

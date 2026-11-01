@@ -13,11 +13,14 @@ export function MesaPaso({
   mesa,
   todas,
   misCuentas = false,
+  cuentasPorMesa = {},
 }: {
   mesas: { id: string; nombre: string }[];
   mesa: string;
   todas: boolean;
   misCuentas?: boolean;
+  /** Cuentas de la ejecutiva por mesa donde se producen: para que abra el daily de la mesa correcta. */
+  cuentasPorMesa?: Record<string, string[]>;
 }) {
   const router = useRouter();
   const ir = (id: string) => {
@@ -51,8 +54,11 @@ export function MesaPaso({
         </p>
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           {mesas.map((m) => (
-            <button key={m.id} className="btn-primary px-6 py-3 text-base" onClick={() => ir(m.id)}>
-              {m.nombre}
+            <button key={m.id} className="btn-primary px-6 py-3 text-base flex flex-col items-center" onClick={() => ir(m.id)}>
+              <span>{m.nombre}</span>
+              {cuentasPorMesa[m.id]?.length ? (
+                <span className="text-[11px] font-normal opacity-90">Tus cuentas: {cuentasPorMesa[m.id]!.join(', ')}</span>
+              ) : null}
             </button>
           ))}
           {misCuentas && (
@@ -73,6 +79,7 @@ export function MesaPaso({
       {mesas.map((m) => (
         <option key={m.id} value={m.id}>
           {m.nombre}
+          {cuentasPorMesa[m.id]?.length ? ` · tus cuentas: ${cuentasPorMesa[m.id]!.length}` : ''}
         </option>
       ))}
       {misCuentas && <option value="cuentas">Mis cuentas</option>}

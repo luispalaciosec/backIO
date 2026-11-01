@@ -23,11 +23,17 @@ vi.mock('../lib/db/evolutivo', async (orig) => ({
   listPublicacionesDaily: async () => m.publicaciones,
 }));
 vi.mock('../lib/db/audit', () => ({ audit: m.audit }));
-vi.mock('../lib/db/mesas', async (orig) => ({ ...(await orig<object>()), getMesa: async () => ({ id: 'm1', nombre: 'Mesa Omega' }) }));
+vi.mock('../lib/db/mesas', async (orig) => ({
+  ...(await orig<object>()),
+  getMesa: async () => ({ id: 'm1', nombre: 'Mesa Omega' }),
+  listMesas: async () => [],
+}));
+vi.mock('../lib/db/clientes', async (orig) => ({ ...(await orig<object>()), listClientes: async () => [] }));
+vi.mock('../lib/db/requerimientos', async (orig) => ({ ...(await orig<object>()), listBacklog: async () => [] }));
 vi.mock('../lib/mcp/publish', async (orig) => ({ ...(await orig<object>()), publicarDailyEnBasecamp: m.publicar }));
 vi.mock('../lib/ia/daily', async (orig) => ({ ...(await orig<object>()), armarDailyMensaje: m.armar }));
 
-const { seccionesDaily } = await import('../lib/rituals/daily');
+const { seccionesDaily, avisosAntesDePublicar } = await import('../lib/rituals/daily');
 const { semanas } = await import('../routes/v1/semanas');
 
 const ctx = { tenantId: 't', usuarioId: null, origen: 'ui' } as never;
@@ -88,6 +94,21 @@ describe('reglas del daily (tablero, mensaje y borrador)', () => {
     expect(s.hoy.map((r) => r.id)).toEqual(['hoy']);
     expect(s.vencen.map((r) => r.id)).toEqual(['vence']);
   });
+  // Apertura del 30/10/2026: «Vence hoy o mañana» traía tareas con 63 días de atraso.
+  it('lo atrasado sin iniciar va aparte, de lo más viejo a lo más nuevo, y no en «vence»', async () => {
+    const s = await seccionesDaily(
+      ctx,
+      [
+        tarea('atrasada-1d', { estado_operativo: 'priorizado', fecha_entrega: '2026-10-28' }),
+        tarea('atrasada-63d', { estado_operativo: 'priorizado', fecha_entrega: '2026-08-27' }),
+        tarea('vence-hoy', { estado_operativo: 'priorizado', fecha_entrega: '2026-10-29' }),
+        tarea('atrasada-en-curso', { fecha_entrega: '2026-10-01' }),
+      ],
+      ahora,
+    );
+    expect(s.vencen.map((r) => r.id)).toEqual(['vence-hoy']);
+    expect(s.atrasadas.map((r) => r.id)).toEqual(['atrasada-63d', 'atrasada-1d']);
+  });
 });
 
 const sesion = {
@@ -109,9 +130,20 @@ const publicar = (body: Record<string, unknown>) =>
   app().request('/semanas/daily/publicar', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ mesa_id: '40000000-0000-4000-8000-000000000002', tipo: 'apertura', ...body }),
+    // «tarde» depende de la hora a la que corre el test: aquí se da por confirmado (tiene su propio test).
+    body: JSON.stringify({ mesa_id: '40000000-0000-4000-8000-000000000002', tipo: 'apertura', confirmado: ['tarde'], ...body }),
   });
-const mensaje = { tipo: 'apertura', responsable: 'Ana', fecha: '2026-10-29', notas: [], hoy: [], vencen: [], bloqueos: [], cambios: [] };
+const mensaje = {
+  tipo: 'apertura',
+  responsable: 'Ana',
+  fecha: '2026-10-29',
+  notas: [],
+  hoy: [{ cliente: 'Banco Amazonas', titulo: 'Post', owner: 'Elias', fecha: null, url: null }],
+  vencen: [],
+  atrasadas: [],
+  bloqueos: [],
+  cambios: [],
+};
 
 describe('publicar el daily una vez por mesa, día y tipo', () => {
   it('si la apertura ya salió hoy, no la publica otra vez sin confirmación', async () => {
@@ -142,5 +174,50 @@ describe('publicar el daily una vez por mesa, día y tipo', () => {
     const [a, b] = await Promise.all([publicar({}), publicar({})]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     expect(m.publicar).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Apertura de Omega del 30/10/2026: una ejecutiva con sus tareas del día en Orión la publicó a las 17:23, vacía.
+describe('confirmar antes de publicar el daily', () => {
+  const base = {
+    tipo: 'apertura' as const,
+    mesa: { id: 'omega', nombre: 'Mesa Omega', lider_id: 'julio' },
+    usuarioId: 'grace',
+    llevaTodas: false,
+    mesasDeSusCuentas: new Set<string>(),
+    publicoAntes: false,
+    hora: '10:30',
+    hoySeTrabaja: 5,
+    suHoyEnOtrasMesas: [],
+    liderNombre: 'Julio Lucio',
+  };
+  const motivos = (x: Partial<typeof base>) => avisosAntesDePublicar({ ...base, ...x }).map((a) => a.motivo);
+
+  it('mesa ajena: sin ser líder, sin cuentas ahí y sin haberla publicado antes', () => {
+    expect(motivos({})).toEqual(['otra_mesa']);
+    expect(motivos({ usuarioId: 'julio' })).toEqual([]);
+    expect(motivos({ mesasDeSusCuentas: new Set(['omega']) })).toEqual([]);
+    expect(motivos({ publicoAntes: true })).toEqual([]);
+    expect(motivos({ llevaTodas: true })).toEqual([]);
+  });
+  it('apertura desde las 14:00 y apertura sin nada elegido para hoy (dice dónde están las tuyas)', () => {
+    expect(motivos({ publicoAntes: true, hora: '13:59' })).toEqual([]);
+    expect(motivos({ publicoAntes: true, hora: '17:23' })).toEqual(['tarde']);
+    const a = avisosAntesDePublicar({ ...base, publicoAntes: true, hoySeTrabaja: 0, suHoyEnOtrasMesas: ['Mesa Orión'] });
+    expect(a.map((x) => x.motivo)).toEqual(['sin_hoy']);
+    expect(a[0]!.mensaje).toContain('Las tareas que elegiste para hoy son de Mesa Orión.');
+  });
+  it('el cierre no pide hora ni selección', () => {
+    expect(motivos({ tipo: 'cierre' as never, publicoAntes: true, hora: '18:00', hoySeTrabaja: 0 })).toEqual([]);
+  });
+  it('la ruta responde 409 con los motivos y publica cuando se confirman', async () => {
+    m.publicaciones = [];
+    m.publicar.mockReset().mockResolvedValue({ id: 9, url: 'https://bc/9' });
+    m.armar.mockResolvedValue({ ...mensaje, hoy: [] });
+    const r = await publicar({});
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { motivos: string[] }).motivos).toEqual(['sin_hoy']);
+    expect(m.publicar).not.toHaveBeenCalled();
+    expect((await publicar({ confirmado: ['tarde', 'sin_hoy'] })).status).toBe(200);
   });
 });

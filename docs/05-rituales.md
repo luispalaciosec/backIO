@@ -112,13 +112,30 @@ hoy se evita.
 
 Propósito distinto: **el daily no prioriza, desbloquea.**
 
-Solo tres señales:
+Solo cuatro señales:
 
 | Señal | Condición |
 |---|---|
-| Vence hoy o mañana sin iniciar | `fecha_entrega <= mañana` y `estado = 'priorizado'` |
+| Vence hoy o mañana sin iniciar | `fecha_entrega` es hoy o mañana y `estado = 'priorizado'` |
+| Atrasado sin iniciar | `fecha_entrega` ya pasó y `estado = 'priorizado'`, de lo más viejo a lo más nuevo |
 | Bloqueo nuevo | está `bloqueado` y pasó a ese estado en las últimas 24 h (según la auditoría; si no hay registro del paso, cuenta su último movimiento) |
-| Fecha cambiada | su `fecha_entrega` cambió en las últimas 24 h (tabla `reprogramaciones`, que incluye los cambios hechos en Basecamp) |
+| Fecha cambiada | su `fecha_entrega` cambió en las últimas 24 h (tabla `reprogramaciones`, que incluye los cambios hechos en Basecamp), con la fecha de antes, la nueva y el motivo |
+
+**Lo que cambió tras la apertura de Omega del 30/10/2026.** Esa apertura se publicó a las 17:23, la publicó una
+ejecutiva cuyas tareas del día eran de Orión (salió «Hoy se trabaja: Nada»), listaba unos 45 «vence hoy o mañana» con
+hasta 63 días de atraso y mencionaba a la ejecutiva de la cuenta unas 40 veces. Desde el 31/10/2026:
+- **Atrasado va aparte.** «Vence hoy o mañana» es solo eso; lo atrasado sin iniciar va en «⏳ Atrasado sin iniciar»,
+  y el mensaje lista los 15 más viejos y cuenta el resto.
+- **Por cliente.** Lo que vence, lo atrasado y los bloqueos se agrupan por cliente, y la ejecutiva se menciona una vez
+  por cliente, no en cada tarea.
+- **Fechas cambiadas con contexto:** «18/09/2026 → 30/11/2026 · Motivo: Insumos o aprobación del cliente».
+- **Confirmar antes de avisar a todo el equipo** (`avisosAntesDePublicar`, la pantalla lo pregunta y reenvía):
+  - la mesa no es tuya: no eres su líder, no tienes cuentas en ella y no la publicaste en los últimos 30 días
+    (admin, gerencia y operaciones llevan todas);
+  - una apertura desde las 14:00 (las de la mañana salen entre las 10:00 y las 13:30);
+  - una apertura sin nada elegido para hoy, diciendo en qué otra mesa están las tareas que elegiste;
+  - y, como antes, una apertura o cierre que ya se publicó hoy.
+- **El selector de mesa** muestra a cada ejecutiva en qué mesa se producen sus cuentas.
 
 **Ejecutiva de otra mesa (29/10/2026).** El daily es de la mesa que produce. Si la ejecutiva de una cuenta lidera otra
 mesa (Grace con Torres & Torres, que produce Omega), entra solo al bloque de su cuenta cuando algo vence o está
@@ -143,7 +160,7 @@ Vista dedicada: `/daily`, armada como un flujo de cuatro pasos por mesa.
 2. **Hoy.** «Elegir tareas de hoy» lista únicamente las tareas activas de la mesa
    (`GET /requerimientos?mesa=`), y marca `daily_fecha`. Se puede filtrar por cliente y por proyecto, el buscador
    encuentra por título, cliente, proyecto o responsable, y cada tarea muestra a sus responsables (28/10/2026).
-3. **Tablero.** Las cuatro columnas salen de `GET /semanas/daily?mesa=`, acotadas a los clientes
+3. **Tablero.** Las cinco columnas salen de `GET /semanas/daily?mesa=`, acotadas a los clientes
    y proyectos de la mesa (`alcanceMesa`).
 4. **Publicar.** Notas, borrador con IA y apertura/cierre van al board Daily de esa misma mesa.
    Cambiar la mesa rearma los cuatro pasos.
@@ -159,7 +176,7 @@ Basecamp no admite tablas) y después la lista *Por tarea* de siempre. El resto 
 
 **Títulos fijos de las secciones (11/10/2026).** Cuando se usa el borrador con IA, los títulos de cada sección
 los pone el código, no la IA. Están en `SECCIONES_DAILY` (`backend/src/lib/ia/daily.ts`): la apertura lleva
-«🎯 Foco del día», «📋 En la mesa hoy», «⏰ Vence hoy o mañana», «⛔ Bloqueos» y «📅 Cambios de fecha»; el
+«🎯 Foco del día», «📋 En la mesa hoy», «⏰ Vence hoy o mañana», «⏳ Atrasado sin iniciar», «⛔ Bloqueos» y «📅 Cambios de fecha»; el
 cierre lleva «🎯 Balance del día», «✅ Completado hoy», «➕ Completadas fuera del daily», «⏳ Quedó abierto»,
 «⛔ Bloqueos» y «➡️ Para mañana». La IA solo escribe el contenido y marca dónde empieza cada sección con
 `[[clave]]`; `armarDaily` pone los títulos en el orden de siempre y omite las secciones vacías. Si la IA no usa

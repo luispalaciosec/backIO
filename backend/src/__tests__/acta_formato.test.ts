@@ -34,6 +34,7 @@ describe('formato de actas y daily', () => {
       notas: [],
       hoy: [],
       vencen: [],
+      atrasadas: [],
       bloqueos: [],
       cambios: [],
     });

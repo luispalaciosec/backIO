@@ -6,7 +6,7 @@ import { apiServer } from '@/lib/api.server';
 import { meServer, puedeEscribir } from '@/lib/me.server';
 import { fecha } from '@/lib/format';
 import { EstadoChip } from '@/components/ui/EstadoChip';
-import { ZONA, hoyLocal, nombrePersona } from '@backio/shared';
+import { ZONA, hoyLocal, nombrePersona, MOTIVOS_REPROGRAMACION } from '@backio/shared';
 import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +27,10 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
   const activas = mesas.filter((m) => m.activa);
   // «Mis cuentas»: para quien es ejecutiva de algún cliente, sus cuentas de cualquier mesa (solo lectura).
   const misCuentas = !!me.usuario_id && clientes.some((c) => c.ejecutiva_id === me.usuario_id);
+  // En qué mesa se produce cada cuenta de la ejecutiva: el selector lo muestra para que publique en la mesa correcta.
+  const cuentasPorMesa: Record<string, string[]> = {};
+  for (const c of clientes)
+    if (c.activo && c.ejecutiva_id === me.usuario_id && c.mesa_id) (cuentasPorMesa[c.mesa_id] ??= []).push(c.nombre);
   const cuentas = misCuentas && searchParams.mesa === 'cuentas';
   const todas = searchParams.mesa === 'todas';
   const mesa =
@@ -48,13 +52,20 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
   const sinResponsable = d
     ? [
         ...new Map(
-          [...d.hoy_se_trabaja, ...d.vencen_hoy_o_manana_sin_iniciar, ...d.bloqueos_nuevos, ...d.fechas_cambiadas]
+          [
+            ...d.hoy_se_trabaja,
+            ...d.vencen_hoy_o_manana_sin_iniciar,
+            ...d.atrasadas_sin_iniciar,
+            ...d.bloqueos_nuevos,
+            ...d.fechas_cambiadas,
+          ]
             .filter((r) => r.owner_agencia.length === 0)
             .map((r) => [r.id, r]),
         ).values(),
       ]
     : [];
-  const Col = ({ titulo, items, vacio }: { titulo: string; items: DailyView['bloqueos_nuevos']; vacio: string }) => (
+  const motivo = (v: string | null) => MOTIVOS_REPROGRAMACION.find((x) => x.valor === v)?.label ?? null;
+  const Col = ({ titulo, items, vacio }: { titulo: string; items: DailyView['fechas_cambiadas']; vacio: string }) => (
     <section className="card flex flex-col min-h-0">
       <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between">
         <span>{titulo}</span>
@@ -71,6 +82,12 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
               </span>
               <span>{fecha(r.fecha_entrega)}</span>
             </div>
+            {r.cambio && (
+              <div className="text-xs text-gray-600 mt-1">
+                {r.cambio.de ? `${fecha(r.cambio.de)} → ` : ''}
+                <b>{fecha(r.cambio.a)}</b> · {motivo(r.cambio.motivo) ?? <em className="text-amber-700">sin motivo</em>}
+              </div>
+            )}
             <div className="mt-1">
               <EstadoChip estado={r.estado_operativo} />
             </div>
@@ -101,6 +118,7 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
                 mesa={cuentas ? 'cuentas' : (mesa?.id ?? '')}
                 todas={todas}
                 misCuentas={misCuentas}
+                cuentasPorMesa={cuentasPorMesa}
               />
             </Paso>
             {escribe && !cuentas && (
@@ -117,7 +135,15 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
           </div>
         )}
       </header>
-      {!elegida && <MesaPaso mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))} mesa="" todas={false} misCuentas={misCuentas} />}
+      {!elegida && (
+        <MesaPaso
+          mesas={activas.map((m) => ({ id: m.id, nombre: m.nombre }))}
+          mesa=""
+          todas={false}
+          misCuentas={misCuentas}
+          cuentasPorMesa={cuentasPorMesa}
+        />
+      )}
       {elegida && d && (
         <>
           {sinResponsable.length > 0 && (
@@ -141,13 +167,14 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
               </a>
             </div>
           )}
-          <div className="grid grid-cols-4 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-5 gap-4 flex-1 min-h-0">
             <Col
               titulo="🎯 Hoy se trabaja"
               items={d.hoy_se_trabaja}
               vacio={`Nadie eligió tareas de ${mesaNombre} para hoy. Usa «Elegir tareas de hoy» o ☀ en el backlog.`}
             />
             <Col titulo="Vence hoy o mañana sin iniciar" items={d.vencen_hoy_o_manana_sin_iniciar} vacio="Nada vence sin iniciar." />
+            <Col titulo="⏳ Atrasado sin iniciar" items={d.atrasadas_sin_iniciar} vacio="Nada atrasado sin iniciar." />
             <Col titulo="Bloqueos nuevos (24h)" items={d.bloqueos_nuevos} vacio="Sin bloqueos nuevos." />
             <Col titulo="Fechas cambiadas desde ayer" items={d.fechas_cambiadas} vacio="Sin cambios de fecha." />
           </div>

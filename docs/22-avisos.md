@@ -51,7 +51,14 @@ De lunes a viernes a las 07:45 cada persona con tareas recibe un correo con lo s
 - lo que vence hoy o mañana;
 - lo atrasado;
 - cuántas tareas tiene por confirmar en «¿ya se entregó?»;
-- lo bloqueado y lo que espera al cliente.
+- lo bloqueado y lo que espera al cliente;
+- **si es ejecutiva de alguna cuenta**, «Tus cuentas»: lo atrasado de sus clientes y lo que espera respuesta del
+  cliente, sea de quien sea la tarea, con los días que lleva esperando (desde el 31/10/2026; antes una ejecutiva solo
+  veía las tareas donde era responsable).
+
+Después de responder «¿ya se entregó?», la página se vuelve a cargar entera. Si al elegir «Todavía no» el motivo es
+«Insumos o aprobación del cliente», Mi día sugiere marcar «Espera al cliente», que saca la tarea del atraso del equipo y
+mide la espera del cliente.
 
 El correo trae solo un resumen. Los botones que cambian algo están en la página **Mi día** (`/mi-dia`), que muestra lo
 mismo en vivo. Quien no tiene nada pendiente no recibe correo.
@@ -66,6 +73,9 @@ Arriba a la derecha de cada pantalla está la campana. Muestra los avisos de los
 correo, más lo que se recibe solo en la campana. Un número marca los no leídos.
 
 - Al abrir un aviso se marca como leído; también se pueden marcar todos.
+- Lo creado antes de que existiera la campana (30/10/2026, 06:45 UTC) ya llegó por correo y se muestra como leído.
+- **Cotización ganada (PrometIO):** el aviso va a la ejecutiva de la cuenta y a operaciones; solo si la cuenta no tiene
+  ejecutiva va a todas. El monto sale redondeado («USD 3.500,00»).
 - **Rutas:** `GET /notificaciones`, `POST /notificaciones/:id/leida` y `POST /notificaciones/leidas`. Cada persona ve
   solo los suyos (RLS de `notificaciones`).
 

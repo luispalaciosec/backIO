@@ -13,7 +13,12 @@ interface MiDia {
   bloqueadas: RequerimientoMetricas[];
   esperando_cliente: RequerimientoMetricas[];
   avisos_mi_dia: boolean;
+  /** Solo si es ejecutiva de alguna cuenta. */
+  cuentas?: { atrasadas: RequerimientoMetricas[]; esperando_cliente: (RequerimientoMetricas & { dias_esperando: number })[] };
 }
+
+/** Evento que lanza «¿Ya se entregó?» al responder: el resto de Mi día se vuelve a cargar. */
+export const EVENTO_MI_DIA = 'backio:mi-dia:cambio';
 
 function Bloque({
   titulo,
@@ -64,9 +69,14 @@ export function MiDiaVista({ clientes }: { clientes: Record<string, string> }) {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   useEffect(() => {
-    api<MiDia>('/mi-dia')
-      .then(setD)
-      .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar tu día'));
+    const cargar = () =>
+      api<MiDia>('/mi-dia')
+        .then(setD)
+        .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar tu día'));
+    void cargar();
+    // Al responder «¿Ya se entregó?» se recarga todo: antes una tarea reprogramada seguía en «Atrasadas» (31/10/2026).
+    window.addEventListener(EVENTO_MI_DIA, cargar);
+    return () => window.removeEventListener(EVENTO_MI_DIA, cargar);
   }, []);
   async function cambiarCorreo(correo: boolean) {
     setGuardando(true);
@@ -114,6 +124,30 @@ export function MiDiaVista({ clientes }: { clientes: Record<string, string> }) {
           clientes={clientes}
         />
       </div>
+      {d.cuentas && (
+        <div>
+          <h2 className="text-lg font-semibold mt-2">Tus cuentas</h2>
+          <p className="text-xs text-gray-500 mb-2">
+            Lo de tus clientes, sea de quien sea la tarea: lo atrasado y lo que espera respuesta del cliente.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Bloque
+              titulo="Atrasado en tus cuentas"
+              items={d.cuentas.atrasadas}
+              vacio="Nada atrasado en tus cuentas."
+              detalle={(r) => `${r.dias_atraso} d de atraso`}
+              clientes={clientes}
+            />
+            <Bloque
+              titulo="Esperando al cliente: pide el feedback"
+              items={d.cuentas.esperando_cliente}
+              vacio="Ningún cliente nos debe respuesta."
+              detalle={(r) => `espera hace ${(r as RequerimientoMetricas & { dias_esperando: number }).dias_esperando} d`}
+              clientes={clientes}
+            />
+          </div>
+        </div>
+      )}
       <label className="flex items-center gap-2 text-sm text-gray-600">
         <input
           id="correo-mi-dia"

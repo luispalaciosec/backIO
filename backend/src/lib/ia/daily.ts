@@ -12,7 +12,7 @@ import { seccionesDaily } from '../rituals/daily';
 import { cargarMesa, fotoDeDia } from '../evolutivo';
 import { dailyItemTexto, type DailyItem, type DailyMensaje, type DailyKpis } from '../mcp/publish';
 import { generarTexto } from './index';
-import { hoyLocal, inicioDiaLocal, sumarDias, nombrePersona } from '@backio/shared';
+import { hoyLocal, inicioDiaLocal, sumarDias, nombrePersona, MOTIVOS_REPROGRAMACION } from '@backio/shared';
 
 /** El daily no se arma ni se publica con tareas sin responsable: nadie sabría a quién preguntar. */
 export class DailySinResponsable extends Error {
@@ -64,7 +64,7 @@ export async function armarDailyMensaje(
     url: r.basecamp_url,
     atraso_dias: r.dias_atraso > 0 ? r.dias_atraso : undefined,
   });
-  const sinResp = [...new Map([...s.hoy, ...s.vencen, ...s.bloqueos, ...s.cambios].map((r) => [r.id, r])).values()].filter(
+  const sinResp = [...new Map([...s.hoy, ...s.vencen, ...s.atrasadas, ...s.bloqueos, ...s.cambios].map((r) => [r.id, r])).values()].filter(
     (r) => r.owner_agencia.length === 0,
   );
   if (sinResp.length) throw new DailySinResponsable(sinResp.map((r) => `${r.titulo_interno} (${cliente(r.cliente_id)})`));
@@ -95,8 +95,13 @@ export async function armarDailyMensaje(
     ...(tipo === 'cierre' ? { completadas, completadas_fuera: completadasFuera, kpis } : {}),
     hoy: s.hoy.map(linea),
     vencen: s.vencen.map((r) => conCuenta(linea(r), r.cliente_id)),
+    atrasadas: s.atrasadas.map((r) => conCuenta(linea(r), r.cliente_id)),
     bloqueos: s.bloqueos.map((r) => conCuenta(linea(r), r.cliente_id)),
-    cambios: s.cambios.map(linea),
+    cambios: s.cambios.map((r) => ({
+      ...linea(r),
+      fecha_anterior: r.cambio.de,
+      motivo: MOTIVOS_REPROGRAMACION.find((x) => x.valor === r.cambio.motivo)?.label ?? null,
+    })),
   };
 }
 
@@ -109,6 +114,7 @@ export const SECCIONES_DAILY: Record<'apertura' | 'cierre', [clave: string, titu
     ['foco', '🎯 Foco del día'],
     ['mesa', '📋 En la mesa hoy'],
     ['vence', '⏰ Vence hoy o mañana'],
+    ['atrasado', '⏳ Atrasado sin iniciar'],
     ['bloqueos', '⛔ Bloqueos'],
     ['cambios', '📅 Cambios de fecha'],
   ],
@@ -154,7 +160,7 @@ const claves = (tipo: 'apertura' | 'cierre') => SECCIONES_DAILY[tipo].map(([c]) 
 const SYSTEM_DAILY = `Redacta el mensaje de {TIPO} de mesa para el board Daily de Basecamp que lee el equipo de producción.
 Formato OBLIGATORIO (markdown simple, se convierte a HTML):
 - Cada sección empieza con una línea que contiene SOLO su marca, sin título: {CLAVES}. El sistema pone los títulos.
-  En una apertura: foco (una sola frase sin viñeta), mesa (lo que se trabaja hoy, por persona), vence (qué vence y quién lo tiene), bloqueos, cambios (fechas movidas).
+  En una apertura: foco (una sola frase sin viñeta), mesa (lo que se trabaja hoy, por persona), vence (qué vence hoy o mañana y quién lo tiene), atrasado (cuántas tareas atrasadas sin iniciar hay y las 3 más antiguas), bloqueos, cambios (fechas movidas: de cuál a cuál y por qué).
   En un cierre: balance (una frase que lea el cumplimiento del plan y lo que entró sin planificar), completado (por persona), fuera (lo cerrado sin estar en la selección del día, por persona), abierto (lo de hoy que no se cerró, por persona), bloqueos, manana (qué sigue mañana).
 - Debajo de cada marca, viñetas con "- " (una idea por viñeta, máximo 4). Omite la sección entera si no hay nada que decir.
 - Nombres de tareas en negrita (**así**) y el responsable después de dos puntos.
@@ -179,6 +185,7 @@ export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Prom
       : {}),
     hoy_se_trabaja: m.hoy.map(dailyItemTexto),
     vencen_hoy_o_manana_sin_iniciar: m.vencen.map(dailyItemTexto),
+    atrasadas_sin_iniciar: m.atrasadas.map(dailyItemTexto),
     bloqueos_nuevos_24h: m.bloqueos.map(dailyItemTexto),
     fechas_cambiadas_24h: m.cambios.map(dailyItemTexto),
   };
