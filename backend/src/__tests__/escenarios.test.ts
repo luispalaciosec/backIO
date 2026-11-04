@@ -107,4 +107,39 @@ describe('escenarios del día', () => {
     expect(e.tareas.map((t) => t.id)).toEqual(['otra']); // la ya elegida ocupa sus 2 h: la mía no entra
     expect(e.impacto.afuera).toBe(1);
   });
+
+  // Del weekly al daily: lo que se acordó sobre una tarea sale primero, con su razón a la vista.
+  it('una tarea con compromiso del weekly va primero, aunque esté quieta o venza lejos', () => {
+    const quieta = r('quieta', { fecha_entrega: '2026-10-01', dias_atraso: 30, dias_sin_movimiento: 30 });
+    const lejos = r('lejos', { fecha_entrega: '2026-12-20' });
+    const otra = r('otra', { fecha_entrega: hoy });
+    const d = calcularEscenarios({
+      activos: [otra, quieta, lejos],
+      hoy,
+      carga: { horas: {}, capacidad_dia: { [otra.owner_agencia[0]!]: 8 }, otras_mesas: {} },
+      salud: new Map(),
+      compromisos: new Set(['quieta', 'lejos']),
+    });
+    const sinVencidos = d.escenarios.find((e) => e.id === 'sin_vencidos')!;
+    expect(
+      sinVencidos.tareas
+        .slice(0, 2)
+        .map((t) => t.id)
+        .sort(),
+    ).toEqual(['lejos', 'quieta']);
+    expect(sinVencidos.tareas.find((t) => t.id === 'quieta')?.razones).toContain('compromiso_weekly');
+    expect(d.sigue_viva.map((x) => x.id)).not.toContain('quieta');
+  });
+  it('un compromiso no saca a una tarea bloqueada o que espera al cliente', () => {
+    const b = r('b', { estado_operativo: 'bloqueado' });
+    const c = r('c', { estado_aprobacion: 'pendiente_cliente' });
+    const d = calcularEscenarios({
+      activos: [b, c],
+      hoy,
+      carga: { horas: {}, capacidad_dia: { [b.owner_agencia[0]!]: 8 }, otras_mesas: {} },
+      salud: new Map(),
+      compromisos: new Set(['b', 'c']),
+    });
+    expect(d.escenarios).toEqual([]);
+  });
 });

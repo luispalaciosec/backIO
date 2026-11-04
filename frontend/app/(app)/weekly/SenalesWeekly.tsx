@@ -232,7 +232,10 @@ export function SenalesWeekly({
   async function crearAcuerdo(s: Senal, f: { descripcion: string; responsable_id: string; fecha_compromiso: string }) {
     setError(null);
     try {
-      await api(`/semanas/${semanaId}/acuerdos`, { method: 'POST', json: { ...f, mesa_id: mesaId } });
+      await api(`/semanas/${semanaId}/acuerdos`, {
+        method: 'POST',
+        json: { ...f, mesa_id: mesaId, requerimiento_id: s.entidad_tipo === 'requerimiento' ? s.entidad_id : null },
+      });
       setAcordando(null);
       await marcar(s, true);
     } catch (e) {

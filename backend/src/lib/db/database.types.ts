@@ -91,6 +91,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           mesa_id: string | null;
+          requerimiento_id: string | null;
         };
         Insert: {
           id?: string;
@@ -104,6 +105,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           mesa_id?: string | null;
+          requerimiento_id?: string | null;
         };
         Update: {
           id?: string;
@@ -117,6 +119,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           mesa_id?: string | null;
+          requerimiento_id?: string | null;
         };
         Relationships: [
           {
@@ -152,6 +155,13 @@ export type Database = {
             columns: ['mesa_id'];
             isOneToOne: false;
             referencedRelation: 'mesas';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'acuerdos_requerimiento_id_fkey';
+            columns: ['requerimiento_id'];
+            isOneToOne: false;
+            referencedRelation: 'requerimientos';
             referencedColumns: ['id'];
           },
         ];

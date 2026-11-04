@@ -317,6 +317,10 @@ señales se escapan en el markdown, así que un `|` o un `_` en un título ya no
   no produce, no cuentan. Nada cambia sin un clic (`lib/rituals/reparto.ts`, `GET /semanas/:id/reparto`).
 - **Modo reunión:** un bloque a la vez en el orden de la agenda, con el marcador de la semana y la anterior arriba. Se navega con
   los botones o con las flechas del teclado (`GET /semanas/:id/marcador`).
+- **Del weekly al daily:** un acuerdo puede llevar su tarea (`acuerdos.requerimiento_id`, migración 43; opcional, y puesta sola
+  si nace de una señal de esa tarea). Mientras esté abierto y venza en los próximos 7 días, esa tarea sale primero en los
+  escenarios del daily con la etiqueta «Compromiso del weekly», aunque lleve días sin moverse. Si está bloqueada, espera al
+  cliente o no tiene responsable, no se sugiere.
 
 ### Marcador (20/10/2026)
 

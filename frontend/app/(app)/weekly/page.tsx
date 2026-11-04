@@ -47,7 +47,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
     apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
     apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad${mesa ? `?mesa=${mesa.id}` : ''}`),
     apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
-    apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id'>[] }>('/clientes'),
+    apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id' | 'mesa_id'>[] }>('/clientes'),
   ]);
   const acuerdos = acuerdosTodos.filter(deLaMesa);
   const abiertos = abiertosTodos.filter(deLaMesa);
@@ -251,6 +251,9 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
                   mesaId={mesa?.id ?? null}
                   mesaNombre={mesa?.nombre ?? 'toda la agencia'}
                   usuarios={activos}
+                  tareas={reqs
+                    .filter((r) => !mesa || clientes.find((c) => c.id === r.cliente_id)?.mesa_id === mesa.id)
+                    .map((r) => ({ id: r.id, titulo: r.titulo_interno }))}
                 />
               ) : (
                 <p className="text-xs text-gray-400">Los acuerdos los registra quien dirige el weekly.</p>
@@ -261,6 +264,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
                     <div>{a.descripcion}</div>
                     <div className="text-xs text-gray-500">
                       {nombre(a.responsable_id)} · {fecha(a.fecha_compromiso)} · {a.estado}
+                      {a.requerimiento_id && titulos[a.requerimiento_id] ? ` · ${titulos[a.requerimiento_id]}` : ''}
                     </div>
                   </li>
                 ))}

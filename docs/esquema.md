@@ -483,6 +483,7 @@ Compromisos del weekly con responsable y fecha.
 | `created_at` | fecha y hora | sí | por defecto `now()` |
 | `created_by` | uuid |  | → [usuarios](#usuarios).id |
 | `mesa_id` | uuid |  | → [mesas](#mesas).id |
+| `requerimiento_id` | uuid |  | → [requerimientos](#requerimientos).id |
 
 ### actas
 

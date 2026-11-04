@@ -5,7 +5,7 @@ import type { Acta, WeeklyIA } from '@backio/shared';
 import { api } from '@/lib/api';
 import { useIA } from '@/lib/useIA';
 import { hrefExterno } from '@/lib/url';
-import { hoyLocal, sumarDias } from '@backio/shared';
+import { coincideBusqueda, hoyLocal, sumarDias } from '@backio/shared';
 
 /** Documentos y agenda del weekly. La mesa es la de las pestañas de arriba (antes había un segundo selector aquí). */
 export function WeeklyActions({ semanaId, mesa }: { semanaId: string; mesa: string }) {
@@ -179,14 +179,18 @@ export function AcuerdoForm({
   mesaId,
   mesaNombre,
   usuarios,
+  tareas = [],
 }: {
   semanaId: string;
   mesaId: string | null;
   mesaNombre: string;
   usuarios: { id: string; nombre: string }[];
+  /** Para vincular el acuerdo a una tarea: sale como sugerencia al armar el daily. */
+  tareas?: { id: string; titulo: string }[];
 }) {
   const router = useRouter();
-  const [f, setF] = useState({ descripcion: '', responsable_id: '', fecha_compromiso: '' });
+  const [f, setF] = useState({ descripcion: '', responsable_id: '', fecha_compromiso: '', requerimiento_id: '' });
+  const [buscar, setBuscar] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const manana = sumarDias(hoyLocal(), 1);
 
@@ -194,8 +198,12 @@ export function AcuerdoForm({
     e.preventDefault();
     setErr(null);
     try {
-      await api(`/semanas/${semanaId}/acuerdos`, { method: 'POST', json: { ...f, mesa_id: mesaId } });
-      setF({ descripcion: '', responsable_id: '', fecha_compromiso: '' });
+      await api(`/semanas/${semanaId}/acuerdos`, {
+        method: 'POST',
+        json: { ...f, mesa_id: mesaId, requerimiento_id: f.requerimiento_id || null },
+      });
+      setF({ descripcion: '', responsable_id: '', fecha_compromiso: '', requerimiento_id: '' });
+      setBuscar('');
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error');
@@ -226,6 +234,35 @@ export function AcuerdoForm({
         value={f.fecha_compromiso}
         onChange={(e) => setF({ ...f, fecha_compromiso: e.target.value })}
       />
+      {tareas.length > 0 && (
+        <div className="space-y-1">
+          <input
+            className="input text-xs"
+            placeholder="Tarea del acuerdo (opcional): buscar…"
+            aria-label="Buscar la tarea del acuerdo"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+          />
+          {(buscar || f.requerimiento_id) && (
+            <select
+              className="input text-xs"
+              aria-label="Tarea del acuerdo"
+              value={f.requerimiento_id}
+              onChange={(e) => setF({ ...f, requerimiento_id: e.target.value })}
+            >
+              <option value="">Sin tarea</option>
+              {tareas
+                .filter((t) => t.id === f.requerimiento_id || coincideBusqueda(buscar, t.titulo))
+                .slice(0, 30)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.titulo}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+      )}
       {err && <p className="text-xs text-red-600">{err}</p>}
       <button className="btn-primary w-full">Guardar acuerdo de {mesaNombre}</button>
     </form>

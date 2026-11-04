@@ -154,7 +154,14 @@ export async function listAcuerdosSemana(ctx: DbCtx, semanaId: string): Promise<
 
 export async function insertAcuerdo(
   ctx: DbCtx,
-  a: { semana_id: string; descripcion: string; responsable_id: string; fecha_compromiso: string; mesa_id?: string | null },
+  a: {
+    semana_id: string;
+    descripcion: string;
+    responsable_id: string;
+    fecha_compromiso: string;
+    mesa_id?: string | null;
+    requerimiento_id?: string | null;
+  },
 ): Promise<Acuerdo> {
   const { data, error } = await ctx.db
     .from('acuerdos')

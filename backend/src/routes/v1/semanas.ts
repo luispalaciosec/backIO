@@ -38,7 +38,7 @@ import {
 } from '../../lib/rituals/daily_compartido';
 import { guardarPreparacion, listPreparacion, type TipoDaily } from '../../lib/db/daily_preparacion';
 import { notificar } from '../../lib/notificaciones';
-import { listClientes, listMesas, listBacklog, listUsuarios } from '../../lib/db';
+import { getRequerimiento, listClientes, listMesas, listBacklog, listUsuarios } from '../../lib/db';
 import type { DbCtx } from '../../lib/db/client';
 import { usuarioDelTenant } from '../../lib/db/admin';
 import { alcanceMesa } from '../../lib/db/mesas';
@@ -172,12 +172,16 @@ export const crearAcuerdoSchema = z.object({
   fecha_compromiso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   /** Mesa en cuyo weekly se acordó (migración 35). Sin mesa: weekly de toda la agencia. */
   mesa_id: z.string().uuid().nullable().optional(),
+  /** Tarea sobre la que se acordó (migración 43). Opcional. */
+  requerimiento_id: z.string().uuid().nullable().optional(),
 });
 
 // Tres campos: acuerdo, responsable, fecha. La fecha es un date picker real: sin "próxima weekly".
 semanas.post('/:id/acuerdos', requireScope('write:actas'), zValidator('json', crearAcuerdoSchema), async (c) => {
   const ctx = ctxOf(c);
-  const a = await insertAcuerdo(ctx, { semana_id: c.req.param('id'), ...c.req.valid('json') });
+  const b = c.req.valid('json');
+  if (b.requerimiento_id && !(await getRequerimiento(ctx, b.requerimiento_id))) return c.json({ error: 'La tarea no existe' }, 422);
+  const a = await insertAcuerdo(ctx, { semana_id: c.req.param('id'), ...b });
   await audit(ctx, { accion: 'crear_acuerdo', entidad: 'acuerdo', entidad_id: a.id });
   return c.json(a, 201);
 });

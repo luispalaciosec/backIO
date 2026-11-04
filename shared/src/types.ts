@@ -290,6 +290,8 @@ export interface Acuerdo {
   created_at: string;
   /** Mesa en cuyo weekly se acordó (migración 35). Null = weekly de toda la agencia. */
   mesa_id?: string | null;
+  /** Tarea sobre la que se acordó (migración 43): sale como sugerencia al armar el daily. */
+  requerimiento_id?: string | null;
 }
 
 export interface Acta {

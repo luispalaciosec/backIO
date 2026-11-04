@@ -10,6 +10,7 @@ export type Razon =
   | 'vence_manana'
   | 'atrasada'
   | 'del_ultimo_daily'
+  | 'compromiso_weekly'
   | 'en_curso'
   | 'urgente'
   | 'cliente_rojo'
@@ -20,6 +21,7 @@ export const ETIQUETA_RAZON: Record<Razon, string> = {
   vence_manana: 'Vence mañana',
   atrasada: 'Atrasada',
   del_ultimo_daily: 'Del último daily',
+  compromiso_weekly: 'Compromiso del weekly',
   en_curso: 'En curso',
   urgente: 'Urgente',
   cliente_rojo: 'Cliente en rojo',
