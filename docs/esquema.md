@@ -77,6 +77,7 @@ Clientes de la agencia (mismo id que en PrometIO), con su proyecto de Basecamp y
 | `basecamp_importado_at` | fecha y hora |  |  |
 | `es_prueba` | boolean | sí | por defecto `false` |
 | `ejecutiva_id` | uuid |  | → [usuarios](#usuarios).id |
+| `empresa_id` | uuid |  | → [clientes](#clientes).id |
 
 ### mesas
 
