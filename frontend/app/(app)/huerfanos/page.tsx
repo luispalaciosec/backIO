@@ -83,7 +83,8 @@ export default function EntradasBasecampPage() {
     acc[e.cliente_id] = (acc[e.cliente_id] ?? 0) + 1;
     return acc;
   }, {});
-  const sinResp = visibles.filter((e) => e.owner_agencia.length === 0).length;
+  // Lo ya cerrado no entra al daily: no hace falta pedirle responsable (la tarea de Jordy, de StackIO, del 30/10/2026).
+  const sinResp = visibles.filter((e) => e.owner_agencia.length === 0 && !['completado', 'cancelado'].includes(e.estado_operativo)).length;
 
   return (
     <div className="space-y-4">

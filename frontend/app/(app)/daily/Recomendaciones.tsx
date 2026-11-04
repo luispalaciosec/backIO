@@ -59,6 +59,7 @@ const h = (n: number) => `${n.toLocaleString('es-EC', { maximumFractionDigits: 1
  */
 export function Recomendaciones({
   mesa,
+  soloMiasInicial = false,
   yo,
   tieneCuentas,
   items,
@@ -71,6 +72,7 @@ export function Recomendaciones({
   hoy,
 }: {
   mesa: string;
+  soloMiasInicial?: boolean;
   yo: string | null;
   tieneCuentas: boolean;
   items: RequerimientoMetricas[];
@@ -84,7 +86,7 @@ export function Recomendaciones({
 }) {
   const ia = useIA();
   const [abierto, setAbierto] = useState(true);
-  const [soloMias, setSoloMias] = useState(false);
+  const [soloMias, setSoloMias] = useState(soloMiasInicial);
   const [d, setD] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aplicado, setAplicado] = useState<{ titulo: string; ids: string[] } | null>(null);

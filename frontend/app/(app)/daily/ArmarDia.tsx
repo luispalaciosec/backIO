@@ -62,12 +62,15 @@ export function ArmarDia({
   mesaNombre,
   seleccionadasHoy,
   yo,
+  soloMisCuentas = false,
 }: {
   hoy: string;
   mesa: string;
   mesaNombre: string;
   seleccionadasHoy: number;
   yo: string | null;
+  /** Vista «Mis cuentas»: solo las cuentas de la persona, de cualquier mesa. */
+  soloMisCuentas?: boolean;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -103,14 +106,16 @@ export function ArmarDia({
       .then(([r, c, p, u, k]) => {
         // Los clientes de prueba no entran a los rituales (migración 34).
         const prueba = new Set(c.items.filter((x) => x.es_prueba).map((x) => x.id));
-        setItems(r.items.filter((x) => !prueba.has(x.cliente_id)));
+        const esMia = (x: R) =>
+          (p.items.find((y) => y.id === x.proyecto_id)?.owner_ejecutiva ?? c.items.find((y) => y.id === x.cliente_id)?.ejecutiva_id) === yo;
+        setItems(r.items.filter((x) => !prueba.has(x.cliente_id) && (!soloMisCuentas || esMia(x))));
         setClientes(c.items);
         setProyectos(p.items);
         setPersonas(conNombrePersona(u.items));
         setCarga(k);
       })
       .catch((e) => setMsg({ tipo: 'error', texto: e instanceof ApiError ? e.message : 'No se pudieron cargar las tareas' }));
-  }, [abierto, mesa]);
+  }, [abierto, mesa, soloMisCuentas, yo]);
 
   const nc = useCallback((id: string) => clientes.find((c) => c.id === id)?.nombre ?? '', [clientes]);
   const np = useCallback((id: string | null) => (id ? (proyectos.find((p) => p.id === id)?.nombre ?? '') : ''), [proyectos]);
@@ -442,6 +447,7 @@ export function ArmarDia({
             </div>
             <Recomendaciones
               mesa={mesa}
+              soloMiasInicial={soloMisCuentas}
               yo={yo}
               tieneCuentas={items.some((r) => !!yo && ejecutivaDe(r) === yo)}
               items={items}

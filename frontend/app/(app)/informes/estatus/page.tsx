@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Cliente, Usuario, RequerimientoMetricas, Bitacora } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
@@ -8,6 +8,8 @@ import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { EstadoChip } from '@/components/ui/EstadoChip';
 import { fecha, fechaCorta, diaLocal, APROBACION_LABEL } from '@/lib/format';
 import { hoyLocal, lunesDe, sumarDias } from '@backio/shared';
+import { hrefExterno } from '@/lib/url';
+import { BitacoraReq } from '@/components/backlog/Bitacora';
 
 type Fila = RequerimientoMetricas & { ultima_nota: Bitacora | null };
 
@@ -32,6 +34,8 @@ function Estatus() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [items, setItems] = useState<Fila[]>([]);
   const [proyectos, setProyectos] = useState<Record<string, string>>({});
+  const [proyectosUrl, setProyectosUrl] = useState<Record<string, string>>({});
+  const [anotando, setAnotando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [soloConNota, setSoloConNota] = useState(false);
@@ -48,6 +52,10 @@ function Estatus() {
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error'));
   }, []);
+  const recargar = () =>
+    api<{ items: Fila[] }>(`/requerimientos/estatus?cliente=${cliente}&desde=${desde}&hasta=${hasta}`)
+      .then((r) => setItems(r.items))
+      .catch(() => undefined);
   useEffect(() => {
     if (!cliente) {
       setItems([]);
@@ -55,8 +63,13 @@ function Estatus() {
     }
     setCargando(true);
     setError(null);
-    api<{ items: Fila[] }>(`/requerimientos/estatus?cliente=${cliente}&desde=${desde}&hasta=${hasta}`)
-      .then((r) => setItems(r.items))
+    api<{ items: Fila[]; proyectos_url?: Record<string, string> }>(
+      `/requerimientos/estatus?cliente=${cliente}&desde=${desde}&hasta=${hasta}`,
+    )
+      .then((r) => {
+        setItems(r.items);
+        setProyectosUrl(r.proyectos_url ?? {});
+      })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error'))
       .finally(() => setCargando(false));
   }, [cliente, desde, hasta]);
@@ -174,7 +187,13 @@ function Estatus() {
           {grupos.map(([nombre, filas]) => (
             <section key={nombre} className="card overflow-hidden">
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 font-semibold flex justify-between">
-                <span>{nombre}</span>
+                {filas[0]?.proyecto_id && proyectosUrl[filas[0].proyecto_id] ? (
+                  <a className="hover:underline" href={hrefExterno(proyectosUrl[filas[0].proyecto_id]!)} target="_blank" rel="noreferrer">
+                    {nombre} <span className="no-print text-xs font-normal text-gray-400">↗ Basecamp</span>
+                  </a>
+                ) : (
+                  <span>{nombre}</span>
+                )}
                 <span className="text-gray-400 font-normal">{filas.length}</span>
               </div>
               <table className="w-full text-sm">
@@ -190,35 +209,64 @@ function Estatus() {
                 </thead>
                 <tbody>
                   {filas.map((r) => (
-                    <tr key={r.id} className={r.estado_operativo === 'completado' ? 'opacity-70' : ''}>
-                      <td className="td">
-                        {r.titulo_interno}
-                        {r.bloque_nombre && <div className="text-xs text-gray-400">{r.bloque_nombre}</div>}
-                      </td>
-                      <td className="td text-gray-700">{nombreU(r.owner_agencia)}</td>
-                      <td
-                        className={`td whitespace-nowrap ${r.dias_atraso > 0 && r.estado_operativo !== 'completado' ? 'text-red-700 font-semibold' : ''}`}
-                      >
-                        {fecha(r.fecha_entrega)}
-                        {r.dias_atraso > 0 && r.estado_operativo !== 'completado' ? ` · ${r.dias_atraso} d` : ''}
-                      </td>
-                      <td className="td">
-                        <EstadoChip estado={r.estado_operativo} />
-                      </td>
-                      <td className="td text-xs">
-                        {r.estado_aprobacion === 'no_aplica' ? '' : (APROBACION_LABEL[r.estado_aprobacion] ?? r.estado_aprobacion)}
-                      </td>
-                      <td className="td text-xs whitespace-pre-wrap">
-                        {r.ultima_nota ? (
-                          <>
-                            <span className="text-gray-400">{fechaCorta(diaLocal(r.ultima_nota.created_at))} · </span>
-                            {r.ultima_nota.nota}
-                          </>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                    </tr>
+                    <Fragment key={r.id}>
+                      <tr className={r.estado_operativo === 'completado' ? 'opacity-70' : ''}>
+                        <td className="td">
+                          {r.basecamp_url ? (
+                            <a className="hover:underline" href={hrefExterno(r.basecamp_url)} target="_blank" rel="noreferrer">
+                              {r.titulo_interno}
+                            </a>
+                          ) : (
+                            r.titulo_interno
+                          )}
+                          {r.bloque_nombre && <div className="text-xs text-gray-400">{r.bloque_nombre}</div>}
+                        </td>
+                        <td className="td text-gray-700">{nombreU(r.owner_agencia)}</td>
+                        <td
+                          className={`td whitespace-nowrap ${r.dias_atraso > 0 && r.estado_operativo !== 'completado' ? 'text-red-700 font-semibold' : ''}`}
+                        >
+                          {fecha(r.fecha_entrega)}
+                          {r.dias_atraso > 0 && r.estado_operativo !== 'completado' ? ` · ${r.dias_atraso} d` : ''}
+                        </td>
+                        <td className="td">
+                          <EstadoChip estado={r.estado_operativo} />
+                        </td>
+                        <td className="td text-xs">
+                          {r.estado_aprobacion === 'no_aplica' ? '' : (APROBACION_LABEL[r.estado_aprobacion] ?? r.estado_aprobacion)}
+                        </td>
+                        <td className="td text-xs whitespace-pre-wrap">
+                          {r.ultima_nota ? (
+                            <>
+                              <span className="text-gray-400">{fechaCorta(diaLocal(r.ultima_nota.created_at))} · </span>
+                              {r.ultima_nota.nota}
+                            </>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                          <button
+                            type="button"
+                            className="no-print block mt-1 text-xs text-brand hover:underline"
+                            onClick={() => setAnotando(anotando === r.id ? null : r.id)}
+                          >
+                            {anotando === r.id ? 'Cerrar' : '+ Observación'}
+                          </button>
+                        </td>
+                      </tr>
+                      {anotando === r.id && (
+                        <tr className="no-print">
+                          <td className="td bg-gray-50" colSpan={6}>
+                            <BitacoraReq
+                              compacto
+                              requerimientoId={r.id}
+                              usuarios={usuarios}
+                              visibleCliente={r.visible_cliente}
+                              puedeComentar={!!r.basecamp_url}
+                              onCambio={() => void recargar()}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

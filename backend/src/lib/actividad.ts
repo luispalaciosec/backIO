@@ -89,6 +89,7 @@ const FRASES: Record<string, string | ((d: Detalle) => string)> = {
   kpi_medicion: (d) => `registró el KPI ${d.codigo ?? ''} (${d.periodo ?? ''})${d.origen === 'ajustado' ? ' con ajuste' : ''}`,
   kpi_definicion: (d) => `editó la definición del KPI ${d.codigo ?? ''}`,
   bitacora: (d) => `anotó en la bitácora${d.visible_cliente ? ' (visible al cliente)' : ''}: “${String(d.nota ?? '').slice(0, 120)}”`,
+  bitacora_a_basecamp: 'comentó en Basecamp una observación',
   bitacora_eliminar: 'borró una nota de la bitácora',
   ia_brief: 'usó la IA para extraer un brief',
   ia_recordatorio: 'redactó un recordatorio al cliente con IA',

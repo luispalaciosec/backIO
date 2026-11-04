@@ -667,6 +667,8 @@ export interface FichaCliente {
   }[];
   tareas: {
     atrasadas: TareaFicha[];
+    /** Total sin las bloqueadas: la lista se corta en 20. */
+    atrasadas_total?: number;
     esperando_cliente: TareaFicha[];
     bloqueadas: TareaFicha[];
     sin_movimiento: TareaFicha[];

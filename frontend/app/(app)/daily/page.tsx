@@ -121,10 +121,11 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
                 cuentasPorMesa={cuentasPorMesa}
               />
             </Paso>
-            {escribe && !cuentas && (
+            {escribe && (
               <Paso n={2} titulo="Hoy">
                 <ArmarDia
-                  key={mesa?.id ?? 'todas'}
+                  key={cuentas ? 'cuentas' : (mesa?.id ?? 'todas')}
+                  soloMisCuentas={cuentas}
                   hoy={hoy}
                   mesa={mesa?.id ?? ''}
                   mesaNombre={mesaNombre}
@@ -182,7 +183,7 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
           <footer className="card p-3">
             {cuentas ? (
               <span className="text-xs text-gray-400">
-                Mis cuentas es para leer: la apertura y el cierre se publican desde el daily de cada mesa.
+                Aquí eliges tus tareas de hoy en todas tus mesas. La apertura y el cierre se publican desde el daily de cada mesa.
               </span>
             ) : escribe ? (
               <Paso n={3} titulo="Publicar">

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { Bitacora, Usuario } from '@backio/shared';
 import { api, ApiError } from '@/lib/api';
+import { hrefExterno } from '@/lib/url';
 import { fecha, diaLocal, ESTADO_LABEL, APROBACION_LABEL } from '@/lib/format';
 
 /** Bitácora de una tarea: observaciones fechadas con el estado del momento. Reemplaza la hoja "Control de tareas". */
@@ -11,16 +12,21 @@ export function BitacoraReq({
   visibleCliente,
   onCambio,
   compacto = false,
+  puedeComentar = false,
 }: {
   requerimientoId: string;
   usuarios: Pick<Usuario, 'id' | 'nombre'>[];
   visibleCliente: boolean;
   onCambio?: () => void;
   compacto?: boolean;
+  /** La tarea tiene to-do en Basecamp: se ofrece también comentarla allá. */
+  puedeComentar?: boolean;
 }) {
   const [items, setItems] = useState<Bitacora[] | null>(null);
   const [nota, setNota] = useState('');
   const [visible, setVisible] = useState(false);
+  const [comentar, setComentar] = useState(false);
+  const [aviso, setAviso] = useState<{ texto: string; url?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const cargar = () =>
@@ -38,7 +44,18 @@ export function BitacoraReq({
     setBusy(true);
     setErr(null);
     try {
-      await api(`/requerimientos/${requerimientoId}/bitacora`, { method: 'POST', json: { nota: n, visible_cliente: visible } });
+      const r = await api<{ comentario_url?: string; comentario_error?: string }>(`/requerimientos/${requerimientoId}/bitacora`, {
+        method: 'POST',
+        json: { nota: n, visible_cliente: visible, comentar_basecamp: comentar },
+      });
+      setAviso(
+        r.comentario_url
+          ? { texto: 'Comentada también en Basecamp.', url: r.comentario_url }
+          : r.comentario_error
+            ? { texto: r.comentario_error }
+            : null,
+      );
+      setComentar(false);
       setNota('');
       setVisible(false);
       await cargar();
@@ -85,11 +102,27 @@ export function BitacoraReq({
             <input type="checkbox" checked={visible} disabled={!visibleCliente} onChange={(e) => setVisible(e.target.checked)} /> Visible
             para el cliente
           </label>
+          {puedeComentar && (
+            <label className="flex items-center gap-2 text-xs text-gray-700" title="Avisa a quienes siguen el to-do. Sale a tu nombre.">
+              <input type="checkbox" checked={comentar} onChange={(e) => setComentar(e.target.checked)} />
+              También comentar en Basecamp
+            </label>
+          )}
           <button className="btn-primary text-xs py-1" disabled={busy || !nota.trim()} onClick={guardar}>
             {busy ? 'Guardando…' : 'Anotar'}
           </button>
         </div>
         {err && <p className="text-xs text-red-600">{err}</p>}
+        {aviso && (
+          <p className="text-xs text-gray-700" role="status">
+            {aviso.texto}{' '}
+            {aviso.url && (
+              <a className="underline" href={hrefExterno(aviso.url)} target="_blank" rel="noreferrer">
+                Ver ↗
+              </a>
+            )}
+          </p>
+        )}
       </div>
       {items === null && <p className="text-sm text-gray-400">Cargando…</p>}
       {items && items.length === 0 && <p className="text-sm text-gray-400">Sin observaciones todavía.</p>}

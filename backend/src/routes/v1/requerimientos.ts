@@ -14,6 +14,7 @@ import {
   audit,
   listClientes,
   listUsuarios,
+  getCliente,
   getClienteBySlug,
   listProyectos,
   getUsuarioByEmail,
@@ -36,10 +37,21 @@ import {
 } from '../../lib/db/historial';
 import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento, getNotaBitacora } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
+import { causasVigentes } from '../../lib/causas';
+import { BasecampSinConectar } from '../../lib/basecamp/client';
+import { tareasParaCausas } from '../../lib/db/requerimientos';
+import { env } from '../../config/env';
+import { log } from '../../lib/logger';
 import { actualizarRequerimiento, ReglaError } from '../../lib/requerimientos/actualizar';
 import { pendientesDeEntrega, responderEntrega } from '../../lib/entregas';
 import { crearLote, type ProyectoDelLote, type RequerimientoDelLote } from '../../lib/db/lote';
 import { ensureSemana, semanaTienePlan } from '../../lib/db/semanas';
+
+/** La nota como HTML de Basecamp: escapada y con sus saltos de línea. */
+export function comentarioDeNota(nota: string): string {
+  const esc = nota.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return `<div>${esc.replace(/\n/g, '<br>')}</div>`;
+}
 
 export const requerimientos = new Hono();
 
@@ -65,7 +77,21 @@ requerimientos.get('/', requireScope('read:backlog'), async (c) => {
 });
 
 // Antes de '/:id': si no, Hono intenta tratar 'causas-pendientes' como uuid.
-requerimientos.get('/causas-pendientes', requireScope('read:backlog'), async (c) => c.json(await listSinMotivo(ctxOf(c), 45)));
+requerimientos.get('/causas-pendientes', requireScope('read:backlog'), async (c) => {
+  const ctx = ctxOf(c);
+  const mesa = c.req.query('mesa');
+  const [{ reprogramaciones, reprocesos }, alcance] = await Promise.all([
+    listSinMotivo(ctx, 45),
+    mesa ? alcanceMesa(ctx, mesa, { sinPrueba: true }) : Promise.resolve(undefined),
+  ]);
+  const ids = [...new Set([...reprogramaciones, ...reprocesos].map((x) => x.requerimiento_id))];
+  const tareas = await tareasParaCausas(ctx, ids);
+  const hoy = hoyLocal();
+  return c.json({
+    reprogramaciones: causasVigentes(reprogramaciones, tareas, hoy, alcance),
+    reprocesos: causasVigentes(reprocesos, tareas, hoy, alcance),
+  });
+});
 
 // ---------------- Bitácora (observaciones fechadas por tarea): lecturas antes de '/:id'
 /** Última nota por requerimiento (columna Observación del backlog). */
@@ -89,7 +115,21 @@ requerimientos.get('/estatus', requireScope('read:backlog'), async (c) => {
       (r.estado_operativo === 'completado' && r.completado_at && (!desdeIso || r.completado_at >= desdeIso) && r.completado_at <= hastaIso),
   );
   const notas = await ultimaBitacoraPorRequerimiento(ctx, { ids: items.map((r) => r.id), hasta: hastaIso });
-  return c.json({ items: items.map((r) => ({ ...r, ultima_nota: notas[r.id] ?? null })) });
+  // Enlace a la lista de Basecamp de cada proyecto: se arma con el proyecto del cliente.
+  const [cliente, proyectos] = await Promise.all([getCliente(ctx, q.cliente), listProyectos(ctx, { cliente_id: q.cliente })]);
+  const proyectos_url = Object.fromEntries(
+    proyectos.flatMap((p) =>
+      cliente?.basecamp_project_id && p.basecamp_todolist_id
+        ? [
+            [
+              p.id,
+              `https://3.basecamp.com/${env().BASECAMP_ACCOUNT_ID}/buckets/${cliente.basecamp_project_id}/todolists/${p.basecamp_todolist_id}`,
+            ],
+          ]
+        : [],
+    ),
+  );
+  return c.json({ items: items.map((r) => ({ ...r, ultima_nota: notas[r.id] ?? null })), proyectos_url });
 });
 
 // ---------------- «¿Ya se entregó?» (docs/22): antes de '/:id'.
@@ -302,7 +342,15 @@ requerimientos.get('/:id/bitacora', requireScope('read:backlog'), async (c) =>
 requerimientos.post(
   '/:id/bitacora',
   escrituraOPropia,
-  zValidator('json', z.object({ nota: z.string().trim().min(1).max(2000), visible_cliente: z.boolean().default(false) })),
+  zValidator(
+    'json',
+    z.object({
+      nota: z.string().trim().min(1).max(2000),
+      visible_cliente: z.boolean().default(false),
+      /** También como comentario del to-do, a nombre de quien anota. Es opcional: un comentario avisa a quienes lo siguen. */
+      comentar_basecamp: z.boolean().default(false),
+    }),
+  ),
   async (c) => {
     const ctx = ctxOf(c);
     const id = c.req.param('id');
@@ -312,6 +360,18 @@ requerimientos.post(
     const bloqueo = await soloSiEsSuya(c, id);
     if (bloqueo) return bloqueo;
     const a = c.get('auth');
+    // Antes de guardar: si no se puede comentar (sin to-do o sin Basecamp conectado), no queda a medias.
+    let comentario: { bc: BasecampClient; proyecto: number; todo: number } | null = null;
+    if (b.comentar_basecamp) {
+      const cliente = await getCliente(ctx, r.cliente_id);
+      if (!r.basecamp_todo_id || !cliente?.basecamp_project_id) return c.json({ error: 'Esta tarea no tiene to-do en Basecamp.' }, 422);
+      try {
+        comentario = { bc: await BasecampClient.forActor(ctx), proyecto: cliente.basecamp_project_id, todo: r.basecamp_todo_id };
+      } catch (err) {
+        if (err instanceof BasecampSinConectar) return c.json({ error: err.message }, 422);
+        throw err;
+      }
+    }
     // Lo que ve el cliente lo decide gestión: un colaborador anota, pero no publica al cliente.
     const visible = b.visible_cliente && r.visible_cliente && !esColaborador(a);
     const nota = await insertBitacora(ctx, {
@@ -327,6 +387,21 @@ requerimientos.post(
       entidad_id: id,
       detalle: { nota: b.nota.slice(0, 200), visible_cliente: b.visible_cliente },
     });
+    if (comentario) {
+      try {
+        const k = await comentario.bc.createComment(comentario.proyecto, comentario.todo, comentarioDeNota(b.nota));
+        await audit(ctx, {
+          accion: 'bitacora_a_basecamp',
+          entidad: 'requerimiento',
+          entidad_id: id,
+          detalle: { comment_id: k.id, url: k.app_url },
+        });
+        return c.json({ ...nota, comentario_url: k.app_url }, 201);
+      } catch (err) {
+        log.error('[bitacora] comentario en Basecamp', err instanceof Error ? err.message : err);
+        return c.json({ ...nota, comentario_error: 'La nota quedó guardada, pero no se pudo comentar en Basecamp.' }, 201);
+      }
+    }
     return c.json(nota, 201);
   },
 );

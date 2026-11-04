@@ -92,9 +92,12 @@ function ListaTareas({
   items,
   vacio,
   detalle,
+  total,
 }: {
   titulo: string;
   items: TareaFicha[];
+  /** Si la lista viene cortada, cuántas son en realidad. */
+  total?: number;
   vacio: string;
   detalle: (t: TareaFicha) => string;
 }) {
@@ -102,7 +105,7 @@ function ListaTareas({
     <section className="card flex flex-col min-h-0">
       <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between">
         <span>{titulo}</span>
-        <span className="text-gray-400 tabular-nums">{items.length}</span>
+        <span className="text-gray-400 tabular-nums">{total ?? items.length}</span>
       </div>
       <ul className="divide-y divide-gray-100 max-h-80 overflow-auto">
         {items.length === 0 && <li className="p-4 text-sm text-gray-400">{vacio}</li>}
@@ -327,8 +330,9 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
 
       <div className="grid gap-4 lg:grid-cols-3">
         <ListaTareas
-          titulo="Atrasadas"
+          titulo="Atrasadas (sin las bloqueadas)"
           items={f.tareas.atrasadas}
+          total={f.tareas.atrasadas_total}
           vacio="Nada atrasado."
           detalle={(t) => `${t.dias_atraso} d · ${fecha(t.fecha_entrega)}`}
         />

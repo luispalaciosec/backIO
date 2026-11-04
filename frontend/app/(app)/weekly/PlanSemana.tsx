@@ -26,6 +26,7 @@ export function PlanSemana({
   owners,
   usuarios,
   escribe,
+  soloClientes,
 }: {
   semanaId: string;
   mesa: string;
@@ -33,6 +34,7 @@ export function PlanSemana({
   owners: Record<string, string[]>;
   usuarios: { id: string; nombre: string }[];
   escribe: boolean;
+  soloClientes?: string[];
 }) {
   const [items, setItems] = useState<Sugerencia[] | null>(null);
   const { patch, busy, error } = usePatchTarea();
@@ -45,12 +47,13 @@ export function PlanSemana({
       vivo = false;
     };
   }, [semanaId, mesa]);
-  if (!items?.length) return null;
-  const reasignables = items.filter((s) => s.a_id).length;
+  const vistas = items?.filter((s) => !soloClientes || soloClientes.includes(s.cliente_id)) ?? [];
+  if (!vistas.length) return null;
+  const reasignables = vistas.filter((s) => s.a_id).length;
   return (
     <div className="border-b border-gray-200 px-4 py-3 space-y-2">
       <div className="text-sm font-semibold">
-        Plan de la semana: {items.length} {items.length === 1 ? 'tarea no entra' : 'tareas no entran'}
+        Plan de la semana: {vistas.length} {vistas.length === 1 ? 'tarea no entra' : 'tareas no entran'}
         {reasignables ? ` · ${reasignables} se pueden reasignar` : ''}
       </div>
       <p className="text-xs text-gray-500">
@@ -58,7 +61,7 @@ export function PlanSemana({
       </p>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <ul className="divide-y divide-gray-100 text-sm">
-        {items.map((s) => {
+        {vistas.map((s) => {
           const actuales = owners[s.tarea_id] ?? [s.de_id];
           return (
             <li key={`${s.tarea_id}|${s.de_id}`} className="py-2 flex flex-wrap items-start justify-between gap-3">

@@ -153,6 +153,29 @@ export async function setPrimeraRespuesta(ctx: DbCtx, id: string, valor: string 
 }
 
 /** Filas de la vista de métricas para un conjunto de ids (bandeja de entradas desde Basecamp). */
+/** Lo mínimo de varias tareas, también cerradas, de a 200 para no pasarse del largo de la consulta. */
+export async function tareasParaCausas(ctx: DbCtx, ids: string[]) {
+  const out: {
+    id: string;
+    titulo_interno: string;
+    cliente_id: string;
+    proyecto_id: string | null;
+    estado_operativo: string;
+    completado_at: string | null;
+  }[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await ctx.db
+      .from('requerimientos')
+      .select('id, titulo_interno, cliente_id, proyecto_id, estado_operativo, completado_at')
+      .eq('tenant_id', ctx.tenantId)
+      .is('deleted_at', null)
+      .in('id', ids.slice(i, i + 200));
+    throwIf(error);
+    out.push(...(data ?? []));
+  }
+  return out;
+}
+
 export async function metricasPorIds(ctx: DbCtx, ids: string[]) {
   if (!ids.length) return [];
   const { data, error } = await ctx.db

@@ -31,7 +31,9 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
   const escribe = puedeEscribir(me.rol);
   // El weekly es de una mesa: señales, acuerdos y compromisos son los suyos (migración 35). «todas» = toda la agencia.
   const activas = mesas.filter((m) => m.activa);
-  const todas = searchParams.mesa === 'todas';
+  // «Mis cuentas»: las cuentas de la ejecutiva, de cualquier mesa. Es para revisar y actuar; los documentos salen por mesa.
+  const cuentas = searchParams.mesa === 'cuentas';
+  const todas = searchParams.mesa === 'todas' || cuentas;
   const mesa = todas ? null : (activas.find((m) => m.id === searchParams.mesa) ?? activas[0] ?? null);
   const deLaMesa = (a: Acuerdo) => !mesa || a.mesa_id === mesa.id;
   const [
@@ -49,14 +51,21 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
     apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
     apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id' | 'mesa_id'>[] }>('/clientes'),
   ]);
-  const acuerdos = acuerdosTodos.filter(deLaMesa);
-  const abiertos = abiertosTodos.filter(deLaMesa);
+  const misClientes = clientes.filter((c) => !!me.usuario_id && c.ejecutiva_id === me.usuario_id);
+  const misClientesIds = misClientes.map((c) => c.id);
+  const tieneCuentas = misClientes.length > 0;
   const { items: reqs } = await apiServer<{ items: RequerimientoMetricas[] }>('/requerimientos?activos=1');
+  const deMisCuentas = (a: Acuerdo) =>
+    a.responsable_id === me.usuario_id ||
+    (!!a.requerimiento_id && misClientesIds.includes(reqs.find((r) => r.id === a.requerimiento_id)?.cliente_id ?? ''));
+  const acuerdos = acuerdosTodos.filter(deLaMesa).filter((a) => !cuentas || deMisCuentas(a));
+  const abiertos = abiertosTodos.filter(deLaMesa).filter((a) => !cuentas || deMisCuentas(a));
   const titulos = Object.fromEntries(reqs.map((r) => [r.id, r.titulo_interno]));
   const ownersDeTarea = Object.fromEntries(reqs.map((r) => [r.id, r.owner_agencia]));
   const activos = usuarios.filter((u) => u.activo).map((u) => ({ id: u.id, nombre: u.nombre }));
   const clienteDeTarea = Object.fromEntries(reqs.map((r) => [r.id, r.cliente_id]));
   const nombreCliente = Object.fromEntries(clientes.map((c) => [c.id, c.nombre]));
+  const mesaDeCliente = Object.fromEntries(clientes.filter((c) => c.mesa_id).map((c) => [c.id, c.mesa_id!]));
   const ejecutivaDeCliente = Object.fromEntries(clientes.filter((c) => c.ejecutiva_id).map((c) => [c.id, c.ejecutiva_id!]));
   const nombres = Object.fromEntries(usuarios.map((u) => [u.id, nombrePersona(u)]));
   const dash = await apiServer<{
@@ -71,7 +80,16 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
       dias_arrastre: number;
     }[];
     arrastre_total?: number;
-  }>(`/dashboard${mesa ? `?mesa=${mesa.id}` : ''}`);
+  }>(`/dashboard${mesa ? `?mesa=${mesa.id}` : cuentas ? '?arrastre=todo' : ''}`);
+  const nombresMisClientes = new Set(misClientes.map((c) => c.nombre));
+  const arrastre = cuentas ? dash.arrastre.filter((a) => nombresMisClientes.has(a.cliente)) : dash.arrastre;
+  // En «Mis cuentas», la capacidad muestra a quienes tienen tareas de esas cuentas y solo el riesgo de ellas.
+  const personasDeMisCuentas = new Set(reqs.filter((r) => misClientesIds.includes(r.cliente_id)).flatMap((r) => r.owner_agencia));
+  const capacidadVista = cuentas
+    ? capacidad
+        .filter((c) => personasDeMisCuentas.has(c.usuario_id))
+        .map((c) => ({ ...c, en_riesgo: c.en_riesgo?.filter((t) => misClientesIds.includes(t.cliente_id)) }))
+    : capacidad;
   const nombre = (id: string) => nombres[id] ?? '—';
   const hoy = hoyLocal();
   const vencidos = abiertos.filter((a) => a.fecha_compromiso < hoy);
@@ -81,7 +99,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
       <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">
-            Weekly · Semana {semana.numero_iso} · {mesa?.nombre ?? 'Toda la agencia'}
+            Weekly · Semana {semana.numero_iso} · {cuentas ? 'Mis cuentas' : (mesa?.nombre ?? 'Toda la agencia')}
           </h1>
           <p className="text-sm text-gray-500">
             {fecha(semana.fecha_inicio)} – {fecha(semana.fecha_fin)} · agenda generada por el motor de señales
@@ -98,13 +116,23 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
             ))}
             <a
               href="/weekly?mesa=todas"
-              className={`rounded-full px-3 py-1 border ${todas ? 'bg-brand text-white border-brand' : 'border-gray-300 hover:bg-gray-50'}`}
+              className={`rounded-full px-3 py-1 border ${todas && !cuentas ? 'bg-brand text-white border-brand' : 'border-gray-300 hover:bg-gray-50'}`}
             >
               Toda la agencia
             </a>
+            {tieneCuentas && (
+              <a
+                href="/weekly?mesa=cuentas"
+                className={`rounded-full px-3 py-1 border ${cuentas ? 'bg-brand text-white border-brand' : 'border-gray-300 hover:bg-gray-50'}`}
+              >
+                Mis cuentas
+              </a>
+            )}
           </nav>
         </div>
-        {escribe ? (
+        {cuentas ? (
+          <span className="text-xs text-gray-400">Los documentos se generan desde el weekly de cada mesa</span>
+        ) : escribe ? (
           <WeeklyActions key={mesa?.id ?? 'todas'} semanaId={semana.id} mesa={mesa?.id ?? ''} />
         ) : (
           <span className="text-xs text-gray-400">Solo lectura · los documentos los genera operaciones</span>
@@ -130,6 +158,8 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
                 ownersDeTarea={ownersDeTarea}
                 clientes={nombreCliente}
                 ejecutivas={ejecutivaDeCliente}
+                mesaDeCliente={mesaDeCliente}
+                soloCuentasDe={cuentas ? (me.usuario_id ?? null) : null}
                 nombre={nombres}
                 usuarios={activos}
                 yo={me.usuario_id ?? null}
@@ -141,8 +171,8 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
             titulo: 'Arrastre',
             contenido: (
               <ArrastreWeekly
-                filas={dash.arrastre}
-                total={dash.arrastre_total ?? dash.arrastre.length}
+                filas={arrastre}
+                total={cuentas ? arrastre.length : (dash.arrastre_total ?? dash.arrastre.length)}
                 owners={ownersDeTarea}
                 usuarios={activos}
                 escribe={escribe}
@@ -182,7 +212,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
                       </tr>
                     </thead>
                     <tbody>
-                      {capacidad.map((c) => {
+                      {capacidadVista.map((c) => {
                         const exceso =
                           c.horas_estimadas !== undefined && c.capacidad_restante !== undefined && c.horas_estimadas > c.capacidad_restante;
                         return (
@@ -225,7 +255,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
                           </Fragment>
                         );
                       })}
-                      {capacidad.length === 0 && (
+                      {capacidadVista.length === 0 && (
                         <tr>
                           <td className="td text-gray-400" colSpan={5}>
                             Sin tareas esta semana.
@@ -241,7 +271,14 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
         ]}
         lateral={
           <>
-            <CausasPendientes titulos={titulos} escribe={escribe} />
+            <CausasPendientes
+              key={searchParams.mesa ?? ''}
+              mesa={mesa?.id ?? ''}
+              clientes={nombreCliente}
+              misClientes={misClientesIds}
+              soloMias={cuentas}
+              escribe={escribe}
+            />
             <section className="card p-4 space-y-3">
               <div className="font-semibold">Acuerdos de la sesión</div>
               <p className="text-xs text-gray-500">Cada acuerdo lleva responsable y una fecha concreta del calendario.</p>

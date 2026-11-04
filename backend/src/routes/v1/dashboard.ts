@@ -4,5 +4,5 @@ import { buildDashboard } from '../../lib/dashboard';
 
 export const dashboard = new Hono();
 dashboard.get('/', requireScope('read:backlog', 'read:proyectos'), async (c) =>
-  c.json(await buildDashboard(ctxOf(c), c.req.query('mesa') || null)),
+  c.json(await buildDashboard(ctxOf(c), c.req.query('mesa') || null, { arrastreCompleto: c.req.query('arrastre') === 'todo' })),
 );

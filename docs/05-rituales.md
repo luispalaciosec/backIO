@@ -321,6 +321,10 @@ señales se escapan en el markdown, así que un `|` o un `_` en un título ya no
   si nace de una señal de esa tarea). Mientras esté abierto y venza en los próximos 7 días, esa tarea sale primero en los
   escenarios del daily con la etiqueta «Compromiso del weekly», aunque lleve días sin moverse. Si está bloqueada, espera al
   cliente o no tiene responsable, no se sugiere.
+- **«Mis cuentas»:** las mismas secciones, solo con las cuentas de la ejecutiva en cualquier mesa. Los documentos se generan por
+  mesa, y un acuerdo creado desde una señal queda en la mesa de ese cliente.
+- **Causas pendientes:** con el título real, por mesa y por mis cuentas. Lo cerrado hace más de 15 días y lo cancelado dejan de
+  pedirse; no se borra nada (`lib/causas.ts`).
 
 ### Marcador (20/10/2026)
 

@@ -195,7 +195,12 @@ export async function fichaCliente(ctx: DbCtx, clienteId: string, ahora = new Da
           a.nombre.localeCompare(b.nombre, 'es'),
       ),
     tareas: {
-      atrasadas: atrasadas.slice(0, 20).map(tarea),
+      // Lo bloqueado tiene su propia lista: aquí repetía las mismas tareas. Se muestran 20; el total dice cuántas son.
+      atrasadas: atrasadas
+        .filter((r) => r.estado_operativo !== 'bloqueado')
+        .slice(0, 20)
+        .map(tarea),
+      atrasadas_total: atrasadas.filter((r) => r.estado_operativo !== 'bloqueado').length,
       // Lo que más tiempo lleva esperando, primero: es lo que la ejecutiva tiene que empujar.
       esperando_cliente: activos
         .filter((r) => r.estado_aprobacion === 'pendiente_cliente')

@@ -109,6 +109,8 @@ export function SenalesWeekly({
   ownersDeTarea,
   clientes,
   ejecutivas = {},
+  mesaDeCliente = {},
+  soloCuentasDe = null,
   nombre,
   usuarios,
   yo,
@@ -122,6 +124,10 @@ export function SenalesWeekly({
   clientes: Record<string, string>;
   /** cliente → ejecutiva de cuenta (migración 37): entra al bloque de su cuenta aunque no sea de la mesa. */
   ejecutivas?: Record<string, string>;
+  /** cliente → mesa: un acuerdo creado desde «Mis cuentas» queda en la mesa de ese cliente. */
+  mesaDeCliente?: Record<string, string>;
+  /** Vista «Mis cuentas»: fija el filtro a las cuentas de esa persona. */
+  soloCuentasDe?: string | null;
   nombre: Record<string, string>;
   usuarios: { id: string; nombre: string }[];
   yo: string | null;
@@ -132,7 +138,7 @@ export function SenalesWeekly({
   const [abierto, setAbierto] = useState<Record<string, boolean>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [cuentasDe, setCuentasDe] = useState('');
+  const [cuentasDe, setCuentasDe] = useState(soloCuentasDe ?? '');
   const [q, setQ] = useState('');
   const [por, setPor] = useState<'cliente' | 'persona'>('cliente');
   const [acordando, setAcordando] = useState<string | null>(null);
@@ -234,7 +240,11 @@ export function SenalesWeekly({
     try {
       await api(`/semanas/${semanaId}/acuerdos`, {
         method: 'POST',
-        json: { ...f, mesa_id: mesaId, requerimiento_id: s.entidad_tipo === 'requerimiento' ? s.entidad_id : null },
+        json: {
+          ...f,
+          mesa_id: mesaId ?? (clienteDeSenal(s) ? (mesaDeCliente[clienteDeSenal(s)!] ?? null) : null),
+          requerimiento_id: s.entidad_tipo === 'requerimiento' ? s.entidad_id : null,
+        },
       });
       setAcordando(null);
       await marcar(s, true);
@@ -273,7 +283,7 @@ export function SenalesWeekly({
               </button>
             ))}
           </div>
-          {conEjecutiva.length > 0 && (
+          {conEjecutiva.length > 0 && !soloCuentasDe && (
             <select
               className="input w-44 text-xs"
               value={cuentasDe}

@@ -1,35 +1,71 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Reprogramacion, Reproceso, MotivoReprogramacion, MotivoReproceso } from '@backio/shared';
 import { MOTIVOS_REPROGRAMACION, MOTIVOS_REPROCESO, diaLocal } from '@backio/shared';
 import { api } from '@/lib/api';
 import { fecha } from '@/lib/format';
 
+type ConTarea<X> = X & { titulo: string; cliente_id: string };
+
 /** Reprogramaciones y reprocesos sin causa registrada: se completan aquí, en el weekly, sin salir a buscarlos. */
-export function CausasPendientes({ titulos, escribe }: { titulos: Record<string, string>; escribe: boolean }) {
-  const [d, setD] = useState<{ reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] } | null>(null);
-  const cargar = () =>
-    api<{ reprogramaciones: Reprogramacion[]; reprocesos: Reproceso[] }>('/requerimientos/causas-pendientes')
-      .then(setD)
-      .catch(() => setD({ reprogramaciones: [], reprocesos: [] }));
+export function CausasPendientes({
+  mesa,
+  clientes,
+  misClientes,
+  soloMias = false,
+  escribe,
+}: {
+  mesa: string;
+  clientes: Record<string, string>;
+  /** Clientes de los que la persona es ejecutiva. */
+  misClientes: string[];
+  soloMias?: boolean;
+  escribe: boolean;
+}) {
+  const [d, setD] = useState<{ reprogramaciones: ConTarea<Reprogramacion>[]; reprocesos: ConTarea<Reproceso>[] } | null>(null);
+  const [mias, setMias] = useState(soloMias);
+  const cargar = useCallback(
+    () =>
+      api<{ reprogramaciones: ConTarea<Reprogramacion>[]; reprocesos: ConTarea<Reproceso>[] }>(
+        `/requerimientos/causas-pendientes${mesa ? `?mesa=${mesa}` : ''}`,
+      )
+        .then(setD)
+        .catch(() => setD({ reprogramaciones: [], reprocesos: [] })),
+    [mesa],
+  );
   useEffect(() => {
     void cargar();
-  }, []);
+  }, [cargar]);
   if (!d) return null;
-  const n = d.reprogramaciones.length + d.reprocesos.length;
-  const t = (id: string) => titulos[id] ?? 'Requerimiento';
+  const visible = (x: { cliente_id: string }) => !mias || misClientes.includes(x.cliente_id);
+  const reprogramaciones = d.reprogramaciones.filter(visible);
+  const reprocesos = d.reprocesos.filter(visible);
+  const n = reprogramaciones.length + reprocesos.length;
+  const t = (x: ConTarea<unknown>) => (
+    <>
+      <b>{x.titulo}</b>
+      {clientes[x.cliente_id] && <span className="text-xs text-gray-500"> · {clientes[x.cliente_id]}</span>}
+    </>
+  );
   return (
     <section className="card">
       <div className="px-4 py-3 border-b border-gray-200 font-semibold flex justify-between">
         <span>Causas pendientes de registrar</span>
-        <span className={n ? 'text-amber-700' : 'text-gray-400'}>{n}</span>
+        <span className="flex items-center gap-3 font-normal">
+          {misClientes.length > 0 && !soloMias && (
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <input type="checkbox" checked={mias} onChange={(e) => setMias(e.target.checked)} /> Mis cuentas
+            </label>
+          )}
+          <span className={`font-semibold ${n ? 'text-amber-700' : 'text-gray-400'}`}>{n}</span>
+        </span>
       </div>
       <ul className="divide-y divide-gray-100 text-sm">
         {n === 0 && <li className="p-4 text-gray-400">Todas las reprogramaciones y reprocesos tienen causa. Así se pueden atribuir.</li>}
-        {d.reprogramaciones.map((x) => (
+        {reprogramaciones.map((x) => (
           <li key={x.id} className="p-3 flex items-center gap-3 flex-wrap">
             <span className="flex-1 min-w-48">
-              <b>{t(x.requerimiento_id)}</b> · fecha {fecha(x.fecha_anterior)} → {fecha(x.fecha_nueva)}{' '}
+              {t(x)} · fecha {fecha(x.fecha_anterior)} → {fecha(x.fecha_nueva)}{' '}
               <span className="text-xs text-gray-500">
                 ({x.origen}, {fecha(diaLocal(x.created_at))})
               </span>
@@ -59,10 +95,10 @@ export function CausasPendientes({ titulos, escribe }: { titulos: Record<string,
             )}
           </li>
         ))}
-        {d.reprocesos.map((x) => (
+        {reprocesos.map((x) => (
           <li key={x.id} className="p-3 flex items-center gap-3 flex-wrap">
             <span className="flex-1 min-w-48">
-              <b>{t(x.requerimiento_id)}</b> · reproceso {x.origen === 'basecamp' ? 'desmarcado en Basecamp' : x.origen}{' '}
+              {t(x)} · reproceso {x.origen === 'basecamp' ? 'desmarcado en Basecamp' : x.origen}{' '}
               <span className="text-xs text-gray-500">
                 ({fecha(x.abierto_at.slice(0, 10))}
                 {x.cerrado_at ? '' : ', abierto'})
