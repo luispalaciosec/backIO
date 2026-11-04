@@ -7,6 +7,7 @@ import { getMesa } from '../../lib/db/mesas';
 import { iaDisponible, MODELO_IA } from '../../lib/ia';
 import { armarDailyMensaje, narrarDaily, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly } from '../../lib/ia/weekly';
+import { explicarEscenario } from '../../lib/ia/escenario';
 import { briefDesdeTexto } from '../../lib/ia/brief';
 import { redactarRecordatorio } from '../../lib/ia/recordatorio';
 import { generarInformeMensual } from '../../lib/ia/informe';
@@ -16,6 +17,19 @@ import { listInformesMensuales } from '../../lib/db/semanas';
 
 /** Capa de IA: redacta, nunca publica. Todo lo que sale de aquí lo revisa y publica una persona. */
 export const ia = new Hono();
+
+/** Explica en dos frases por qué se recomienda el escenario de hoy. Las reglas ya decidieron: la IA solo lo dice. */
+ia.post(
+  '/daily-escenario',
+  requireScope('write:actas'),
+  zValidator('json', z.object({ mesa_id: z.string().uuid().nullable().optional(), solo_mias: z.boolean().optional() })),
+  async (c) => {
+    if (!iaDisponible()) return c.json({ error: 'La capa de IA no está configurada' }, 503);
+    const ctx = ctxOf(c);
+    const b = c.req.valid('json');
+    return c.json({ texto: await explicarEscenario(ctx, b.mesa_id ?? undefined, b.solo_mias ? (ctx.usuarioId ?? undefined) : undefined) });
+  },
+);
 
 ia.get('/estado', requireScope('read:backlog'), (c) => c.json({ disponible: iaDisponible(), modelo: MODELO_IA }));
 

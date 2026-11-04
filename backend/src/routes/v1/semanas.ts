@@ -20,6 +20,7 @@ import { listClientes, listMesas, listBacklog } from '../../lib/db';
 import { usuarioDelTenant } from '../../lib/db/admin';
 import { alcanceMesa } from '../../lib/db/mesas';
 import { cargaDelDia } from '../../lib/carga';
+import { escenariosDelDia, preguntarSiSiguenVivas } from '../../lib/rituals/escenarios';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
@@ -45,6 +46,31 @@ semanas.get('/daily/carga', requireScope('read:backlog'), async (c) => {
   const mesa = c.req.query('mesa');
   return c.json(await cargaDelDia(ctx, mesa ? await alcanceMesa(ctx, mesa, { sinPrueba: true }) : undefined));
 });
+
+/** Escenarios para armar el día (docs/05). `solo_mias=1`: solo con las cuentas de quien pregunta. */
+semanas.get('/daily/escenarios', requireScope('read:backlog'), async (c) => {
+  const ctx = ctxOf(c);
+  return c.json(
+    await escenariosDelDia(
+      ctx,
+      c.req.query('mesa') || undefined,
+      c.req.query('solo_mias') === '1' ? (ctx.usuarioId ?? undefined) : undefined,
+    ),
+  );
+});
+
+/** «¿Sigue viva?»: avisa a la campana de los responsables de esas tareas atrasadas y quietas. */
+semanas.post(
+  '/daily/preguntar-vivas',
+  requireScope('write:actas'),
+  zValidator('json', z.object({ ids: z.array(z.string().uuid()).min(1).max(100) })),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const r = await preguntarSiSiguenVivas(ctx, c.req.valid('json').ids, c.get('auth').nombre);
+    await audit(ctx, { accion: 'preguntar_sigue_viva', entidad: 'mesa', detalle: r });
+    return c.json(r);
+  },
+);
 
 semanas.get('/acuerdos/abiertos', requireScope('read:senales'), async (c) => c.json({ items: await listAcuerdosAbiertos(ctxOf(c)) }));
 

@@ -181,6 +181,31 @@ Desde el 4/11/2026 reemplaza a la lista plana «Elegir tareas de hoy». El códi
 - **En lote:** `POST /requerimientos/daily-seleccion` aplica las mismas reglas que una por una y devuelve el motivo de las
   que no entraron.
 
+### Escenarios recomendados
+
+Dentro de «Armar el día», BackIO propone hasta tres formas de elegir las tareas de hoy y recomienda una. Las reglas
+deciden; la IA, si se le pide, solo explica el porqué en dos frases. Nada se marca sin un clic, se puede mirar antes de
+aplicar y se puede deshacer. El código está en `backend/src/lib/rituals/escenarios.ts`.
+
+| Escenario | Qué prioriza |
+|---|---|
+| Sin vencidos | Lo que vence hoy, lo atrasado que sigue vivo y lo que vence mañana |
+| Cuentas en riesgo | Clientes en rojo y luego en amarillo, según la foto diaria de salud |
+| Más entregas | Lo que está en curso o vence pronto, de lo más corto a lo más largo |
+
+- **Se recomienda** «Sin vencidos» si algo vence hoy o hay atrasadas vivas; si no, «Cuentas en riesgo» si hay clientes en
+  rojo; si no, «Más entregas».
+- **Horas:** cada escenario se ajusta a las horas del día de cada persona, sumando lo que ya tiene elegido, también en
+  otras mesas. La primera tarea de alguien entra aunque sola pase del día. Lo elegido antes se mantiene.
+- **Cada tarjeta dice lo que logra y lo que deja afuera:** tareas, cuántas de las que vencen hoy cubre, cómo cambia el
+  atraso vivo, qué queda afuera y si alguien se pasa de sus horas.
+- **Nunca se sugiere** lo que espera al cliente, lo bloqueado, lo que no tiene responsable ni lo atrasado sin moverse hace
+  más de 7 días. Eso último va en **«¿Siguen vivas?»**: un botón avisa a la campana de sus responsables, que responden en
+  [Mi día](./22-avisos.md).
+- **Solo mis cuentas:** limita lo sugerido, no las horas de las personas, que siguen siendo las de toda su carga.
+
+Rutas: `GET /semanas/daily/escenarios`, `POST /semanas/daily/preguntar-vivas` y `POST /ia/daily-escenario`.
+
 **Regla: ninguna tarea entra al daily sin responsable (22/09/2026).** Marcar `daily_fecha` en una
 tarea sin `owner_agencia` devuelve 422 (backlog ☀ y «Armar el día», donde se le puede asignar ahí mismo); el tablero muestra
 una alerta con las tareas sin responsable de las cuatro columnas y la publicación (y el borrador con IA)

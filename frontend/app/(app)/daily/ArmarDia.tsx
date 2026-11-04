@@ -7,6 +7,7 @@ import { USUARIOS_CON_INACTIVOS, conNombrePersona } from '@/lib/personas';
 import { api, ApiError } from '@/lib/api';
 import { fecha } from '@/lib/format';
 import { EstadoChip } from '@/components/ui/EstadoChip';
+import { Recomendaciones, ETIQUETA_RAZON, type Sugerencia } from './Recomendaciones';
 
 type R = RequerimientoMetricas;
 type Agrupar = 'persona' | 'cliente' | 'proyecto' | 'fecha' | 'nada';
@@ -78,6 +79,8 @@ export function ArmarDia({
   const [f, setF] = useState<Filtros>(FILTROS0);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  // Escenario que se está mirando: la lista muestra solo sus tareas, con el porqué de cada una.
+  const [viendo, setViendo] = useState<Sugerencia | null>(null);
 
   const cambiar = useCallback((p: Partial<Filtros>) => {
     setF((x) => {
@@ -179,18 +182,21 @@ export function ArmarDia({
     }),
   );
 
+  const enVista = viendo ? new Map(viendo.tareas.map((t) => [t.id, t.razones])) : null;
+  const listadas = enVista ? visibles.filter((r) => enVista.has(r.id)) : visibles;
+
   const orden = (a: R, b: R) =>
     (b.daily_fecha === hoy ? 1 : 0) - (a.daily_fecha === hoy ? 1 : 0) ||
     (a.fecha_entrega ?? '9999').localeCompare(b.fecha_entrega ?? '9999');
   const grupos = useMemo(() => {
-    if (f.agrupar === 'nada') return [{ clave: 'todas', nombre: 'Todas', tareas: [...visibles].sort(orden) }];
+    if (f.agrupar === 'nada') return [{ clave: 'todas', nombre: 'Todas', tareas: [...listadas].sort(orden) }];
     const m = new Map<string, { clave: string; nombre: string; tareas: R[] }>();
     const poner = (clave: string, nombre: string, r: R) => {
       const g = m.get(clave) ?? { clave, nombre, tareas: [] };
       g.tareas.push(r);
       m.set(clave, g);
     };
-    for (const r of visibles) {
+    for (const r of listadas) {
       if (f.agrupar === 'persona') {
         if (!r.owner_agencia.length) poner('sin', '⚠ Sin responsable', r);
         // Una tarea con varios responsables aparece bajo cada uno, como en el mensaje del daily.
@@ -212,7 +218,7 @@ export function ArmarDia({
       ? lista.sort((a, b) => a.clave.localeCompare(b.clave))
       : lista.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibles, f.agrupar, hoy]);
+  }, [listadas, f.agrupar, hoy]);
 
   /** Horas elegidas por persona: lo de esta mesa más lo que ya tiene elegido en otras. */
   const cargaPersonas = useMemo(() => {
@@ -226,7 +232,7 @@ export function ArmarDia({
       .sort((a, b) => (b.capacidad ? b.horas / b.capacidad : 0) - (a.capacidad ? a.horas / a.capacidad : 0));
   }, [carga, items, hoy, npersona]);
 
-  async function marcar(ids: string[], dia: string | null) {
+  async function marcar(ids: string[], dia: string | null): Promise<void> {
     if (!ids.length) return;
     setBusy(true);
     setMsg(null);
@@ -434,6 +440,19 @@ export function ArmarDia({
                 </div>
               )}
             </div>
+            <Recomendaciones
+              mesa={mesa}
+              yo={yo}
+              tieneCuentas={items.some((r) => !!yo && ejecutivaDe(r) === yo)}
+              items={items}
+              nombreCliente={nc}
+              nombrePersona={npersona}
+              ocupado={busy}
+              viendo={viendo?.id ?? null}
+              onVer={(x) => setViendo(x)}
+              onMarcar={marcar}
+              hoy={hoy}
+            />
             {msg && (
               <p className={`px-4 pt-2 text-sm ${msg.tipo === 'ok' ? 'text-green-700' : 'text-red-600'}`} role="status">
                 {msg.texto}
@@ -503,6 +522,18 @@ export function ArmarDia({
                                 ))}
                               </select>
                             )}
+                            {enVista
+                              ?.get(r.id)
+                              ?.filter((x) => x !== 'ya_elegida')
+                              .slice(0, 2)
+                              .map((x) => (
+                                <span
+                                  key={x}
+                                  className="rounded-full bg-brand/10 text-brand-dark px-2 text-[10px] font-semibold whitespace-nowrap"
+                                >
+                                  {ETIQUETA_RAZON[x]}
+                                </span>
+                              ))}
                             {r.estado_aprobacion === 'pendiente_cliente' && (
                               <span className="rounded-full bg-amber-100 text-amber-800 px-2 text-[10px] font-semibold whitespace-nowrap">
                                 espera al cliente
@@ -531,7 +562,7 @@ export function ArmarDia({
                   </section>
                 );
               })}
-              {visibles.length === 0 && (
+              {listadas.length === 0 && (
                 <p className="p-4 text-sm text-gray-400">
                   {items.length === 0
                     ? `Cargando las tareas de ${mesaNombre}…`
