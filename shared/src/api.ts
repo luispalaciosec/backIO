@@ -68,6 +68,7 @@ export type ActualizarRequerimientoInput = {
     | 'owner_agencia'
     | 'owner_cliente'
     | 'piezas'
+    | 'tipo_pieza_id'
     | 'brief_url'
     | 'entregable_urls'
     | 'planificacion'

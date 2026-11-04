@@ -34,13 +34,15 @@ export interface BacklogTableProps {
   proyectos?: Record<string, string>;
   /** Recargar tras registrar/cerrar un reproceso o completar una causa. */
   onCambio?: () => void;
+  /** Catálogo para la columna «Tipo de pieza». */
+  tiposPieza?: { id: string; nombre: string }[];
   /** Si se pasa, muestra ↻ junto al cliente para sincronizar con Basecamp (admin, operaciones, ejecutivas). */
   onSincronizar?: (cliente: Cliente) => Promise<void>;
 }
 
 // w-max min-w-full: la fila mide lo que suman sus columnas; sin esto el contenedor recortaba las últimas (Basecamp, Última act.).
 const COLS =
-  'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_130px_90px_80px_80px_70px_240px_120px_120px]';
+  'w-max min-w-full grid-cols-[minmax(260px,2fr)_150px_120px_110px_110px_110px_130px_150px_120px_80px_140px_130px_90px_80px_80px_70px_240px_120px_120px]';
 
 export function BacklogTable({
   items,
@@ -55,6 +57,7 @@ export function BacklogTable({
   proyectosCliente = {},
   onCambio = () => undefined,
   onSincronizar,
+  tiposPieza,
 }: BacklogTableProps) {
   const [sincronizando, setSincronizando] = useState<string | null>(null);
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
@@ -70,7 +73,7 @@ export function BacklogTable({
     });
 
   return (
-    <div className="space-y-6 min-w-[1700px]">
+    <div className="space-y-6 min-w-[1840px]">
       {grupos.map(({ cliente, color, reqs }) => {
         const cerrado = colapsados.has(cliente.id);
         return (
@@ -138,6 +141,7 @@ export function BacklogTable({
                     'Aprobación',
                     'Planificación',
                     'Piezas',
+                    'Tipo de pieza',
                     'Tipo',
                     'Clase',
                     'Atraso',
@@ -164,6 +168,7 @@ export function BacklogTable({
                     bloqueada={puedeEditar ? !puedeEditar(r) : false}
                     proyecto={r.proyecto_id ? proyectos[r.proyecto_id] : undefined}
                     onCambio={onCambio}
+                    tiposPieza={tiposPieza}
                   />
                 ))}
                 {onCrear && (
@@ -194,7 +199,9 @@ function Fila({
   bloqueada,
   proyecto,
   onCambio,
+  tiposPieza = [],
 }: {
+  tiposPieza?: { id: string; nombre: string }[];
   r: RequerimientoMetricas;
   color: string;
   usuarios: Usuario[];
@@ -374,6 +381,25 @@ function Fila({
         title="Piezas del requerimiento (lo llena la ejecutiva). Alimenta el informe por canal."
       >
         <CeldaPiezas valor={r.piezas ?? 0} onCommit={(n) => p({ piezas: n })} />
+      </div>
+      <div
+        className={`border-l border-gray-100 ${r.piezas && !r.tipo_pieza_id && !hecho ? 'bg-amber-50' : ''}`}
+        title="Qué tipo de pieza es. Con esto BackIO estima mejor cuánto tarda cada persona."
+      >
+        <select
+          className="h-9 w-full bg-transparent px-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
+          aria-label={`Tipo de pieza de ${r.titulo_interno}`}
+          value={r.tipo_pieza_id ?? ''}
+          disabled={bloqueada}
+          onChange={(e) => p({ tipo_pieza_id: e.target.value || null })}
+        >
+          <option value="">¿tipo?</option>
+          {tiposPieza.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.nombre}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="border-l border-gray-100">
         <span

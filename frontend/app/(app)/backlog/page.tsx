@@ -20,7 +20,8 @@ import { useFiltrosBacklog, type Vista } from './useFiltrosBacklog';
 function BacklogInner() {
   const [items, setItems] = useState<RequerimientoMetricas[]>([]);
   const { fallos, avisar } = useAvisosCarga();
-  const { clientes, usuarios, horas, notas, setNotas, proyectos, proyectosCliente, proyectoMesa, mesas } = useCatalogosBacklog(avisar);
+  const { clientes, usuarios, horas, notas, setNotas, proyectos, proyectosCliente, proyectoMesa, mesas, tiposPieza } =
+    useCatalogosBacklog(avisar);
   const { vista, setVista, filtro, setFiltro, orden, setOrden, FILTRO0 } = useFiltrosBacklog();
   const [panel, setPanel] = useState(false);
   const [reprog, setReprog] = useState<{ r: RequerimientoMetricas; fecha: string | null } | null>(null);
@@ -478,6 +479,7 @@ function BacklogInner() {
             notas={notas}
             puedeEditar={puedeEditar}
             proyectos={proyectos}
+            tiposPieza={tiposPieza}
             proyectosCliente={proyectosCliente}
             onCambio={() => {
               void cargar(true);

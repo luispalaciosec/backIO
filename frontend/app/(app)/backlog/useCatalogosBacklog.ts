@@ -18,6 +18,7 @@ export function useCatalogosBacklog(avisar: (que: string) => (e: unknown) => voi
   >({});
   const [proyectoMesa, setProyectoMesa] = useState<Record<string, string | null>>({});
   const [mesas, setMesas] = useState<Mesa[]>([]);
+  const [tiposPieza, setTiposPieza] = useState<{ id: string; nombre: string }[]>([]);
   useEffect(() => {
     api<{ items: Cliente[] }>('/clientes')
       .then((r) => setClientes(r.items))
@@ -52,6 +53,9 @@ export function useCatalogosBacklog(avisar: (que: string) => (e: unknown) => voi
         setProyectosCliente(pc);
       })
       .catch(avisar('los proyectos'));
+    api<{ items: { id: string; nombre: string }[] }>('/tipos-pieza')
+      .then((r) => setTiposPieza(r.items))
+      .catch(avisar('los tipos de pieza'));
     api<{ items: Mesa[] }>('/mesas')
       .then((r) => setMesas(r.items.filter((m) => m.activa)))
       .catch(avisar('las mesas'));
@@ -62,5 +66,5 @@ export function useCatalogosBacklog(avisar: (que: string) => (e: unknown) => voi
       .then((r) => setNotas(r.items))
       .catch(avisar('las últimas notas'));
   }, [avisar]);
-  return { clientes, usuarios, horas, notas, setNotas, proyectos, proyectosCliente, proyectoMesa, mesas };
+  return { clientes, usuarios, horas, notas, setNotas, proyectos, proyectosCliente, proyectoMesa, mesas, tiposPieza };
 }

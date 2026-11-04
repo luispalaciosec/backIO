@@ -38,6 +38,7 @@ import {
 import { listBitacora, insertBitacora, deleteBitacora, ultimaBitacoraPorRequerimiento, getNotaBitacora } from '../../lib/db/bitacora';
 import { registrarReproceso, cerrarReproceso } from '../../lib/cumplimiento';
 import { causasVigentes } from '../../lib/causas';
+import { listTiposPieza } from '../../lib/db/tipos_pieza';
 import { BasecampSinConectar } from '../../lib/basecamp/client';
 import { tareasParaCausas } from '../../lib/db/requerimientos';
 import { env } from '../../config/env';
@@ -213,6 +214,7 @@ export const actualizarRequerimientoSchema = z.object({
   owner_agencia: z.array(z.string().uuid()).optional(),
   owner_cliente: z.array(z.string()).nullable().optional(),
   piezas: z.number().int().min(0).optional(),
+  tipo_pieza_id: z.string().uuid().nullable().optional(),
   brief_url: z.string().url().nullable().optional(),
   entregable_urls: z.array(z.string().url()).nullable().optional(),
   motivo_reprogramacion: z
@@ -283,6 +285,8 @@ requerimientos.post(
 
 requerimientos.patch('/:id', escrituraOPropia, zValidator('json', actualizarRequerimientoSchema), async (c) => {
   const ctx = ctxOf(c);
+  const tipo = c.req.valid('json').tipo_pieza_id;
+  if (tipo && !(await listTiposPieza(ctx, true)).some((t) => t.id === tipo)) return c.json({ error: 'Ese tipo de pieza no existe' }, 422);
   try {
     const { requerimiento, basecamp_due_on } = await actualizarRequerimiento(ctx, c.req.param('id'), c.req.valid('json'), {
       colaborador: esColaborador(c.get('auth')),

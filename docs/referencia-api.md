@@ -457,6 +457,7 @@ Las tres señales del daily
 | `owner_agencia` | lista de string (uuid) |  |  |
 | `owner_cliente` | lista de string |  | admite null |
 | `piezas` | integer |  | mínimo 0 |
+| `tipo_pieza_id` | string (uuid) |  | admite null |
 | `brief_url` | string (uri) |  | admite null |
 | `entregable_urls` | lista de string (uri) |  | admite null |
 | `motivo_reprogramacion` | `insumos_cliente` · `cambio_alcance` · `capacidad_equipo` · `prioridad_negocio` · `error_estimacion` · `reproceso` · `otro` |  | admite null |
