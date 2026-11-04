@@ -1,6 +1,6 @@
 import type { DailyView, Usuario, Mesa, Cliente } from '@backio/shared';
 import { DailyPublicar } from './DailyPublicar';
-import { SeleccionDaily } from './SeleccionDaily';
+import { ArmarDia } from './ArmarDia';
 import { MesaPaso } from './MesaPaso';
 import { apiServer } from '@/lib/api.server';
 import { meServer, puedeEscribir } from '@/lib/me.server';
@@ -123,12 +123,13 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
             </Paso>
             {escribe && !cuentas && (
               <Paso n={2} titulo="Hoy">
-                <SeleccionDaily
+                <ArmarDia
                   key={mesa?.id ?? 'todas'}
                   hoy={hoy}
                   mesa={mesa?.id ?? ''}
                   mesaNombre={mesaNombre}
                   seleccionadasHoy={d?.hoy_se_trabaja.length ?? 0}
+                  yo={me.usuario_id ?? null}
                 />
               </Paso>
             )}
@@ -171,7 +172,7 @@ export default async function DailyPage({ searchParams: spP }: { searchParams: P
             <Col
               titulo="🎯 Hoy se trabaja"
               items={d.hoy_se_trabaja}
-              vacio={`Nadie eligió tareas de ${mesaNombre} para hoy. Usa «Elegir tareas de hoy» o ☀ en el backlog.`}
+              vacio={`Nadie eligió tareas de ${mesaNombre} para hoy. Usa «Armar el día» o ☀ en el backlog.`}
             />
             <Col titulo="Vence hoy o mañana sin iniciar" items={d.vencen_hoy_o_manana_sin_iniciar} vacio="Nada vence sin iniciar." />
             <Col titulo="⏳ Atrasado sin iniciar" items={d.atrasadas_sin_iniciar} vacio="Nada atrasado sin iniciar." />

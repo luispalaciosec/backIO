@@ -18,6 +18,8 @@ import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCi
 import { getDaily, avisosAntesDePublicar, type MotivoConfirmacion } from '../../lib/rituals/daily';
 import { listClientes, listMesas, listBacklog } from '../../lib/db';
 import { usuarioDelTenant } from '../../lib/db/admin';
+import { alcanceMesa } from '../../lib/db/mesas';
+import { cargaDelDia } from '../../lib/carga';
 import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
@@ -36,6 +38,13 @@ semanas.get('/actual', requireScope('read:senales'), async (c) => c.json(await e
 semanas.get('/daily', requireScope('read:backlog'), async (c) =>
   c.json(await getDaily(ctxOf(c), { mesaId: c.req.query('mesa') || undefined, ejecutivaId: c.req.query('ejecutiva') || undefined })),
 );
+
+/** Para armar el día: horas por tarea y persona, capacidad de un día y lo elegido en otras mesas (docs/05). */
+semanas.get('/daily/carga', requireScope('read:backlog'), async (c) => {
+  const ctx = ctxOf(c);
+  const mesa = c.req.query('mesa');
+  return c.json(await cargaDelDia(ctx, mesa ? await alcanceMesa(ctx, mesa, { sinPrueba: true }) : undefined));
+});
 
 semanas.get('/acuerdos/abiertos', requireScope('read:senales'), async (c) => c.json({ items: await listAcuerdosAbiertos(ctxOf(c)) }));
 

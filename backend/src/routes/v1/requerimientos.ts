@@ -214,6 +214,33 @@ requerimientos.post(
   },
 );
 
+/**
+ * Marca o quita varias tareas de «hoy se trabaja» de una vez (armar el día, docs/05). Pasa por las mismas reglas que una
+ * por una: una tarea sin responsable no entra. Las que fallan se devuelven con su motivo y las demás quedan guardadas.
+ */
+requerimientos.post(
+  '/daily-seleccion',
+  requireScope('write:requerimientos'),
+  zValidator('json', z.object({ ids: z.array(z.string().uuid()).min(1).max(200), fecha: fecha.nullable() })),
+  async (c) => {
+    if (esColaborador(c.get('auth'))) return c.json({ error: 'Elegir las tareas del día es de gestión' }, 403);
+    const ctx = ctxOf(c);
+    const { ids, fecha: dia } = c.req.valid('json');
+    const guardadas: string[] = [];
+    const errores: { id: string; error: string }[] = [];
+    for (const id of ids) {
+      try {
+        await actualizarRequerimiento(ctx, id, { daily_fecha: dia }, { colaborador: false, exigirMotivo: false });
+        guardadas.push(id);
+      } catch (e) {
+        if (!(e instanceof ReglaError)) throw e;
+        errores.push({ id, error: e.message });
+      }
+    }
+    return c.json({ guardadas, errores });
+  },
+);
+
 requerimientos.patch('/:id', escrituraOPropia, zValidator('json', actualizarRequerimientoSchema), async (c) => {
   const ctx = ctxOf(c);
   try {

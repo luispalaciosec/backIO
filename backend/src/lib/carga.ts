@@ -11,7 +11,7 @@
  * (revisión del 30/10/2026). Sin timesheet suficiente, la del equipo; sin nada, la declarada.
  */
 import type { RequerimientoMetricas, Usuario, TipoPieza } from '@backio/shared';
-import { hoyLocal, medianaDe, nombrePersona, sumarDias } from '@backio/shared';
+import { hoyLocal, lunesDe, medianaDe, nombrePersona, sumarDias } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { listBacklog } from './db/requerimientos';
 import { listUsuarios } from './db/usuarios';
@@ -126,7 +126,6 @@ export function crearEstimador(muestras: MuestraHoras[], tipos: Pick<TipoPieza, 
   };
 }
 
-const lunesDe = (dia: string) => sumarDias(dia, -((new Date(`${dia}T12:00:00Z`).getUTCDay() + 6) % 7));
 /** Percentil 75: una semana fuerte, no la excepcional. */
 const p75 = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.ceil(xs.length * 0.75) - 1]!;
 
@@ -179,6 +178,17 @@ export function cuentaEnLaCarga(r: RequerimientoMetricas, hoy: string, finSemana
   return r.fecha_entrega >= hoy || r.dias_sin_movimiento <= DIAS_ATRASADA_VIVA;
 }
 
+/** Horas que le faltan a una persona en una tarea: la estimación menos lo que ya registró (siempre queda algo). */
+export function horasRestantes(
+  usuarioId: string,
+  r: Pick<RequerimientoMetricas, 'id' | 'tipo_pieza_id'>,
+  estimar: Estimador,
+  registradas: Map<string, number>,
+): { horas: number; base: BaseEstimacion } {
+  const est = estimar(usuarioId, r.tipo_pieza_id);
+  return { horas: r1(Math.max(est.horas - (registradas.get(`${usuarioId}|${r.id}`) ?? 0), HORAS_MINIMAS_RESTANTES)), base: est.base };
+}
+
 /** Carga de cada persona activa con tareas en la semana. Pura: se prueba sin base. */
 export function calcularCarga(e: {
   activos: RequerimientoMetricas[];
@@ -198,15 +208,14 @@ export function calcularCarga(e: {
       const tareas = semana
         .filter((r) => r.owner_agencia.includes(u.id))
         .map((r): TareaCarga => {
-          const est = e.estimar(u.id, r.tipo_pieza_id);
-          const hechas = e.registradas.get(`${u.id}|${r.id}`) ?? 0;
+          const est = horasRestantes(u.id, r, e.estimar, e.registradas);
           return {
             id: r.id,
             titulo: r.titulo_interno,
             cliente_id: r.cliente_id,
             proyecto_id: r.proyecto_id,
             fecha_entrega: r.fecha_entrega!,
-            horas: r1(Math.max(est.horas - hechas, HORAS_MINIMAS_RESTANTES)),
+            horas: est.horas,
             base: est.base,
           };
         })
@@ -254,6 +263,64 @@ export async function cargaDelEquipo(
     hoy,
     estimar: crearEstimador(muestras, tipos),
     capacidades: crearCapacidades(horas, semana.fecha_inicio),
+    registradas,
+  });
+}
+
+/** Para armar el día: horas por tarea y persona, capacidad de un día y lo que cada una ya tiene elegido en otras mesas. */
+export interface CargaDia {
+  horas: Record<string, Record<string, number>>;
+  capacidad_dia: Record<string, number>;
+  otras_mesas: Record<string, number>;
+}
+
+/** Calcula la carga de un día a partir de lo ya cargado. `deLaMesa` es el alcance que se está armando. Pura. */
+export function calcularCargaDia(e: {
+  activos: RequerimientoMetricas[];
+  deLaMesa: Set<string>;
+  usuarios: Usuario[];
+  hoy: string;
+  estimar: Estimador;
+  capacidades: Capacidades;
+  registradas: Map<string, number>;
+}): CargaDia {
+  const out: CargaDia = { horas: {}, capacidad_dia: {}, otras_mesas: {} };
+  for (const u of e.usuarios) if (u.activo) out.capacidad_dia[u.id] = r1(e.capacidades(u).horas / 5);
+  for (const r of e.activos) {
+    const propia = e.deLaMesa.has(r.id);
+    if (!propia && r.daily_fecha !== e.hoy) continue;
+    for (const uid of r.owner_agencia) {
+      const h = horasRestantes(uid, r, e.estimar, e.registradas).horas;
+      if (propia) (out.horas[r.id] ??= {})[uid] = h;
+      else out.otras_mesas[uid] = r1((out.otras_mesas[uid] ?? 0) + h);
+    }
+  }
+  return out;
+}
+
+export async function cargaDelDia(
+  ctx: DbCtx,
+  mesa: { clienteIds: string[]; proyectoIds: string[] } | undefined,
+  hoy = hoyLocal(),
+): Promise<CargaDia> {
+  const lunes = lunesDe(hoy);
+  const [activos, usuarios, horas, tipos, prueba, deLaMesa] = await Promise.all([
+    listBacklog(ctx, { solo_activos: true }),
+    listUsuarios(ctx),
+    listHorasConTarea(ctx, sumarDias(lunes, -7 * SEMANAS_RITMO)),
+    listTiposPieza(ctx, true),
+    idsClientesDePrueba(ctx),
+    mesa ? listBacklog(ctx, { solo_activos: true, mesa }) : Promise.resolve(null),
+  ]);
+  const reales = activos.filter((r) => !prueba.has(r.cliente_id));
+  const { muestras, registradas } = agruparHoras(horas);
+  return calcularCargaDia({
+    activos: reales,
+    deLaMesa: new Set((deLaMesa ?? reales).map((r) => r.id)),
+    usuarios,
+    hoy,
+    estimar: crearEstimador(muestras, tipos),
+    capacidades: crearCapacidades(horas, lunes),
     registradas,
   });
 }

@@ -157,16 +157,32 @@ Vista dedicada: `/daily`, armada como un flujo de cuatro pasos por mesa.
 
 1. **Mesa.** Se elige primero (queda en la URL `?mesa=` y el navegador recuerda la última). Nada
    se muestra hasta elegirla; existe la opción «toda la agencia» solo para gerencia.
-2. **Hoy.** «Elegir tareas de hoy» lista únicamente las tareas activas de la mesa
-   (`GET /requerimientos?mesa=`), y marca `daily_fecha`. Se puede filtrar por cliente y por proyecto, el buscador
-   encuentra por título, cliente, proyecto o responsable, y cada tarea muestra a sus responsables (28/10/2026).
+2. **Hoy.** «Armar el día» lista las tareas activas de la mesa (`GET /requerimientos?mesa=`) y marca `daily_fecha`. Ver
+   [Armar el día](#armar-el-dia).
 3. **Tablero.** Las cinco columnas salen de `GET /semanas/daily?mesa=`, acotadas a los clientes
    y proyectos de la mesa (`alcanceMesa`).
 4. **Publicar.** Notas, borrador con IA y apertura/cierre van al board Daily de esa misma mesa.
    Cambiar la mesa rearma los cuatro pasos.
 
+### Armar el día
+
+Desde el 4/11/2026 reemplaza a la lista plana «Elegir tareas de hoy». El código está en `ArmarDia.tsx`.
+
+- **Buscador:** por título, cliente, proyecto y persona, sin importar mayúsculas, tildes ni el orden de las palabras
+  (`coincideBusqueda`, en `shared`).
+- **Filtros en chips, con su conteo:** urgencia (atrasadas, vence hoy, vence mañana, esta semana), estado (sin iniciar, en
+  ejecución, en revisión) y marcas (elegidas hoy, quedaron del último daily, urgentes, reprogramadas, mis cuentas). Además,
+  cliente, proyecto, persona y ejecutiva. Quedan en la URL (`?armar=`) y se recuerdan en el navegador.
+- **Agrupar** por persona, cliente, proyecto o fecha. Cada grupo se puede elegir entero.
+- **Carga en vivo:** por persona, las horas elegidas de un día, sumando lo que ya tiene elegido en otras mesas
+  (`GET /semanas/daily/carga`). Las horas salen de la misma estimación del [riesgo de la semana](#riesgo-de-la-semana), y
+  un día es la quinta parte de su semana fuerte. Avisa, no bloquea.
+- **Traer lo del último daily:** suma con un clic lo elegido ese día que sigue abierto.
+- **En lote:** `POST /requerimientos/daily-seleccion` aplica las mismas reglas que una por una y devuelve el motivo de las
+  que no entraron.
+
 **Regla: ninguna tarea entra al daily sin responsable (22/09/2026).** Marcar `daily_fecha` en una
-tarea sin `owner_agencia` devuelve 422 (backlog ☀ y modal «Elegir tareas de hoy»); el tablero muestra
+tarea sin `owner_agencia` devuelve 422 (backlog ☀ y «Armar el día», donde se le puede asignar ahí mismo); el tablero muestra
 una alerta con las tareas sin responsable de las cuatro columnas y la publicación (y el borrador con IA)
 se bloquea con `DailySinResponsable` hasta que se asigne a alguien.
 
@@ -293,7 +309,7 @@ hizo fracasar los intentos anteriores de implementar WorkOS.
 
 - **Reprogramar no cambia el estado.** Mover la fecha incrementa `veces_reprogramado` y queda en `reprogramaciones` con motivo, pero la tarea conserva su estado ("En proceso" sigue en proceso). El estado "Reprogramado" queda como estado manual.
 - **Planificación.** `requerimientos.planificacion`: `planificado` (entró por el weekly), `no_planificado` (se creó durante la semana, con plan ya generado y fecha dentro de la semana; automático al crear) o `urgente` (manual). Columna en el backlog, filtro "Fuera del weekly", KPI en el dashboard.
-- **Selección del daily.** `requerimientos.daily_fecha`: la mesa elige qué se trabaja hoy («Elegir tareas de hoy» en Daily o ☀ en el backlog). Columna «Hoy se trabaja» en el Daily y sección 🎯 en la apertura/cierre publicados.
+- **Selección del daily.** `requerimientos.daily_fecha`: la mesa elige qué se trabaja hoy («Armar el día» en Daily o ☀ en el backlog). Columna «Hoy se trabaja» en el Daily y sección 🎯 en la apertura/cierre publicados.
 - **Motivo obligatorio.** Desde la pantalla no se puede cambiar la fecha de entrega sin elegir el motivo de la
   reprogramación: la API responde 422 si falta (`backend/src/lib/requerimientos/actualizar.ts`). Ver
   [16-cumplimiento.md](./16-cumplimiento.md).
