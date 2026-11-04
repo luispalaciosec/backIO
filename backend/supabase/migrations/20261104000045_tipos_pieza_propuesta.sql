@@ -1,0 +1,205 @@
+-- Migración 45 · 4/11/2026 · tipo de pieza propuesto por título para las tareas que ya tienen piezas (aprobado por Luis).
+--
+-- Son reglas por palabras del título, así que es una propuesta: se puede corregir en el backlog, columna «Tipo de pieza».
+-- Solo toca tareas sin tipo. Cambiar el tipo no mueve «sin movimiento» ni avisa a nadie; no escribe en Basecamp.
+-- Quedan sin tipo las que no son piezas de estos tipos (reportes, cronogramas, reuniones, mailing) y las de clientes de prueba.
+-- No cambia políticas RLS.
+
+-- Gráfica
+update requerimientos set tipo_pieza_id = (select id from tipos_pieza where tenant_id = '00000000-0000-4000-8000-000000000001' and slug = 'post')
+where tenant_id = '00000000-0000-4000-8000-000000000001' and tipo_pieza_id is null and id in (
+  '7aa3c40a-ca82-48b8-9aa5-0bd6bb91d6b3',
+  '2eca489a-4a4c-46f7-af15-d19883b106f6',
+  'dabb63b1-102f-46fc-8367-00f0f60e1fcb',
+  '557159a2-decb-4f4f-941c-c44217d4b795',
+  '3be77e5c-2173-4b17-b4b4-f3bc29cc62a2',
+  'cc057564-e815-42e0-8d7c-41145be95911',
+  'bab753f3-b517-410b-b03e-b0cd7b508580',
+  '48605545-fe00-4d0f-a709-66fcd9265833',
+  '2888d7bc-a924-47b0-b122-4977cbad178c',
+  '91da2635-9d1c-4709-ab06-1a311b142402',
+  'b78dc190-784d-4063-9b9c-ba9af11e7425',
+  '7ffbbc60-b5cf-4024-bb00-74a8be19223c',
+  'd4a9f394-3d66-4343-974d-0c0e1075e4d4',
+  '03cdb342-45ec-4b63-b793-6bd5bae2637f',
+  'dfc37468-91be-4dfa-a790-6e864406b23b',
+  '9bef5ccd-7a75-47df-9ebc-f72cb929531c',
+  '43278a6c-c7ca-4708-88da-04a97dd1372a',
+  '62fe870c-7844-4844-ab28-b71360d038e9',
+  '4a4d5dc6-7df8-4c70-8708-755b81a4efcb',
+  '926853dc-5866-4e37-9017-835c27b02091',
+  '63cc0e94-c385-43e1-afcb-73a7491361c6',
+  '3b1c0771-2e64-4aab-9f78-a6bb730e5314',
+  '8d26ea0d-063c-4c7b-af3d-091d900f0812',
+  '1dbbfdbb-cfab-428c-9377-7883d92993ba',
+  'fca6c765-0a26-4cc7-aa6f-50c9dc01aff7',
+  '823f8229-401c-46f2-b770-46a44b950688',
+  'd8f148f8-6287-47da-99d5-9313c1796186',
+  'b65ddca4-2732-4c55-8719-265cca8e6d89',
+  'd6f5cf1f-9679-4c80-98c9-8702b9914b17',
+  '4ec64ab1-d8eb-4b85-b6c4-854f96a4da94',
+  '63ac3510-27dc-4e12-a332-2984ce305498',
+  'cf22ee14-cfe0-44d2-9a81-b239a51da6a1',
+  '649c00f2-314f-4cef-b1e4-5b6b5292af02',
+  'a63d8b0d-b885-4e60-8b7d-bcd26a4a8aeb',
+  'eb04dfb6-720b-4230-b6e8-52c44964095c',
+  '59893091-8c94-478d-84ec-a232783b01ed',
+  'b8254231-88d2-4d32-8129-af43d7581b75',
+  '8cf99c7c-fd3d-47fb-bbe7-4dcb42490800',
+  '4b5a9b53-c4b7-43d8-9e5f-d4710e951e47',
+  '5a56497b-4819-4c87-a626-c878f225cfc3',
+  '3f3ba205-4f34-4aae-a5bd-18b3c64f785a',
+  '0cb9d672-1fde-4c70-827c-156002171dad',
+  'f2ae8832-4ae7-4d6f-a6e3-4106d1737176',
+  'eaf7932f-deba-4d54-93be-01d449d8f926',
+  '4adc14b1-5c1b-4298-8958-1099b3fc4dc9',
+  'cef5298b-fe51-40ba-b0e7-f525fdeb3c28',
+  'c532125e-a013-4898-8aa2-25004c783a9c',
+  '428a41b3-464a-462e-a4de-7a3fe3b8c125',
+  '093d13ba-011b-4c11-977d-b6383961644b',
+  '2eaf5262-757e-427c-a320-24c1edf048b7',
+  '75958186-5e7c-442b-b623-d2da03f11f14',
+  '0756b7d4-1fda-4408-a1e3-48097c1261dc',
+  '3097651c-60f5-433b-b24e-5d381fdc37be',
+  '113f8b0e-57a7-4d4f-9c72-8cbdeb5fb961',
+  'ea074288-99e1-4ed6-9dff-cd5a11f30bb8',
+  '5ad688e7-ece0-42be-b914-e9e32904bbb7',
+  '883f9cad-b95a-4d04-9c76-9002d1e75b46',
+  '908b3d2a-fd3b-49fd-909a-f3712a68594e',
+  'c3d1d6aa-2d9a-4379-8d85-4ee51e20df1e',
+  '913320d2-4d7a-4a1f-a158-77fbe65ea94f',
+  '68792616-1003-42f2-941c-fd3d3b8b807b',
+  '4db7574f-c25b-47ef-8364-f770063526fc',
+  '60e1095c-3e57-4f5b-ab37-a25b9cad28e1',
+  '3f165d32-6054-4c00-8094-c08d328520e2',
+  'd93b4606-5097-45b4-bbd4-08dd07c455f9',
+  'ab2d5352-be91-4c0f-bbdd-5ebe7c4d414e',
+  '5e0d20d1-adeb-4e8f-9170-e43bfdb947ef',
+  '4c53c36b-c6eb-4bf4-8b29-dcd3d5c57202',
+  '2f1e231e-bf46-4149-89c7-007a589d74d1',
+  '776e078b-6f07-49c2-872b-46891da3bfa8',
+  '1479acdb-eff1-4f81-be8f-d32941b1ce2a',
+  'd8a918a6-17dd-4f92-b840-aee30691d42d',
+  'cde91f73-ed59-47eb-b583-1f19e73de06e',
+  'f821cb99-6cf2-4911-a110-36056e4819f5',
+  '3bb3247a-9103-4ca6-8168-825949a8e40f',
+  'cda69e33-3b76-4c90-bfa4-57b84a8a3190',
+  '05e47256-358b-4f58-ac61-974d66be5c70',
+  '3db6ddba-3fd5-45d4-8886-47791954eca0',
+  '382f2007-c70b-453a-bdcf-050b9156895b',
+  'b77b94c6-8435-4e17-9cb2-393a6c95bd18',
+  '97194ebe-7179-4380-ab13-21e18d7d2071',
+  '25d54fd9-054d-43ca-bdb7-a036a4c99e42',
+  'a6117039-cd9c-4f5a-9551-38e2410d1c3c',
+  '3b4cdbfe-5066-4d6e-b254-01e7610e2508',
+  'ee3b774b-df32-4e15-9ec5-dd8e005b164f',
+  '8c4857b3-4ddf-48d5-a543-d58ece804309',
+  '9b1aa690-0e9e-40f2-b773-cf12d640bf4a',
+  'e5ba1660-b147-49ac-9348-1789d46eca0e',
+  'b63aad67-3b21-4a51-89bc-159416cb5108',
+  'd098db34-71e7-447c-a612-485116d63e94',
+  '3d70f047-f8fe-49cb-abe1-ba2189ab1faf',
+  '3e3551c3-1c30-4836-904d-a7acc10c6cc9',
+  '6e5b368e-a3d3-44b8-91a3-895e2547795f',
+  '5ff2b8aa-9934-4d3f-8065-bfea2186e454',
+  '95a8f20b-801a-421c-ba45-b2c18641f000',
+  '7571a637-422e-485c-8589-b4f580bf5fb5',
+  'b319230b-c029-479a-a65e-f738ee4c300e',
+  'e1ef71ce-e32e-4b41-a4dc-74a9930b9d8d',
+  'c2e846a5-6061-4eaf-9eb2-e84f4e69f695',
+  '067c6642-12b2-40b7-a679-ada9983b61f6',
+  '590052fd-e315-463a-a1a0-471fb345d8fe',
+  '8528c21a-42b5-4a38-886e-3f220a205a57',
+  'faba15a1-7b7b-4abe-a7f0-cbe733ff641a',
+  '8f44a7cf-e785-4a62-a647-6892d07fe607',
+  '6090fc1a-f44d-4423-af2e-0166637481a1',
+  'f0c51231-3a36-4471-a80b-a5a391cceccd',
+  '3b733232-fc12-4a89-8ba1-786699a74c8b',
+  '8611cc77-4253-4857-9732-d429578a1a4b',
+  'a8bf69a5-284d-4f9f-a5e0-b2d21677a7d9',
+  '846a8cb7-a52e-4713-b62c-c2157e85ef3b',
+  'fcbee1ac-e5ad-4976-9a39-36ffecd6bf6d',
+  '471cff71-2be4-443a-b8ab-734230479949',
+  '2f537e95-2e85-421a-9e35-06e75ebe0a56',
+  '265f1463-4f10-476a-9bac-12bad558b25f',
+  'c65ad65e-94e0-4020-818f-10b58a02eb32',
+  '1aa5c518-9c4a-4e70-b289-6c501821d187',
+  '7cdc765c-b979-489d-a73c-0c6a4f3a6b36',
+  '54da4837-9b01-4874-bcef-a5ca4ea1d852',
+  '259fa1c7-093e-4ac5-ba98-64cbc95c094d',
+  '79e3b4a3-789c-4a3c-9d4a-d6c048b09a97',
+  '0ca1f586-725f-4b0e-b794-57c0f502e15f',
+  '9b53785b-b246-4379-be65-10e0e540c5d8',
+  'ab0ea274-db0e-4ddd-9516-bb56ef6bd0c2',
+  '007ee4ee-af34-4728-8747-5bb6dc6de30f',
+  '2102662b-26b0-401d-ae9a-aa8c92b3c1b1',
+  '4da7e4a6-0f2b-40d5-beba-3f4f88cb2e1c',
+  '9601e2bc-2191-4fae-9eee-3bae04cb8bda',
+  'edc096c7-d04f-4c1a-b044-f7a5c9e6cc90',
+  'f9d171e1-541c-439d-8d60-2acca01f79b3'
+);
+
+-- Adaptación gráfica
+update requerimientos set tipo_pieza_id = (select id from tipos_pieza where tenant_id = '00000000-0000-4000-8000-000000000001' and slug = 'adaptacion')
+where tenant_id = '00000000-0000-4000-8000-000000000001' and tipo_pieza_id is null and id in (
+  '788970be-98a9-4054-a9ec-a9eafafa7da6',
+  'a88fae4e-ce5a-45e1-98c7-93cad36d73e1',
+  '025f5b01-eccc-4ed9-8ba2-ae2bb2433524',
+  '0cb4cf4a-454c-4a4d-b8d2-2bc238d196ec',
+  '8c2afd9c-3f78-4862-aa11-b7e9464aef22',
+  'bb922773-e76c-4eec-89c4-f846c9254b1f',
+  'b1efaa4d-fee6-4236-bb1d-26775c81d820',
+  '1ead7647-f4f6-46df-8f44-75d8617cc091',
+  '1d1b529a-11b3-461b-b9ac-11c40f745fb6',
+  'e69cc69f-55d0-4608-b590-d9d053d8daab',
+  '210ae332-9789-4e22-a49b-ebaccaa0aff6',
+  'ccfe1e6d-a7c6-4c1b-8ca3-5475091afe05',
+  '3cfaa2aa-2e97-404f-b4a4-8a4f58a86d5b',
+  '7be24a88-7dc1-45d9-b60a-5914af60accd',
+  'c9639420-b5b9-4f98-8271-902d9194a580',
+  '11842342-c2f6-4815-8b74-021fb4f97195',
+  '7f5dc7da-a43f-4bf4-adaa-76740a326760',
+  '00656328-e12a-48db-9ed0-aa8315f5d608',
+  'd99bf741-c231-4f4c-91d1-c3390e3a7693',
+  '50477ff6-1379-41dd-a0ed-81f7ec9adbe9',
+  '2868cf9d-ab37-491d-b163-6663aaf7b6c3',
+  '88d2426e-5089-450b-8382-476723bf9c67',
+  'd1733e46-6022-461e-9f56-20f726afc55a',
+  '25fa2546-06aa-43eb-9e78-a05410d4c48c',
+  '27db241d-01b7-487e-b588-51a140a8eb15',
+  'cd2a66ac-7d19-43af-bd8c-b59c560ec217',
+  '9d9d302f-617a-4a16-bc80-c43312019295',
+  'b05cf853-24d5-4556-8278-d345bd2971f1'
+);
+
+-- Video para reels
+update requerimientos set tipo_pieza_id = (select id from tipos_pieza where tenant_id = '00000000-0000-4000-8000-000000000001' and slug = 'reel')
+where tenant_id = '00000000-0000-4000-8000-000000000001' and tipo_pieza_id is null and id in (
+  '29c14b7a-ceff-409f-95d1-9456c1ac2cc9',
+  '8f095530-c492-422c-82fc-1a565f739376',
+  '13d4dc4d-9fe3-46d5-b764-fdccdf4fc50d',
+  '714a13c4-89a2-4f2a-a19e-2d83b965bbbe',
+  '3090672a-f84e-4c5a-b619-722cdbf942c0',
+  '9e6450d1-f49b-4793-a3ee-f20951e76615',
+  '572c106e-c94c-4c11-b7e9-70f3e9aead9a',
+  '4c7e401e-0cb0-410f-b701-0211e34e4239'
+);
+
+-- Guión
+update requerimientos set tipo_pieza_id = (select id from tipos_pieza where tenant_id = '00000000-0000-4000-8000-000000000001' and slug = 'guion')
+where tenant_id = '00000000-0000-4000-8000-000000000001' and tipo_pieza_id is null and id in (
+  'd4a1cc04-614a-4d44-ab83-29341c67070d',
+  '2baeed7f-2812-41cf-804d-bf898da6928d',
+  'cc1ea430-905e-4c3b-b981-8e828b4a71ee',
+  '78157df4-2544-4a38-bf46-0bc550952161'
+);
+
+-- Animación
+update requerimientos set tipo_pieza_id = (select id from tipos_pieza where tenant_id = '00000000-0000-4000-8000-000000000001' and slug = 'animacion')
+where tenant_id = '00000000-0000-4000-8000-000000000001' and tipo_pieza_id is null and id in (
+  '7b00d504-1368-427b-8284-b3a56118eea4'
+);
+
+-- Verificación (esperado: Gráfica 129, Adaptación gráfica 28, Video para reels 8, Guión 4, Animación 1).
+select t.nombre, count(*) as tareas from requerimientos r join tipos_pieza t on t.id = r.tipo_pieza_id
+where r.tenant_id = '00000000-0000-4000-8000-000000000001' and r.deleted_at is null group by t.nombre order by t.nombre;
