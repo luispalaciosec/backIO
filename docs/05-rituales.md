@@ -305,6 +305,19 @@ señales se escapan en el markdown, así que un `|` o un `_` en un título ya no
   muestra los 15 más reprogramados.
 - Las señales del domingo se guardan en la semana que empieza el lunes, y el correo trae solo las que faltan atender.
 
+### El weekly se trabaja en el mismo lugar (4/11/2026)
+
+- **Compromisos vencidos:** «Cumplido», «Nueva fecha» o «Cancelar».
+- **Señales:** buscador sin tildes ni orden, por cliente o por persona, y «Mis cuentas». «Crear acuerdo» viene precargado con
+  el texto y la persona de la señal; al guardarlo, la señal queda atendida.
+- **Arrastre:** buscador y filtros por persona y cliente. «Reprogramar» pide motivo, «Reasignar» cambia al primer responsable y
+  «Cancelar» archiva también el to-do. Todo pasa por `actualizarRequerimiento` y sale en Basecamp a nombre de quien hace clic.
+- **Plan de la semana:** por cada tarea en riesgo propone a quién reasignarla o, si nadie puede, renegociar la fecha. Solo
+  propone a quien ya tiene tareas de esa cuenta y horas libres: las horas sobrantes de alguien que no conoce la cuenta, o que
+  no produce, no cuentan. Nada cambia sin un clic (`lib/rituals/reparto.ts`, `GET /semanas/:id/reparto`).
+- **Modo reunión:** un bloque a la vez en el orden de la agenda, con el marcador de la semana y la anterior arriba. Se navega con
+  los botones o con las flechas del teclado (`GET /semanas/:id/marcador`).
+
 ### Marcador (20/10/2026)
 
 Arriba de los documentos de una mesa va un **marcador**, para que el weekly se sienta como avance de equipo sin perder

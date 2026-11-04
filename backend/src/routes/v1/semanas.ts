@@ -10,12 +10,22 @@ import {
   marcarSenalAtendida,
   insertAcuerdo,
   cerrarAcuerdo,
+  cambiarFechaAcuerdo,
   listAcuerdosSemana,
   listAcuerdosAbiertos,
   getActa,
   audit,
 } from '../../lib/db';
-import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre, senalesDeMesa } from '../../lib/rituals/service';
+import {
+  recalcularSenales,
+  capacidadSemana,
+  generarPlanOperativo,
+  generarActaCierre,
+  marcadorDeMesa,
+  senalesDeMesa,
+} from '../../lib/rituals/service';
+import { sugerirReparto } from '../../lib/rituals/reparto';
+import { idsClientesDePrueba } from '../../lib/db/clientes';
 import { getDaily, avisosAntesDePublicar } from '../../lib/rituals/daily';
 import {
   estadoDaily,
@@ -32,7 +42,7 @@ import { listClientes, listMesas, listBacklog, listUsuarios } from '../../lib/db
 import type { DbCtx } from '../../lib/db/client';
 import { usuarioDelTenant } from '../../lib/db/admin';
 import { alcanceMesa } from '../../lib/db/mesas';
-import { cargaDelDia } from '../../lib/carga';
+import { cargaDelDia, cargaDelEquipo } from '../../lib/carga';
 import { escenariosDelDia, preguntarSiSiguenVivas } from '../../lib/rituals/escenarios';
 import {
   comentarDailyEnBasecamp,
@@ -177,10 +187,57 @@ semanas.post(
   requireScope('write:actas'),
   zValidator('json', z.object({ estado: z.enum(['cumplido', 'cancelado']) })),
   async (c) => {
-    await cerrarAcuerdo(ctxOf(c), c.req.param('acuerdoId'), c.req.valid('json').estado);
+    const ctx = ctxOf(c);
+    const { estado } = c.req.valid('json');
+    await cerrarAcuerdo(ctx, c.req.param('acuerdoId'), estado);
+    await audit(ctx, { accion: 'cerrar_acuerdo', entidad: 'acuerdo', entidad_id: c.req.param('acuerdoId'), detalle: { estado } });
     return c.body(null, 204);
   },
 );
+
+semanas.patch(
+  '/:id/acuerdos/:acuerdoId/fecha',
+  requireScope('write:actas'),
+  zValidator('json', z.object({ fecha_compromiso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const { fecha_compromiso } = c.req.valid('json');
+    if (fecha_compromiso < hoyLocal()) return c.json({ error: 'La nueva fecha no puede estar en el pasado' }, 422);
+    await cambiarFechaAcuerdo(ctx, c.req.param('acuerdoId'), fecha_compromiso);
+    await audit(ctx, {
+      accion: 'reprogramar_acuerdo',
+      entidad: 'acuerdo',
+      entidad_id: c.req.param('acuerdoId'),
+      detalle: { fecha_compromiso },
+    });
+    return c.body(null, 204);
+  },
+);
+
+/** Qué hacer con lo que no entra esta semana: a quién reasignarlo o qué fecha renegociar. Solo sugiere. */
+semanas.get('/:id/reparto', requireScope('read:capacidad'), async (c) => {
+  const ctx = ctxOf(c);
+  const semana = await getSemana(ctx, c.req.param('id'));
+  if (!semana) return c.json({ error: 'Semana no encontrada' }, 404);
+  const mesa = c.req.query('mesa');
+  const alcance = mesa ? await alcanceMesa(ctx, mesa, { sinPrueba: true }) : null;
+  return c.json({
+    items: sugerirReparto(await cargaDelEquipo(ctx, semana), {
+      soloClientes: alcance ? new Set(alcance.clienteIds) : undefined,
+      fechaRenegociar: sumarDias(semana.fecha_fin, 1),
+    }),
+  });
+});
+
+/** El marcador de la semana para el modo reunión. Solo por mesa, como en el plan y el acta. */
+semanas.get('/:id/marcador', requireScope('read:senales'), async (c) => {
+  const ctx = ctxOf(c);
+  const semana = await getSemana(ctx, c.req.param('id'));
+  const mesa = c.req.query('mesa');
+  if (!semana || !mesa) return c.json({ error: 'Semana o mesa no encontrada' }, 404);
+  const [alcance, prueba] = await Promise.all([alcanceMesa(ctx, mesa, { sinPrueba: true }), idsClientesDePrueba(ctx)]);
+  return c.json({ marcador: (await marcadorDeMesa(ctx, semana, alcance, prueba, false)) ?? null });
+});
 
 /** ?ia=1 antepone el resumen ejecutivo y la agenda por causa redactados por la IA. */
 async function narrativaOpcional(c: Parameters<typeof ctxOf>[0], semanaId: string, mesaId: string | null): Promise<string | undefined> {

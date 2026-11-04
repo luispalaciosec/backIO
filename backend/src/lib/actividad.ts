@@ -75,6 +75,8 @@ const FRASES: Record<string, string | ((d: Detalle) => string)> = {
   publicar_acta: 'publicó el documento en Basecamp',
   publicar_daily_apertura: 'publicó la apertura de mesa en Basecamp',
   publicar_daily_cierre: 'publicó el cierre de mesa en Basecamp',
+  cerrar_acuerdo: 'cerró un acuerdo del weekly',
+  reprogramar_acuerdo: 'le cambió la fecha a un acuerdo del weekly',
   agregar_daily_apertura: 'agregó a la apertura de mesa en Basecamp',
   agregar_daily_cierre: 'agregó al cierre de mesa en Basecamp',
   basecamp_importar: (d) =>

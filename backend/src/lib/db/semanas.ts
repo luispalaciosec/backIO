@@ -174,6 +174,17 @@ export async function cerrarAcuerdo(ctx: DbCtx, id: string, estado: 'cumplido' |
   throwIf(error);
 }
 
+/** Nueva fecha de un compromiso que sigue abierto. */
+export async function cambiarFechaAcuerdo(ctx: DbCtx, id: string, fecha: string): Promise<void> {
+  const { error } = await ctx.db
+    .from('acuerdos')
+    .update({ fecha_compromiso: fecha })
+    .eq('tenant_id', ctx.tenantId)
+    .eq('id', id)
+    .eq('estado', 'pendiente');
+  throwIf(error);
+}
+
 /**
  * Guarda un acta generada. Si la semana ya tiene una sin publicar del mismo tipo y mesa, la reemplaza: antes cada clic
  * en «Generar» dejaba un acta nueva (revisión del 29/10/2026). Una ya publicada no se toca; entonces se crea otra.
