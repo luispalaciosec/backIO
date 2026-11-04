@@ -6,6 +6,7 @@
  *  - Un job de intervalo (p. ej. reconcile cada 30 min) sin ninguna corrida en tres intervalos.
  * Un job que corrió pero terminó con errores no se repite aquí: ese error ya se registró al correr.
  */
+import { fechaDMA } from '@backio/shared';
 import type { Job } from './jobs';
 import { momentoLocal } from './jobs';
 import { inicioDelRegistro, reclamarVentana, tenantsActivos, ultimasCorridas, ventanasRegistradas } from './db/cron_runs';
@@ -70,7 +71,7 @@ export async function revisarJobs(jobs: Job[], ahoraMs: number): Promise<Problem
         job: c.job.nombre,
         descripcion: c.job.descripcion,
         clave: c.ventana,
-        detalle: `No corrió en su ventana del ${c.ventana}.`,
+        detalle: `No corrió en su ventana del ${/^\d{4}-\d{2}-\d{2}$/.test(c.ventana) ? fechaDMA(c.ventana) : c.ventana}.`,
       });
 
   const ultimas = await ultimasCorridas();
@@ -103,8 +104,8 @@ export async function vigilar(jobs: Job[], ahoraMs = Date.now()): Promise<{ prob
         { tenantId },
         {
           tipo: 'job_sin_correr',
-          titulo: `Tarea programada sin correr: ${p.descripcion}`,
-          cuerpo: `${p.detalle}\nRevisa los logs de Railway o la sección de tareas programadas en Admin → Servicios.`,
+          titulo: `No corrió: ${p.descripcion.split(',')[0]}`,
+          cuerpo: `${p.descripcion}.\n${p.detalle}\nRevisa los logs de Railway o la sección de tareas programadas en Admin → Servicios.`,
           ruta: '/admin/servicios',
         },
         { roles: ['admin'] },

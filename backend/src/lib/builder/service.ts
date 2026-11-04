@@ -3,7 +3,7 @@
  * tool MCP confirm_plan. Si divergen, el preview miente.
  */
 import type { CrearProyectoInput, Proyecto, Requerimiento, ClientSafeProject } from '@backio/shared';
-import { sanitizeForClient } from '@backio/shared';
+import { fechaDMA, sanitizeForClient } from '@backio/shared';
 import type { DbCtx } from '../db/client';
 import { DbError } from '../db/client';
 import { getPlantillaArbol } from '../db/plantillas';
@@ -181,7 +181,7 @@ export async function crearProyectoDesdePlantilla(ctx: DbCtx, input: CrearProyec
       {
         tipo: 'proyecto_asignado',
         titulo: `Nuevo proyecto: ${proyecto.nombre} (${cliente.nombre})`,
-        cuerpo: `Se te asignaron tareas en el proyecto "${proyecto.nombre}" de ${cliente.nombre}. Entrega final: ${input.fecha_entrega}.`,
+        cuerpo: `Se te asignaron tareas en el proyecto "${proyecto.nombre}" de ${cliente.nombre}. Entrega final: ${fechaDMA(input.fecha_entrega)}.`,
         ruta: `/proyectos/${proyecto.id}`,
         entidad_tipo: 'proyecto',
         entidad_id: proyecto.id,

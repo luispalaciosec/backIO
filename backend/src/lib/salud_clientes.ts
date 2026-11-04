@@ -11,6 +11,7 @@ import { buildDashboard } from './dashboard';
 import { listClientes } from './db/clientes';
 import { listMesas } from './db/mesas';
 import { notificar } from './notificaciones';
+import type { CorreoRico } from './notificaciones/email';
 
 export interface FotoSalud {
   cliente_id: string;
@@ -45,6 +46,28 @@ export function textoCambio(c: CambioSalud): { titulo: string; cuerpo: string } 
   };
 }
 
+/** Bloques del correo: el color nuevo y los motivos, uno por fila. */
+export function correoCambio(c: CambioSalud): CorreoRico {
+  const mejora = ORDEN[c.salud] < ORDEN[c.antes];
+  return {
+    intro: mejora
+      ? c.motivos.length
+        ? 'Mejoró, pero todavía tiene puntos por atender.'
+        : 'Mejoró: ya no tiene motivos de alerta.'
+      : 'Empeoró. Conviene revisarlo hoy.',
+    secciones: c.motivos.length
+      ? [
+          {
+            titulo: mejora ? 'Todavía' : 'Por qué',
+            tono: c.salud === 'rojo' ? 'rojo' : c.salud === 'amarillo' ? 'ambar' : 'gris',
+            total: c.motivos.length,
+            filas: c.motivos.map((texto) => ({ texto })),
+          },
+        ]
+      : [],
+  };
+}
+
 /** Toma la foto del día (idempotente por cliente y día) y avisa los cambios. La corre la tarea programada. */
 export async function fotoSaludClientes(ctx: DbCtx, hoy = hoyLocal()): Promise<{ clientes: number; cambios: number }> {
   const db = serviceClient();
@@ -67,7 +90,14 @@ export async function fotoSaludClientes(ctx: DbCtx, hoy = hoyLocal()): Promise<{
       const destino = [cl?.ejecutiva_id, lider].filter((x): x is string => !!x);
       await notificar(
         ctx,
-        { tipo: 'salud_cliente', ...textoCambio(c), ruta: `/clientes/${c.cliente_id}`, entidad_tipo: 'cliente', entidad_id: c.cliente_id },
+        {
+          tipo: 'salud_cliente',
+          ...textoCambio(c),
+          correo: correoCambio(c),
+          ruta: `/clientes/${c.cliente_id}`,
+          entidad_tipo: 'cliente',
+          entidad_id: c.cliente_id,
+        },
         destino.length ? { usuarioIds: [...new Set(destino)] } : { roles: ['operaciones'] },
       );
     }

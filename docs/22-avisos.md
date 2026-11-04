@@ -65,7 +65,7 @@ mismo en vivo. Quien no tiene nada pendiente no recibe correo.
 
 Desde el 4/11/2026 el correo va por bloques, con hasta 5 tareas cada uno, el cliente y los días de atraso, y dice qué
 hacer primero. Cada tarea sale una sola vez: una atrasada que hay que confirmar va en «¿Ya se entregaron?» y no se repite
-en «Atrasadas». La agenda del weekly, el riesgo de la semana y la cotización ganada usan el mismo formato. Los demás
+en «Atrasadas». La agenda del weekly, el riesgo de la semana, la cotización ganada, el cambio de color de un cliente y la tarea que espera al cliente usan el mismo formato. Los demás
 avisos usan la misma plantilla con su texto, y cada correo trae un botón que dice qué se va a hacer. Los asuntos ya no
 llevan «[BackIO]», porque el remitente ya lo dice.
 

@@ -116,6 +116,17 @@ async function avisarEjecutiva(ctx: DbCtx, req: Requerimiento): Promise<void> {
       ruta: `/clientes/${req.cliente_id}`,
       entidad_tipo: 'requerimiento',
       entidad_id: req.id,
+      correo: {
+        intro: 'Según su responsable, esta tarea pasó su fecha porque espera al cliente. Pide el feedback.',
+        secciones: [
+          {
+            titulo: 'Espera respuesta del cliente',
+            tono: 'ambar',
+            total: 1,
+            filas: [{ texto: req.titulo_interno, detalle: cliente?.nombre ?? '' }],
+          },
+        ],
+      },
     },
     cliente?.ejecutiva_id ? { usuarioIds: [cliente.ejecutiva_id] } : { roles: ['operaciones'] },
   );

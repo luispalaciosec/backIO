@@ -51,3 +51,29 @@ const formatoHora = new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, hour: '2-
 export function horaLocal(iso: string): string {
   return formatoHora.format(new Date(iso));
 }
+
+/** '2026-10-29' → '29/10/2026', como se muestran las fechas al equipo. */
+export function fechaDMA(iso: string): string {
+  const [a, m, d] = iso.slice(0, 10).split('-');
+  return `${d}/${m}/${a}`;
+}
+
+/** '2026-10' → 'octubre 2026'. */
+export function mesLegible(mes: string): string {
+  const [a, m] = mes.split('-');
+  const nombres = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
+  return `${nombres[Number(m) - 1] ?? mes} ${a}`;
+}

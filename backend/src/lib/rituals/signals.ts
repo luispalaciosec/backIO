@@ -3,7 +3,7 @@
  * Principio: las reglas deciden, la IA solo redacta. Reglas deterministas y puras
  * sobre un WeekContext; los umbrales viven en tenants.config.signal_thresholds.
  */
-import { nombrePersona } from '@backio/shared';
+import { fechaDMA, nombrePersona } from '@backio/shared';
 import type { RequerimientoMetricas, Usuario, Acuerdo, Cliente, TipoSenal, SeveridadSenal } from '@backio/shared';
 import type { CargaPersona } from '../carga';
 import type { CorreoRico, CorreoSeccion } from '../notificaciones/email';
@@ -89,7 +89,7 @@ export const REGLAS: SignalRule[] = [
           severidad: 'critica',
           entidad_tipo: 'acuerdo',
           entidad_id: a.id,
-          titulo: `${nombreDe(ctx, a.responsable_id)}: "${a.descripcion}" venció el ${a.fecha_compromiso}`,
+          titulo: `${nombreDe(ctx, a.responsable_id)}: "${a.descripcion}" venció el ${fechaDMA(a.fecha_compromiso)}`,
           detalle: { responsable_id: a.responsable_id, fecha_compromiso: a.fecha_compromiso },
         })),
   },

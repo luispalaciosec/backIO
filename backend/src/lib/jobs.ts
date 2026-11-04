@@ -6,7 +6,7 @@
  * lo perdía, y con dos réplicas corría dos veces. Ahora un job corre si «ahora ≥ objetivo» dentro de una tolerancia
  * y su ventana (día, semana, mes o tramo de intervalo) no figura en cron_runs; la fila única hace de candado.
  */
-import { ZONA, hoyLocal, sumarDias } from '@backio/shared';
+import { ZONA, hoyLocal, mesLegible, sumarDias } from '@backio/shared';
 import type { DbCtx } from './db/client';
 import { serviceClient } from './db';
 import { clientesConBasecamp, cerrarVentana, limpiarCronRuns, reclamarVentana, tenantsActivos } from './db/cron_runs';
@@ -198,7 +198,7 @@ export const JOBS: Job[] = [
             { tenantId: ctx.tenantId },
             {
               tipo: 'informe_mensual',
-              titulo: `Informe mensual ${mes} · ${mesa.nombre} listo para revisar`,
+              titulo: `Informe de ${mesLegible(mes)} listo para revisar: ${mesa.nombre}`,
               cuerpo: 'BackIO redactó el informe ejecutivo del mes. Revísalo y publícalo en Basecamp desde Informes.',
               ruta: '/informes',
             },
