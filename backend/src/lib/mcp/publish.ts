@@ -96,6 +96,8 @@ async function publicarReservada(
 
 /** Línea del daily: título enlazado al to-do de Basecamp cuando existe. */
 export interface DailyItem {
+  /** La tarea: permite saber qué falta sumar a un daily ya publicado («Agregar a la apertura»). */
+  id?: string;
   cliente: string;
   titulo: string;
   owner: string;
@@ -319,6 +321,52 @@ export async function publicarDailyEnBasecamp(ctx: DbCtx, mesa: Mesa, m: DailyMe
     content: cuerpoDaily(m, await mencionesDailyBasecamp(ctx, bc)),
   });
   return { id: r.id, url: r.app_url };
+}
+
+/** Lo que una segunda ejecutiva suma a un daily ya publicado: va como comentario del mismo mensaje. */
+export function cuerpoAgregado(
+  a: { notas: string[]; hoy: DailyItem[]; completadas: DailyItem[]; completadas_fuera: DailyItem[] },
+  tipo: 'apertura' | 'cierre',
+  quien: string,
+  men?: Menciones,
+): string {
+  const lista = (xs: DailyItem[]) =>
+    `<ul>${xs.map((i) => `<li><strong>${esc(i.cliente)}</strong> · ${esc(i.titulo)} · ${(i.owners?.length ? i.owners : [i.owner]).map((o) => mencion(o, men)).join(', ')}</li>`).join('')}</ul>`;
+  const bloque = (titulo: string, xs: DailyItem[]) => (xs.length ? [`<p><strong>${titulo}</strong></p>`, lista(xs)] : []);
+  return [
+    `<p>➕ <strong>Agregado por ${esc(quien)}</strong> · <strong>Hora:</strong> ${horaLocal(new Date().toISOString()).replace(':', 'H')}</p>`,
+    ...(a.notas.length
+      ? [`<p>📌 <strong>Notas clave del día</strong></p>`, `<ul>${a.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`]
+      : []),
+    ...bloque(tipo === 'cierre' ? '🎯 Quedó abierto de lo de hoy' : '🎯 Hoy se trabaja', a.hoy),
+    ...bloque('✅ Completado hoy', a.completadas),
+    ...bloque('➕ Completadas fuera del daily', a.completadas_fuera),
+  ].join('\n');
+}
+
+/** Comenta en el mensaje del daily, a nombre de quien agrega. Basecamp avisa a quienes siguen el mensaje. */
+export async function comentarDailyEnBasecamp(
+  ctx: DbCtx,
+  mesa: Mesa,
+  messageId: number,
+  armar: (men: Menciones) => string,
+): Promise<{ id: number; url: string }> {
+  if (!mesa.basecamp_project_id) throw new Error(`La mesa ${mesa.nombre} no tiene proyecto de Basecamp`);
+  const bc = await BasecampClient.forActor(ctx);
+  const r = await bc.createComment(mesa.basecamp_project_id, messageId, armar(await mencionesDailyBasecamp(ctx, bc)));
+  return { id: r.id, url: r.app_url };
+}
+
+/** A cuántas personas avisa un mensaje nuevo: las del proyecto de la mesa. null si Basecamp no responde (la vista previa sigue). */
+export async function personasDelProyectoDaily(ctx: DbCtx, mesa: Mesa): Promise<number | null> {
+  if (!mesa.basecamp_project_id) return null;
+  try {
+    const bc = await BasecampClient.forTenant(ctx.tenantId);
+    return (await bc.request<unknown[]>('GET', `/projects/${mesa.basecamp_project_id}/people.json`)).length;
+  } catch (err) {
+    log.error('[daily] personas del proyecto', err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /** Usuarios de BackIO con basecamp_user_id → sgid de mención. Si Basecamp falla, el mensaje sale con nombres sin etiqueta. */

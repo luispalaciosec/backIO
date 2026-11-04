@@ -937,6 +937,23 @@ Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
 | `motivos` | jsonb | sí |  |
 | `created_at` | fecha y hora | sí | por defecto `now()` |
 
+### daily_preparacion
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | uuid | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `mesa_id` | uuid | sí | → [mesas](#mesas).id |
+| `fecha` | date | sí |  |
+| `tipo` | texto | sí |  |
+| `usuario_id` | uuid | sí | → [usuarios](#usuarios).id |
+| `notas` | jsonb | sí |  |
+| `listo_at` | fecha y hora |  |  |
+| `created_at` | fecha y hora | sí | por defecto `now()` |
+| `updated_at` | fecha y hora | sí | por defecto `now()` |
+
 ### fees_cliente
 
 Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.

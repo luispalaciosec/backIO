@@ -801,6 +801,67 @@ export type Database = {
         };
         Relationships: [];
       };
+      daily_preparacion: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          mesa_id: string;
+          fecha: string;
+          tipo: string;
+          usuario_id: string;
+          notas: Json;
+          listo_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          mesa_id: string;
+          fecha: string;
+          tipo: string;
+          usuario_id: string;
+          notas?: Json;
+          listo_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          mesa_id?: string;
+          fecha?: string;
+          tipo?: string;
+          usuario_id?: string;
+          notas?: Json;
+          listo_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'daily_preparacion_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'daily_preparacion_mesa_id_fkey';
+            columns: ['mesa_id'];
+            isOneToOne: false;
+            referencedRelation: 'mesas';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'daily_preparacion_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       daily_snapshots: {
         Row: {
           id: string;

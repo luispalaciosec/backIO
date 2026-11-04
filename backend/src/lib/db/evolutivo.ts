@@ -89,9 +89,30 @@ export async function listEventosBloqueo(ctx: DbCtx, desdeIso: string) {
 }
 
 /** Aperturas y cierres del daily publicados para la mesa. */
+/** Lo que se sumó como comentario a los dailys publicados desde una fecha («Agregar a la apertura»). */
+export async function listAgregadosDaily(ctx: DbCtx, mesaId: string, desdeIso: string) {
+  const db = serviceClient();
+  return paginar<{ accion: string; created_at: string; usuario_id: string | null; detalle: { ids?: string[]; notas?: string[] } }>((a, b) =>
+    db
+      .from('audit_log')
+      .select('accion, created_at, usuario_id, detalle')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('entidad_id', mesaId)
+      .in('accion', ['agregar_daily_apertura', 'agregar_daily_cierre'])
+      .gte('created_at', desdeIso)
+      .order('created_at')
+      .range(a, b),
+  );
+}
+
 export async function listPublicacionesDaily(ctx: DbCtx, mesaId: string, desdeIso: string) {
   const db = serviceClient();
-  return paginar<{ accion: string; created_at: string; usuario_id: string | null; detalle: { message_id?: number } }>((a, b) =>
+  return paginar<{
+    accion: string;
+    created_at: string;
+    usuario_id: string | null;
+    detalle: { message_id?: number; url?: string; ids?: string[]; notas?: string[] };
+  }>((a, b) =>
     db
       .from('audit_log')
       .select('accion, created_at, usuario_id, detalle')

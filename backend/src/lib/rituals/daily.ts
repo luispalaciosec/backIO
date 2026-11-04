@@ -90,11 +90,12 @@ export async function getDaily(ctx: DbCtx, opts: { mesaId?: string; ejecutivaId?
 
 export type MotivoConfirmacion = 'ya_publicado' | 'otra_mesa' | 'tarde' | 'sin_hoy';
 
-/** Desde esta hora (Guayaquil) una apertura pide confirmación: las de la mañana salen entre las 10:00 y las 13:30. */
+/** Desde esta hora (Guayaquil) la vista previa avisa que la apertura va tarde: las de la mañana salen entre las 10:00 y las 13:30. */
 export const HORA_APERTURA_TARDE = '14:00';
 
 /**
- * Lo que hay que confirmar antes de publicar un daily que avisa a todo el equipo de la mesa. Pura: se prueba sin base.
+ * Lo que conviene saber antes de publicar un daily que avisa a todo el equipo de la mesa: sale en la vista previa y no
+ * impide publicar (desde el 4/11/2026; antes eran confirmaciones en cadena). Pura: se prueba sin base.
  * Sale de la apertura de Omega del 30/10/2026, publicada a las 17:23 por una ejecutiva cuyas tareas del día eran de
  * Orión: «Hoy se trabaja: Nada» y 17 personas avisadas.
  * - otra_mesa: no es líder de la mesa, no tiene cuentas en ella y no la publicó en los últimos 30 días.

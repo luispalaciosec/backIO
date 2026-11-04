@@ -268,6 +268,14 @@ export class BasecampClient {
     return { id: r.id, app_url: r.app_url };
   }
 
+  /** Comenta en un mensaje: «Agregar a la apertura» (docs/05). Basecamp avisa a quienes siguen el mensaje. */
+  async createComment(projectId: number, recordingId: number, content: string): Promise<{ id: number; app_url: string }> {
+    const r = await this.request<{ id: number; app_url: string }>('POST', `/buckets/${projectId}/recordings/${recordingId}/comments.json`, {
+      content,
+    });
+    return { id: r.id, app_url: r.app_url };
+  }
+
   async createTodolist(projectId: number, todosetId: number, input: { name: string; description?: string }): Promise<BcTodolistRef> {
     const r = await this.request<{ id: number; app_url: string }>(
       'POST',

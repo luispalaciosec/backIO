@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '../../lib/validacion';
-import { requireScope, ctxOf } from '../../lib/auth/middleware';
+import { requireScope, ctxOf, type AuthInfo } from '../../lib/auth/middleware';
+import type { Mesa } from '@backio/shared';
 import {
   ensureSemana,
   getSemana,
@@ -15,18 +16,39 @@ import {
   audit,
 } from '../../lib/db';
 import { recalcularSenales, capacidadSemana, generarPlanOperativo, generarActaCierre, senalesDeMesa } from '../../lib/rituals/service';
-import { getDaily, avisosAntesDePublicar, type MotivoConfirmacion } from '../../lib/rituals/daily';
-import { listClientes, listMesas, listBacklog } from '../../lib/db';
+import { getDaily, avisosAntesDePublicar } from '../../lib/rituals/daily';
+import {
+  estadoDaily,
+  faltanEnDaily,
+  huellaDaily,
+  nombreDe,
+  notasUnificadas,
+  pendienteDeAgregar,
+  responsablesDaily,
+} from '../../lib/rituals/daily_compartido';
+import { guardarPreparacion, listPreparacion, type TipoDaily } from '../../lib/db/daily_preparacion';
+import { notificar } from '../../lib/notificaciones';
+import { listClientes, listMesas, listBacklog, listUsuarios } from '../../lib/db';
+import type { DbCtx } from '../../lib/db/client';
 import { usuarioDelTenant } from '../../lib/db/admin';
 import { alcanceMesa } from '../../lib/db/mesas';
 import { cargaDelDia } from '../../lib/carga';
 import { escenariosDelDia, preguntarSiSiguenVivas } from '../../lib/rituals/escenarios';
-import { publicarActaEnBasecamp, publicarDailyEnBasecamp, type DailyMensaje } from '../../lib/mcp/publish';
+import {
+  comentarDailyEnBasecamp,
+  cuerpoAgregado,
+  cuerpoDaily,
+  personasDelProyectoDaily,
+  publicarActaEnBasecamp,
+  publicarDailyEnBasecamp,
+  tituloDaily,
+  type DailyMensaje,
+} from '../../lib/mcp/publish';
 import { getMesa } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 import { fotoDaily } from '../../lib/evolutivo';
-import { listPublicacionesDaily } from '../../lib/db/evolutivo';
+import { listAgregadosDaily, listPublicacionesDaily } from '../../lib/db/evolutivo';
 import { conCandado } from '../../lib/candado';
 import { serviceClient } from '../../lib/db/client';
 import { hoyLocal, inicioDiaLocal, horaLocal, sumarDias } from '@backio/shared';
@@ -201,7 +223,192 @@ semanas.post('/actas/:actaId/publicar', requireScope('write:actas'), async (c) =
   }
 });
 
-/** Publica apertura o cierre de mesa en el board Daily, con las tres señales del daily acotadas a la mesa. */
+const TIPO_DAILY = z.enum(['apertura', 'cierre']);
+
+/** El mensaje como saldría ahora: notas de todas, responsables y lo ya publicado hoy para saber qué falta sumar. */
+async function armarDailyCompartido(
+  ctx: DbCtx,
+  mesa: Mesa,
+  tipo: TipoDaily,
+  b: { notas?: string[]; responsable?: string; narrativa?: string },
+  quien: string,
+) {
+  const hoy = hoyLocal();
+  const inicio = inicioDiaLocal(hoy);
+  const [prep, usuarios, publicadas, agregados] = await Promise.all([
+    listPreparacion(ctx, mesa.id, hoy, tipo),
+    listUsuarios(ctx, { incluirInactivos: true }),
+    listPublicacionesDaily(ctx, mesa.id, inicio),
+    listAgregadosDaily(ctx, mesa.id, inicio),
+  ]);
+  const nombre = nombreDe(usuarios);
+  const m: DailyMensaje = {
+    ...(await armarDailyMensaje(
+      ctx,
+      mesa,
+      tipo,
+      notasUnificadas(prep, nombre, b.notas ?? []),
+      b.responsable ?? responsablesDaily(prep, nombre, quien),
+    )),
+    narrativa: b.narrativa?.trim() || undefined,
+  };
+  const previas = publicadas.filter((x) => x.accion === `publicar_daily_${tipo}`);
+  // Una publicación anterior a este registro no trae `ids` y su contenido se considera nuevo.
+  const ya = [...previas, ...agregados.filter((x) => x.accion === `agregar_daily_${tipo}`)].map((x) => x.detalle);
+  return { m, previas, agregado: pendienteDeAgregar(m, ya) };
+}
+
+/** ¿Es tu mesa?, ¿es hora de apertura?, ¿hay algo elegido para hoy? Se muestran en la vista previa; no impiden publicar. */
+async function avisosDelDaily(ctx: DbCtx, auth: AuthInfo, mesa: Mesa, tipo: TipoDaily, hoySeTrabaja: number): Promise<string[]> {
+  const hoy = hoyLocal();
+  const [clientes, mesas, activosHoy, lider, publicaciones] = await Promise.all([
+    listClientes(ctx, { incluirInactivos: true }),
+    listMesas(ctx),
+    tipo === 'apertura' ? listBacklog(ctx, { solo_activos: true }) : Promise.resolve([]),
+    mesa.lider_id ? usuarioDelTenant(ctx, mesa.lider_id) : Promise.resolve(null),
+    listPublicacionesDaily(ctx, mesa.id, inicioDiaLocal(sumarDias(hoy, -30))),
+  ]);
+  const yo = ctx.usuarioId;
+  const mesaDe = new Map(clientes.map((x) => [x.id, x.mesa_id]));
+  const suHoyEnOtrasMesas = [
+    ...new Set(
+      activosHoy
+        .filter(
+          (r) =>
+            r.daily_fecha === hoy &&
+            !!yo &&
+            (r.owner_agencia.includes(yo) || clientes.find((x) => x.id === r.cliente_id)?.ejecutiva_id === yo),
+        )
+        .map((r) => mesaDe.get(r.cliente_id))
+        .filter((id): id is string => !!id && id !== mesa.id),
+    ),
+  ].map((id) => mesas.find((x) => x.id === id)?.nombre ?? 'otra mesa');
+  return avisosAntesDePublicar({
+    tipo,
+    mesa,
+    usuarioId: yo,
+    llevaTodas: auth.tipo !== 'usuario' || ['admin', 'gerencia', 'operaciones'].includes(auth.rol ?? ''),
+    mesasDeSusCuentas: new Set(clientes.filter((x) => yo && x.ejecutiva_id === yo && x.mesa_id).map((x) => x.mesa_id!)),
+    publicoAntes: publicaciones.some((x) => x.usuario_id === yo),
+    hora: horaLocal(new Date().toISOString()),
+    hoySeTrabaja,
+    suHoyEnOtrasMesas,
+    liderNombre: lider?.nombre ?? null,
+  }).map((a) => a.mensaje);
+}
+
+/** Cómo va el daily de la mesa: quién preparó qué y si ya se publicó. */
+semanas.get('/daily/preparacion', requireScope('read:backlog'), async (c) => {
+  const ctx = ctxOf(c);
+  const tipo = TIPO_DAILY.safeParse(c.req.query('tipo'));
+  const mesa = await getMesa(ctx, c.req.query('mesa') ?? '');
+  if (!tipo.success || !mesa) return c.json({ error: 'Mesa o tipo no válidos' }, 400);
+  return c.json({ ...(await estadoDaily(ctx, mesa, tipo.data)), yo: ctx.usuarioId });
+});
+
+/** Mis notas y «Mi parte está lista». Cada persona escribe solo lo suyo. Marcar «lista» avisa por la campana a las demás. */
+semanas.put(
+  '/daily/preparacion',
+  requireScope('write:actas'),
+  zValidator(
+    'json',
+    z.object({
+      mesa_id: z.string().uuid(),
+      tipo: TIPO_DAILY,
+      notas: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
+      listo: z.boolean().optional(),
+    }),
+  ),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const b = c.req.valid('json');
+    const yo = ctx.usuarioId;
+    if (!yo) return c.json({ error: 'Solo una persona puede preparar el daily' }, 403);
+    const mesa = await getMesa(ctx, b.mesa_id);
+    if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
+    const hoy = hoyLocal();
+    const mia = (await listPreparacion(ctx, mesa.id, hoy, b.tipo)).find((p) => p.usuario_id === yo);
+    const listoAhora = b.listo === true && !mia?.listo_at;
+    await guardarPreparacion(ctx, yo, mesa.id, hoy, b.tipo, {
+      notas: b.notas ?? mia?.notas ?? [],
+      listo_at: b.listo === undefined ? (mia?.listo_at ?? null) : b.listo ? (mia?.listo_at ?? new Date().toISOString()) : null,
+    });
+    const estado = await estadoDaily(ctx, mesa, b.tipo, hoy);
+    if (listoAhora) {
+      const quien = c.get('auth').nombre ?? 'Alguien';
+      await notificar(
+        ctx,
+        {
+          tipo: 'daily_listo',
+          titulo: `${quien} terminó su parte ${b.tipo === 'apertura' ? 'de la apertura' : 'del cierre'}`,
+          cuerpo: `${mesa.nombre}: ya puedes revisar y publicar, o sumar lo tuyo.`,
+          ruta: `/daily?mesa=${mesa.id}`,
+        },
+        { usuarioIds: estado.personas.map((p) => p.usuario_id).filter((id) => id !== yo) },
+        { soloCampana: true },
+      );
+    }
+    return c.json({ ...estado, yo });
+  },
+);
+
+/** El mensaje real antes de publicar, con lo que conviene saber. Un solo clic después. */
+semanas.post(
+  '/daily/vista-previa',
+  requireScope('write:actas'),
+  zValidator(
+    'json',
+    z.object({
+      mesa_id: z.string().uuid(),
+      tipo: TIPO_DAILY,
+      notas: z.array(z.string()).default([]),
+      narrativa: z.string().max(4000).optional(),
+    }),
+  ),
+  async (c) => {
+    const ctx = ctxOf(c);
+    const auth = c.get('auth');
+    const b = c.req.valid('json');
+    const mesa = await getMesa(ctx, b.mesa_id);
+    if (!mesa) return c.json({ error: 'Mesa no encontrada' }, 404);
+    const quien = auth.nombre ?? 'BackIO';
+    try {
+      const { m, previas, agregado } = await armarDailyCompartido(ctx, mesa, b.tipo, b, quien);
+      if (previas.length) {
+        return c.json({
+          modo: 'agregar',
+          asunto: tituloDaily(m, mesa),
+          html: agregado.vacio ? '' : cuerpoAgregado(agregado, b.tipo, quien),
+          nada_nuevo: agregado.vacio,
+          avisos: [],
+          avisados: null,
+          hora_publicada: horaLocal(previas[previas.length - 1]!.created_at),
+        });
+      }
+      const [avisos, estado, avisados] = await Promise.all([
+        avisosDelDaily(ctx, auth, mesa, b.tipo, m.hoy.length),
+        estadoDaily(ctx, mesa, b.tipo),
+        personasDelProyectoDaily(ctx, mesa),
+      ]);
+      return c.json({
+        modo: 'publicar',
+        asunto: tituloDaily(m, mesa),
+        html: cuerpoDaily(m),
+        nada_nuevo: false,
+        avisos: [...avisos, ...faltanEnDaily(estado.personas, ctx.usuarioId)],
+        avisados,
+      });
+    } catch (err) {
+      if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422);
+      throw err;
+    }
+  },
+);
+
+/**
+ * Publica apertura o cierre de mesa en el board Daily. Si ya salió hoy, `agregar` suma lo nuevo como comentario en el mismo
+ * mensaje; sin `agregar` responde 409, y así dos personas publicando a la vez no duplican el mensaje.
+ */
 semanas.post(
   '/daily/publicar',
   requireScope('write:actas'),
@@ -209,14 +416,13 @@ semanas.post(
     'json',
     z.object({
       mesa_id: z.string().uuid(),
-      tipo: z.enum(['apertura', 'cierre']),
+      tipo: TIPO_DAILY,
       notas: z.array(z.string()).default([]),
       responsable: z.string().optional(),
       narrativa: z.string().max(4000).optional(),
-      // Publicar otra vez lo que ya salió hoy (la pantalla lo pide tras confirmar).
+      agregar: z.boolean().default(false),
+      // Publicar un mensaje nuevo aunque ya haya uno hoy.
       repetir: z.boolean().default(false),
-      // Avisos que la persona ya confirmó en pantalla (otra mesa, apertura tarde, nada elegido para hoy).
-      confirmado: z.array(z.enum(['ya_publicado', 'otra_mesa', 'tarde', 'sin_hoy'])).default([]),
     }),
   ),
   async (c) => {
@@ -227,92 +433,58 @@ semanas.post(
     // Una publicación por mesa, día y tipo: dos pestañas o un reintento ya no la duplican (revisión del 29/10/2026).
     // El candado ordena las llamadas simultáneas; la auditoría dice si ya salió hoy.
     return conCandado(`daily|${ctx.tenantId}|${mesa.id}|${b.tipo}`, async () => {
-      const hoy = hoyLocal();
-      const previas = (await listPublicacionesDaily(ctx, mesa.id, inicioDiaLocal(hoy))).filter(
-        (x) => x.accion === `publicar_daily_${b.tipo}`,
-      );
-      if (previas.length && !b.repetir && !b.confirmado.includes('ya_publicado')) {
-        const hora = horaLocal(previas[previas.length - 1]!.created_at);
-        return c.json(
-          { error: `La ${b.tipo} de ${mesa.nombre} ya se publicó hoy a las ${hora}.`, ya_publicado: true, hora, motivos: ['ya_publicado'] },
-          409,
-        );
-      }
-      let m: DailyMensaje;
+      const quien = c.get('auth').nombre ?? 'BackIO';
+      let armado: Awaited<ReturnType<typeof armarDailyCompartido>>;
       try {
-        m = {
-          ...(await armarDailyMensaje(ctx, mesa, b.tipo, b.notas, b.responsable ?? c.get('auth').nombre)),
-          narrativa: b.narrativa?.trim() || undefined,
-        };
+        armado = await armarDailyCompartido(ctx, mesa, b.tipo, b, quien);
       } catch (err) {
         if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422);
         throw err;
       }
-      // Antes de avisar a todo el equipo: ¿es tu mesa?, ¿es hora de apertura?, ¿hay algo elegido para hoy?
-      const auth = c.get('auth');
-      const [clientes, mesas, activosHoy, lider] = await Promise.all([
-        listClientes(ctx, { incluirInactivos: true }),
-        listMesas(ctx),
-        b.tipo === 'apertura' ? listBacklog(ctx, { solo_activos: true }) : Promise.resolve([]),
-        mesa.lider_id ? usuarioDelTenant(ctx, mesa.lider_id) : Promise.resolve(null),
-      ]);
-      const yo = ctx.usuarioId;
-      const mesaDe = new Map(clientes.map((x) => [x.id, x.mesa_id]));
-      const suHoyEnOtrasMesas = [
-        ...new Set(
-          activosHoy
-            .filter(
-              (r) =>
-                r.daily_fecha === hoy &&
-                !!yo &&
-                (r.owner_agencia.includes(yo) || clientes.find((x) => x.id === r.cliente_id)?.ejecutiva_id === yo),
-            )
-            .map((r) => mesaDe.get(r.cliente_id))
-            .filter((id): id is string => !!id && id !== mesa.id),
-        ),
-      ].map((id) => mesas.find((x) => x.id === id)?.nombre ?? 'otra mesa');
-      const publicoAntes = (await listPublicacionesDaily(ctx, mesa.id, inicioDiaLocal(sumarDias(hoy, -30)))).some(
-        (x) => x.usuario_id === yo,
-      );
-      const avisos = avisosAntesDePublicar({
-        tipo: b.tipo,
-        mesa,
-        usuarioId: yo,
-        llevaTodas: auth.tipo !== 'usuario' || ['admin', 'gerencia', 'operaciones'].includes(auth.rol ?? ''),
-        mesasDeSusCuentas: new Set(clientes.filter((x) => yo && x.ejecutiva_id === yo && x.mesa_id).map((x) => x.mesa_id!)),
-        publicoAntes,
-        hora: horaLocal(new Date().toISOString()),
-        hoySeTrabaja: m.hoy.length,
-        suHoyEnOtrasMesas,
-        liderNombre: lider?.nombre ?? null,
-      }).filter((a) => !b.confirmado.includes(a.motivo));
-      if (avisos.length)
-        return c.json(
-          {
-            error: `${avisos.map((a) => a.mensaje).join(' ')} La ${b.tipo} avisa a todo el equipo de ${mesa.nombre}.`,
-            motivos: avisos.map((a) => a.motivo) satisfies MotivoConfirmacion[],
-          },
-          409,
-        );
+      const { m, previas, agregado } = armado;
+      const resumen = {
+        hoy: m.hoy.length,
+        vencen: m.vencen.length,
+        atrasadas: m.atrasadas.length,
+        bloqueos: m.bloqueos.length,
+        cambios: m.cambios.length,
+        completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0),
+      };
+      if (previas.length && b.agregar) {
+        const messageId = previas[previas.length - 1]!.detalle.message_id;
+        if (!messageId) return c.json({ error: 'No se encontró el mensaje publicado para comentar en él.' }, 422);
+        if (agregado.vacio) return c.json({ error: 'No hay nada nuevo que agregar: todo ya salió en el mensaje.' }, 422);
+        try {
+          const r = await comentarDailyEnBasecamp(ctx, mesa, messageId, (men) => cuerpoAgregado(agregado, b.tipo, quien, men));
+          await audit(ctx, {
+            accion: `agregar_daily_${b.tipo}`,
+            entidad: 'mesa',
+            entidad_id: mesa.id,
+            detalle: { message_id: messageId, comment_id: r.id, url: r.url, ...huellaDaily(m) },
+          });
+          return c.json({ ...r, agregado: true, resumen });
+        } catch (err) {
+          return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
+        }
+      }
+      if (previas.length && !b.repetir) {
+        const hora = horaLocal(previas[previas.length - 1]!.created_at);
+        return c.json({ error: `La ${b.tipo} de ${mesa.nombre} ya se publicó hoy a las ${hora}.`, ya_publicado: true, hora }, 409);
+      }
       try {
         const r = await publicarDailyEnBasecamp(ctx, mesa, m);
-        await audit(ctx, { accion: `publicar_daily_${b.tipo}`, entidad: 'mesa', entidad_id: mesa.id, detalle: { message_id: r.id } });
+        await audit(ctx, {
+          accion: `publicar_daily_${b.tipo}`,
+          entidad: 'mesa',
+          entidad_id: mesa.id,
+          detalle: { message_id: r.id, url: r.url, ...huellaDaily(m) },
+        });
         // Evolutivo: el cierre publicado deja la foto del día (no bloquea la respuesta si falla).
         if (b.tipo === 'cierre')
           await fotoDaily({ ...ctx, db: serviceClient() }, mesa, undefined, 'cierre').catch((e: Error) =>
             log.error('[evolutivo] foto del cierre', e.message),
           );
-        return c.json({
-          ...r,
-          resumen: {
-            hoy: m.hoy.length,
-            vencen: m.vencen.length,
-            atrasadas: m.atrasadas.length,
-            bloqueos: m.bloqueos.length,
-            cambios: m.cambios.length,
-            completadas: (m.completadas?.length ?? 0) + (m.completadas_fuera?.length ?? 0),
-          },
-        });
+        return c.json({ ...r, resumen });
       } catch (err) {
         return c.json({ error: err instanceof Error ? err.message : String(err) }, 422);
       }

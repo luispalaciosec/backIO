@@ -25,6 +25,7 @@ import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
 import { vigilar } from './vigia';
 import { fotoSaludClientes } from './salud_clientes';
+import { recordarDaily } from './rituals/daily_compartido';
 import { avisarRiesgoSemana } from './carga';
 import { miDia, resumenMiDia } from './mi_dia';
 import { listClientes } from './db/clientes';
@@ -309,6 +310,18 @@ export const JOBS: Job[] = [
         }
         return { correo, campana };
       }),
+  },
+  {
+    nombre: 'daily_recordatorio_apertura',
+    descripcion: 'Recuerda por la campana la apertura que no se ha publicado, L-V 11:30',
+    ventana: aLas(11, 30, { cuando: esLaborable }),
+    ejecutar: () => porTenant((ctx) => recordarDaily(ctx, 'apertura')),
+  },
+  {
+    nombre: 'daily_recordatorio_cierre',
+    descripcion: 'Recuerda por la campana el cierre que no se ha publicado, L-V 18:00',
+    ventana: aLas(18, 0, { cuando: esLaborable }),
+    ejecutar: () => porTenant((ctx) => recordarDaily(ctx, 'cierre')),
   },
   {
     // Avisa (Sentry + correo a admin, una vez por problema) si un job de hora fija no corrió en su ventana o si uno

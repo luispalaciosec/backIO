@@ -49,6 +49,7 @@ export async function armarDailyMensaje(
     return e ? { ...i, cuenta: nombre(e) } : i;
   };
   const linea = (r: {
+    id: string;
     titulo_interno: string;
     cliente_id: string;
     owner_agencia: string[];
@@ -56,6 +57,7 @@ export async function armarDailyMensaje(
     basecamp_url: string | null;
     dias_atraso: number;
   }): DailyItem => ({
+    id: r.id,
     cliente: cliente(r.cliente_id),
     titulo: r.titulo_interno,
     owner: nombre(r.owner_agencia[0]),

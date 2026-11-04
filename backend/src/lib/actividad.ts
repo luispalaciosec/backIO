@@ -75,6 +75,8 @@ const FRASES: Record<string, string | ((d: Detalle) => string)> = {
   publicar_acta: 'publicó el documento en Basecamp',
   publicar_daily_apertura: 'publicó la apertura de mesa en Basecamp',
   publicar_daily_cierre: 'publicó el cierre de mesa en Basecamp',
+  agregar_daily_apertura: 'agregó a la apertura de mesa en Basecamp',
+  agregar_daily_cierre: 'agregó al cierre de mesa en Basecamp',
   basecamp_importar: (d) =>
     `sincronizó con Basecamp (${d.requerimientos_creados ?? 0} nuevas · ${d.titulos_actualizados ?? 0} títulos · ${d.eliminados_en_basecamp ?? 0} eliminadas)`,
   adoptar_huerfano: 'adoptó un huérfano de Basecamp',

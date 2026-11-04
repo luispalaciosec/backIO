@@ -21,7 +21,10 @@ vi.mock('../lib/db/evolutivo', async (orig) => ({
   listReprogramacionesDesde: async () => m.reprogramaciones,
   listEventosBloqueo: async () => m.bloqueos,
   listPublicacionesDaily: async () => m.publicaciones,
+  listAgregadosDaily: async () => [],
 }));
+vi.mock('../lib/db/daily_preparacion', () => ({ listPreparacion: async () => [], guardarPreparacion: vi.fn() }));
+vi.mock('../lib/db/usuarios', async (orig) => ({ ...(await orig<object>()), listUsuarios: async () => [] }));
 vi.mock('../lib/db/audit', () => ({ audit: m.audit }));
 vi.mock('../lib/db/mesas', async (orig) => ({
   ...(await orig<object>()),
@@ -130,8 +133,7 @@ const publicar = (body: Record<string, unknown>) =>
   app().request('/semanas/daily/publicar', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    // «tarde» depende de la hora a la que corre el test: aquí se da por confirmado (tiene su propio test).
-    body: JSON.stringify({ mesa_id: '40000000-0000-4000-8000-000000000002', tipo: 'apertura', confirmado: ['tarde'], ...body }),
+    body: JSON.stringify({ mesa_id: '40000000-0000-4000-8000-000000000002', tipo: 'apertura', ...body }),
   });
 const mensaje = {
   tipo: 'apertura',
@@ -146,7 +148,8 @@ const mensaje = {
 };
 
 describe('publicar el daily una vez por mesa, día y tipo', () => {
-  it('si la apertura ya salió hoy, no la publica otra vez sin confirmación', async () => {
+  it('si la apertura ya salió hoy, no publica otro mensaje', async () => {
+    m.armar.mockResolvedValue(mensaje);
     m.publicaciones = [{ accion: 'publicar_daily_apertura', created_at: new Date().toISOString(), detalle: { message_id: 1 } }];
     const res = await publicar({});
     expect(res.status).toBe(409);
@@ -178,7 +181,7 @@ describe('publicar el daily una vez por mesa, día y tipo', () => {
 });
 
 // Apertura de Omega del 30/10/2026: una ejecutiva con sus tareas del día en Orión la publicó a las 17:23, vacía.
-describe('confirmar antes de publicar el daily', () => {
+describe('avisos antes de publicar el daily', () => {
   const base = {
     tipo: 'apertura' as const,
     mesa: { id: 'omega', nombre: 'Mesa Omega', lider_id: 'julio' },
@@ -210,14 +213,10 @@ describe('confirmar antes de publicar el daily', () => {
   it('el cierre no pide hora ni selección', () => {
     expect(motivos({ tipo: 'cierre' as never, publicoAntes: true, hora: '18:00', hoySeTrabaja: 0 })).toEqual([]);
   });
-  it('la ruta responde 409 con los motivos y publica cuando se confirman', async () => {
-    m.publicaciones = [];
-    m.publicar.mockReset().mockResolvedValue({ id: 9, url: 'https://bc/9' });
+  it('la ruta ya no los exige: la vista previa los muestra y publicar no se detiene', async () => {
     m.armar.mockResolvedValue({ ...mensaje, hoy: [] });
-    const r = await publicar({});
-    expect(r.status).toBe(409);
-    expect(((await r.json()) as { motivos: string[] }).motivos).toEqual(['sin_hoy']);
-    expect(m.publicar).not.toHaveBeenCalled();
-    expect((await publicar({ confirmado: ['tarde', 'sin_hoy'] })).status).toBe(200);
+    m.publicar.mockResolvedValue({ id: 9, url: 'https://bc/9' });
+    expect((await publicar({})).status).toBe(200);
+    expect(m.publicar).toHaveBeenCalledTimes(1);
   });
 });

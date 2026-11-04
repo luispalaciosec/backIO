@@ -206,6 +206,29 @@ aplicar y se puede deshacer. El código está en `backend/src/lib/rituals/escena
 
 Rutas: `GET /semanas/daily/escenarios`, `POST /semanas/daily/preguntar-vivas` y `POST /ia/daily-escenario`.
 
+### Daily compartido
+
+Una mesa puede tener varias ejecutivas (Omega tiene dos). Trabajan en la misma pantalla y **ninguna espera a otra**:
+
+- **Notas de cada una.** Cada persona deja las suyas en el paso 3, se guardan solas y las demás las ven con su nombre. Al
+  publicar, salen juntas en el mensaje, y como responsables salen quienes prepararon y quien publica («Carolina y Grace»).
+- **Quién falta.** La pantalla muestra cómo va cada ejecutiva: lista a tal hora, cuántas notas dejó, o cuántas cuentas y
+  tareas tiene todavía sin marcar. Es solo información.
+- **«Mi parte está lista».** Es opcional y avisa por la campana a las demás.
+- **Publicar.** El botón abre el mensaje real, dice a cuántas personas avisará y lista lo que conviene saber: mesa que la
+  persona no lleva, apertura desde las 14:00, nada elegido para hoy o alguien sin marcar su parte. Un clic publica. Estos
+  avisos reemplazan a las confirmaciones en cadena del 31/10, que ya no detienen la publicación.
+- **Agregar a la apertura o al cierre.** Si ya salió, el botón cambia y lo nuevo (tareas y notas que no estaban) va como
+  **comentario en el mismo mensaje**, a nombre de quien agrega, y avisa a quienes lo siguen. Si no hay nada nuevo, lo dice y
+  no comenta. Si dos personas publican a la vez, la segunda ve lo que falta agregar en vez de duplicar el mensaje.
+- **Recordatorio.** De lunes a viernes a las 11:30 (apertura) y a las 18:00 (cierre), si la mesa no ha publicado, la campana
+  avisa a las ejecutivas de la mesa y a su líder. No manda correo ni publica nada.
+
+Rutas: `GET` y `PUT /semanas/daily/preparacion`, `POST /semanas/daily/vista-previa` y `POST /semanas/daily/publicar` con
+`agregar`. El código está en `backend/src/lib/rituals/daily_compartido.ts`; la tabla es `daily_preparacion` (migración 42):
+las personas de gestión del tenant la leen y cada persona escribe solo su fila.
+
+
 **Regla: ninguna tarea entra al daily sin responsable (22/09/2026).** Marcar `daily_fecha` en una
 tarea sin `owner_agencia` devuelve 422 (backlog ☀ y «Armar el día», donde se le puede asignar ahí mismo); el tablero muestra
 una alerta con las tareas sin responsable de las cuatro columnas y la publicación (y el borrador con IA)
