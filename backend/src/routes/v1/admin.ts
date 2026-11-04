@@ -172,7 +172,12 @@ async function mandar(
   const cuerpo = existente
     ? `Hola ${nombre}. Usa el botón para definir tu contraseña y entrar a BackIO, la capa de gestión de Geeks.`
     : `Hola ${nombre}. Te crearon una cuenta en BackIO, la capa de gestión de backlog de Geeks. Usa el botón para definir tu contraseña y entrar. El enlace vence en 24 horas.`;
-  await sendEmail({ to: email, subject: `[BackIO] ${titulo}`, html: plantillaHtml(titulo, cuerpo, link), text: `${cuerpo}\n${link}` });
+  await sendEmail({
+    to: email,
+    subject: titulo,
+    html: plantillaHtml(titulo, cuerpo, link, { accion: 'Definir contraseña', enlaceVisible: true }),
+    text: `${cuerpo}\n${link}`,
+  });
   return { enviado: true };
 }
 

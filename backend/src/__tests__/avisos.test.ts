@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { RequerimientoMetricas } from '@backio/shared';
 import { armarCuentas, armarMiDia, resumenMiDia } from '../lib/mi_dia';
 import { cambiosDeSalud, textoCambio, type FotoSalud } from '../lib/salud_clientes';
-import { rutaPermitida } from '../lib/notificaciones';
+import { rutaPermitida, separarRuta } from '../lib/notificaciones';
+import { plantillaHtml, textoPlano } from '../lib/notificaciones/email';
 
 const r = (p: Partial<RequerimientoMetricas>) =>
   ({
@@ -42,8 +43,71 @@ describe('Mi día', () => {
   });
   it('el correo resume con el nombre del cliente y no se envía si no hay nada', () => {
     const m = armarMiDia([r({ titulo_interno: 'Post', daily_fecha: hoy })], hoy);
-    expect(resumenMiDia(m, () => 'Foligain')).toEqual({ titulo: 'Tu día: 1 para hoy', cuerpo: 'Hoy trabajas en 1: Post (Foligain).' });
+    expect(resumenMiDia(m, () => 'Foligain')).toMatchObject({
+      titulo: 'Tu día: 1 para hoy',
+      cuerpo: 'Hoy trabajas en 1: Post (Foligain).',
+    });
     expect(resumenMiDia(armarMiDia([], hoy), () => '')).toBeNull();
+  });
+});
+
+// Correo real del 2/11/2026: las 5 atrasadas salían dos veces y el asunto decía «5 por confirmar».
+describe('correo de Mi día', () => {
+  const hoy = '2026-11-04';
+  const quieta = (titulo: string) => r({ titulo_interno: titulo, fecha_entrega: '2026-10-20', dias_atraso: 15, dias_sin_movimiento: 15 });
+  const correoDe = (tareas: RequerimientoMetricas[]) =>
+    resumenMiDia(armarMiDia(tareas, hoy), () => 'Banco Amazonas', { nombre: 'Luis Palacios', hoy })!;
+
+  it('cada tarea sale una sola vez, en el bloque que más pide', () => {
+    const c = correoDe([quieta('A'), quieta('B')]);
+    expect(c.titulo).toBe('Tu día: 2 atrasadas');
+    const titulos = c.correo.secciones.flatMap((s) => s.filas.map((f) => f.texto));
+    expect(titulos).toEqual(['A', 'B']);
+    expect(c.correo.secciones.map((s) => s.titulo)).toEqual(['¿Ya se entregaron?']);
+    expect(c.cuerpo).not.toContain('Atrasadas');
+  });
+  it('saluda por el primer nombre, dice qué hacer primero y el botón lo lleva a responder', () => {
+    const c = correoDe([quieta('A')]).correo;
+    expect(c.saludo).toBe('Buenos días, Luis');
+    expect(c.intro).toContain('confirma si ya se entregó');
+    expect(c.accion).toBe('Responder en Mi día');
+    expect(c.secciones[0]!.filas[0]!.detalle).toBe('Banco Amazonas · 15 días de atraso');
+  });
+  it('muestra hasta 5 por bloque y cuenta el total', () => {
+    const c = correoDe(['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(quieta)).correo.secciones[0]!;
+    expect(c.total).toBe(7);
+    expect(c.filas).toHaveLength(5);
+  });
+  it('concuerda el singular en el asunto', () => {
+    expect(correoDe([r({ fecha_entrega: hoy })]).titulo).toBe('Tu día: 1 vence');
+  });
+});
+
+describe('plantilla de correo', () => {
+  const correo = {
+    intro: 'Intro',
+    secciones: [{ titulo: 'Bloque', tono: 'rojo' as const, total: 7, filas: [{ texto: '<b>Tarea</b>', detalle: 'Cliente' }] }],
+  };
+  it('escapa lo que viene de los datos y avisa cuánto queda fuera', () => {
+    const html = plantillaHtml('Título', 'Resumen', 'https://x/mi-dia', { correo, accion: 'Abrir Mi día' });
+    expect(html).toContain('&lt;b&gt;Tarea&lt;/b&gt;');
+    expect(html).not.toContain('<b>Tarea</b>');
+    expect(html).toContain('y 6 más en BackIO');
+    expect(html).toContain('Abrir Mi día');
+  });
+  it('sin bloques, los renglones con viñeta salen como filas', () => {
+    const html = plantillaHtml('T', 'Hola\n• Uno\n• Dos');
+    expect(html).toContain('Uno');
+    expect(html).not.toContain('• Uno');
+  });
+  it('la versión de texto trae la misma información', () => {
+    expect(textoPlano('T', 'R', correo, 'https://x')).toContain('Bloque (7)\n- <b>Tarea</b> · Cliente\ny 6 más en BackIO');
+  });
+  it('los bloques viajan con el aviso, no se ven en la campana y no se pueden falsificar desde el texto', () => {
+    const guardado = `Resumen\n__correo__:${JSON.stringify(correo)}\n__ruta__:/mi-dia`;
+    expect(separarRuta(guardado)).toEqual({ cuerpo: 'Resumen', ruta: '/mi-dia', correo });
+    expect(separarRuta('Resumen\n__correo__:{roto').correo).toBeUndefined();
+    expect(separarRuta('Resumen\n__correo__:{roto').cuerpo).toBe('Resumen');
   });
 });
 

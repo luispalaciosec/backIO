@@ -22,6 +22,7 @@ import { listMesas } from './db/mesas';
 import { listProyectos } from './db/proyectos';
 import { ensureSemana } from './db/semanas';
 import { notificar } from './notificaciones';
+import type { CorreoRico } from './notificaciones/email';
 
 /** Tareas completadas con horas que hacen falta para confiar en una mediana. */
 export const MIN_MUESTRAS = 5;
@@ -335,7 +336,7 @@ export const diaCorto = (iso: string) =>
 export function textoRiesgo(
   items: { tarea: TareaCarga; persona: CargaPersona }[],
   cliente: (id: string) => string,
-): { titulo: string; cuerpo: string } {
+): { titulo: string; cuerpo: string; correo: CorreoRico } {
   const lineas = items
     .slice(0, MAX_LINEAS)
     .map(
@@ -350,6 +351,26 @@ export function textoRiesgo(
       `${personas === 1 ? 'Una persona tiene' : `${personas} personas tienen`} más trabajo estimado que horas disponibles. Conviene repartir, recortar o avisar al cliente hoy:`,
       ...lineas,
     ].join('\n'),
+    correo: {
+      intro: `${personas === 1 ? 'Una persona tiene' : `${personas} personas tienen`} más trabajo estimado que horas disponibles. Conviene repartir, recortar o avisar al cliente hoy.`,
+      secciones: [
+        {
+          titulo: 'En riesgo esta semana',
+          tono: 'rojo',
+          total: items.length,
+          filas: items.slice(0, MAX_LINEAS).map(({ tarea: t, persona: p }) => ({
+            texto: t.titulo,
+            detalle: [
+              cliente(t.cliente_id),
+              `vence el ${diaCorto(t.fecha_entrega)}`,
+              `${p.nombre}: ~${Math.round(p.horas)} h para ${Math.round(p.capacidad_restante)} h disponibles`,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          })),
+        },
+      ],
+    },
   };
 }
 

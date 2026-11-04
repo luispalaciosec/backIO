@@ -24,7 +24,7 @@ export async function insertarNotificaciones(filas: FilaInsert<'notificaciones'>
 export async function listarNotificacionesPendientes(maxIntentos: number, tenantId?: string) {
   let q = serviceClient()
     .from('notificaciones')
-    .select('id, tenant_id, usuario_id, email_destino, titulo, cuerpo, intentos')
+    .select('id, tenant_id, usuario_id, email_destino, tipo, titulo, cuerpo, intentos')
     .eq('canal', 'email')
     .is('enviada_at', null)
     .lt('intentos', maxIntentos)

@@ -63,6 +63,12 @@ mide la espera del cliente.
 El correo trae solo un resumen. Los botones que cambian algo están en la página **Mi día** (`/mi-dia`), que muestra lo
 mismo en vivo. Quien no tiene nada pendiente no recibe correo.
 
+Desde el 4/11/2026 el correo va por bloques, con hasta 5 tareas cada uno, el cliente y los días de atraso, y dice qué
+hacer primero. Cada tarea sale una sola vez: una atrasada que hay que confirmar va en «¿Ya se entregaron?» y no se repite
+en «Atrasadas». La agenda del weekly, el riesgo de la semana y la cotización ganada usan el mismo formato. Los demás
+avisos usan la misma plantilla con su texto, y cada correo trae un botón que dice qué se va a hacer. Los asuntos ya no
+llevan «[BackIO]», porque el remitente ya lo dice.
+
 Cada persona puede desactivar el correo desde Mi día (`usuarios.avisos_mi_dia`, migración 38). Aun así el resumen le
 llega a la campana. La tarea programada es `mi_dia` (`backend/src/lib/jobs.ts`); el resumen lo arma
 `backend/src/lib/mi_dia.ts`.

@@ -6,6 +6,7 @@
 import { nombrePersona } from '@backio/shared';
 import type { RequerimientoMetricas, Usuario, Acuerdo, Cliente, TipoSenal, SeveridadSenal } from '@backio/shared';
 import type { CargaPersona } from '../carga';
+import type { CorreoRico, CorreoSeccion } from '../notificaciones/email';
 
 export interface SignalThresholds {
   arrastre_reincidente_min: number;
@@ -335,4 +336,23 @@ export function calcularSenales(ctx: WeekContext): SignalOut[] {
 
 export function temaAgenda(tipo: TipoSenal): string {
   return REGLAS.find((r) => r.tipo === tipo)?.tema_agenda ?? tipo;
+}
+
+/** Correo de la agenda del weekly: las señales por gravedad, con el tema de la agenda al que van. Máximo 15 en total. */
+export function correoAgenda(senales: { severidad: SeveridadSenal; titulo: string; tipo: TipoSenal }[]): CorreoRico {
+  const grupos: { sev: SeveridadSenal; titulo: string; tono: CorreoSeccion['tono'] }[] = [
+    { sev: 'critica', titulo: 'Críticas', tono: 'rojo' },
+    { sev: 'alta', titulo: 'Altas', tono: 'ambar' },
+    { sev: 'media', titulo: 'Medias', tono: 'gris' },
+  ];
+  let quedan = 15;
+  const secciones: CorreoSeccion[] = [];
+  for (const g of grupos) {
+    const xs = senales.filter((s) => s.severidad === g.sev);
+    if (!xs.length) continue;
+    const filas = xs.slice(0, quedan).map((s) => ({ texto: s.titulo, detalle: temaAgenda(s.tipo) }));
+    quedan -= filas.length;
+    secciones.push({ titulo: g.titulo, tono: g.tono, total: xs.length, filas });
+  }
+  return { intro: 'Esto es lo que falta atender para la reunión del lunes.', secciones };
 }

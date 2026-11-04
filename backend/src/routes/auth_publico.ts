@@ -45,8 +45,8 @@ authPublico.post(
       const cuerpo = `Hola ${usuario.nombre}. Recibimos una solicitud para restablecer tu contraseña de BackIO. Usa el botón para definir una nueva. El enlace vence en 24 horas.\nSi no fuiste tú, ignora este correo: tu contraseña actual sigue igual.`;
       await sendEmail({
         to: email,
-        subject: '[BackIO] Restablece tu contraseña',
-        html: plantillaHtml('Restablece tu contraseña', cuerpo, link),
+        subject: 'Restablece tu contraseña de BackIO',
+        html: plantillaHtml('Restablece tu contraseña', cuerpo, link, { accion: 'Definir nueva contraseña', enlaceVisible: true }),
         text: `${cuerpo}\n${link}`,
       });
       await audit(

@@ -69,8 +69,12 @@ export async function usuarioPorBasecampId(ctx: DbCtx, basecampUserId: number): 
 }
 
 /** Personas activas con su preferencia de correo de «Mi día» (migración 38). */
-export async function usuariosParaMiDia(tenantId: string): Promise<{ id: string; avisos_mi_dia: boolean }[]> {
-  const { data, error } = await serviceClient().from('usuarios').select('id, avisos_mi_dia').eq('tenant_id', tenantId).eq('activo', true);
+export async function usuariosParaMiDia(tenantId: string): Promise<{ id: string; nombre: string; avisos_mi_dia: boolean }[]> {
+  const { data, error } = await serviceClient()
+    .from('usuarios')
+    .select('id, nombre, avisos_mi_dia')
+    .eq('tenant_id', tenantId)
+    .eq('activo', true);
   throwIf(error);
   return data ?? [];
 }

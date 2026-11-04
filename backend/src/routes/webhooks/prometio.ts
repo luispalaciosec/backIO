@@ -163,6 +163,19 @@ prometioWebhook.post('/', async (c) => {
         ruta: '/proyectos/nuevo',
         entidad_tipo: 'proyecto_borrador',
         entidad_id: borrador.id,
+        correo: {
+          intro: `PrometIO reporta una cotización aprobada${cot.valor ? ` por ${montoUsd(cot.valor)}` : ''}. Hay un borrador de proyecto listo para revisar y confirmar en el Builder.`,
+          secciones: cot.lineas.length
+            ? [
+                {
+                  titulo: 'Lo que se vendió',
+                  tono: 'azul',
+                  total: cot.lineas.length,
+                  filas: cot.lineas.slice(0, 10).map((l) => ({ texto: l.servicio, detalle: `Cantidad: ${l.cantidad}` })),
+                },
+              ]
+            : [],
+        },
       },
       // A la ejecutiva de la cuenta (y a operaciones, que arma proyectos). Sin ejecutiva asignada, a todas: antes iba
       // siempre a todas y a Grace le llegaban las cotizaciones de las cuentas de Carolina (revisión del 31/10/2026).

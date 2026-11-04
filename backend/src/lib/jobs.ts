@@ -14,7 +14,7 @@ import { reconcileTenant } from './basecamp/reconcile';
 import { recalcularSenales } from './rituals/service';
 import { ensureSemana } from './db/semanas';
 import { notificar, procesarPendientes } from './notificaciones';
-import { temaAgenda } from './rituals/signals';
+import { correoAgenda, temaAgenda } from './rituals/signals';
 import { iaDisponible } from './ia';
 import { generarInformeMensual } from './ia/informe';
 import { listMesas } from './db/mesas';
@@ -261,9 +261,12 @@ export const JOBS: Job[] = [
           { tenantId: ctx.tenantId },
           {
             tipo: 'agenda_weekly',
-            titulo: `Agenda del weekly: ${s.length} señales por atender (${criticas.length} críticas)`,
+            titulo: criticas.length
+              ? `Agenda del weekly: ${criticas.length} ${criticas.length === 1 ? 'crítica' : 'críticas'} de ${s.length} señales`
+              : `Agenda del weekly: ${s.length} ${s.length === 1 ? 'señal' : 'señales'} por atender`,
             cuerpo: lineas.length ? lineas.join('\n') : 'Sin señales por atender esta semana.',
             ruta: '/weekly',
+            correo: s.length ? correoAgenda(s) : undefined,
           },
           { roles: ['operaciones', 'admin'] },
         );
@@ -298,7 +301,7 @@ export const JOBS: Job[] = [
         let correo = 0,
           campana = 0;
         for (const u of usuarios) {
-          const r = resumenMiDia(await miDia(ctx, u.id), (id) => clientes.get(id) ?? '');
+          const r = resumenMiDia(await miDia(ctx, u.id), (id) => clientes.get(id) ?? '', { nombre: u.nombre });
           if (!r) continue;
           await notificar(ctx, { tipo: 'mi_dia', ...r, ruta: '/mi-dia' }, { usuarioIds: [u.id] }, { soloCampana: !u.avisos_mi_dia });
           if (u.avisos_mi_dia) correo += 1;

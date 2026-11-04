@@ -55,6 +55,7 @@ vi.mock('../lib/db/client', async (orig) => {
 vi.mock('../lib/notificaciones/email', () => ({
   emailHabilitado: () => true,
   plantillaHtml: (t: string) => t,
+  textoPlano: (t: string) => t,
   sendEmail: async (m: { to: string }) => {
     enviados.push(m.to);
     return { id: 'x' };
