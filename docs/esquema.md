@@ -485,6 +485,7 @@ Compromisos del weekly con responsable y fecha.
 | `created_by` | uuid |  | → [usuarios](#usuarios).id |
 | `mesa_id` | uuid |  | → [mesas](#mesas).id |
 | `requerimiento_id` | uuid |  | → [requerimientos](#requerimientos).id |
+| `proyecto_id` | uuid |  | → [proyectos](#proyectos).id |
 
 ### actas
 

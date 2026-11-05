@@ -17,6 +17,6 @@ describe('OpenAPI desde los esquemas de las rutas', () => {
   });
   it('crear proyecto y acuerdo vienen de sus rutas', () => {
     expect(campos('CrearProyecto')).toEqual(expect.arrayContaining(['fecha_inicio', 'repetir_mensual']));
-    expect(campos('Acuerdo')).toEqual(['descripcion', 'responsable_id', 'fecha_compromiso', 'mesa_id', 'requerimiento_id']);
+    expect(campos('Acuerdo')).toEqual(['descripcion', 'responsable_id', 'fecha_compromiso', 'mesa_id', 'requerimiento_id', 'proyecto_id']);
   });
 });

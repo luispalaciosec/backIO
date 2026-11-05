@@ -1,4 +1,4 @@
-import type { Semana, Senal, Acuerdo, Usuario, CapacidadPersona, Mesa, RequerimientoMetricas, Cliente } from '@backio/shared';
+import type { Semana, ProyectosWeekly, Acuerdo, Usuario, CapacidadPersona, Mesa, RequerimientoMetricas, Cliente } from '@backio/shared';
 import { Fragment } from 'react';
 import { apiServer } from '@/lib/api.server';
 import { fecha } from '@/lib/format';
@@ -6,7 +6,7 @@ import { WeeklyActions, AcuerdoForm } from './WeeklyActions';
 import { CausasPendientes } from './CausasPendientes';
 import { SenalesWeekly } from './SenalesWeekly';
 import { CompromisosWeekly } from './CompromisosWeekly';
-import { ArrastreWeekly } from './ArrastreWeekly';
+import { ProyectosWeeklyVista } from './ProyectosWeekly';
 import { PlanSemana } from './PlanSemana';
 import { BloquesWeekly } from './BloquesWeekly';
 import { meServer, puedeEscribir } from '@/lib/me.server';
@@ -36,28 +36,25 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
   const todas = searchParams.mesa === 'todas' || cuentas;
   const mesa = todas ? null : (activas.find((m) => m.id === searchParams.mesa) ?? activas[0] ?? null);
   const deLaMesa = (a: Acuerdo) => !mesa || a.mesa_id === mesa.id;
-  const [
-    { items: senales },
-    { items: acuerdosTodos },
-    { items: abiertosTodos },
-    { items: capacidad },
-    { items: usuarios },
-    { items: clientes },
-  ] = await Promise.all([
-    apiServer<{ items: Senal[] }>(`/semanas/${semana.id}/senales${mesa ? `?mesa=${mesa.id}` : ''}`),
-    apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
-    apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
-    apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad${mesa ? `?mesa=${mesa.id}` : ''}`),
-    apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
-    apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id' | 'mesa_id'>[] }>('/clientes'),
-  ]);
+  const [agenda, { items: acuerdosTodos }, { items: abiertosTodos }, { items: capacidad }, { items: usuarios }, { items: clientes }] =
+    await Promise.all([
+      apiServer<ProyectosWeekly>(
+        `/semanas/${semana.id}/proyectos${mesa ? `?mesa=${mesa.id}` : cuentas && me.usuario_id ? `?ejecutiva=${me.usuario_id}` : ''}`,
+      ),
+      apiServer<{ items: Acuerdo[] }>(`/semanas/${semana.id}/acuerdos`),
+      apiServer<{ items: Acuerdo[] }>('/semanas/acuerdos/abiertos'),
+      apiServer<{ items: CapacidadPersona[] }>(`/semanas/${semana.id}/capacidad${mesa ? `?mesa=${mesa.id}` : ''}`),
+      apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
+      apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id' | 'mesa_id'>[] }>('/clientes'),
+    ]);
   const misClientes = clientes.filter((c) => !!me.usuario_id && c.ejecutiva_id === me.usuario_id);
   const misClientesIds = misClientes.map((c) => c.id);
   const tieneCuentas = misClientes.length > 0;
   const { items: reqs } = await apiServer<{ items: RequerimientoMetricas[] }>('/requerimientos?activos=1');
   const deMisCuentas = (a: Acuerdo) =>
     a.responsable_id === me.usuario_id ||
-    (!!a.requerimiento_id && misClientesIds.includes(reqs.find((r) => r.id === a.requerimiento_id)?.cliente_id ?? ''));
+    (!!a.requerimiento_id && misClientesIds.includes(reqs.find((r) => r.id === a.requerimiento_id)?.cliente_id ?? '')) ||
+    (!!a.proyecto_id && agenda.clientes.some((c) => c.proyectos.some((p) => p.proyecto_id === a.proyecto_id)));
   const acuerdos = acuerdosTodos.filter(deLaMesa).filter((a) => !cuentas || deMisCuentas(a));
   const abiertos = abiertosTodos.filter(deLaMesa).filter((a) => !cuentas || deMisCuentas(a));
   const titulos = Object.fromEntries(reqs.map((r) => [r.id, r.titulo_interno]));
@@ -68,21 +65,6 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
   const mesaDeCliente = Object.fromEntries(clientes.filter((c) => c.mesa_id).map((c) => [c.id, c.mesa_id!]));
   const ejecutivaDeCliente = Object.fromEntries(clientes.filter((c) => c.ejecutiva_id).map((c) => [c.id, c.ejecutiva_id!]));
   const nombres = Object.fromEntries(usuarios.map((u) => [u.id, nombrePersona(u)]));
-  const dash = await apiServer<{
-    arrastre: {
-      requerimiento_id: string;
-      titulo: string;
-      cliente: string;
-      owner: string | null;
-      veces_reprogramado: number;
-      fecha_original: string | null;
-      fecha_actual: string | null;
-      dias_arrastre: number;
-    }[];
-    arrastre_total?: number;
-  }>(`/dashboard${mesa ? `?mesa=${mesa.id}` : cuentas ? '?arrastre=todo' : ''}`);
-  const nombresMisClientes = new Set(misClientes.map((c) => c.nombre));
-  const arrastre = cuentas ? dash.arrastre.filter((a) => nombresMisClientes.has(a.cliente)) : dash.arrastre;
   // En «Mis cuentas», la capacidad muestra a quienes tienen tareas de esas cuentas y solo el riesgo de ellas.
   const personasDeMisCuentas = new Set(reqs.filter((r) => misClientesIds.includes(r.cliente_id)).flatMap((r) => r.owner_agencia));
   const capacidadVista = cuentas
@@ -148,124 +130,129 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
             contenido: <CompromisosWeekly vencidos={vencidos} semanaId={semana.id} nombre={nombres} escribe={escribe} />,
           },
           {
-            titulo: 'Señales',
+            titulo: 'Proyectos',
             contenido: (
-              <SenalesWeekly
-                senales={senales}
+              <ProyectosWeeklyVista
+                key={searchParams.mesa ?? ''}
+                datos={agenda}
                 semanaId={semana.id}
                 mesaId={mesa?.id ?? null}
-                clienteDeTarea={clienteDeTarea}
-                ownersDeTarea={ownersDeTarea}
-                clientes={nombreCliente}
-                ejecutivas={ejecutivaDeCliente}
                 mesaDeCliente={mesaDeCliente}
-                soloCuentasDe={cuentas ? (me.usuario_id ?? null) : null}
-                nombre={nombres}
-                usuarios={activos}
-                yo={me.usuario_id ?? null}
-                escribe={escribe}
-              />
-            ),
-          },
-          {
-            titulo: 'Arrastre',
-            contenido: (
-              <ArrastreWeekly
-                filas={arrastre}
-                total={cuentas ? arrastre.length : (dash.arrastre_total ?? dash.arrastre.length)}
-                owners={ownersDeTarea}
+                nombres={nombres}
                 usuarios={activos}
                 escribe={escribe}
               />
             ),
           },
           {
-            titulo: 'Capacidad',
+            titulo: 'Equipo',
             contenido: (
-              <section className="card">
-                <div className="px-4 py-3 border-b border-gray-200">
-                  <div className="font-semibold">4. Capacidad y riesgo de la semana</div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Horas estimadas con lo que cada persona tarda de verdad en una tarea (timesheet de las últimas 12 semanas), en todas sus
-                    mesas. Disponibles: lo que registra en una semana fuerte, por los días hábiles que quedan (sin timesheet suficiente, lo
-                    del equipo). Lo que no entra, por fecha, queda en riesgo.
-                  </p>
-                </div>
-                <PlanSemana
-                  key={mesa?.id ?? 'todas'}
-                  semanaId={semana.id}
-                  mesa={mesa?.id ?? ''}
-                  clientes={nombreCliente}
-                  owners={ownersDeTarea}
-                  usuarios={activos}
-                  escribe={escribe}
-                />
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr>
-                        <th className="th">Persona</th>
-                        <th className="th text-right">Tareas</th>
-                        <th className="th text-right">% total</th>
-                        <th className="th text-right">Horas estimadas</th>
-                        <th className="th text-right">Disponibles</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {capacidadVista.map((c) => {
-                        const exceso =
-                          c.horas_estimadas !== undefined && c.capacidad_restante !== undefined && c.horas_estimadas > c.capacidad_restante;
-                        return (
-                          <Fragment key={c.usuario_id}>
-                            <tr>
-                              <td className="td">{c.nombre}</td>
-                              <td className="td text-right">{c.tareas}</td>
-                              <td className={`td text-right ${c.pct_del_total > 30 ? 'text-red-600 font-semibold' : ''}`}>
-                                {c.pct_del_total}%
-                              </td>
-                              <td className={`td text-right tabular-nums ${exceso ? 'text-red-600 font-semibold' : ''}`}>
-                                {c.horas_estimadas !== undefined ? `${Math.round(c.horas_estimadas)} h` : '—'}
-                              </td>
-                              <td
-                                className="td text-right tabular-nums"
-                                title={c.capacidad_base ? BASE_CAPACIDAD[c.capacidad_base] : 'Capacidad declarada'}
-                              >
-                                {c.capacidad_restante !== undefined ? `${Math.round(c.capacidad_restante)} h` : `${c.capacidad_semanal} h`}
-                              </td>
-                            </tr>
-                            {!!c.en_riesgo?.length && (
+              <div className="space-y-6">
+                <section className="card">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <div className="font-semibold">3. Equipo: capacidad y riesgo de la semana</div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Horas estimadas con lo que cada persona tarda de verdad en una tarea (timesheet de las últimas 12 semanas), en todas
+                      sus mesas. Disponibles: lo que registra en una semana fuerte, por los días hábiles que quedan (sin timesheet
+                      suficiente, lo del equipo). Lo que no entra, por fecha, queda en riesgo.
+                    </p>
+                  </div>
+                  <PlanSemana
+                    key={mesa?.id ?? 'todas'}
+                    semanaId={semana.id}
+                    mesa={mesa?.id ?? ''}
+                    clientes={nombreCliente}
+                    owners={ownersDeTarea}
+                    usuarios={activos}
+                    escribe={escribe}
+                  />
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr>
+                          <th className="th">Persona</th>
+                          <th className="th text-right">Tareas</th>
+                          <th className="th text-right">% total</th>
+                          <th className="th text-right">Horas estimadas</th>
+                          <th className="th text-right">Disponibles</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {capacidadVista.map((c) => {
+                          const exceso =
+                            c.horas_estimadas !== undefined &&
+                            c.capacidad_restante !== undefined &&
+                            c.horas_estimadas > c.capacidad_restante;
+                          return (
+                            <Fragment key={c.usuario_id}>
                               <tr>
-                                <td className="td pt-0 pb-3" colSpan={5}>
-                                  <div className="rounded-md bg-red-50 px-3 py-2 text-xs">
-                                    <div className="font-semibold text-red-700">
-                                      En riesgo ({c.en_riesgo.length}): no entran en lo que le queda de la semana
-                                    </div>
-                                    <ul className="mt-1 space-y-0.5 text-gray-700">
-                                      {c.en_riesgo.map((t) => (
-                                        <li key={t.id}>
-                                          {t.titulo} · {nombreCliente[t.cliente_id] ?? ''} · vence el {fecha(t.fecha_entrega)} · ~{t.horas}{' '}
-                                          h
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
+                                <td className="td">{c.nombre}</td>
+                                <td className="td text-right">{c.tareas}</td>
+                                <td className={`td text-right ${c.pct_del_total > 30 ? 'text-red-600 font-semibold' : ''}`}>
+                                  {c.pct_del_total}%
+                                </td>
+                                <td className={`td text-right tabular-nums ${exceso ? 'text-red-600 font-semibold' : ''}`}>
+                                  {c.horas_estimadas !== undefined ? `${Math.round(c.horas_estimadas)} h` : '—'}
+                                </td>
+                                <td
+                                  className="td text-right tabular-nums"
+                                  title={c.capacidad_base ? BASE_CAPACIDAD[c.capacidad_base] : 'Capacidad declarada'}
+                                >
+                                  {c.capacidad_restante !== undefined
+                                    ? `${Math.round(c.capacidad_restante)} h`
+                                    : `${c.capacidad_semanal} h`}
                                 </td>
                               </tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                      {capacidadVista.length === 0 && (
-                        <tr>
-                          <td className="td text-gray-400" colSpan={5}>
-                            Sin tareas esta semana.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                              {!!c.en_riesgo?.length && (
+                                <tr>
+                                  <td className="td pt-0 pb-3" colSpan={5}>
+                                    <div className="rounded-md bg-red-50 px-3 py-2 text-xs">
+                                      <div className="font-semibold text-red-700">
+                                        En riesgo ({c.en_riesgo.length}): no entran en lo que le queda de la semana
+                                      </div>
+                                      <ul className="mt-1 space-y-0.5 text-gray-700">
+                                        {c.en_riesgo.map((t) => (
+                                          <li key={t.id}>
+                                            {t.titulo} · {nombreCliente[t.cliente_id] ?? ''} · vence el {fecha(t.fecha_entrega)} · ~
+                                            {t.horas} h
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                        {capacidadVista.length === 0 && (
+                          <tr>
+                            <td className="td text-gray-400" colSpan={5}>
+                              Sin tareas esta semana.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+                <SenalesWeekly
+                  titulo="Otras señales: personas y cuentas"
+                  senales={agenda.otras_senales}
+                  semanaId={semana.id}
+                  mesaId={mesa?.id ?? null}
+                  clienteDeTarea={clienteDeTarea}
+                  ownersDeTarea={ownersDeTarea}
+                  clientes={nombreCliente}
+                  ejecutivas={ejecutivaDeCliente}
+                  mesaDeCliente={mesaDeCliente}
+                  soloCuentasDe={cuentas ? (me.usuario_id ?? null) : null}
+                  nombre={nombres}
+                  usuarios={activos}
+                  yo={me.usuario_id ?? null}
+                  escribe={escribe}
+                />
+              </div>
             ),
           },
         ]}

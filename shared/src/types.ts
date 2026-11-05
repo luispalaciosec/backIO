@@ -292,6 +292,65 @@ export interface Acuerdo {
   mesa_id?: string | null;
   /** Tarea sobre la que se acordó (migración 43): sale como sugerencia al armar el daily. */
   requerimiento_id?: string | null;
+  /** Proyecto sobre el que se acordó (migración 46): se ve en su fila del weekly. */
+  proyecto_id?: string | null;
+}
+
+/** El weekly por proyecto (docs/05). Cada tarea cae en un solo grupo: el que más pide de la reunión. */
+export type GrupoTareaWeekly = 'bloqueada' | 'atrasada' | 'sin_responsable' | 'espera_cliente' | 'quieta' | 'esta_semana' | 'resto';
+export type EstadoProyectoWeekly = 'rojo' | 'amarillo' | 'verde';
+export interface TareaWeekly {
+  id: string;
+  titulo: string;
+  grupo: GrupoTareaWeekly;
+  owners: string[];
+  fecha_entrega: string | null;
+  fecha_original: string | null;
+  dias_atraso: number;
+  dias_sin_movimiento: number;
+  veces_reprogramado: number;
+  basecamp_url: string | null;
+  /** Horas registradas en la tarea. */
+  horas: number;
+  senales: Senal[];
+}
+export interface ProyectoWeekly {
+  proyecto_id: string | null;
+  nombre: string;
+  cliente_id: string;
+  estado: EstadoProyectoWeekly;
+  /** Por qué tiene ese estado, en palabras. */
+  motivo: string;
+  conteo: Record<GrupoTareaWeekly, number>;
+  abiertas: number;
+  proxima_entrega: string | null;
+  /** Horas del timesheet de todo el proyecto, también de sus tareas cerradas, y las de esta semana. */
+  horas: { total: number; semana: number };
+  /** Avance del proyecto (0-100), el mismo de la pantalla de proyectos. */
+  avance: number | null;
+  /** Días de atraso de la tarea más vieja. */
+  atraso_maximo: number;
+  /** Personas con tareas abiertas, de la que más tiene a la que menos. */
+  responsables: string[];
+  /** Cuántas tareas abiertas tiene cada una. */
+  carga: { usuario_id: string; tareas: number }[];
+  senales_por_atender: number;
+  senales_de_proyecto: Senal[];
+  acuerdos: Pick<Acuerdo, 'id' | 'descripcion' | 'responsable_id' | 'fecha_compromiso'>[];
+  basecamp_url: string | null;
+  tareas: TareaWeekly[];
+}
+export interface ClienteWeekly {
+  cliente_id: string;
+  nombre: string;
+  ejecutiva_id: string | null;
+  proyectos: ProyectoWeekly[];
+}
+export interface ProyectosWeekly {
+  clientes: ClienteWeekly[];
+  resumen: Record<EstadoProyectoWeekly, number>;
+  /** Señales que no son de una tarea o proyecto abierto: de personas, de cuentas o de tareas ya cerradas. */
+  otras_senales: Senal[];
 }
 
 export interface Acta {

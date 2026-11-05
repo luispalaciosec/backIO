@@ -133,7 +133,7 @@ export interface Dashboard {
 const dias = (a: string, b: string) =>
   Math.round((new Date(`${b}T12:00:00Z`).getTime() - new Date(`${a}T12:00:00Z`).getTime()) / 86_400_000);
 
-export async function buildDashboard(ctx: DbCtx, mesaId?: string | null, opts: { arrastreCompleto?: boolean } = {}): Promise<Dashboard> {
+export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promise<Dashboard> {
   const hoy = hoyLocal();
   const lunes = lunesDe(hoy);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -353,7 +353,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null, opts: {
       estado: r.estado_operativo,
     }))
     .sort((a, b) => b.veces_reprogramado - a.veces_reprogramado || b.dias_arrastre - a.dias_arrastre);
-  const arrastre = opts.arrastreCompleto ? arrastreTodo : arrastreTodo.slice(0, 50);
+  const arrastre = arrastreTodo.slice(0, 50);
 
   return {
     generado_at: new Date().toISOString(),

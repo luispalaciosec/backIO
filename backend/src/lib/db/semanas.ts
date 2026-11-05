@@ -161,6 +161,7 @@ export async function insertAcuerdo(
     fecha_compromiso: string;
     mesa_id?: string | null;
     requerimiento_id?: string | null;
+    proyecto_id?: string | null;
   },
 ): Promise<Acuerdo> {
   const { data, error } = await ctx.db

@@ -25,6 +25,9 @@ import {
   senalesDeMesa,
 } from '../../lib/rituals/service';
 import { sugerirReparto } from '../../lib/rituals/reparto';
+import { armarProyectosWeekly } from '../../lib/rituals/proyectos_weekly';
+import { listHorasDesde } from '../../lib/db/horas';
+import { env } from '../../config/env';
 import { idsClientesDePrueba } from '../../lib/db/clientes';
 import { getDaily, avisosAntesDePublicar } from '../../lib/rituals/daily';
 import {
@@ -38,10 +41,10 @@ import {
 } from '../../lib/rituals/daily_compartido';
 import { guardarPreparacion, listPreparacion, type TipoDaily } from '../../lib/db/daily_preparacion';
 import { notificar } from '../../lib/notificaciones';
-import { getRequerimiento, listClientes, listMesas, listBacklog, listUsuarios } from '../../lib/db';
+import { getProyecto, getRequerimiento, listClientes, listMesas, listBacklog, listProyectos, listUsuarios } from '../../lib/db';
 import type { DbCtx } from '../../lib/db/client';
 import { usuarioDelTenant } from '../../lib/db/admin';
-import { alcanceMesa } from '../../lib/db/mesas';
+import { alcanceEjecutiva, alcanceMesa } from '../../lib/db/mesas';
 import { cargaDelDia, cargaDelEquipo } from '../../lib/carga';
 import { escenariosDelDia, preguntarSiSiguenVivas } from '../../lib/rituals/escenarios';
 import {
@@ -158,6 +161,45 @@ semanas.post('/:id/senales/atender', requireScope('write:actas'), zValidator('js
   return c.body(null, 204);
 });
 
+/** La agenda por proyecto: estado, motivo y sus tareas. ?mesa= o, para «Mis cuentas», ?ejecutiva=. */
+semanas.get('/:id/proyectos', requireScope('read:senales'), async (c) => {
+  const ctx = ctxOf(c);
+  const semana = await getSemana(ctx, c.req.param('id'));
+  if (!semana) return c.json({ error: 'Semana no encontrada' }, 404);
+  const mesa = c.req.query('mesa') || null;
+  const ejecutiva = c.req.query('ejecutiva') || null;
+  const alcance = ejecutiva ? await alcanceEjecutiva(ctx, ejecutiva) : mesa ? await alcanceMesa(ctx, mesa, { sinPrueba: true }) : undefined;
+  const [activos, proyectos, clientes, senales, acuerdos, prueba] = await Promise.all([
+    listBacklog(ctx, { solo_activos: true, mesa: alcance }),
+    listProyectos(ctx),
+    listClientes(ctx, { incluirInactivos: true }),
+    senalesDeMesa(ctx, semana, mesa),
+    listAcuerdosAbiertos(ctx),
+    idsClientesDePrueba(ctx),
+  ]);
+  const reales = activos.filter((r) => !prueba.has(r.cliente_id));
+  const clientesDeLaAgenda = [...new Set(reales.map((r) => r.cliente_id))];
+  const [horasTotal, horasSemana] = clientesDeLaAgenda.length
+    ? await Promise.all([
+        listHorasDesde(ctx, '2000-01-01', clientesDeLaAgenda),
+        listHorasDesde(ctx, semana.fecha_inicio, clientesDeLaAgenda),
+      ])
+    : [[], []];
+  const armado = armarProyectosWeekly({
+    activos: reales,
+    horas: { total: horasTotal, semana: horasSemana },
+    proyectos,
+    clientes,
+    senales,
+    acuerdos,
+    hoy: hoyLocal(),
+    finSemana: semana.fecha_fin,
+    urlLista: (bucket, lista) => `https://3.basecamp.com/${env().BASECAMP_ACCOUNT_ID}/buckets/${bucket}/todolists/${lista}`,
+  });
+  // En «Mis cuentas» las señales de personas y de otras cuentas no van.
+  return c.json(ejecutiva ? { ...armado, otras_senales: [] } : armado);
+});
+
 semanas.get('/:id/capacidad', requireScope('read:capacidad'), async (c) =>
   c.json({ items: await capacidadSemana(ctxOf(c), c.req.param('id'), c.req.query('mesa') || null) }),
 );
@@ -174,6 +216,8 @@ export const crearAcuerdoSchema = z.object({
   mesa_id: z.string().uuid().nullable().optional(),
   /** Tarea sobre la que se acordó (migración 43). Opcional. */
   requerimiento_id: z.string().uuid().nullable().optional(),
+  /** Proyecto sobre el que se acordó (migración 46). Opcional. */
+  proyecto_id: z.string().uuid().nullable().optional(),
 });
 
 // Tres campos: acuerdo, responsable, fecha. La fecha es un date picker real: sin "próxima weekly".
@@ -181,6 +225,7 @@ semanas.post('/:id/acuerdos', requireScope('write:actas'), zValidator('json', cr
   const ctx = ctxOf(c);
   const b = c.req.valid('json');
   if (b.requerimiento_id && !(await getRequerimiento(ctx, b.requerimiento_id))) return c.json({ error: 'La tarea no existe' }, 422);
+  if (b.proyecto_id && !(await getProyecto(ctx, b.proyecto_id))) return c.json({ error: 'El proyecto no existe' }, 422);
   const a = await insertAcuerdo(ctx, { semana_id: c.req.param('id'), ...b });
   await audit(ctx, { accion: 'crear_acuerdo', entidad: 'acuerdo', entidad_id: a.id });
   return c.json(a, 201);

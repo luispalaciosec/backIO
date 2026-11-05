@@ -305,13 +305,31 @@ señales se escapan en el markdown, así que un `|` o un `_` en un título ya no
   muestra los 15 más reprogramados.
 - Las señales del domingo se guardan en la semana que empieza el lunes, y el correo trae solo las que faltan atender.
 
+### El weekly se revisa por proyecto (4/11/2026)
+
+El weekly decide y el daily ejecuta: la reunión recorre proyectos y baja a la tarea solo cuando hay algo que resolver. El orden
+es compromisos vencidos, proyectos, equipo y acuerdos. La lista de proyectos reemplaza a las de señales y arrastre.
+
+- **Por cliente y por estado.** El estado sale de las tareas, no de la fecha del proyecto, que suele quedar vencida con el
+  proyecto en marcha. **Decidir:** hay tareas bloqueadas o atrasadas en marcha. **Confirmar:** espera al cliente, no tiene
+  responsable o tiene atrasadas sin movimiento en más de 7 días. **En orden:** no se discute y queda oculto al abrir la pantalla.
+- **Resumen primero.** Al abrir un proyecto se ve su avance, lo abierto, lo que sale esta semana, la próxima entrega, las horas
+  del timesheet (todo el proyecto y esta semana), el mayor atraso y cuántas tareas tiene cada persona; debajo, sus tareas.
+- **Una tarea, un grupo.** Al abrir un proyecto, cada tarea aparece una sola vez, en el grupo que más pide de la reunión, con sus
+  señales. Las señales de personas, de cuentas o de tareas ya cerradas siguen en el bloque Equipo, así que ninguna se pierde.
+- **Sobre el proyecto:** «Crear acuerdo» (`acuerdos.proyecto_id`, migración 46), que luego se ve en su fila, y preguntar si
+  siguen vivas las tareas quietas.
+- **Sobre varias tareas:** elegirlas y darles una nueva fecha, con motivo, o cancelarlas.
+- **«Siguiente proyecto»** recorre la lista sin volver arriba.
+
+Código: `backend/src/lib/rituals/proyectos_weekly.ts`, `GET /semanas/:id/proyectos`.
+
 ### El weekly se trabaja en el mismo lugar (4/11/2026)
 
 - **Compromisos vencidos:** «Cumplido», «Nueva fecha» o «Cancelar».
-- **Señales:** buscador sin tildes ni orden, por cliente o por persona, y «Mis cuentas». «Crear acuerdo» viene precargado con
-  el texto y la persona de la señal; al guardarlo, la señal queda atendida.
-- **Arrastre:** buscador y filtros por persona y cliente. «Reprogramar» pide motivo, «Reasignar» cambia al primer responsable y
-  «Cancelar» archiva también el to-do. Todo pasa por `actualizarRequerimiento` y sale en Basecamp a nombre de quien hace clic.
+- **Tareas:** dentro de su proyecto, «Actuar» da «Reprogramar» (pide motivo), «Reasignar» (cambia al primer responsable) y
+  «Cancelar» (archiva también el to-do). Todo pasa por `actualizarRequerimiento` y sale en Basecamp a nombre de quien hace clic.
+- **Otras señales:** en el bloque Equipo, con buscador, por cliente o por persona, y «Crear acuerdo» precargado.
 - **Plan de la semana:** por cada tarea en riesgo propone a quién reasignarla o, si nadie puede, renegociar la fecha. Solo
   propone a quien ya tiene tareas de esa cuenta y horas libres: las horas sobrantes de alguien que no conoce la cuenta, o que
   no produce, no cuentan. Nada cambia sin un clic (`lib/rituals/reparto.ts`, `GET /semanas/:id/reparto`).

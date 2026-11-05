@@ -21,6 +21,22 @@ interface Grupo {
   pendientes: number;
 }
 
+export const atenderSenal = (semanaId: string, s: Senal, atendida: boolean) =>
+  api(`/semanas/${semanaId}/senales/atender`, {
+    method: 'POST',
+    json: {
+      atendida,
+      senal: {
+        tipo: s.tipo,
+        severidad: s.severidad,
+        entidad_tipo: s.entidad_tipo,
+        entidad_id: s.entidad_id,
+        titulo: s.titulo,
+        detalle: s.detalle,
+      },
+    },
+  });
+
 /** De quién es la señal: la persona del compromiso, de la tarea o la señal misma. */
 function personaDeSenal(s: Senal, owners: Record<string, string[]>): string | null {
   const d = s.detalle as { responsable_id?: string; owner?: string | null };
@@ -31,20 +47,20 @@ function personaDeSenal(s: Senal, owners: Record<string, string[]>): string | nu
 }
 
 /** Convierte una señal en un acuerdo: precargado con su texto y su persona. Al guardar, la señal queda atendida. */
-function AcuerdoDeSenal({
-  senal,
+export function FormAcuerdo({
+  texto,
   responsable,
   usuarios,
   guardar,
   cancelar,
 }: {
-  senal: Senal;
+  texto: string;
   responsable: string | null;
   usuarios: { id: string; nombre: string }[];
   guardar: (x: { descripcion: string; responsable_id: string; fecha_compromiso: string }) => Promise<void>;
   cancelar: () => void;
 }) {
-  const [f, setF] = useState({ descripcion: senal.titulo, responsable_id: responsable ?? '', fecha_compromiso: '' });
+  const [f, setF] = useState({ descripcion: texto, responsable_id: responsable ?? '', fecha_compromiso: '' });
   const [busy, setBusy] = useState(false);
   return (
     <form
@@ -59,6 +75,7 @@ function AcuerdoDeSenal({
       <input
         className="input flex-1 min-w-52 text-xs py-1"
         aria-label="Acuerdo"
+        placeholder="¿Qué se acordó?"
         required
         minLength={3}
         value={f.descripcion}
@@ -103,6 +120,7 @@ function AcuerdoDeSenal({
  */
 export function SenalesWeekly({
   senales,
+  titulo = 'Señales',
   semanaId,
   mesaId,
   clienteDeTarea,
@@ -117,6 +135,7 @@ export function SenalesWeekly({
   escribe,
 }: {
   senales: Senal[];
+  titulo?: string;
   semanaId: string;
   mesaId: string | null;
   clienteDeTarea: Record<string, string>;
@@ -214,20 +233,7 @@ export function SenalesWeekly({
     setOcupado(clave);
     setError(null);
     try {
-      await api(`/semanas/${semanaId}/senales/atender`, {
-        method: 'POST',
-        json: {
-          atendida,
-          senal: {
-            tipo: s.tipo,
-            severidad: s.severidad,
-            entidad_tipo: s.entidad_tipo,
-            entidad_id: s.entidad_id,
-            titulo: s.titulo,
-            detalle: s.detalle,
-          },
-        },
-      });
+      await atenderSenal(semanaId, s, atendida);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar');
@@ -257,7 +263,7 @@ export function SenalesWeekly({
     <section className="card">
       <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
         <span className="font-semibold">
-          2. Señales · {pendientes} por atender{senales.length > pendientes ? ` de ${senales.length}` : ''}
+          {titulo} · {pendientes} por atender{senales.length > pendientes ? ` de ${senales.length}` : ''}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -375,8 +381,8 @@ export function SenalesWeekly({
                           )}
                         </div>
                         {acordando === clave && (
-                          <AcuerdoDeSenal
-                            senal={s}
+                          <FormAcuerdo
+                            texto={s.titulo}
                             responsable={personaDeSenal(s, ownersDeTarea)}
                             usuarios={usuarios}
                             guardar={(f) => crearAcuerdo(s, f)}

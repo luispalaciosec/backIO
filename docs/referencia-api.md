@@ -536,6 +536,7 @@ Las tres señales del daily
 | `fecha_compromiso` | string | sí |  |
 | `mesa_id` | string (uuid) |  | admite null |
 | `requerimiento_id` | string (uuid) |  | admite null |
+| `proyecto_id` | string (uuid) |  | admite null |
 
 ### ResumenCliente
 
