@@ -1,11 +1,16 @@
 /**
  * Informe por canal (réplica del tablero "Gráfico TRADE…" de Monday): piezas y tareas por mes, por semana
  * y por canal, con estado, aprobación y prioridad. Un canal = un cliente. Se agrupan varios clientes por
- * `config.grupo` o por lista explícita de ids. Solo cuenta lo registrado en BackIO desde `desde`.
+ * `config.grupo` o por lista explícita de ids.
+ *
+ * Todo se cuenta por **fecha de entrega**, como en Monday y como lo lleva el equipo (pieza entregada = pieza del informe).
+ * Antes las barras iban por fecha de pedido (o de creación) y la línea semanal por el día en que se completó: el 6/11/2026
+ * Grace no podía cuadrar septiembre de CADENAS (el informe decía 604 piezas, ella 305) porque una tarea de 259 piezas sin
+ * fecha de pedido, creada el 14/09 y entregada el 15/10, caía en septiembre.
  */
 import type { DbCtx } from './db/client';
 import { getConfigTenantInformes, listClientesActivosConfig, listClientesCanal, listRequerimientosCanal } from './db/informes';
-import { diaLocal, lunesDe } from '@backio/shared';
+import { lunesDe } from '@backio/shared';
 
 export interface CanalSerie {
   cliente_id: string;
@@ -31,6 +36,8 @@ export interface InformeCanal {
   aprobacion: { aprobado: number; pendiente_cliente: number; pendiente_interno: number; otros: number };
   prioridad: { alta: number; media: number; baja: number };
   sin_piezas: number;
+  /** Tareas abiertas sin fecha de entrega: no entran a ningún mes. */
+  sin_fecha: { tareas: number; piezas: number };
 }
 
 const PALETA = ['#9BD24E', '#FF7F41', '#7E3FBF', '#1F77B4', '#F0B429', '#2CA58D', '#E4405F', '#5D6D7E'];
@@ -105,19 +112,15 @@ export async function informeCanal(
     estado_operativo: string;
     estado_aprobacion: string;
     prioridad: string;
-    fecha_pedido: string | null;
-    created_at: string;
-    completado_at: string | null;
+    fecha_entrega: string | null;
   };
   const filas = await listRequerimientosCanal<R>(ctx, o.clienteIds);
-  const fechaGen = (r: R) => r.fecha_pedido ?? diaLocal(r.created_at);
-  const enRango = filas.filter((r) => {
-    const f = fechaGen(r);
-    return f >= o.desde && f <= o.hasta;
-  });
+  const enRango = filas.filter((r) => !!r.fecha_entrega && r.fecha_entrega >= o.desde && r.fecha_entrega <= o.hasta);
+  // Lo abierto sin fecha queda fuera de todos los meses: se avisa. Lo cerrado sin fecha es historia importada y no se cuenta.
+  const sinFecha = filas.filter((r) => !r.fecha_entrega && r.estado_operativo !== 'completado');
   const piezasDe = (rs: R[]) => rs.reduce((s, r) => s + (Number(r.piezas) || 0), 0);
   const por_mes = mesesEntre(o.desde, o.hasta).map((mes) => {
-    const rs = enRango.filter((r) => fechaGen(r).slice(0, 7) === mes);
+    const rs = enRango.filter((r) => r.fecha_entrega!.slice(0, 7) === mes);
     const por_canal: Record<string, { piezas: number; tareas: number }> = {};
     for (const c of canales) {
       const rc = rs.filter((r) => r.cliente_id === c.cliente_id);
@@ -126,9 +129,8 @@ export async function informeCanal(
     const [y, m] = mes.split('-').map(Number);
     return { mes, etiqueta: `${MESES_L[m! - 1]} ${y}`, piezas: piezasDe(rs), tareas: rs.length, por_canal };
   });
-  const entregadas = filas.filter((r) => r.completado_at && diaLocal(r.completado_at) >= o.desde && diaLocal(r.completado_at) <= o.hasta);
   const por_semana = semanasEntre(o.desde, o.hasta).map((sem) => {
-    const rs = entregadas.filter((r) => lunesDe(diaLocal(r.completado_at as string)) === sem);
+    const rs = enRango.filter((r) => lunesDe(r.fecha_entrega!) === sem);
     const [, m, d] = sem.split('-').map(Number);
     return { semana: sem, etiqueta: `${d} ${MESES[m! - 1]}`, piezas: piezasDe(rs), tareas: rs.length };
   });
@@ -169,6 +171,7 @@ export async function informeCanal(
       baja: enRango.filter((r) => r.prioridad === 'baja').length,
     },
     sin_piezas: enRango.filter((r) => !r.piezas).length,
+    sin_fecha: { tareas: sinFecha.length, piezas: piezasDe(sinFecha) },
   };
 }
 

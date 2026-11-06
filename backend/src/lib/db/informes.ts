@@ -22,7 +22,7 @@ export async function listRequerimientosCanal<T>(ctx: DbCtx, clienteIds: string[
   return paginar<T>((from, to) =>
     ctx.db
       .from('requerimientos')
-      .select('cliente_id, piezas, estado_operativo, estado_aprobacion, prioridad, fecha_pedido, created_at, completado_at')
+      .select('cliente_id, piezas, estado_operativo, estado_aprobacion, prioridad, fecha_entrega')
       .eq('tenant_id', ctx.tenantId)
       .in('cliente_id', clienteIds)
       .is('deleted_at', null)

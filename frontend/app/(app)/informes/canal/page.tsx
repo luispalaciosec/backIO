@@ -26,6 +26,7 @@ interface Informe {
   aprobacion: { aprobado: number; pendiente_cliente: number; pendiente_interno: number; otros: number };
   prioridad: { alta: number; media: number; baja: number };
   sin_piezas: number;
+  sin_fecha?: { tareas: number; piezas: number };
 }
 interface Grupo {
   id: string;
@@ -104,7 +105,8 @@ export default function InformeCanalPage() {
         <div>
           <h1 className="text-2xl font-bold">Informe por canal</h1>
           <p className="text-sm text-gray-500">
-            Piezas y tareas por mes, semana y canal. Un canal = un cliente. Se calcula desde el campo <b>Piezas</b> del backlog.{' '}
+            Piezas y tareas por mes, semana y canal, según la <b>fecha de entrega</b>. Un canal = un cliente. Se calcula desde el campo{' '}
+            <b>Piezas</b> del backlog.{' '}
             <Link href="/informes" className="link-action">
               ← Informes mensuales
             </Link>
@@ -179,6 +181,15 @@ export default function InformeCanalPage() {
         <input className="input mt-2" placeholder="Título del informe" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
       </details>
       {error && <Alert tipo="error">{error}</Alert>}
+      {d && !!d.sin_fecha?.tareas && (
+        <div className="no-print">
+          <Alert tipo="warn">
+            {d.sin_fecha.tareas === 1 ? 'Una tarea no tiene' : `${d.sin_fecha.tareas} tareas no tienen`} fecha de entrega
+            {d.sin_fecha.piezas ? ` (${d.sin_fecha.piezas} piezas)` : ''}: no entran en ningún mes. Ponles fecha en el backlog o en
+            Basecamp.
+          </Alert>
+        </div>
+      )}
       {d && d.sin_piezas > 0 && (
         <div className="no-print">
           <Alert tipo="warn">
@@ -205,10 +216,10 @@ export default function InformeCanalPage() {
               <div className="text-4xl font-medium text-center py-3 text-gray-800">{d.totales.tareas}</div>
             </Tarjeta>
           </div>
-          <Tarjeta titulo="Conteo de Piezas y Tareas generadas por mes">
+          <Tarjeta titulo="Conteo de Piezas y Tareas por mes de entrega">
             <BarrasDobles datos={d.por_mes.map((m) => ({ etiqueta: m.etiqueta, a: m.piezas, b: m.tareas }))} a={PIEZAS} b={RECUENTO} />
           </Tarjeta>
-          <Tarjeta titulo="Cantidad de Piezas y Tareas entregadas por semana">
+          <Tarjeta titulo="Cantidad de Piezas y Tareas por semana de entrega">
             <Lineas datos={d.por_semana.map((s) => ({ etiqueta: s.etiqueta, a: s.piezas, b: s.tareas }))} a={PIEZAS} b={RECUENTO} />
           </Tarjeta>
           <div className="grid gap-3" style={{ gridTemplateColumns: '1.4fr 1.4fr 1fr' }}>
