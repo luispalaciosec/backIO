@@ -74,8 +74,8 @@ sido:
 | `concentracion_carga` | **Elías en 9 de 21 tareas (43%)** — señal más fuerte de la semana |
 | `arrastre_reincidente` | 7 pendientes trasladados con fecha "Próxima Weekly" |
 | `bloqueo_cliente` | 5 dependencias "Alto" sin responsable ni acción definida |
-| `compromiso_vencido` | Foligain: investigación comercial no entregada |
-| `cuenta_silenciosa` | Torres & Torres retrasado sin fecha definitiva |
+| `compromiso_vencido` | Un cliente: investigación comercial no entregada |
+| `cuenta_silenciosa` | Otro cliente retrasado sin fecha definitiva |
 
 Ninguna de estas fue tema explícito de agenda en el acta real. Todas estaban en la data.
 
@@ -138,7 +138,7 @@ hasta 63 días de atraso y mencionaba a la ejecutiva de la cuenta unas 40 veces.
 - **El selector de mesa** muestra a cada ejecutiva en qué mesa se producen sus cuentas.
 
 **Ejecutiva de otra mesa (29/10/2026).** El daily es de la mesa que produce. Si la ejecutiva de una cuenta lidera otra
-mesa (Grace con Torres & Torres, que produce Omega), entra solo al bloque de su cuenta cuando algo vence o está
+mesa (una cuenta que produce Omega y cuya ejecutiva lidera Orión), entra solo al bloque de su cuenta cuando algo vence o está
 bloqueado, y el mensaje publicado la menciona en esas tareas («Cuenta: @Grace»). Para seguir sus cuentas de todas las
 mesas usa «Mis cuentas» en el paso 1, que es solo de lectura. En el weekly, cada grupo de señales de un cliente
 muestra a su ejecutiva y se puede filtrar por «Cuentas de…». Ver [Clientes](./21-clientes.md).

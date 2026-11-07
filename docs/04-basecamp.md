@@ -303,8 +303,8 @@ cliente → ejecutiva → BackIO → Basecamp sigue siendo el preferido, pero de
   además de renombres, movimientos, responsables y eliminados. Sigue entrando solo el título (excepción D1).
   Recorre **todas** las listas activas del proyecto, con todas sus páginas, y salta las completadas (no tienen trabajo
   abierto; si se reabre un to-do, la lista vuelve a recorrerse). Hasta el 28/10/2026 se leía solo la primera página
-  (15 listas): Banco Amazonas tenía 49 y «Campaña Factoring», «Neo cuenta» y otras cuatro listas activas nunca
-  entraron, igual que «Proyecto Libro T&T» de Grupo Torres & Torres.
+  (15 listas): un cliente tenía 49, y seis de sus listas activas nunca entraron, igual que una lista activa de otro
+  cliente.
 - **Estado inicial de lo importado** (`filaDesdeTodo` en `backend/src/lib/basecamp/decisiones.ts`): `completado`
   si el to-do ya estaba completado, `priorizado` si tiene fecha y `backlog` si no la tiene. Los to-dos completados
   hace más de 60 días no se importan.

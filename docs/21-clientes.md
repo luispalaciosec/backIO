@@ -7,9 +7,8 @@
 | **Mesa** | El equipo de producción que ejecuta. El daily y el weekly son de la mesa | `clientes.mesa_id` (y el override `proyectos.mesa_id`) |
 | **Ejecutiva de cuenta** | La dueña de la relación con el cliente. Puede tener cuentas en varias mesas | `clientes.ejecutiva_id` (migración 37) |
 
-Un cliente se queda en la mesa que lo produce aunque su ejecutiva lidere otra. Grupo Torres & Torres lo produce
-Mesa Omega y lo lleva Grace Franco, que lidera Mesa Orión: Torres & Torres sigue en Omega y Grace es su
-ejecutiva.
+Un cliente se queda en la mesa que lo produce aunque su ejecutiva lidere otra: si Omega produce una cuenta y su ejecutiva
+lidera Orión, la cuenta sigue en Omega y ella sigue siendo su ejecutiva.
 
 - **Ejecutiva efectiva de un proyecto:**
   - es `proyectos.owner_ejecutiva` si está, y si no, la del cliente;

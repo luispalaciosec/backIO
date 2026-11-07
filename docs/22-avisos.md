@@ -91,7 +91,7 @@ De lunes a viernes a las 07:30, la tarea `salud_clientes` guarda el color de cad
 (migración 38). Es el mismo color de la ficha y del dashboard.
 
 - **Aviso:** si el color cambió respecto del último registrado, avisa a la ejecutiva de la cuenta y al líder de su mesa.
-  - Si empeora, el aviso dice por qué. Ejemplo: «Foligain pasó de verde a amarillo · Por qué: 2 tareas atrasadas».
+  - Si empeora, el aviso dice por qué. Ejemplo: «Cliente X pasó de verde a amarillo · Por qué: 2 tareas atrasadas».
   - Si mejora, también avisa.
 - **Primer día:** la primera foto solo sirve de base y no avisa.
 - **En la ficha:** el cliente muestra la tira de colores de sus últimos 30 días.
