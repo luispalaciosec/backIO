@@ -4,6 +4,7 @@ const e = vi.hoisted(() => ({
   registradas: new Set<string>(),
   ultimas: new Map<string, { job: string; inicio_at: string; fin_at: string | null; ok: boolean | null }>(),
   inicio: 0 as number | null,
+  primeras: new Map<string, number | null>(),
   reclamadas: new Set<string>(),
   notificar: vi.fn(),
 }));
@@ -12,6 +13,7 @@ vi.mock('../lib/db/cron_runs', () => ({
     new Set(pares.map((p) => `${p.job}|${p.ventana}`).filter((k) => e.registradas.has(k))),
   ultimasCorridas: async () => e.ultimas,
   inicioDelRegistro: async () => e.inicio,
+  primerasCorridas: async (jobs: string[]) => new Map(jobs.map((j) => [j, e.primeras.has(j) ? e.primeras.get(j)! : e.inicio])),
   tenantsActivos: async () => ['t1'],
   reclamarVentana: async (job: string, ventana: string) =>
     !e.reclamadas.has(`${job}|${ventana}`) && !!e.reclamadas.add(`${job}|${ventana}`),
@@ -37,6 +39,7 @@ beforeEach(() => {
   // Última corrida de reconcile a las 20:00 de Guayaquil: al día.
   e.ultimas = new Map([['reconcile', { job: 'reconcile', inicio_at: '2026-10-12T01:00:00Z', fin_at: null, ok: true }]]);
   e.inicio = ms('2026-10-01T00:00:00-05:00');
+  e.primeras = new Map();
   e.reclamadas = new Set();
   e.notificar.mockReset().mockResolvedValue(1);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -72,5 +75,22 @@ describe('vigía de jobs', () => {
       expect.objectContaining({ tipo: 'job_sin_correr', ruta: '/admin/servicios' }),
       { roles: ['admin'] },
     );
+  });
+
+  // 4/11/2026: los recordatorios del daily se desplegaron a las 09:50 y a las 10:00 llegó «no corrió» por el día anterior.
+  it('un job nuevo no se juzga por ventanas de antes de existir', async () => {
+    e.registradas.add('senales|2026-10-11');
+    const recordatorio: Job = { nombre: 'recordatorio', descripcion: 'Recordatorio', ventana: aLas(11, 30), ejecutar: async () => 0 };
+    e.primeras.set('recordatorio', null);
+    const ahora = ms('2026-10-12T10:00:00-05:00');
+    expect(await revisarJobs([senales, recordatorio], ahora, ms('2026-10-12T09:50:00-05:00'))).toEqual([]);
+    // Si el proceso ya estaba arriba y el job nunca corrió, sí se avisa.
+    expect(await revisarJobs([senales, recordatorio], ahora, ms('2026-10-10T09:00:00-05:00'))).toEqual([
+      expect.objectContaining({ job: 'recordatorio', clave: '2026-10-11' }),
+    ]);
+  });
+  it('un job que ya corría antes se sigue juzgando aunque el proceso se haya reiniciado', async () => {
+    const ahora = ms('2026-10-11T20:30:00-05:00');
+    expect(await revisarJobs(jobs, ahora, ms('2026-10-11T20:25:00-05:00'))).toEqual([expect.objectContaining({ job: 'senales' })]);
   });
 });

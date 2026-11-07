@@ -45,7 +45,8 @@ minuto. Cada corrida queda en `cron_runs`. Las de hora fija se recuperan si un d
 
 Si una tarea de hora fija no corrió en su ventana, o una periódica lleva tres intervalos sin correr, el vigía registra
 un error en Sentry y manda un correo a las personas admin, con enlace a Admin → Servicios. Avisa **una sola vez por
-problema**. No vuelve a avisar una corrida que terminó con errores: ese error ya quedó registrado cuando ocurrió.
+problema**. No vuelve a avisar una corrida que terminó con errores: ese error ya quedó registrado cuando ocurrió. Cada tarea se juzga desde su primera corrida, y una tarea nueva, desde que se desplegó: así una tarea recién
+agregada no se avisa como perdida por un horario anterior a que existiera.
 
 ### Lo que el vigía no ve
 

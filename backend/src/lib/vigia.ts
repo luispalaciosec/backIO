@@ -9,7 +9,7 @@
 import { fechaDMA } from '@backio/shared';
 import type { Job } from './jobs';
 import { momentoLocal } from './jobs';
-import { inicioDelRegistro, reclamarVentana, tenantsActivos, ultimasCorridas, ventanasRegistradas } from './db/cron_runs';
+import { inicioDelRegistro, primerasCorridas, reclamarVentana, tenantsActivos, ultimasCorridas, ventanasRegistradas } from './db/cron_runs';
 import { notificar } from './notificaciones';
 import { log } from './logger';
 
@@ -59,11 +59,21 @@ export function ventanasCerradas(jobs: Job[], ahoraMs: number, desdeMs = ahoraMs
   return [...cerradas.values()];
 }
 
-/** Lo que hoy está mal, sin avisar todavía. */
-export async function revisarJobs(jobs: Job[], ahoraMs: number): Promise<Problema[]> {
+/** Cuándo arrancó este proceso: el código de un job nuevo no existía antes del despliegue. */
+const INICIO_PROCESO = Date.now();
+
+/**
+ * Lo que hoy está mal, sin avisar todavía. Cada job se juzga desde su primera corrida; uno que nunca corrió, desde que arrancó
+ * el proceso. Antes se juzgaba desde la primera corrida de cualquier job, y el 4/11/2026 los recordatorios del daily, recién
+ * desplegados, se avisaron como «no corrió» por la ventana del día anterior, cuando todavía no existían.
+ */
+export async function revisarJobs(jobs: Job[], ahoraMs: number, inicioProceso = INICIO_PROCESO): Promise<Problema[]> {
   const problemas: Problema[] = [];
   const inicio = await inicioDelRegistro();
-  const cerradas = ventanasCerradas(jobs, ahoraMs, Math.max(ahoraMs - ALCANCE_MS, inicio ?? ahoraMs));
+  const desdeGlobal = Math.max(ahoraMs - ALCANCE_MS, inicio ?? ahoraMs);
+  const fijos = jobs.filter((j) => deHoraFija(j) && habilitado(j));
+  const primeras = await primerasCorridas(fijos.map((j) => j.nombre));
+  const cerradas = fijos.flatMap((j) => ventanasCerradas([j], ahoraMs, Math.max(desdeGlobal, primeras.get(j.nombre) ?? inicioProceso)));
   const registradas = await ventanasRegistradas(cerradas.map((c) => ({ job: c.job.nombre, ventana: c.ventana })));
   for (const c of cerradas)
     if (!registradas.has(`${c.job.nombre}|${c.ventana}`))

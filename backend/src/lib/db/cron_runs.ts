@@ -83,6 +83,19 @@ export async function ultimasCorridas(): Promise<Map<string, UltimaCorrida>> {
   return out;
 }
 
+/** Primera corrida registrada de cada job (null si nunca corrió). */
+export async function primerasCorridas(jobs: string[]): Promise<Map<string, number | null>> {
+  const db = serviceClient();
+  const pares = await Promise.all(
+    jobs.map(async (job) => {
+      const { data, error } = await db.from('cron_runs').select('inicio_at').eq('job', job).order('inicio_at').limit(1).maybeSingle();
+      throwIf(error);
+      return [job, data ? Date.parse(data.inicio_at) : null] as const;
+    }),
+  );
+  return new Map(pares);
+}
+
 /** Inicio del registro: la corrida más antigua en cron_runs (antes de eso no hay con qué comparar). */
 export async function inicioDelRegistro(): Promise<number | null> {
   const { data, error } = await serviceClient().from('cron_runs').select('inicio_at').order('inicio_at').limit(1).maybeSingle();
