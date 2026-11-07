@@ -284,7 +284,7 @@ señales se escapan en el markdown, así que un `|` o un `_` en un título ya no
 - **Con `?mesa=`, todo es de esa mesa** (19/10/2026): tareas, números, **señales** y **acuerdos**. Las señales se
   calculan con los clientes y proyectos de la mesa (`senalesDeMesa`), respetando las que ya se marcaron como atendidas;
   los acuerdos son los acordados en el weekly de esa mesa (`acuerdos.mesa_id`, migración 35; antes se adivinaba por las tareas del responsable y quien trabajaba en dos mesas veía su acuerdo en las dos actas). Antes las señales y los acuerdos eran los
-  de toda la agencia: en el cierre de Omega de la semana 42 aparecieron AB-Inbev (Orión) y Acme (prueba).
+  de toda la agencia: en el cierre de Omega de la semana 42 aparecieron cuentas de Orión y el cliente de prueba.
 - En el acta, el **resultado** y el **arrastre** no cuentan las tareas canceladas (no pasan a la semana siguiente).
 - Los **clientes de prueba** (`clientes.es_prueba`, migración 34; hoy Acme EC S.A.S, el del sandbox de Basecamp) no
   generan señales ni cuentan en actas, dashboard, personas ni KPIs. Siguen en el backlog para poder probar.

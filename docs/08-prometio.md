@@ -144,14 +144,13 @@ PrometIO no cubre, como un cliente con un proyecto de Basecamp por rama. Ese cli
 después PrometIO envía la empresa, se enlaza por nombre desde Admin.
 
 **Empresa con varios fees** (migración 36, aplicada el 4/11/2026). En PrometIO una empresa puede ser una sola, aunque en
-BackIO y Basecamp su trabajo se lleve en varios clientes, uno por fee. Es el caso de Cervecería Nacional C.N., dueña
-de los 7 fees «AB-Inbev ||…» de la mesa Orión. Cada fee tiene `empresa_id` apuntando a la empresa. Al usar una
+BackIO y Basecamp su trabajo se lleve en varios clientes, uno por fee o por marca. Cada fee tiene `empresa_id` apuntando a
+la empresa. Al usar una
 cotización ganada de esa empresa en el Builder, el cliente se elige entre sus fees. El aviso de la cotización le llega
 a la ejecutiva de la empresa y a operaciones.
 
 **Duplicados.** Si PrometIO tiene la misma empresa dos veces, se unifica allá (PrometIO vuelve a crear o activar el
-cliente con el mismo id). En BackIO se desactiva el que sobra: «Cervecería Nacional»
-(queda «Cervecería Nacional C.N.») y «Torres & Torres» (queda «Grupo Torres & Torres»).
+cliente con el mismo id). En BackIO se desactiva el que sobra, si no tiene tareas, proyectos ni horas.
 
 Campos que BackIO agrega y PrometIO no conoce:
 - `empresa_id` (empresa dueña de un fee)
