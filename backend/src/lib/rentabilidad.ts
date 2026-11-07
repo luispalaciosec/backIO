@@ -3,8 +3,11 @@
  *
  * Margen del mes = fee mensual del cliente − su costo. El costo es el sueldo de cada persona repartido entre sus clientes
  * según las horas que registró ese mes en el timesheet. No es horas × costo por hora: el timesheet recoge ~13 h de las
- * 40 h de la semana, y así quedaban fuera dos tercios de los sueldos (revisión del 30/10/2026). Los sueldos de quien no
- * registró horas en el mes no se pueden repartir y se muestran aparte.
+ * 40 h de la semana, y así quedaban fuera dos tercios de los sueldos (revisión del 30/10/2026).
+ *
+ * Las ejecutivas no registran horas: su sueldo se reparte entre sus cuentas (`clientes.ejecutiva_id`) según el fee de cada
+ * una. Antes quedaba sin repartir y sus cuentas parecían más rentables de lo que son (Luis, 7/11/2026). Los sueldos de quien
+ * no registró horas ni lleva cuentas (gerencia, administración) no se pueden repartir y se muestran aparte.
  */
 import type { CostoPersonal, FeeCliente, RentabilidadCliente, RentabilidadMes, Usuario } from '@backio/shared';
 import { nombrePersona } from '@backio/shared';
@@ -34,7 +37,7 @@ export function calcularRentabilidad(e: {
   fees: Pick<FeeCliente, 'cliente_id' | 'fee_mensual' | 'desde'>[];
   horas: { cliente_id: string | null; usuario_id: string | null; horas: number }[];
   usuarios: Pick<Usuario, 'id' | 'nombre' | 'activo' | 'fecha_salida'>[];
-  clientes: { id: string; nombre: string; empresa_id?: string | null }[];
+  clientes: { id: string; nombre: string; empresa_id?: string | null; ejecutiva_id?: string | null; activo?: boolean }[];
   /** Clientes que no cuentan (de prueba). */
   excluir?: Set<string>;
 }): RentabilidadMes {
@@ -104,7 +107,29 @@ export function calcularRentabilidad(e: {
     }
     const sueldo = Number(costo.sueldo_mensual);
     if (total <= 0) {
-      sinRepartir.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), sueldo });
+      // Sin horas: si es ejecutiva de alguna cuenta, su sueldo va a sus cuentas según el fee de cada una (sin fees, en partes
+      // iguales). Una marca sin fee propio no recibe parte: su empresa ya cobra por ella.
+      const cuentas = e.clientes.filter((c) => c.ejecutiva_id === usuarioId && c.activo !== false && !e.excluir?.has(c.id));
+      const pesos = cuentas.map((c) => {
+        const f = vigente(
+          e.fees.filter((x) => x.cliente_id === c.id),
+          hasta,
+        );
+        return { id: c.id, peso: f ? Number(f.fee_mensual) : 0 };
+      });
+      const suma = pesos.reduce((s, x) => s + x.peso, 0);
+      const repartir = suma > 0 ? pesos.filter((x) => x.peso > 0) : pesos.map((x) => ({ ...x, peso: 1 }));
+      const base = suma > 0 ? suma : repartir.length;
+      if (!repartir.length) {
+        sinRepartir.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), sueldo });
+        continue;
+      }
+      for (const x of repartir) {
+        const parte = (sueldo * x.peso) / base;
+        const c = fila(x.id);
+        c.costo += parte;
+        c.personas.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), horas: 0, costo: r2(parte), reparto: 'cuenta' });
+      }
       continue;
     }
     for (const [clienteId, h] of horas!) {

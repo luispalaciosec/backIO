@@ -18,7 +18,7 @@ const sumarMeses = (mes: string, n: number) => {
 const quien = (personas: RentabilidadMes['clientes'][number]['personas']) =>
   personas
     .slice(0, 3)
-    .map((p) => `${p.nombre.split(' ')[0]} ${Math.round(p.horas)} h`)
+    .map((p) => (p.reparto === 'cuenta' ? `${p.nombre.split(' ')[0]} (ejecutiva)` : `${p.nombre.split(' ')[0]} ${Math.round(p.horas)} h`))
     .join(' · ') + (personas.length > 3 ? ` y ${personas.length - 3} más` : '');
 
 /** Rentabilidad por cliente (docs/21): solo gerencia y admin. */
@@ -38,7 +38,8 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
         <div>
           <h1 className="text-2xl font-bold">Rentabilidad · {nombreMes(mes)}</h1>
           <p className="text-sm text-gray-500">
-            Fee del cliente menos el sueldo de cada persona repartido según las horas que registró en ese cliente durante el mes.
+            Fee del cliente menos el sueldo de cada persona repartido según las horas que registró en ese cliente durante el mes. El sueldo
+            de cada ejecutiva se reparte entre sus cuentas según el fee de cada una.
           </p>
         </div>
         <nav className="flex items-center gap-2 text-sm">
@@ -76,8 +77,8 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
           <div className="font-semibold">Lo que este cálculo no cubre</div>
           {r.sin_repartir.total > 0 && (
             <p>
-              <b>{dinero(r.sin_repartir.total)}</b> de sueldos sin horas registradas en el mes, que no se pueden repartir entre clientes:{' '}
-              {r.sin_repartir.personas.map((p) => p.nombre).join(', ')}.
+              <b>{dinero(r.sin_repartir.total)}</b> de sueldos de personas sin horas registradas en el mes y sin cuentas a su cargo, que no
+              se pueden repartir entre clientes: {r.sin_repartir.personas.map((p) => p.nombre).join(', ')}.
             </p>
           )}
           {r.sin_sueldo.length > 0 && (

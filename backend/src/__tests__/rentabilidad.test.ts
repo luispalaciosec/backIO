@@ -131,6 +131,69 @@ describe('empresa con varios fees', () => {
   });
 });
 
+// 7/11/2026: el sueldo de las ejecutivas quedaba «sin repartir» porque no registran horas.
+describe('sueldo de las ejecutivas', () => {
+  const base = {
+    mes: '2026-10',
+    horas: [{ cliente_id: 'a', usuario_id: 'beto', horas: 10 }],
+    usuarios: [...usuarios, { id: 'caro', nombre: 'Carolina', activo: true }],
+  };
+  it('se reparte entre sus cuentas según el fee de cada una', () => {
+    const r = calcularRentabilidad({
+      ...base,
+      costos: [
+        { usuario_id: 'caro', sueldo_mensual: 1000, desde: '2026-01-01' },
+        { usuario_id: 'beto', sueldo_mensual: 500, desde: '2026-01-01' },
+      ],
+      fees: [
+        { cliente_id: 'a', fee_mensual: 3000, desde: '2026-01-01' },
+        { cliente_id: 'b', fee_mensual: 1000, desde: '2026-01-01' },
+      ],
+      clientes: [
+        { id: 'a', nombre: 'A', ejecutiva_id: 'caro' },
+        { id: 'b', nombre: 'B', ejecutiva_id: 'caro' },
+        { id: 'z', nombre: 'Inactiva', ejecutiva_id: 'caro', activo: false },
+      ],
+    });
+    const a = r.clientes.find((c) => c.cliente_id === 'a')!;
+    expect(a.costo).toBe(750 + 500);
+    expect(a.personas.find((p) => p.usuario_id === 'caro')).toMatchObject({ costo: 750, horas: 0, reparto: 'cuenta' });
+    expect(r.clientes.find((c) => c.cliente_id === 'b')!.costo).toBe(250);
+    expect(r.sin_repartir.personas).toEqual([]);
+    expect(r.totales.costo).toBe(1500);
+  });
+  it('una marca sin fee no recibe parte: va a la empresa que cobra por ella', () => {
+    const r = calcularRentabilidad({
+      ...base,
+      horas: [],
+      costos: [{ usuario_id: 'caro', sueldo_mensual: 900, desde: '2026-01-01' }],
+      fees: [{ cliente_id: 'cn', fee_mensual: 10000, desde: '2026-01-01' }],
+      clientes: [
+        { id: 'cn', nombre: 'Empresa', ejecutiva_id: 'caro' },
+        { id: 'm1', nombre: 'Marca', ejecutiva_id: 'caro', empresa_id: 'cn' },
+      ],
+    });
+    expect(r.clientes.map((c) => [c.cliente_id, c.costo])).toEqual([['cn', 900]]);
+  });
+  it('sin fees cargados, en partes iguales; sin cuentas, queda sin repartir', () => {
+    const r = calcularRentabilidad({
+      ...base,
+      horas: [],
+      costos: [
+        { usuario_id: 'caro', sueldo_mensual: 600, desde: '2026-01-01' },
+        { usuario_id: 'ana', sueldo_mensual: 400, desde: '2026-01-01' },
+      ],
+      fees: [],
+      clientes: [
+        { id: 'a', nombre: 'A', ejecutiva_id: 'caro' },
+        { id: 'b', nombre: 'B', ejecutiva_id: 'caro' },
+      ],
+    });
+    expect(r.clientes.map((c) => c.costo)).toEqual([300, 300]);
+    expect(r.sin_repartir.personas.map((p) => p.usuario_id)).toEqual(['ana']);
+  });
+});
+
 describe('Permisos de rentabilidad, sueldos y fees', () => {
   const app = (auth: Partial<AuthInfo>) => {
     const a = new Hono();

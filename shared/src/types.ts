@@ -764,7 +764,8 @@ export interface RentabilidadCliente {
   margen_pct: number | null;
   horas: number;
   /** Costo por persona en este cliente. */
-  personas: { usuario_id: string; nombre: string; horas: number; costo: number }[];
+  /** `cuenta`: sueldo de la ejecutiva repartido entre sus cuentas por el tamaño de su fee, no por horas. */
+  personas: { usuario_id: string; nombre: string; horas: number; costo: number; reparto?: 'cuenta' }[];
   /**
    * Si es una empresa con varios fees (`clientes.empresa_id`, migración 36): sus marcas, con su costo y sus horas. La fila de
    * la empresa ya las suma; el margen se calcula una sola vez, porque el fee es uno solo por todas.
