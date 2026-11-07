@@ -4,7 +4,7 @@ import { hoyLocal } from '@backio/shared';
 import { zValidator } from '../../lib/validacion';
 import { requireScope, ctxOf } from '../../lib/auth/middleware';
 import { esGerenciaOAdmin } from '../../lib/auth/roles';
-import { rentabilidadMes } from '../../lib/rentabilidad';
+import { buscarCliente, rentabilidadMes } from '../../lib/rentabilidad';
 import { guardarCostoPersonal, guardarFeeCliente, listCostosPersonal, listFeesCliente } from '../../lib/db/costos';
 import { clienteEsDelTenant, usuarioDelTenant } from '../../lib/db/admin';
 import { audit } from '../../lib/db/audit';
@@ -46,7 +46,7 @@ rentabilidad.get('/rentabilidad/clientes/:id', requireScope('read:proyectos'), a
   const items = await Promise.all(
     meses.map(async (mes) => {
       const r = await rentabilidadMes(ctx, mes);
-      const x = r.clientes.find((y) => y.cliente_id === id);
+      const x = buscarCliente(r, id);
       return {
         mes,
         fee: x?.fee ?? null,

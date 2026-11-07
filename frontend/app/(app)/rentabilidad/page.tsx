@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Fragment } from 'react';
 import type { RentabilidadMes } from '@backio/shared';
 import { hoyLocal } from '@backio/shared';
 import { apiServer } from '@/lib/api.server';
@@ -13,6 +14,12 @@ const sumarMeses = (mes: string, n: number) => {
   const [a, m] = mes.split('-').map(Number) as [number, number];
   return new Date(Date.UTC(a, m - 1 + n, 1)).toISOString().slice(0, 7);
 };
+
+const quien = (personas: RentabilidadMes['clientes'][number]['personas']) =>
+  personas
+    .slice(0, 3)
+    .map((p) => `${p.nombre.split(' ')[0]} ${Math.round(p.horas)} h`)
+    .join(' · ') + (personas.length > 3 ? ` y ${personas.length - 3} más` : '');
 
 /** Rentabilidad por cliente (docs/21): solo gerencia y admin. */
 export default async function RentabilidadPage({ searchParams: spP }: { searchParams: Promise<{ mes?: string }> }) {
@@ -99,29 +106,44 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
           </thead>
           <tbody>
             {r.clientes.map((c) => (
-              <tr key={c.cliente_id}>
-                <td className="td">
-                  <Link href={`/clientes/${c.cliente_id}`} className="hover:underline">
-                    {c.cliente}
-                  </Link>
-                </td>
-                <td className="td text-right tabular-nums">{dinero(c.fee)}</td>
-                <td className="td text-right tabular-nums">{dinero(c.costo)}</td>
-                <td className={`td text-right tabular-nums font-semibold ${c.margen !== null && c.margen < 0 ? 'text-red-600' : ''}`}>
-                  {dinero(c.margen)}
-                </td>
-                <td className={`td text-right tabular-nums ${c.margen_pct !== null && c.margen_pct < 20 ? 'text-amber-700' : ''}`}>
-                  {c.margen_pct === null ? '—' : `${c.margen_pct} %`}
-                </td>
-                <td className="td text-right tabular-nums">{Math.round(c.horas)}</td>
-                <td className="td text-xs text-gray-500">
-                  {c.personas
-                    .slice(0, 3)
-                    .map((p) => `${p.nombre.split(' ')[0]} ${Math.round(p.horas)} h`)
-                    .join(' · ')}
-                  {c.personas.length > 3 ? ` y ${c.personas.length - 3} más` : ''}
-                </td>
-              </tr>
+              <Fragment key={c.cliente_id}>
+                <tr>
+                  <td className="td">
+                    <Link href={`/clientes/${c.cliente_id}`} className="hover:underline">
+                      {c.cliente}
+                    </Link>
+                    {c.marcas?.length ? (
+                      <span className="block text-xs text-gray-500">Un fee por {c.marcas.length} marcas: el margen es de todas juntas</span>
+                    ) : null}
+                  </td>
+                  <td className="td text-right tabular-nums">{dinero(c.fee)}</td>
+                  <td className="td text-right tabular-nums">{dinero(c.costo)}</td>
+                  <td className={`td text-right tabular-nums font-semibold ${c.margen !== null && c.margen < 0 ? 'text-red-600' : ''}`}>
+                    {dinero(c.margen)}
+                  </td>
+                  <td className={`td text-right tabular-nums ${c.margen_pct !== null && c.margen_pct < 20 ? 'text-amber-700' : ''}`}>
+                    {c.margen_pct === null ? '—' : `${c.margen_pct} %`}
+                  </td>
+                  <td className="td text-right tabular-nums">{Math.round(c.horas)}</td>
+                  <td className="td text-xs text-gray-500">{quien(c.personas)}</td>
+                </tr>
+                {/* Las marcas, debajo de su empresa: cuánto cuesta y cuánto trabajo se lleva cada una. */}
+                {c.marcas?.map((m) => (
+                  <tr key={m.cliente_id} className="text-sm text-gray-600">
+                    <td className="td pl-8">
+                      <Link href={`/clientes/${m.cliente_id}`} className="hover:underline">
+                        {m.cliente}
+                      </Link>
+                    </td>
+                    <td className="td text-right text-gray-400">incluido</td>
+                    <td className="td text-right tabular-nums">{dinero(m.costo)}</td>
+                    <td className="td text-right text-gray-400">—</td>
+                    <td className="td text-right text-gray-400">—</td>
+                    <td className="td text-right tabular-nums">{Math.round(m.horas)}</td>
+                    <td className="td text-xs text-gray-500">{quien(m.personas)}</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
             {r.clientes.length === 0 && (
               <tr>

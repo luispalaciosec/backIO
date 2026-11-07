@@ -166,6 +166,10 @@ tercios de los sueldos.
 
 Quien salió antes del mes ya no cuesta. Los clientes de prueba no cuentan.
 
+**Empresa con varios fees** (`empresa_id`, migración 36): si la empresa paga un solo fee por varias marcas, sale como una
+sola fila, con su fee una vez y el costo y las horas de todas sus marcas; debajo va cada marca con su costo y sus horas.
+El margen se calcula una sola vez, para todas juntas (desde el 7/11/2026).
+
 **Dónde se ve:** `/rentabilidad` (mes por cliente) y la sección «Rentabilidad» de la ficha (últimos 6 meses), solo
 para esos roles. Rutas: `GET /rentabilidad`, `GET /rentabilidad/clientes/:id`, `GET /costos`,
 `PUT /costos/sueldos` y `PUT /costos/fees`. El cálculo está en `backend/src/lib/rentabilidad.ts`.

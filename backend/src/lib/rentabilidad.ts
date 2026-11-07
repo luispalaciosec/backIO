@@ -34,7 +34,7 @@ export function calcularRentabilidad(e: {
   fees: Pick<FeeCliente, 'cliente_id' | 'fee_mensual' | 'desde'>[];
   horas: { cliente_id: string | null; usuario_id: string | null; horas: number }[];
   usuarios: Pick<Usuario, 'id' | 'nombre' | 'activo' | 'fecha_salida'>[];
-  clientes: { id: string; nombre: string }[];
+  clientes: { id: string; nombre: string; empresa_id?: string | null }[];
   /** Clientes que no cuentan (de prueba). */
   excluir?: Set<string>;
 }): RentabilidadMes {
@@ -118,19 +118,43 @@ export function calcularRentabilidad(e: {
   // Clientes con fee y sin horas en el mes también van: todo su fee es margen.
   for (const f of e.fees) if (!e.excluir?.has(f.cliente_id) && vigente([f], hasta)) fila(f.cliente_id);
 
+  const cerrar = (c: RentabilidadCliente): RentabilidadCliente => {
+    const costo = r2(c.costo);
+    const margen = c.fee === null ? null : r2(c.fee - costo);
+    return {
+      ...c,
+      costo,
+      horas: r2(c.horas),
+      margen,
+      margen_pct: c.fee && margen !== null ? Math.round((margen / c.fee) * 100) : null,
+      personas: c.personas.sort((a, b) => b.costo - a.costo),
+    };
+  };
+  // Empresa con varios fees (Cervecería Nacional C.N. y sus 7 marcas de AB-Inbev): una sola fila con el fee de la empresa y
+  // el costo y las horas de todas. Antes la empresa salía con 100 % de margen y las marcas con costo y sin fee.
+  const empresaDe = new Map(e.clientes.filter((c) => c.empresa_id).map((c) => [c.id, c.empresa_id!]));
+  const marcasDe = new Map<string, RentabilidadCliente[]>();
+  for (const c of porCliente.values()) {
+    const emp = empresaDe.get(c.cliente_id);
+    if (emp) marcasDe.set(emp, [...(marcasDe.get(emp) ?? []), c]);
+  }
+  for (const [emp, marcas] of marcasDe) {
+    const p = fila(emp);
+    const personas = new Map<string, RentabilidadCliente['personas'][number]>();
+    for (const x of [...p.personas, ...marcas.flatMap((m) => m.personas)]) {
+      const y = personas.get(x.usuario_id);
+      personas.set(x.usuario_id, y ? { ...y, horas: r2(y.horas + x.horas), costo: r2(y.costo + x.costo) } : { ...x });
+    }
+    const fees = [p.fee, ...marcas.map((m) => m.fee)].filter((f): f is number => f !== null);
+    p.fee = fees.length ? fees.reduce((s, f) => s + f, 0) : null;
+    p.costo += marcas.reduce((s, m) => s + m.costo, 0);
+    p.horas += marcas.reduce((s, m) => s + m.horas, 0);
+    p.personas = [...personas.values()];
+    p.marcas = marcas.map(cerrar).sort((a, b) => b.costo - a.costo);
+    for (const m of marcas) porCliente.delete(m.cliente_id);
+  }
   const clientes = [...porCliente.values()]
-    .map((c) => {
-      const costo = r2(c.costo);
-      const margen = c.fee === null ? null : r2(c.fee - costo);
-      return {
-        ...c,
-        costo,
-        horas: r2(c.horas),
-        margen,
-        margen_pct: c.fee && margen !== null ? Math.round((margen / c.fee) * 100) : null,
-        personas: c.personas.sort((a, b) => b.costo - a.costo),
-      };
-    })
+    .map(cerrar)
     .filter((c) => c.fee !== null || c.costo > 0 || c.horas > 0)
     .sort((a, b) => (a.margen ?? Infinity) - (b.margen ?? Infinity) || b.costo - a.costo);
 
@@ -144,6 +168,11 @@ export function calcularRentabilidad(e: {
     horas_sin_costo: r2(horasSinCosto),
     sin_sueldo: sinSueldo.sort((a, b) => b.horas - a.horas),
   };
+}
+
+/** Un cliente del mes, esté arriba o dentro de su empresa (una marca de C.N.). */
+export function buscarCliente(r: RentabilidadMes, id: string): RentabilidadCliente | undefined {
+  return r.clientes.find((c) => c.cliente_id === id) ?? r.clientes.flatMap((c) => c.marcas ?? []).find((c) => c.cliente_id === id);
 }
 
 /** Rentabilidad del mes con el cliente de la persona: la RLS de la migración 41 vuelve a exigir gerencia o admin. */

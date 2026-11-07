@@ -16,7 +16,7 @@ vi.mock('../lib/db/costos', () => ({
   guardarFeeCliente: vi.fn(),
 }));
 
-const { calcularRentabilidad, vigente } = await import('../lib/rentabilidad');
+const { buscarCliente, calcularRentabilidad, vigente } = await import('../lib/rentabilidad');
 const { rentabilidad } = await import('../routes/v1/rentabilidad');
 
 const usuarios = [
@@ -87,6 +87,47 @@ describe('Rentabilidad por cliente', () => {
     ];
     expect(vigente(filas, '2026-10-31')?.v).toBe(2);
     expect(vigente(filas, '2025-12-31')).toBeUndefined();
+  });
+});
+
+// 6/11/2026: C.N. salía con 100 % de margen ($10.450 sin costo) y sus 7 marcas con costo y sin fee.
+describe('empresa con varios fees', () => {
+  const r = calcularRentabilidad({
+    mes: '2026-10',
+    costos: [
+      { usuario_id: 'ana', sueldo_mensual: 1000, desde: '2026-01-01' },
+      { usuario_id: 'beto', sueldo_mensual: 900, desde: '2026-01-01' },
+    ],
+    fees: [{ cliente_id: 'cn', fee_mensual: 10450, desde: '2026-01-01' }],
+    horas: [
+      { cliente_id: 'on', usuario_id: 'ana', horas: 30 },
+      { cliente_id: 'off', usuario_id: 'ana', horas: 10 },
+      { cliente_id: 'off', usuario_id: 'beto', horas: 20 },
+      { cliente_id: 'tyt', usuario_id: 'beto', horas: 20 },
+    ],
+    usuarios,
+    clientes: [
+      { id: 'cn', nombre: 'Cervecería Nacional C.N.' },
+      { id: 'on', nombre: 'TRADE: ON', empresa_id: 'cn' },
+      { id: 'off', nombre: 'TRADE: OFF', empresa_id: 'cn' },
+      { id: 'tyt', nombre: 'Torres' },
+    ],
+  });
+  it('una sola fila con el fee de la empresa y el costo y las horas de sus marcas', () => {
+    const cn = r.clientes.find((c) => c.cliente_id === 'cn')!;
+    expect(cn).toMatchObject({ fee: 10450, costo: 1450, horas: 60, margen: 9000, margen_pct: 86 });
+    expect(cn.marcas!.map((m) => [m.cliente, m.costo, m.fee])).toEqual([
+      ['TRADE: ON', 750, null],
+      ['TRADE: OFF', 700, null],
+    ]);
+    expect(cn.personas.find((p) => p.usuario_id === 'ana')).toMatchObject({ horas: 40, costo: 1000 });
+  });
+  it('las marcas no salen sueltas y los totales no cambian', () => {
+    expect(r.clientes.map((c) => c.cliente_id).sort()).toEqual(['cn', 'tyt']);
+    expect(r.totales).toEqual({ fee: 10450, costo: 1900, margen: 8550 });
+  });
+  it('la ficha de una marca la encuentra dentro de su empresa', () => {
+    expect(buscarCliente(r, 'off')?.costo).toBe(700);
   });
 });
 
