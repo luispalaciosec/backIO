@@ -2,14 +2,15 @@
  * Consultas del middleware de autenticación (lib/auth/middleware). Reciben el cliente explícito porque cada vía usa
  * el suyo: service role para API keys y OAuth, cliente con el JWT del usuario (RLS) para la sesión de la UI.
  */
-import { serviceClient, type Db } from './client';
+import { lanzarSiBaseCaida, serviceClient, type Db } from './client';
 
 export async function getApiKeyPorHash(db: Db, keyHash: string) {
-  const { data } = await db
+  const { data, error, status } = await db
     .from('api_keys')
     .select('id, tenant_id, nombre, scopes, perfil, cliente_id, revocada_at')
     .eq('key_hash', keyHash)
     .maybeSingle();
+  lanzarSiBaseCaida(error, status);
   return data;
 }
 
@@ -28,13 +29,20 @@ export function registrarUsoApiKey(db: Db, apiKeyId: string): void {
 
 /** Usuario de la sesión de la UI (con el cliente del JWT: RLS aplica). */
 export async function getUsuarioSesion(db: Db, usuarioId: string) {
-  const { data } = await db.from('usuarios').select('tenant_id, rol, nombre, activo').eq('id', usuarioId).maybeSingle();
+  const { data, error, status } = await db.from('usuarios').select('tenant_id, rol, nombre, activo').eq('id', usuarioId).maybeSingle();
+  lanzarSiBaseCaida(error, status);
   return data;
 }
 
 /** Usuario dueño de un token OAuth, dentro de su tenant. */
 export async function getUsuarioOAuth(db: Db, usuarioId: string, tenantId: string) {
-  const { data } = await db.from('usuarios').select('rol, nombre, activo').eq('id', usuarioId).eq('tenant_id', tenantId).maybeSingle();
+  const { data, error, status } = await db
+    .from('usuarios')
+    .select('rol, nombre, activo')
+    .eq('id', usuarioId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  lanzarSiBaseCaida(error, status);
   return data;
 }
 

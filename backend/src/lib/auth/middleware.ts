@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Rol } from '@backio/shared';
 import { ROLES_INTERNOS_GESTION } from '@backio/shared';
-import { serviceClient, userClient, type DbCtx } from '../db/client';
+import { lanzarSiBaseCaida, serviceClient, userClient, type DbCtx } from '../db/client';
 import { getApiKeyPorHash, getUsuarioOAuth, getUsuarioSesion, registrarUsoApiKey } from '../db/auth';
 import { resolverAccessToken } from '../oauth';
 
@@ -63,6 +63,8 @@ async function resolveApiKey(key: string): Promise<AuthInfo | null> {
 async function resolveJwt(jwt: string): Promise<AuthInfo | null> {
   const db = userClient(jwt);
   const { data: auth, error } = await db.auth.getUser(jwt);
+  // Si Auth no llega a la base, la sesión puede estar bien: decir «credenciales inválidas» confundió el 9/11/2026.
+  lanzarSiBaseCaida(error);
   if (error || !auth.user) return null;
   const u = await getUsuarioSesion(db, auth.user.id);
   if (!u) return null;

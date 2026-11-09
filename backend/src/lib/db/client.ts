@@ -54,9 +54,33 @@ export class DbError extends Error {
   }
 }
 
+/** La base no responde: es del servidor y pasajero, no de quien hace la petición. */
+export class BaseNoDisponible extends DbError {
+  readonly codigo = 'base_no_disponible';
+  constructor(detalle?: unknown) {
+    super('La base de datos no está respondiendo. Intenta de nuevo en unos minutos.', 503, detalle);
+  }
+}
+
+/** ¿Este error dice que la base no responde? PGRST000 a PGRST003: PostgREST no consigue conexión con Postgres. */
+export function esFallaDeBase(error: { message?: string; code?: string; status?: number } | null | undefined, status?: number): boolean {
+  if (!error) return false;
+  return (
+    /^PGRST00[0-3]$/.test(error.code ?? '') ||
+    (status ?? error.status ?? 0) >= 500 ||
+    /fetch failed|timed out|timeout|ECONN/i.test(error.message ?? '')
+  );
+}
+
+/** Para las consultas que tratan «sin datos» como respuesta válida: una caída no debe confundirse con «no existe». */
+export function lanzarSiBaseCaida(error: { message?: string; code?: string; status?: number } | null | undefined, status?: number): void {
+  if (esFallaDeBase(error, status)) throw new BaseNoDisponible(error);
+}
+
 /** Convierte un PostgrestError en DbError con status HTTP razonable. */
 export function throwIf(error: { message: string; code?: string; details?: string } | null): void {
   if (!error) return;
+  if (/^PGRST00[0-3]$/.test(error.code ?? '')) throw new BaseNoDisponible(error);
   if (error.code === 'PGRST116') throw new DbError('No encontrado', 404, error);
   if (error.code === '23505') throw new DbError('Registro duplicado', 409, error);
   if (error.code === '23514' || error.message.includes('No se puede abrir visibilidad')) {

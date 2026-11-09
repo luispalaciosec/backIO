@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TodoPlano } from '../lib/basecamp/recorrer';
 
 const estado = vi.hoisted(() => ({
+  auditados: [] as string[],
+  marcados: 0,
+  importadoAt: null as string | null,
   insertados: [] as { basecamp_todo_id: number; titulo_interno: string; clase?: string }[],
   duplicados: new Set<number>(),
   enlazados: [] as unknown[],
@@ -13,7 +16,7 @@ const estado = vi.hoisted(() => ({
 }));
 
 vi.mock('../lib/db/clientes', () => ({
-  getCliente: async () => ({ id: 'c1', basecamp_project_id: 10 }),
+  getCliente: async () => ({ id: 'c1', basecamp_project_id: 10, basecamp_importado_at: estado.importadoAt }),
   clientePorProyectoBasecamp: async (b: number) => ({ id: `c-de-${b}`, tenant_id: 't', nombre: `Cliente ${b}` }),
 }));
 vi.mock('../lib/db/huerfanos', () => ({ getRequerimientoPorTodo: async () => estado.conElNuevo }));
@@ -22,7 +25,7 @@ vi.mock('../lib/db/proyectos', () => ({
   insertProyecto: async () => ({ id: 'p-nuevo' }),
   updateProyecto: async () => undefined,
 }));
-vi.mock('../lib/db/audit', () => ({ audit: async () => undefined }));
+vi.mock('../lib/db/audit', () => ({ audit: async (_c: unknown, e: { accion: string }) => void estado.auditados.push(e.accion) }));
 vi.mock('../lib/db/basecamp_import', () => ({
   proyectosDeCliente: async () => [{ id: 'p1', nombre: 'Lista', basecamp_todolist_id: 100, basecamp_grupos: {} }],
   enlazadosDeCliente: async () => estado.enlazados,
@@ -37,7 +40,7 @@ vi.mock('../lib/db/basecamp_import', () => ({
   },
   actualizarEnlazado: estado.actualizar,
   marcarHuerfanosAdoptados: async () => undefined,
-  marcarClienteImportado: async () => undefined,
+  marcarClienteImportado: async () => void (estado.marcados += 1),
 }));
 vi.mock('../lib/basecamp/client', () => ({
   BasecampClient: {
@@ -203,6 +206,35 @@ describe('importarBasecampCliente (B6)', () => {
     estado.ignorados = new Set([2]);
     await importarBasecampCliente(ctx, 'c1');
     expect(estado.insertados.map((x) => x.basecamp_todo_id)).toEqual([1]);
+  });
+});
+
+// 9/11/2026: 992 de los últimos 1.000 registros de auditoría eran sincronizaciones sin cambios.
+describe('la sincronización automática sin cambios no deja marca', () => {
+  beforeEach(() => {
+    estado.auditados = [];
+    estado.marcados = 0;
+    estado.importadoAt = '2026-11-01T00:00:00Z';
+    estado.todos = [];
+  });
+  const manual = { ...(ctx as object), origen: 'ui' } as never;
+  it('sin cambios no escribe ni audita', async () => {
+    await importarBasecampCliente(ctx, 'c1');
+    expect(estado.auditados).not.toContain('basecamp_importar');
+    expect(estado.marcados).toBe(0);
+  });
+  it('si entró algo, deja marca', async () => {
+    estado.todos = [todo(1)];
+    await importarBasecampCliente(ctx, 'c1');
+    expect(estado.auditados).toContain('basecamp_importar');
+    expect(estado.marcados).toBe(1);
+  });
+  it('la primera importación y la pedida a mano siempre dejan marca', async () => {
+    await importarBasecampCliente(manual, 'c1');
+    expect(estado.marcados).toBe(1);
+    estado.importadoAt = null;
+    await importarBasecampCliente(ctx, 'c1');
+    expect(estado.marcados).toBe(2);
   });
 });
 

@@ -290,7 +290,7 @@ export default function AdminClientesPage() {
                   className={`${c.basecamp_importado_at ? 'btn-ghost' : 'btn-primary'} text-xs`}
                   title={
                     c.basecamp_importado_at
-                      ? `Importado ${new Date(c.basecamp_importado_at).toLocaleString('es-EC')}. Volver a importar trae solo lo nuevo.`
+                      ? `Último cambio traído de Basecamp: ${new Date(c.basecamp_importado_at).toLocaleString('es-EC')}. Volver a importar trae solo lo nuevo.`
                       : 'Trae las listas y to-dos existentes del proyecto Basecamp (solo títulos, nunca comentarios)'
                   }
                   onClick={async () => {

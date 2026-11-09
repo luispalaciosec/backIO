@@ -73,6 +73,21 @@ export function importarBasecampCliente(
   return conCandado(`importar:${ctx.tenantId}:${clienteId}`, () => importar(ctx, clienteId, opts));
 }
 
+/** ¿La importación cambió algo en BackIO? Lo ya enlazado o lo que se omite no cuenta. */
+export function importacionConCambios(r: ResultadoImport): boolean {
+  return (
+    r.proyectos_creados +
+      r.requerimientos_creados +
+      r.responsables_actualizados +
+      r.titulos_actualizados +
+      r.movidos +
+      r.proyectos_renombrados +
+      r.eliminados_en_basecamp +
+      r.movidos_a_otro_proyecto >
+    0
+  );
+}
+
 async function importar(
   ctx: DbCtx,
   clienteId: string,
@@ -277,7 +292,12 @@ async function importar(
     });
     r.eliminados_en_basecamp += 1;
   }
-  await marcarClienteImportado(ctx, clienteId);
-  await audit(ctx, { accion: 'basecamp_importar', entidad: 'cliente', entidad_id: clienteId, detalle: r });
+  // La sincronización automática corre cada 15 min por cliente: si no cambió nada, no deja marca. El 9/11/2026, 992 de los
+  // últimos 1.000 registros de auditoría eran esto, y la base se quedó sin memoria. Una importación pedida a mano sí se registra.
+  const automatica = ctx.origen === 'cron' || ctx.origen === 'webhook:basecamp';
+  if (!automatica || importacionConCambios(r) || !cliente.basecamp_importado_at) {
+    await marcarClienteImportado(ctx, clienteId);
+    await audit(ctx, { accion: 'basecamp_importar', entidad: 'cliente', entidad_id: clienteId, detalle: r });
+  }
   return r;
 }

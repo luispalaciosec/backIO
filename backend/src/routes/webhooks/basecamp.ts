@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env';
-import { serviceClient } from '../../lib/db';
+import { BaseNoDisponible, serviceClient } from '../../lib/db';
 import { extractSafePayload, extractSafeTodo, applyBasecampUpdate, type BasecampSyncPayload } from '../../lib/basecamp/sync';
 import { findByBasecampTodo } from '../../lib/db/requerimientos';
 import type { Requerimiento } from '@backio/shared';
@@ -145,15 +145,34 @@ async function handle(raw: string) {
   return { status: 200 as const, body: JSON.stringify(resultado) };
 }
 
+/** Con la base caída no se la sigue golpeando: 30 s de 503 inmediato, y Basecamp reintenta la entrega más tarde. */
+const PAUSA_BASE_CAIDA_MS = 30_000;
+let baseCaidaHasta = 0;
+export const reiniciarPausaWebhook = () => {
+  baseCaidaHasta = 0;
+};
+
+async function responder(raw: string) {
+  if (Date.now() < baseCaidaHasta) return { status: 503 as const, body: 'reintentar' };
+  try {
+    return await handle(raw);
+  } catch (err) {
+    if (!(err instanceof BaseNoDisponible)) throw err;
+    baseCaidaHasta = Date.now() + PAUSA_BASE_CAIDA_MS;
+    log.error('[webhook basecamp] la base no responde; se pausan los webhooks 30 s');
+    return { status: 503 as const, body: 'reintentar' };
+  }
+}
+
 basecampWebhook.post('/:token', async (c) => {
   if (!tokenValido(c.req.param('token'))) return c.text('unauthorized', 401);
-  const r = await handle(await c.req.text());
+  const r = await responder(await c.req.text());
   return c.text(r.body, r.status);
 });
 
 // Compatibilidad: sin token solo en desarrollo.
 basecampWebhook.post('/', async (c) => {
   if (!tokenValido(undefined)) return c.text('unauthorized', 401);
-  const r = await handle(await c.req.text());
+  const r = await responder(await c.req.text());
   return c.text(r.body, r.status);
 });

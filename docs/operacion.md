@@ -140,6 +140,12 @@ credenciales se guardan en una tabla que solo lee el servidor.
 2. En Admin → Clientes, pulsa «Actualizar webhooks (rotar secreto)». Esto reescribe la URL en Basecamp para todos los
    clientes activos.
 
+### BackIO dice que la base de datos no responde
+
+La sesión de cada persona sigue bien: no hay que cerrarla ni cambiar claves. Revisa en Supabase la memoria, el disco y si el
+proyecto está en pausa. Si el disco no está lleno, reinicia el proyecto desde Project Settings → General. Mientras dure, los
+webhooks de Basecamp responden 503 para que Basecamp reintente, y la sincronización periódica recupera lo que falte.
+
 ### No llegan los correos
 
 1. Admin → Servicios: Resend debe estar operativo y con remitente.

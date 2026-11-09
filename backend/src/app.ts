@@ -5,7 +5,7 @@ import { logPeticiones, redactarRuta } from './lib/log';
 import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import { env, frontendOrigins } from './config/env';
-import { DbError } from './lib/db';
+import { BaseNoDisponible, DbError } from './lib/db';
 import { v1 } from './routes/v1';
 import { portal } from './routes/portal';
 import { basecampWebhook } from './routes/webhooks/basecamp';
@@ -84,7 +84,7 @@ export function createApp(): Hono {
       const prod = env().NODE_ENV === 'production';
       return c.json(
         {
-          error: prod && err.status >= 500 ? 'Error interno' : err.message,
+          error: prod && err.status >= 500 && !(err instanceof BaseNoDisponible) ? 'Error interno' : err.message,
           detalle: prod ? undefined : err.detalle,
           // Para que la pantalla reconozca el caso sin leer el texto (p. ej. basecamp_sin_conectar → botón de conectar).
           codigo: (err as { codigo?: string }).codigo,

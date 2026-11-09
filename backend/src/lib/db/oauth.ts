@@ -2,7 +2,7 @@
  * Tablas del servidor OAuth (oauth_clients, oauth_codes, oauth_tokens). Solo service role. Códigos y tokens se
  * guardan y se buscan por su hash: estas funciones reciben siempre el hash, nunca el valor en claro (lib/oauth).
  */
-import { serviceClient, throwIf, type FilaInsert } from './client';
+import { lanzarSiBaseCaida, serviceClient, throwIf, type FilaInsert } from './client';
 
 export async function insertarClienteOAuth(fila: FilaInsert<'oauth_clients'>): Promise<void> {
   const { error } = await serviceClient().from('oauth_clients').insert(fila);
@@ -90,11 +90,12 @@ export async function revocarTokenPorHash(tokenHash: string): Promise<void> {
 }
 
 export async function getAccessToken(tokenHash: string) {
-  const { data } = await serviceClient()
+  const { data, error, status } = await serviceClient()
     .from('oauth_tokens')
     .select('tenant_id, usuario_id, scope, client_id, expira_at, revocado_at')
     .eq('token_hash', tokenHash)
     .eq('tipo', 'access')
     .maybeSingle();
+  lanzarSiBaseCaida(error, status);
   return data;
 }
