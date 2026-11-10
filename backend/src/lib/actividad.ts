@@ -79,6 +79,7 @@ const FRASES: Record<string, string | ((d: Detalle) => string)> = {
   reprogramar_acuerdo: 'le cambió la fecha a un acuerdo del weekly',
   agregar_daily_apertura: 'agregó a la apertura de mesa en Basecamp',
   agregar_daily_cierre: 'agregó al cierre de mesa en Basecamp',
+  ejecutar_job: (d) => `ejecutó a mano la tarea programada «${d.job ?? ''}»`,
   basecamp_importar: (d) =>
     `sincronizó con Basecamp (${d.requerimientos_creados ?? 0} nuevas · ${d.titulos_actualizados ?? 0} títulos · ${d.eliminados_en_basecamp ?? 0} eliminadas)`,
   adoptar_huerfano: 'adoptó un huérfano de Basecamp',

@@ -140,6 +140,11 @@ credenciales se guardan en una tabla que solo lee el servidor.
 2. En Admin → Clientes, pulsa «Actualizar webhooks (rotar secreto)». Esto reescribe la URL en Basecamp para todos los
    clientes activos.
 
+### Relanzar una tarea que no corrió
+
+En **Admin → Servicios**, cada tarea programada tiene «Ejecutar ahora». Antes de correr dice qué hace, por ejemplo si manda
+correos, y se confirma con un segundo clic. Queda en el registro de tareas y en la auditoría. Solo admin.
+
 ### BackIO dice que la base de datos no responde
 
 La sesión de cada persona sigue bien: no hay que cerrarla ni cambiar claves. Revisa en Supabase la memoria, el disco y si el

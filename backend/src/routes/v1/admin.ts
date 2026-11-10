@@ -6,6 +6,8 @@ import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
 import { listUsuarios, audit, serviceClient } from '../../lib/db';
 import { frontendOrigins } from '../../config/env';
 import { verificarSalud } from '../../lib/salud';
+import { ejecutarJob, jobPorNombre, momentoLocal } from '../../lib/jobs';
+import { conCandado } from '../../lib/candado';
 import { BasecampClient } from '../../lib/basecamp/client';
 import { emailHabilitado, plantillaHtml, sendEmail } from '../../lib/notificaciones/email';
 import { aplicarSalida, inventarioSalida } from '../../lib/salida';
@@ -291,6 +293,22 @@ admin.get('/audit', async (c) => {
 
 // ---------------- salud del sistema
 admin.get('/salud', async (c) => c.json(await verificarSalud(ctxOf(c).tenantId)));
+
+/**
+ * Ejecutar ahora una tarea programada (Admin → Servicios): para recuperar lo que no corrió, como tras la caída de la base del
+ * 9/11/2026. Es la misma ejecución que la del horario, con su registro en cron_runs. Una a la vez por tarea.
+ */
+admin.post('/jobs/:nombre/ejecutar', async (c) => {
+  const ctx = ctxOf(c);
+  const job = jobPorNombre(c.req.param('nombre'));
+  if (!job) return c.json({ error: 'Esa tarea no existe' }, 404);
+  if (job.habilitado && !job.habilitado()) return c.json({ error: 'Esta tarea no está habilitada en este servidor' }, 422);
+  const r = await conCandado(`job-manual:${job.nombre}`, () => ejecutarJob(job, momentoLocal(), { manual: true }));
+  await audit(ctx, { accion: 'ejecutar_job', entidad: 'tenant', entidad_id: ctx.tenantId, detalle: { job: job.nombre } });
+  const resultado = r?.resultado ?? null;
+  const ok = !JSON.stringify(resultado ?? null).includes('"error"');
+  return c.json({ ok, resultado });
+});
 
 // ---------------- mantenimiento: reparaciones de datos en dos pasos (revisar → aplicar)
 const tareaValida = (t: string): t is Tarea => Object.hasOwn(TAREAS, t);

@@ -31,6 +31,19 @@ const ESTADO_JOB: Record<Job['estado'], { label: string; punto: string }> = {
   sin_registro: { label: 'Aún no corre', punto: 'bg-gray-400' },
 };
 
+/** Qué pasa al ejecutar a mano: lo que manda o escribe se dice antes de confirmar. */
+const EFECTO: Record<string, string> = {
+  mi_dia: 'Manda el correo de Mi día a todo el equipo, aunque ya se haya mandado hoy.',
+  riesgo_semana: 'Si hay tareas en riesgo, avisa por correo a líderes y ejecutivas.',
+  salud_clientes: 'Si una cuenta cambió de color, avisa a su ejecutiva y al líder de su mesa.',
+  senales: 'Recalcula las señales del weekly y manda la agenda por correo a operaciones y admin.',
+  informe_mensual: 'Redacta con IA el informe del mes anterior de cada mesa y avisa a operaciones y admin.',
+  recurrencias: 'Si a un fee le toca, crea el proyecto del mes siguiente, también en Basecamp.',
+  daily_recordatorio_apertura: 'Avisa por la campana a las mesas que no han publicado la apertura de hoy.',
+  daily_recordatorio_cierre: 'Avisa por la campana a las mesas que no han publicado el cierre de hoy.',
+};
+const SIN_EFECTO = 'Lee y actualiza datos de BackIO; no avisa a nadie.';
+
 const ICONO: Record<string, string> = {
   railway: '🚂',
   vercel: '▲',
@@ -65,6 +78,27 @@ export default function ServiciosPage() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+  const [confirmar, setConfirmar] = useState<string | null>(null);
+  const [corriendo, setCorriendo] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<{ nombre: string; ok: boolean; texto: string } | null>(null);
+  async function ejecutar(nombre: string) {
+    setCorriendo(nombre);
+    try {
+      const r = await api<{ ok: boolean; resultado: unknown }>(`/admin/jobs/${nombre}/ejecutar`, { method: 'POST' });
+      setResultado({
+        nombre,
+        ok: r.ok,
+        texto: r.ok
+          ? `Listo. Resultado: ${JSON.stringify(r.resultado ?? {}).slice(0, 300)}`
+          : `Terminó con errores: ${JSON.stringify(r.resultado ?? {}).slice(0, 300)}`,
+      });
+      setConfirmar(null);
+      await cargar();
+    } catch (e) {
+      setResultado({ nombre, ok: false, texto: e instanceof ApiError ? e.message : 'No se pudo ejecutar' });
+    }
+    setCorriendo(null);
+  }
   const caidos = d?.servicios.filter((s) => s.estado === 'caido') ?? [];
   const lentos = d?.servicios.filter((s) => s.estado === 'degradado') ?? [];
   return (
@@ -125,9 +159,9 @@ export default function ServiciosPage() {
           </p>
           <div className="card divide-y">
             {d.jobs.map((j) => (
-              <div key={j.nombre} className="px-4 py-2 flex items-center justify-between gap-4 text-sm">
+              <div key={j.nombre} className="px-4 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
                 <span className="min-w-0">{j.descripcion}</span>
-                <span className="shrink-0 text-gray-600 flex items-center gap-2">
+                <span className="shrink-0 text-gray-600 flex items-center gap-2 flex-wrap justify-end">
                   <span className={`inline-block h-2 w-2 rounded-full ${ESTADO_JOB[j.estado].punto}`} />
                   {ESTADO_JOB[j.estado].label}
                   {j.ultima_at && (
@@ -142,7 +176,34 @@ export default function ServiciosPage() {
                       })}
                     </span>
                   )}
+                  <button
+                    type="button"
+                    className="btn-ghost text-xs py-1"
+                    disabled={!!corriendo}
+                    onClick={() => {
+                      setConfirmar(confirmar === j.nombre ? null : j.nombre);
+                      setResultado(null);
+                    }}
+                  >
+                    Ejecutar ahora
+                  </button>
                 </span>
+                {confirmar === j.nombre && (
+                  <div className="w-full mt-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center gap-2">
+                    <span className="flex-1 min-w-52">{EFECTO[j.nombre] ?? SIN_EFECTO}</span>
+                    <button type="button" className="btn-primary text-xs py-1" disabled={!!corriendo} onClick={() => ejecutar(j.nombre)}>
+                      {corriendo === j.nombre ? 'Ejecutando…' : 'Sí, ejecutar'}
+                    </button>
+                    <button type="button" className="btn-ghost text-xs py-1" disabled={!!corriendo} onClick={() => setConfirmar(null)}>
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+                {resultado?.nombre === j.nombre && (
+                  <p className={`w-full mt-1 text-xs ${resultado.ok ? 'text-green-700' : 'text-red-600'}`} role="status">
+                    {resultado.texto}
+                  </p>
+                )}
               </div>
             ))}
           </div>
