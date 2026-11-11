@@ -149,7 +149,7 @@ proyecto, mesa, acuerdo y recurrencia; ver [Cuando alguien se va](./20-salida.md
 peticiones: `limite_sumar`, `limite_estado`, `limites_limpiar` (migración 28).
 
 Migraciones en `backend/supabase/migrations/`, numeradas `YYYYMMDD0000NN_nombre.sql` (hoy 01–31).
-**Regla operativa:** todo SQL se entrega como archivo secuencial y lo corre Luis en el SQL editor
+**Regla operativa:** todo SQL se entrega como archivo secuencial y lo corre el administrador técnico en el SQL editor
 de Supabase (el conector MCP perdió permisos de SQL el 07/09). Procedimiento en
 [Aplicar una migración](./operacion.md#aplicar-una-migracion).
 

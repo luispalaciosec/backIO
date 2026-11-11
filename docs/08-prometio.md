@@ -118,7 +118,7 @@ Authorization: Bearer {prometio_api_key}    ← scope: read:proyectos
 }
 ```
 
-**Valor comercial:** Juan y el equipo comercial dejan de preguntar por Slack cómo va tal
+**Valor comercial:** El equipo comercial deja de preguntar por Slack cómo va tal
 cuenta. Y antes de una reunión de renovación, ven el estado real de entrega.
 
 **Valor de riesgo:** `dias_sin_movimiento` en la ficha comercial es una alerta temprana de

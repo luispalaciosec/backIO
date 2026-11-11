@@ -1,7 +1,7 @@
 # 10 · CoreIO — capa compartida de la suite
 
 ::: warning Propuesta descartada
-El 03/09/2026 Luis decidió no construir CoreIO por ahora: BackIO mantiene sus propias tablas y comparte con PrometIO
+El 03/09/2026 Gerencia decidió no construir CoreIO por ahora: BackIO mantiene sus propias tablas y comparte con PrometIO
 el mismo `cliente_id`, más un webhook. Se conserva como referencia.
 :::
 
@@ -36,7 +36,7 @@ cinco convenciones informales que nadie documenta.
 |---|---|---|
 | **Identidad (SSO)** | Un login para los tres sistemas | Tres tablas de usuarios. Alguien renuncia y hay que darlo de baja en tres lados; uno se olvida |
 | **Tabla maestra de clientes** | El `cliente_id` ya decidido | Reconciliación manual entre "Cliente Ejemplo" y "CE" (el mismo cliente con dos nombres) |
-| **Roles y permisos** | Que "ejecutiva" signifique lo mismo en los tres | Marcia es admin en uno y operaciones en otro; nadie sabe qué puede ver |
+| **Roles y permisos** | Que "ejecutiva" signifique lo mismo en los tres | La jefa de operaciones es admin en uno y operaciones en otro; nadie sabe qué puede ver |
 | **Catálogo de servicios** | PrometIO cotiza, BackIO ejecuta, DatIO reporta el mismo servicio | Tres listas que divergen. Rentabilidad por servicio imposible de calcular |
 | **Design system** | Componentes y tokens compartidos | Un chip de estado escrito tres veces, con tres verdes distintos |
 
@@ -256,7 +256,7 @@ La ventana es ahora precisamente porque BackIO todavía no existe.
 CoreIO sin dueño se convierte en el lugar que nadie quiere tocar, y termina generando
 acoplamiento sin gobierno — peor que no tenerlo.
 
-Requiere un responsable nombrado antes de escribirse. Y si ese responsable es Luis, CoreIO
+Requiere un responsable nombrado antes de escribirse. Y si ese responsable es gerencia, CoreIO
 lo ata más a la operación técnica, no menos, lo cual contradice la estrategia de extracción
 declarada para el año.
 

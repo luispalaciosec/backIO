@@ -416,6 +416,6 @@ create index idx_senales_semana       on senales(semana_id, atendida);
 ```
 
 
-> **Cambio 04/09/2026 (aprobado por Luis):** `requerimientos_select` ya no filtra por `owner_agencia` para colaboradores. Todo el equipo interno lee el backlog completo del tenant; la escritura de un colaborador sigue limitada a sus propias tareas (política de update + campos acotados en el backend: estado, fecha de entrega, entregables). Migración `20260904000014_rls_colaborador_lee_todo.sql`.
+> **Cambio 04/09/2026 (aprobado por gerencia):** `requerimientos_select` ya no filtra por `owner_agencia` para colaboradores. Todo el equipo interno lee el backlog completo del tenant; la escritura de un colaborador sigue limitada a sus propias tareas (política de update + campos acotados en el backend: estado, fecha de entrega, entregables). Migración `20260904000014_rls_colaborador_lee_todo.sql`.
 
 :::

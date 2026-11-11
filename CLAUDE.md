@@ -101,7 +101,7 @@ En estas zonas: generar, detener, pedir revisión. No hacer commit automático.
 20. `docs/esquema.md` y `docs/referencia-api.md` — generados desde el código (`db:types`, `docs:api`); no se editan a mano
 
 La documentación es un sitio VitePress publicado en `backio.vercel.app/docs`, que se compila con el frontend (local:
-`pnpm --filter @backio/docs dev`). Es pública: no escribir en `docs/` secretos, credenciales ni vulnerabilidades abiertas. Si cambias un comportamiento
+`pnpm --filter @backio/docs dev`). Es pública: no escribir en `docs/` secretos, credenciales, vulnerabilidades abiertas, nombres de clientes ni nombres de personas del equipo (se usa el rol: gerencia, operaciones, ejecutiva). Si cambias un comportamiento
 documentado, corrige la página en el mismo commit. `HARDENING-CHANGELOG.md` registra el trabajo posterior a la
 auditoría del 10/10/2026.
 

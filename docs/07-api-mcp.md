@@ -65,9 +65,9 @@ type Scope =
 
 | Perfil | Scopes | Uso |
 |---|---|---|
-| Lectura gerencial | `read:*` | Dashboards, consultas de Luis por Claude |
+| Lectura gerencial | `read:*` | Dashboards, consultas de gerencia por Claude |
 | Ejecutiva | `read:*`, `write:requerimientos` | Trabajo diario asistido |
-| Operaciones | `read:*`, `write:*` | Marcia, generación de actas |
+| Operaciones | `read:*`, `write:*` | Operaciones, generación de actas |
 | PrometIO | `read:proyectos`, `write:proyectos` | Webhook de cotización ganada |
 | Cliente | `read:proyectos` | Agente de un cliente; exige indicar el `cliente_id` al crear la key |
 | Custom | Los que se elijan | Integraciones con permisos a medida |
@@ -206,17 +206,17 @@ respuestas se describen en ese archivo. No se mantiene a mano.
 ## Casos de uso reales
 
 ```
-Luis (en Claude): "¿cómo va Cliente Ejemplo esta semana?"
+Gerencia (en Claude): "¿cómo va Cliente Ejemplo esta semana?"
   → get_client_health + list_backlog(cliente: "Cliente Ejemplo", semana: actual)
 
-Marcia (en Claude): "prepara la agenda del weekly"
+Operaciones (en Claude): "prepara la agenda del weekly"
   → get_weekly_signals + get_capacity → agenda ordenada
 
 Ejecutiva: "arma la campaña de Black Friday para Cliente Ejemplo,
             entrega el 20 de noviembre"
   → plan_project_from_template → preview → confirm_plan
 
-Marcia (viernes): "genera el acta de cierre"
+Operaciones (viernes): "genera el acta de cierre"
   → generate_closing_minutes → revisa → publish_document → confirm_plan
 ```
 

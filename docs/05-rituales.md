@@ -139,7 +139,7 @@ hasta 63 días de atraso y mencionaba a la ejecutiva de la cuenta unas 40 veces.
 
 **Ejecutiva de otra mesa (29/10/2026).** El daily es de la mesa que produce. Si la ejecutiva de una cuenta lidera otra
 mesa (una cuenta que produce Omega y cuya ejecutiva lidera Orión), entra solo al bloque de su cuenta cuando algo vence o está
-bloqueado, y el mensaje publicado la menciona en esas tareas («Cuenta: @Grace»). Para seguir sus cuentas de todas las
+bloqueado, y el mensaje publicado la menciona en esas tareas («Cuenta: @Ejecutiva»). Para seguir sus cuentas de todas las
 mesas usa «Mis cuentas» en el paso 1, que es solo de lectura. En el weekly, cada grupo de señales de un cliente
 muestra a su ejecutiva y se puede filtrar por «Cuentas de…». Ver [Clientes](./21-clientes.md).
 
@@ -211,7 +211,7 @@ Rutas: `GET /semanas/daily/escenarios`, `POST /semanas/daily/preguntar-vivas` y 
 Una mesa puede tener varias ejecutivas (Omega tiene dos). Trabajan en la misma pantalla y **ninguna espera a otra**:
 
 - **Notas de cada una.** Cada persona deja las suyas en el paso 3, se guardan solas y las demás las ven con su nombre. Al
-  publicar, salen juntas en el mensaje, y como responsables salen quienes prepararon y quien publica («Carolina y Grace»).
+  publicar, salen juntas en el mensaje, y como responsables salen quienes prepararon y quien publica («Ejecutiva A y Ejecutiva B»).
 - **Quién falta.** La pantalla muestra cómo va cada ejecutiva: lista a tal hora, cuántas notas dejó, o cuántas cuentas y
   tareas tiene todavía sin marcar. Es solo información.
 - **«Mi parte está lista».** Es opcional y avisa por la campana a las demás.
@@ -244,7 +244,7 @@ los pone el código, no la IA. Están en `SECCIONES_DAILY` (`backend/src/lib/ia/
 cierre lleva «🎯 Balance del día», «✅ Completado hoy», «➕ Completadas fuera del daily», «⏳ Quedó abierto»,
 «⛔ Bloqueos» y «➡️ Para mañana». La IA solo escribe el contenido y marca dónde empieza cada sección con
 `[[clave]]`; `armarDaily` pone los títulos en el orden de siempre y omite las secciones vacías. Si la IA no usa
-ninguna marca, se publica su texto tal cual. Luis decidió el 11/10/2026 mantener los emojis en los títulos,
+ninguna marca, se publica su texto tal cual. Gerencia decidió el 11/10/2026 mantener los emojis en los títulos,
 porque son el formato que el equipo ya usa en Basecamp.
 
 **Cierre (22/09/2026).** Antes de lo que quedó abierto, el cierre lleva «✅ Completado hoy» (completadas con
@@ -347,12 +347,12 @@ Código: `backend/src/lib/rituals/proyectos_weekly.ts`, `GET /semanas/:id/proyec
 ### Marcador (20/10/2026)
 
 Arriba de los documentos de una mesa va un **marcador**, para que el weekly se sienta como avance de equipo sin perder
-seriedad (decisión de Luis). Todo sale de los datos: nada se escribe a mano, no lleva emojis ni frases de juego, y
+seriedad (decisión de gerencia). Todo sale de los datos: nada se escribe a mano, no lleva emojis ni frases de juego, y
 nunca se nombra a quien no cumplió. Código: `backend/src/lib/rituals/marcador.ts`.
 
 | Pieza | Cómo se calcula |
 |---|---|
-| Semana de cada tarea | La de su **fecha comprometida**: la original, salvo que el cliente la haya movido (motivo atribuible al cliente: insumos o aprobación, cambio de alcance); entonces, la última fecha que fijó un cambio del cliente. Reprogramar por causa del equipo, neutra o sin motivo no saca la tarea de su semana: sigue contando ahí como no cumplida (decisión de Luis, 21/10/2026). Completar el motivo de una reprogramación del cliente la pasa a la semana nueva |
+| Semana de cada tarea | La de su **fecha comprometida**: la original, salvo que el cliente la haya movido (motivo atribuible al cliente: insumos o aprobación, cambio de alcance); entonces, la última fecha que fijó un cambio del cliente. Reprogramar por causa del equipo, neutra o sin motivo no saca la tarea de su semana: sigue contando ahí como no cumplida (decisión de gerencia, 21/10/2026). Completar el motivo de una reprogramación del cliente la pasa a la semana nueva |
 | Resultado | Tareas comprometidas para la semana completadas **dentro de la semana** (hasta el domingo) sobre las vigentes; las canceladas no cuentan. Cerrar tarde no la mejora, y lo que se completó después del domingo se dice aparte («1 se completó después del domingo»), para que cuadre con el arrastre. Una completada sin fecha de cierre (históricas) cuenta como completada. Si el acta se genera antes del domingo, lo que se cierre el fin de semana todavía sube el número que muestre el plan siguiente |
 | Meta | 80 % para todas las mesas (`META_SEMANAL`) |
 | Compromiso (plan) | Tareas con entrega en la semana y cuántas ya están completadas |
@@ -374,7 +374,7 @@ Weekly de esa mesa. Solo un documento sin mesa se publica como Doc en el proyect
 
 **¿El Gerente General aparece en el backlog operativo?**
 
-En el Plan Operativo del 03/08, Luis figura como responsable de 4 tareas de prioridad Alta.
+En el Plan Operativo del 03/08, el gerente general figura como responsable de 4 tareas de prioridad Alta.
 Resultado: 2 no entregadas, 2 entregadas con retraso, 0 a tiempo.
 
 Consecuencia técnica: si el GG está en el backlog, **el motor lo va a marcar cada semana**
@@ -384,15 +384,15 @@ antes de encender el motor:
 | Opción | Implicación |
 |---|---|
 | **A. GG sale del backlog operativo** | Sus compromisos van a un tablero de dirección con ritual propio. Consistente con la estrategia de extracción |
-| **B. GG permanece en el backlog** | Marcia lo marca públicamente igual que a cualquiera. Es lo único que hace que WorkOS sobreviva por adopción |
+| **B. GG permanece en el backlog** | Operaciones lo marca públicamente igual que a cualquiera. Es lo único que hace que WorkOS sobreviva por adopción |
 
 **Lo que no funciona:** estar en el backlog y ser el único exento. Es precisamente lo que
 hizo fracasar los intentos anteriores de implementar WorkOS.
 
-**Decisión (03/09/2026): Opción A.** El weekly es de Marcia; Luis no participa ni aparece como responsable en el backlog operativo. No se implementa ninguna exención en el motor: simplemente no se le asignan requerimientos ni acuerdos.
+**Decisión (03/09/2026): Opción A.** El weekly es de operaciones; el gerente general no participa ni aparece como responsable en el backlog operativo. No se implementa ninguna exención en el motor: simplemente no se le asignan requerimientos ni acuerdos.
 
 
-## Cambios del 10/09/2026 (feedback de Marcia)
+## Cambios del 10/09/2026 (feedback de operaciones)
 
 - **Reprogramar no cambia el estado.** Mover la fecha incrementa `veces_reprogramado` y queda en `reprogramaciones` con motivo, pero la tarea conserva su estado ("En proceso" sigue en proceso). El estado "Reprogramado" queda como estado manual.
 - **Planificación.** `requerimientos.planificacion`: `planificado` (entró por el weekly), `no_planificado` (se creó durante la semana, con plan ya generado y fecha dentro de la semana; automático al crear) o `urgente` (manual). Columna en el backlog, filtro "Fuera del weekly", KPI en el dashboard.

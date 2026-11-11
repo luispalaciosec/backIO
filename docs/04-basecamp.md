@@ -32,21 +32,21 @@ OAuth2 de Basecamp 3, con dos clases de cuenta (migración 33, 16/10/2026):
   registrar una salida, aplicar Mantenimiento) va con **su** cuenta y sale a su nombre, con sus avisos. Antes todo
   salía a nombre de quien había conectado la integración. Si la persona no conectó su cuenta, BackIO no escribe en
   Basecamp por ella: responde 428 (`basecamp_sin_conectar`) **antes** de cambiar nada, y la pantalla muestra el
-  botón «Conectar mi Basecamp» (decisión de Luis, 16/10/2026). Al conectar, BackIO comprueba que la cuenta autorizada
+  botón «Conectar mi Basecamp» (decisión de gerencia, 16/10/2026). Al conectar, BackIO comprueba que la cuenta autorizada
   sea la de esa persona (`usuarios.basecamp_user_id`, o el mismo correo si todavía no estaba enlazada): nadie puede
   conectar la cuenta de otro. Tokens en `basecamp_credenciales_usuario` (solo service role). Al registrar la salida de
   alguien, su conexión se borra.
 - **Lo automático con un responsable** también va con la cuenta de esa persona, si la conectó
   (`BasecampClient.forResponsable`): el proyecto mensual de un fee recurrente, con la de la **ejecutiva** del proyecto;
   la fecha que la reconciliación reenvía, con la de **quien la cambió por última vez** en BackIO. Si esa persona no
-  conectó su cuenta, **no se escribe** (decisión de Luis, 19/10/2026): el fee se crea en BackIO con el proyecto
+  conectó su cuenta, **no se escribe** (decisión de gerencia, 19/10/2026): el fee se crea en BackIO con el proyecto
   marcado para reintentar y la ejecutiva recibe el aviso de conectar su Basecamp y pulsar «Reintentar Basecamp»; la
   fecha queda pendiente hasta que esa persona conecte.
 - **Las API keys** escriben a nombre de **quien creó la key**, con su cuenta. Si no la conectó, la escritura se rechaza
   con 428.
 - **La de la organización** (Admin → Integraciones) es **solo para leer**: sincronización, horas, huérfanos y
   reconciliación. Nunca escribe a nombre de nadie: en Basecamp no aparece nada a nombre de una persona que no lo hizo
-  (antes salía a nombre de quien conectó la integración; caso de Grace, 19/10/2026).
+  (antes salía a nombre de quien conectó la integración; caso real del 19/10/2026).
 - **Si Basecamp rechaza la cuenta de una persona** (401, por ejemplo «OAuth token expired (rekeyed_identity)»), BackIO
   pide un token nuevo con el refresh y repite. Si tampoco sirve, borra esa conexión: la persona aparece «Sin conectar»
   en Admin → Usuarios y BackIO le pide conectar otra vez antes de su próximo cambio (20/10/2026; antes fallaba en
@@ -202,7 +202,7 @@ Los webhooks de Basecamp fallan ocasionalmente. El job `reconcile` corre cada 30
 to-do vivo y aplica las diferencias de estado con la misma lógica del webhook.
 
 También corrige fechas. Para saber quién la cambió, BackIO guarda en cada tarea **la última fecha que vio (o
-escribió) en el to-do de Basecamp** (`requerimientos.basecamp_due_on_visto`, migración 35; decisión de Luis, 21/10/2026):
+escribió) en el to-do de Basecamp** (`requerimientos.basecamp_due_on_visto`, migración 35; decisión de gerencia, 21/10/2026):
 
 | Basecamp tiene… | Significa | BackIO hace |
 |---|---|---|
@@ -282,7 +282,7 @@ Nunca: comentarios, descripciones, adjuntos.
 dejaba los asignados vacíos y, además, no aplicaba la fecha (verificado en el sandbox: HTTP 200, assignees [],
 due_on sin cambio). Ese PUT lo hacía BackIO al reprogramar y, desde el 17/09, la reconciliación cada 30 min
 para cualquier tarea con fecha distinta entre BackIO y Basecamp. Efecto: a las pocas horas de asignar en
-Basecamp, la tarea quedaba sin dueño; y las fechas cambiadas en BackIO no llegaban a Basecamp (punto 1 de Marcia).
+Basecamp, la tarea quedaba sin dueño; y las fechas cambiadas en BackIO no llegaban a Basecamp (punto 1 de operaciones).
 
 **Corrección.** `BasecampClient.updateTodo` lee el to-do vivo y en cada PUT reenvía siempre `content`,
 `description`, `due_on`, `starts_on`, `assignee_ids` y `completion_subscriber_ids`, cambiando solo lo pedido. La
@@ -293,7 +293,7 @@ poner el responsable de BackIO en los to-dos abiertos que quedaron sin asignar (
 
 ## Basecamp como origen aceptado (23/09/2026)
 
-Decisión de Luis tras una semana de uso real: 5 de 23 usuarios activos, producción sigue creando to-dos a mano
+Decisión de gerencia tras una semana de uso real: 5 de 23 usuarios activos, producción sigue creando to-dos a mano
 en Basecamp y las ejecutivas gastaban su tiempo importando y adoptando huérfanos. El flujo
 cliente → ejecutiva → BackIO → Basecamp sigue siendo el preferido, pero deja de ser el único.
 

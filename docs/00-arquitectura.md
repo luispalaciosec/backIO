@@ -220,6 +220,6 @@ eso, la conversación no tiene sustancia.
 
 ## Decisiones pendientes (bloquean fases específicas)
 
-Resueltas el 03/09/2026. Ver tabla en [09 · Fases](./09-fases.md): product owner Marcia, sin CoreIO por
+Resueltas el 03/09/2026. Ver tabla en [09 · Fases](./09-fases.md): product owner la jefa de operaciones, sin CoreIO por
 ahora, Gantt/Calendario en Fase 2, GG fuera del backlog operativo (opción A), notificaciones
 por correo, límite de 50 to-dos por operación.

@@ -85,14 +85,14 @@ comentarios y adjuntos de todos los proyectos, lo que rompería esta defensa por
 revisión del 23/09/2026 viven en la tabla `integracion_credenciales`, con RLS activo y sin políticas: solo el
 service role del backend la lee (migración `20260923000021_seguridad_rls.sql`).
 
-**Excepción acotada D1 (aprobada por Luis, 04/09/2026).** Para importar el trabajo que ya vive en
+**Excepción acotada D1 (aprobada por gerencia, 04/09/2026).** Para importar el trabajo que ya vive en
 Basecamp y para detectar to-dos creados fuera de BackIO, entra el **título** del to-do como
 `titulo_interno`, siempre con `visible_cliente = false` y sin etiqueta. Un título es el nombre de una
 tarea, no una conversación. Siguen fuera, sin excepción: descripción, comentarios, adjuntos y la
 descripción de las entradas de timesheet. Se implementa en `BasecampClient.listTodosSafe` y
 `timesheetSafe`, que construyen el objeto campo a campo.
 
-**Excepción D1b (aprobada por Luis, 13/10/2026).** El **nombre de la lista** de Basecamp entra como nombre del
+**Excepción D1b (aprobada por gerencia, 13/10/2026).** El **nombre de la lista** de Basecamp entra como nombre del
 proyecto (`lib/basecamp/importar.ts`) y el cliente lo ve en su portal. Es el nombre que el equipo le da al proyecto, no
 una conversación, y el portal necesita uno. Consecuencia para el equipo: en Basecamp, las listas se nombran como las
 vería el cliente.
@@ -188,8 +188,8 @@ El módulo exporta además:
 («Por iniciar»). Todos los demás se colapsan a `en_proceso`: `en_ejecucion`, `en_revision`, `reprogramado`,
 `bloqueado` y también `cancelado`. El cliente no ve la palabra "atrasado" ni "bloqueado por nosotros".
 
-Que `cancelado` se muestre como «En proceso» fue una decisión explícita (04/09/2026, Luis). Las tareas
-visibles canceladas siguen apareciendo como hitos en proceso, pero desde el 11/10/2026 (decisión de Luis) no
+Que `cancelado` se muestre como «En proceso» fue una decisión explícita (04/09/2026, gerencia). Las tareas
+visibles canceladas siguen apareciendo como hitos en proceso, pero desde el 11/10/2026 (decisión de gerencia) no
 cuentan en el avance: `sanitizeForClient` lo calcula solo sobre las visibles no canceladas.
 
 **Agentes con perfil cliente.** Una API key de perfil «cliente» queda atada a un cliente

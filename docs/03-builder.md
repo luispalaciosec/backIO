@@ -30,7 +30,7 @@ también se puede descartar. Ver [08 · PrometIO](./08-prometio.md).
 | Transformación | Chatbots y Agentes de IA · Automatización de Procesos / RPA · Minería de Procesos · Analítica Predictiva · IA Generativa a Medida · Arquitectura de Datos · Dashboards con Analítica Automatizada · Proyectos Especiales de Innovación |
 | Transversal | Producción Audiovisual · Creatividad de Campañas · BTL / Activaciones · Kit de Activación POP |
 
-Medios (Audela) no tiene plantilla: no se produce por pieza. Las 37 líneas del tarifario 2024 y
+Medios (proveedor externo) no tiene plantilla: no se produce por pieza. Las 37 líneas del tarifario 2024 y
 los nombres de servicio de PrometIO están mapeados a su familia en `mapeo_servicios`, así que una
 cotización aprobada sugiere la plantilla correcta. Cada familia lleva pilar, unidad (proyecto, mes,
 pieza) y precio de referencia. Las plantillas se editan en Admin → Plantillas, pueden ser generales o

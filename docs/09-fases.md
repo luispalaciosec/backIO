@@ -44,7 +44,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 ### Fase 1
 - [x] Builder completo, paso 5 usando `sanitizeForClient` real
 - [x] Bulk import CSV con preview y validación de `etiqueta_cliente`
-- [x] Notificaciones funcionando (canal decidido por Marcia)
+- [x] Notificaciones funcionando (canal decidido por operaciones)
 - [x] Alerta de concentración de carga en paso 4
 
 ### Fase 2
@@ -70,7 +70,7 @@ con 7-8 semanas y ajustar si el ritmo lo permite.
 - [x] `audit_log` registrando todas las escrituras + alerta >20 escrituras/5 min por key
 
 ### Fase 3
-- [x] **Checklist completo de `02-visibilidad.md` firmado** (código aprobado por Luis 03/09/2026; portal verificado en producción con proyecto sandbox: 2 hitos visibles de 4, avance renormalizado 79%)
+- [x] **Checklist completo de `02-visibilidad.md` firmado** (código aprobado por gerencia 03/09/2026; portal verificado en producción con proyecto sandbox: 2 hitos visibles de 4, avance renormalizado 79%)
 - [x] Test de integración: endpoint público no devuelve campos internos
 - [ ] Portal responsive verificado en móvil (verificado en escritorio; falta abrir el enlace desde el celular)
 - [x] Resumen IA cacheado 6 horas (verificado en producción)
@@ -102,10 +102,10 @@ Todas tomadas el 03/09/2026:
 
 | Decisión | Resultado |
 |---|---|
-| Product owner de BackIO en Geeks | **Marcia** (jefe de operaciones). Luis solo como último recurso |
+| Product owner de BackIO en Geeks | **La jefa de operaciones**. Gerencia solo como último recurso |
 | ¿CoreIO antes de Fase 0? | **No.** Modelo actual: tablas propias + `cliente_id` compartido + webhook de PrometIO. Revisar cuando BackIO esté en uso |
 | ¿Gantt y Calendario entran al alcance? | **Fase 2**, no Fase 1 |
-| ¿El GG aparece en el backlog operativo? | **Opción A: no.** El weekly es de Marcia; Luis no participa. Sus compromisos no entran al backlog operativo |
+| ¿El GG aparece en el backlog operativo? | **Opción A: no.** El weekly es de operaciones; el gerente general no participa. Sus compromisos no entran al backlog operativo |
 | Canal de notificación | **Correo** |
 | Límite de to-dos por operación en Basecamp | **50** |
 

@@ -74,7 +74,7 @@ se miran en los últimos 90 días.
 | Amarillo | alguna atrasada, más de 7 días sin movimiento, menos del 80 % a tiempo, o reprocesos nuestros en más del 20 % de las entregas |
 | Verde | nada de lo anterior |
 
-- **Lo que espera al cliente no cuenta** (decisión de Luis, 29/10/2026):
+- **Lo que espera al cliente no cuenta** (decisión de gerencia, 29/10/2026):
   - una tarea con aprobación «pendiente del cliente» no suma atraso ni días sin movimiento a la salud, porque ese
     atraso es del cliente (`operacionParaSalud`);
   - la ficha la muestra en un aviso para que la ejecutiva pida el feedback, con los días que lleva esperando;
@@ -83,7 +83,7 @@ se miran en los últimos 90 días.
   - solo el trabajo pedido desde el 21/09/2026, cuando empezó la operación en BackIO (`INICIO_MEDICION`, según
     `fecha_pedido`; en lo importado es la fecha de creación del to-do en Basecamp);
   - lo pedido antes es historia importada: en septiembre se cerraron en bloque cientos de to-dos viejos con meses de
-    atraso, y el % a tiempo no medía el trabajo actual (decisión de Luis, 29/10/2026);
+    atraso, y el % a tiempo no medía el trabajo actual (decisión de gerencia, 29/10/2026);
   - la ficha muestra cuántas entregas se midieron de cuántas hubo.
 - Con menos de 5 entregas medidas en 90 días, el % a tiempo y los reprocesos no deciden el color: son muy pocos
   datos.

@@ -44,8 +44,8 @@ flowchart LR
 
 | Rol | Persona | Para qué |
 |---|---|---|
-| Product owner | Marcia (jefa de operaciones) | Decide el producto y los rituales |
-| Administración técnica | Luis | Último recurso; credenciales, migraciones y despliegue |
+| Product owner | Jefa de operaciones | Decide el producto y los rituales |
+| Administración técnica | Gerencia | Último recurso; credenciales, migraciones y despliegue |
 
 ## Cómo está organizada esta documentación
 

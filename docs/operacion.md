@@ -187,7 +187,7 @@ El mensaje llega tal cual a la pantalla. Si dice que la clave no es válida o el
 ### Aplicar una migración
 
 Las migraciones son archivos SQL numerados en `backend/supabase/migrations/`. Las que tocan seguridad (RLS) las revisa
-Luis antes de aplicarlas.
+el administrador técnico antes de aplicarlas.
 
 1. Se aplica en el **SQL editor de Supabase**, copiando el archivo completo.
 2. Se corre la consulta de verificación que trae el propio archivo al final.

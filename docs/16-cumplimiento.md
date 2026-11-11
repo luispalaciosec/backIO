@@ -2,7 +2,7 @@
 
 > Revisado contra el código el 11/10/2026.
 
-> Aprobado por Luis el 04/09/2026 (siguió las recomendaciones propuestas). Migración `20260904000015`.
+> Aprobado por gerencia el 04/09/2026 (siguió las recomendaciones propuestas). Migración `20260904000015`.
 
 ## Principio
 

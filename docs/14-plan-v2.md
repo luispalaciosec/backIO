@@ -7,7 +7,7 @@ ya no corre solo. Ver [decisiones](./decisiones.md).
 :::
 
 > Estado al 04/09/2026: las fases 0 a 4 del plan original están en producción. Este plan
-> consolida los inputs nuevos de Luis (estructura real de Basecamp, mesas, horas, capa de IA)
+> consolida los inputs nuevos de gerencia (estructura real de Basecamp, mesas, horas, capa de IA)
 > en cinco sprints de una semana.
 
 ## Principio rector
@@ -58,12 +58,12 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 - **DoD**: el dashboard muestra horas reales del mes por cliente; la lista de huérfanos baja semana a semana.
 
 ### Sprint 4 · Capa de IA operativa — **hecho 04/09/2026** (ver `15-ia.md`)
-- Apertura y cierre de mesa redactados desde el Daily; Grace edita y publica.
+- Apertura y cierre de mesa redactados desde el Daily; la ejecutiva de la mesa edita y publica.
 - Status semanal narrado desde el Plan Operativo y las señales; agenda del weekly agrupada por causa con la pregunta de decisión.
 - Brief → plan: pegar correo/transcripción y obtener brief estructurado + plantilla sugerida + alcance.
 - Recordatorio al cliente por `pendiente_cliente` (borrador, nunca automático).
 - Informe ejecutivo mensual por mesa desde el dashboard.
-- **DoD**: una semana completa de daily y weekly de Orión publicados desde BackIO con edición mínima de Grace.
+- **DoD**: una semana completa de daily y weekly de Orión publicados desde BackIO con edición mínima de la ejecutiva.
 
 ### Sprint 5 · Adopción y baja de Monday (desde el 5/10)
 - Clientes reales desde PrometIO; `basecamp_project_id` y mesa por cliente; equipo con roles y `basecamp_user_id`.
@@ -80,17 +80,17 @@ horas. De Basecamp solo vuelven `completed`, `due_on`, asignados y horas. Nunca 
 
 | # | Decisión | Quién | Bloquea |
 |---|---|---|---|
-| D1 | Importar títulos de to-dos existentes como `titulo_interno` (excepción acotada a la regla 1) — **aprobado e implementado 04/09** | Luis | Sprint 3 |
-| D2 | Día del cron de generación mensual (propuesto: 25) y quién confirma (ejecutiva de la cuenta) | Marcia | Sprint 2 — **decidido e implementado 04/09: día 25, patrón de la plantilla, Admin → Recurrencias** |
-| D3 | Tono y firma de los mensajes IA — por defecto "Redactado por BackIO, publicado por [persona]"; ajustable | Marcia / Grace | Sprint 4 |
-| D4 | Formato del informe mensual — implementado (lectura del mes + decisiones + tablas cliente/persona); ajustar con Marcia | Marcia | Sprint 4 |
-| D5 | Fecha objetivo de baja de Monday | Luis | Sprint 5 |
+| D1 | Importar títulos de to-dos existentes como `titulo_interno` (excepción acotada a la regla 1) — **aprobado e implementado 04/09** | Gerencia | Sprint 3 |
+| D2 | Día del cron de generación mensual (propuesto: 25) y quién confirma (ejecutiva de la cuenta) | Operaciones | Sprint 2 — **decidido e implementado 04/09: día 25, patrón de la plantilla, Admin → Recurrencias** |
+| D3 | Tono y firma de los mensajes IA — por defecto "Redactado por BackIO, publicado por [persona]"; ajustable | Operaciones / ejecutivas | Sprint 4 |
+| D4 | Formato del informe mensual — implementado (lectura del mes + decisiones + tablas cliente/persona); ajustar con operaciones | Operaciones | Sprint 4 |
+| D5 | Fecha objetivo de baja de Monday | Gerencia | Sprint 5 |
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
-| El equipo sigue creando to-dos a mano en Basecamp | Detector de huérfanos con nombre del creador; Marcia lo revisa en el weekly |
+| El equipo sigue creando to-dos a mano en Basecamp | Detector de huérfanos con nombre del creador; Operaciones lo revisa en el weekly |
 | La importación de títulos abre una grieta en la regla 1 | Solo títulos, solo `titulo_interno`, `visible_cliente=false`; comentarios y descripciones siguen fuera |
 | La IA escribe cosas que no son verdad | Solo redacta sobre datos estructurados de BackIO; nunca ve Basecamp; una persona publica |
 | Plantillas recurrentes generan trabajo fantasma | Nunca se crean solas: borrador + confirmación en paso 5 |

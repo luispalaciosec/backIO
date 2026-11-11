@@ -33,7 +33,7 @@ webhooks e IA · frontend, secretos y dependencias). Cada hallazgo fue verificad
 | Estado | Significado |
 |---|---|
 | ✅ Corregido | Código desplegado el 23/09 o después (se indica cuándo) |
-| 🗄️ Migración 21 | Corregido en `20260923000021_seguridad_rls.sql`, aplicada por Luis el 23/09 (verificado: tokens en `integracion_credenciales`, `tenants.config` sin `basecamp`, sin URLs de webhook) |
+| 🗄️ Migración 21 | Corregido en `20260923000021_seguridad_rls.sql`, aplicada el 23/09 (verificado: tokens en `integracion_credenciales`, `tenants.config` sin `basecamp`, sin URLs de webhook) |
 | ⏳ Pendiente | Requiere decisión o trabajo aparte |
 
 ### Críticos
@@ -99,7 +99,7 @@ producción.
 - Historial git sin credenciales desde el primer commit; `.env` ignorado; sin `dangerouslySetInnerHTML`;
   el token de sesión nunca toca URL ni `localStorage`.
 
-### Pasos que dependen de Luis
+### Pasos que dependen del administrador técnico
 
 1. ~~Revisar y aplicar la migración 21~~ Hecho el 23/09.
 2. ~~Desconectar y reconectar Basecamp (Admin → Integraciones) para rotar los tokens.~~ Hecho el 10/10.
@@ -147,4 +147,4 @@ hallazgo por hallazgo, con archivos y cómo se verificó, está en [Endurecimien
 | Operación | Jobs con ventana y registro en `cron_runs` (B10); logger JSON con niveles; Sentry opcional sin datos personales |
 
 Migraciones de esta ronda: 27 (seguridad), 28 (límites y `cron_runs`) y 29 (transacciones), aplicadas y verificadas
-por Luis entre el 10 y el 11/10.
+entre el 10 y el 11/10.

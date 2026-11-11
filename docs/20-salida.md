@@ -50,7 +50,7 @@ La reasignación no reinicia «días sin movimiento»: la tarea no se movió, so
 
 ## Tareas heredadas
 
-Decisión de Luis (11/10/2026): una tarea **cuenta para quien la cierra**. Excepción: si la recibió con menos de **3
+Decisión de gerencia (11/10/2026): una tarea **cuenta para quien la cierra**. Excepción: si la recibió con menos de **3
 días hábiles** para la entrega, o ya vencida, queda marcada como **heredada**, y si se cierra tarde ese atraso no
 cuenta para nadie. La marca la calcula el backend al confirmar (`esHeredada` en `shared/src/metricas.ts`). La pantalla
 la muestra antes de confirmar.

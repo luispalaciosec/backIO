@@ -12,7 +12,7 @@ Arte y Diseño, Creatividad, Content). Cada KPI se mide **a cada persona del ár
 | Equipo → KPIs (`/kpis`) | Roles de gestión | Vista por equipo (valor del equipo + matriz de integrantes, tendencia de 6 meses) y por persona. Clic en una celda: tareas que componen el cálculo y formulario de seguimiento |
 | Personas → modal → pestaña KPIs | Roles de gestión | Ficha de la persona en el mes en curso |
 | Admin → Catálogo → KPIs | Admin | Meta, operador, periodicidad, cálculo, textos, activo |
-| Admin → Usuarios → Área | Admin | Área de cada persona: define qué KPIs le aplican. Admin, gerencia y operaciones no se miden (Marcia, 26/09) |
+| Admin → Usuarios → Área | Admin | Área de cada persona: define qué KPIs le aplican. Admin, gerencia y operaciones no se miden (operaciones, 26/09) |
 | Menú → Mis KPIs (`/kpis`, `GET /kpis/mios`) | Colaboradores | Solo su propia ficha y el agregado de su equipo, nunca a sus compañeros |
 
 Registrar mediciones (manuales, ajustes, causa, plan de mejora): **admin, gerencia y operaciones**.
@@ -77,7 +77,7 @@ de atraso, y medirlas castigaba al equipo por la limpieza (a tiempo de Diseño p
 
 **Tareas heredadas por una salida.** Una tarea que alguien recibió con menos de 3 días hábiles para la entrega
 (o ya vencida) queda marcada `heredada`. Si se cierra tarde, no entra en «a tiempo» de nadie; si se cierra a
-tiempo, cuenta para quien la cerró (decisión de Luis, 11/10/2026).
+tiempo, cuenta para quien la cerró (decisión de gerencia, 11/10/2026).
 
 ## Datos nuevos que los alimentan (migración 22)
 

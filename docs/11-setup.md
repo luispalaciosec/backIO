@@ -94,7 +94,7 @@ Las migraciones están en `backend/supabase/migrations/`, numeradas `YYYYMMDD000
 aplican. Las recientes son idempotentes y traen al final una consulta para verificar que quedaron aplicadas. Las que tocan RLS, el alta
 de usuarios o funciones `SECURITY DEFINER` son zona de revisión humana (`CLAUDE.md`).
 
-Todo SQL nuevo se entrega como el siguiente archivo de la secuencia y lo aplica Luis en el SQL editor de Supabase. El
+Todo SQL nuevo se entrega como el siguiente archivo de la secuencia y lo aplica el administrador técnico en el SQL editor de Supabase. El
 procedimiento completo, incluida la regeneración de tipos, está en
 [Aplicar una migración](./operacion.md#aplicar-una-migracion).
 
