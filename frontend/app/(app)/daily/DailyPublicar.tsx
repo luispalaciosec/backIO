@@ -75,7 +75,10 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
     void cargar(true);
   }, [cargar]);
   useEffect(() => {
-    const recargar = () => void cargar();
+    // Solo con la pestaña a la vista (ver Campana).
+    const recargar = () => {
+      if (document.visibilityState === 'visible') void cargar();
+    };
     const t = window.setInterval(recargar, 60_000);
     window.addEventListener('focus', recargar);
     return () => {

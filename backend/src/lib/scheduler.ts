@@ -4,6 +4,7 @@
  */
 import { JOBS, ejecutarJob, momentoLocal } from './jobs';
 import { log } from './logger';
+import { baseEnPausa } from './db/disyuntor';
 
 export function startScheduler(): void {
   if (process.env.ENABLE_INTERNAL_CRON !== '1') return;
@@ -13,6 +14,9 @@ export function startScheduler(): void {
   // proyectos. Entre procesos el candado es la fila única de cron_runs.
   const enCurso = new Set<string>();
   const tick = () => {
+    // Con la base caída no se corre nada: cada tarea fallaba y volvía a intentarlo al minuto siguiente (290 errores
+    // el 18/11). Lo que no corrió se recupera solo: su ventana sigue sin registro en cron_runs.
+    if (baseEnPausa()) return;
     const m = momentoLocal();
     for (const job of JOBS) {
       if (enCurso.has(job.nombre)) continue;

@@ -9,6 +9,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../../config/env';
 import type { Database } from './database.types';
+import { fetchConDisyuntor } from './disyuntor';
 
 /** Cliente tipado con el esquema real (database.types.ts, generado con `pnpm db:types`). */
 export type Db = SupabaseClient<Database>;
@@ -32,6 +33,7 @@ export function serviceClient(): Db {
   const e = env();
   service = createClient<Database>(e.SUPABASE_URL, e.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchConDisyuntor() },
   });
   return service;
 }
@@ -40,7 +42,7 @@ export function userClient(jwt: string): Db {
   const e = env();
   return createClient<Database>(e.SUPABASE_URL, e.SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    global: { headers: { Authorization: `Bearer ${jwt}` }, fetch: fetchConDisyuntor() },
   });
 }
 

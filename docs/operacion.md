@@ -151,6 +151,13 @@ La sesión de cada persona sigue bien: no hay que cerrarla ni cambiar claves. Re
 proyecto está en pausa. Si el disco no está lleno, reinicia el proyecto desde Project Settings → General. Mientras dure, los
 webhooks de Basecamp responden 503 para que Basecamp reintente, y la sincronización periódica recupera lo que falte.
 
+Desde el 18/11/2026, BackIO deja de consultar la base apenas detecta la caída: responde «la base no responde» al
+instante, sin esperar, y no corre tareas programadas. Cada 15 s (y luego cada 30 s, 1 min y 2 min) deja pasar una sola
+consulta de prueba; cuando la base responde, todo vuelve solo, y las tareas que no corrieron se ponen al día. Antes,
+cada pantalla abierta y cada tarea esperaban hasta un minuto y lo volvían a intentar, lo que llenaba el log de errores y
+ocupaba las conexiones que la base necesitaba para recuperarse. Las pestañas de BackIO en segundo plano ya no consultan
+la campana ni el daily hasta que se vuelven a mirar.
+
 ### No llegan los correos
 
 1. Admin → Servicios: Resend debe estar operativo y con remitente.

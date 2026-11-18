@@ -38,8 +38,18 @@ export function Campana() {
   }, []);
   useEffect(() => {
     void cargar();
-    const t = setInterval(() => void cargar(), 120_000);
-    return () => clearInterval(t);
+    // Solo con la pestaña a la vista: una pestaña olvidada consultaba cada 2 min todo el día, también con la base caída.
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') void cargar();
+    }, 120_000);
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') void cargar();
+    };
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
   }, [cargar]);
   useEffect(() => {
     if (!abierta) return;
