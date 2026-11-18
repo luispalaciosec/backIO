@@ -142,8 +142,10 @@ export interface Job {
 export const JOBS: Job[] = [
   {
     nombre: 'notificaciones',
-    descripcion: 'Reintento de correos pendientes, cada minuto',
-    ventana: cada(1),
+    // Cada correo sale al crearse; esto solo reintenta los que fallaron. Cada 5 min (antes cada minuto: 1.440
+    // consultas al día para casi siempre no encontrar nada).
+    descripcion: 'Reintento de correos pendientes, cada 5 min',
+    ventana: cada(5),
     registrar: false,
     ejecutar: () => procesarPendientes(),
   },
@@ -158,9 +160,11 @@ export const JOBS: Job[] = [
     // Red de seguridad del webhook todo_created: to-dos nuevos, renombres, movimientos, responsables y eliminados.
     // Basecamp es origen aceptado (23/09/2026): lo creado a mano entra solo.
     nombre: 'estructura',
-    descripcion: 'Estructura de Basecamp, cada 15 min',
-    ventana: cada(15),
-    intervaloMin: 15,
+    // Cada 30 min desde el 18/11/2026 (antes 15): el webhook trae los cambios al instante y esto era la mayor carga
+    // de la base (lee las tareas y proyectos de cada cliente en cada pasada).
+    descripcion: 'Estructura de Basecamp, cada 30 min',
+    ventana: cada(30),
+    intervaloMin: 30,
     ejecutar: () =>
       porTenant(async (ctx) => {
         const out: Record<string, unknown> = {};

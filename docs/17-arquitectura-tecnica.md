@@ -166,7 +166,7 @@ de Supabase (el conector MCP perdió permisos de SQL el 07/09). Procedimiento en
 | `credenciales.ts` | Lee y guarda los tokens en `integracion_credenciales` (solo service role) | — |
 | `sync.ts` | Webhook: `completed`, `completed_at`, `due_on`, `assignee_ids`, papelera/archivado. El webhook aplica el estado del to-do **vivo** (lo vuelve a leer en Basecamp), no el del payload. **Nunca extrae texto** (`sync.test.ts` lo garantiza) | — |
 | `reconcile.ts` | Polling cada 30 min: converge `completed` desde Basecamp y reenvía `due_on` desde BackIO (regla 3), máximo 25 fechas por corrida, cada una auditada | — |
-| `importar.ts` | Sincronización de estructura: listas → proyectos, grupos → bloques, to-dos → requerimientos (solo título, excepción D1), renombres, movimientos, responsables, eliminados. Corre cada 15 min y, para un to-do nuevo, también desde el webhook en segundos | — |
+| `importar.ts` | Sincronización de estructura: listas → proyectos, grupos → bloques, to-dos → requerimientos (solo título, excepción D1), renombres, movimientos, responsables, eliminados. Corre cada 30 min y, para un to-do nuevo, también desde el webhook en segundos | — |
 | `decisiones.ts` | Reglas puras de la importación: clasificar un to-do, qué cambió, fechas de un proyecto nuevo | — |
 | `recorrer.ts` | Recorre los to-dos de un proyecto y mapea responsables de Basecamp a usuarios | — |
 | `webhooks.ts` | Registra y actualiza el webhook de cada cliente (y enmascara el secreto en los logs) | — |

@@ -161,7 +161,7 @@ la campana ni el daily hasta que se vuelven a mirar.
 ### No llegan los correos
 
 1. Admin → Servicios: Resend debe estar operativo y con remitente.
-2. Los correos que fallan quedan pendientes y se reintentan cada minuto.
+2. Los correos que fallan quedan pendientes y se reintentan cada 5 minutos.
 3. Si una persona dice que no le llegó, revisa que su correo en Admin → Usuarios sea el actual: los correos se mandan
    siempre al correo vigente de la persona.
 

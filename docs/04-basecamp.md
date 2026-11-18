@@ -259,19 +259,19 @@ Basecamp → BackIO, automático:
 | Cambio en Basecamp | Efecto en BackIO | Cuándo |
 |---|---|---|
 | To-do completado / reabierto | Estado completado / en proceso (+ reproceso) | Webhook, segundos |
-| To-do enviado a la papelera o archivado | Requerimiento **cancelado** (auditoría `basecamp_eliminado`); si se restaura, vuelve a En proceso | Webhook, segundos; verificación cada 15 min |
+| To-do enviado a la papelera o archivado | Requerimiento **cancelado** (auditoría `basecamp_eliminado`); si se restaura, vuelve a En proceso | Webhook, segundos; verificación cada 30 min |
 | Tarea **cancelada en BackIO** | El to-do se **archiva** en Basecamp con la cuenta de quien canceló (se puede deshacer); si después se saca de «cancelado», vuelve a quedar activo. Si la persona no conectó su Basecamp, no se cancela (428). Si Basecamp falla, la cancelación queda y se audita `basecamp_archivar_error` | Al instante (28/10/2026) |
-| Título del to-do editado | `titulo_interno` (excepción D1, solo por la lectura de listas; el webhook sigue sin extraer texto) | Cada 15 min o con ↻ Sincronizar |
-| To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada 15 min |
-| To-do movido a **otro proyecto de Basecamp** (otro cliente) | Basecamp crea un to-do nuevo y el id viejo redirige a él. Si el nuevo ya entró a BackIO, la tarea vieja se da de baja (no queda duplicada); si no, la tarea vieja pasa al to-do nuevo y a su cliente, oculta en el portal. Queda `basecamp_movido` en la auditoría | Cada 15 min |
-| Lista renombrada | Nombre del proyecto | Cada 15 min |
-| Responsables cambiados | `owner_agencia` (si la persona está vinculada), solo en tareas abiertas. No cambia si Basecamp todavía asigna a alguien que ya no tiene acceso: ahí manda el reparto de BackIO | Cada 15 min |
-| To-do nuevo creado a mano | Se importa como requerimiento (ver «Basecamp como origen aceptado») | Webhook, unos 20 s; cada 15 min como respaldo |
-| Lista nueva | Se importa como proyecto | Cada 15 min |
+| Título del to-do editado | `titulo_interno` (excepción D1, solo por la lectura de listas; el webhook sigue sin extraer texto) | Cada 30 min o con ↻ Sincronizar |
+| To-do movido a otra lista o grupo | Cambia de proyecto / bloque | Cada 30 min |
+| To-do movido a **otro proyecto de Basecamp** (otro cliente) | Basecamp crea un to-do nuevo y el id viejo redirige a él. Si el nuevo ya entró a BackIO, la tarea vieja se da de baja (no queda duplicada); si no, la tarea vieja pasa al to-do nuevo y a su cliente, oculta en el portal. Queda `basecamp_movido` en la auditoría | Cada 30 min |
+| Lista renombrada | Nombre del proyecto | Cada 30 min |
+| Responsables cambiados | `owner_agencia` (si la persona está vinculada), solo en tareas abiertas. No cambia si Basecamp todavía asigna a alguien que ya no tiene acceso: ahí manda el reparto de BackIO | Cada 30 min |
+| To-do nuevo creado a mano | Se importa como requerimiento (ver «Basecamp como origen aceptado») | Webhook, unos 20 s; cada 30 min como respaldo |
+| Lista nueva | Se importa como proyecto | Cada 30 min |
 | Horas del timesheet | Horas por tarea y persona (también de quien ya no tiene acceso) | Cada 6 h |
 
 Manual e inmediato: Admin → Clientes → **↻ Sincronizar Basecamp** (`POST /clientes/:id/basecamp/importar`) hace lo
-mismo que la corrida de 15 min para ese cliente. Lo pueden usar admin, operaciones y ejecutivas.
+mismo que la corrida de 30 min para ese cliente. Lo pueden usar admin, operaciones y ejecutivas.
 BackIO → Basecamp: fecha de entrega (al instante), estructura de proyectos del Builder, reapertura por reproceso, mensajes de daily/weekly/informe.
 Nunca: comentarios, descripciones, adjuntos.
 
@@ -297,7 +297,7 @@ Decisión de gerencia tras una semana de uso real: 5 de 23 usuarios activos, pro
 en Basecamp y las ejecutivas gastaban su tiempo importando y adoptando huérfanos. El flujo
 cliente → ejecutiva → BackIO → Basecamp sigue siendo el preferido, pero deja de ser el único.
 
-- **Sincronización completa cada 15 min** (job `estructura`, que llama a `importarBasecampCliente` para todo
+- **Sincronización completa cada 30 min** (job `estructura`, que llama a `importarBasecampCliente` para todo
   cliente activo con proyecto Basecamp): listas nuevas → proyectos, grupos → bloques, to-dos nuevos →
   requerimientos (`tipo=fee`, `prioridad=media`, `visible_cliente=false`, responsables por `basecamp_user_id`),
   además de renombres, movimientos, responsables y eliminados. Sigue entrando solo el título (excepción D1).
@@ -323,7 +323,7 @@ El webhook de Basecamp ya avisaba `todo_created`, pero solo se usaba para estado
 `todo_created` (o `untrashed`/`unarchived`/`changed`) de un to-do que BackIO no conoce, se programa una
 sincronización de estructura **solo de ese cliente** con 20 s de debounce (`backend/src/routes/webhooks/basecamp.ts`,
 `programarImportacion`). Resultado: lo creado a mano en Basecamp entra en menos de un minuto. La corrida
-periódica baja a 15 min y queda como red de seguridad (renombres, movimientos, eliminados, webhook caído).
+periódica queda cada 30 min (desde el 18/11/2026; antes 15) como red de seguridad (renombres, movimientos, eliminados, webhook caído).
 
 ### Cómo está armada la importación
 

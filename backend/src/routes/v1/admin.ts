@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '../../lib/validacion';
 import { randomBytes } from 'node:crypto';
-import { requireScope, ctxOf, hashApiKey } from '../../lib/auth/middleware';
+import { requireScope, ctxOf, hashApiKey, olvidarSesiones } from '../../lib/auth/middleware';
 import { listUsuarios, audit, serviceClient } from '../../lib/db';
 import { frontendOrigins } from '../../config/env';
 import { verificarSalud } from '../../lib/salud';
@@ -98,6 +98,7 @@ admin.patch(
       return c.json({ error: 'No puedes quitarte el rol admin' }, 422);
     }
     const data = await actualizarUsuario(ctx, id, patch);
+    olvidarSesiones(); // rol o acceso nuevos rigen desde la próxima petición, sin esperar el minuto de la caché
     await audit(ctx, { accion: 'actualizar_usuario', entidad: 'usuario', entidad_id: id, detalle: patch });
     return c.json(data);
   },
@@ -362,7 +363,11 @@ admin.post(
       recurrencias: asignacion,
     }),
   ),
-  async (c) => c.json(await aplicarSalida(ctxOf(c), c.req.param('id'), c.req.valid('json'))),
+  async (c) => {
+    const r = await aplicarSalida(ctxOf(c), c.req.param('id'), c.req.valid('json'));
+    olvidarSesiones(); // quien se va pierde el acceso desde la próxima petición
+    return c.json(r);
+  },
 );
 
 /** Restaurar acceso: reactiva, desbloquea en Auth y manda un enlace para definir contraseña nueva. */

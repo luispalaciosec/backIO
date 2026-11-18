@@ -236,6 +236,6 @@ patrón y ejecutiva, y **generar ahora**.
 
 El Builder sigue existiendo para proyectos que nacen de una cotización de PrometIO o de una plantilla. Pero la
 mayoría de los proyectos de fee nacen como listas en Basecamp: desde el 23/09 esas listas se convierten solas en
-proyectos cada 15 min, y en unos 20 segundos cuando el webhook avisa de un to-do nuevo (ver
+proyectos cada 30 min, y en unos 20 segundos cuando el webhook avisa de un to-do nuevo (ver
 [04 · Basecamp](./04-basecamp.md), «Basecamp como origen aceptado»), con `brief.origen =
 'importacion_basecamp'`, fechas tomadas de los to-dos y estado según su avance. La ejecutiva no crea: clasifica.

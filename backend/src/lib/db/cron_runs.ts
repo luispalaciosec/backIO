@@ -84,13 +84,21 @@ export async function ultimasCorridas(): Promise<Map<string, UltimaCorrida>> {
 }
 
 /** Primera corrida registrada de cada job (null si nunca corrió). */
+// La primera corrida de un job no cambia: se consulta una vez por proceso y se recuerda (el vigía la pedía cada hora).
+const primeraCorrida = new Map<string, number>();
+let inicioRegistro: number | null = null;
+
 export async function primerasCorridas(jobs: string[]): Promise<Map<string, number | null>> {
   const db = serviceClient();
   const pares = await Promise.all(
     jobs.map(async (job) => {
+      const recordada = primeraCorrida.get(job);
+      if (recordada !== undefined) return [job, recordada] as const;
       const { data, error } = await db.from('cron_runs').select('inicio_at').eq('job', job).order('inicio_at').limit(1).maybeSingle();
       throwIf(error);
-      return [job, data ? Date.parse(data.inicio_at) : null] as const;
+      const t = data ? Date.parse(data.inicio_at) : null;
+      if (t !== null) primeraCorrida.set(job, t);
+      return [job, t] as const;
     }),
   );
   return new Map(pares);
@@ -98,7 +106,9 @@ export async function primerasCorridas(jobs: string[]): Promise<Map<string, numb
 
 /** Inicio del registro: la corrida más antigua en cron_runs (antes de eso no hay con qué comparar). */
 export async function inicioDelRegistro(): Promise<number | null> {
+  if (inicioRegistro !== null) return inicioRegistro;
   const { data, error } = await serviceClient().from('cron_runs').select('inicio_at').order('inicio_at').limit(1).maybeSingle();
   throwIf(error);
-  return data ? Date.parse(data.inicio_at) : null;
+  inicioRegistro = data ? Date.parse(data.inicio_at) : null;
+  return inicioRegistro;
 }

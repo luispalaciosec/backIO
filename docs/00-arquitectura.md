@@ -131,7 +131,7 @@ El backend tiene su propio programador de tareas (`backend/src/lib/jobs.ts`, tab
 | Job | Cuándo |
 |---|---|
 | `notificaciones` | Cada minuto (reintento de correos) |
-| `estructura` | Cada 15 min (importación desde Basecamp) |
+| `estructura` | Cada 30 min (importación desde Basecamp) |
 | `reconcile` | Cada 30 min (reconciliación con Basecamp) |
 | `vigia` | Cada hora |
 | `horas` | Cada 6 h (timesheet de Basecamp) |
