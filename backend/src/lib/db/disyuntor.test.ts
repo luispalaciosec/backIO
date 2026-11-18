@@ -89,7 +89,7 @@ describe('disyuntor: prueba colgada (18/11)', () => {
   it('una prueba que no responde no deja el circuito abierto para siempre', async () => {
     let modo: 'caida' | 'colgada' | 'ok' = 'caida';
     const base = vi.fn(
-      (_i: RequestInfo | URL, init?: RequestInit) =>
+      (_i: unknown, init?: RequestInit) =>
         new Promise<Response>((resolve, reject) => {
           if (modo === 'caida') return resolve(sinPool());
           if (modo === 'ok') return resolve(ok());
