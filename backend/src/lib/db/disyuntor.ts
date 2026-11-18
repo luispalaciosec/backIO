@@ -19,10 +19,16 @@ const CODIGO_CAIDA = /"code"\s*:\s*"PGRST00[0-3]"/;
 let abiertoHasta = 0;
 let pausaMs = PAUSA_MIN_MS;
 let pruebaEnCurso = false;
+let pruebaDesde = 0;
+/** Una prueba que no responde en este tiempo se da por fallida (18/11: una prueba colgada durante el reinicio de
+ * Supabase dejó el circuito abierto con la base ya sana). */
+const PRUEBA_MAX_MS = 15_000;
+
+const pruebaColgada = (ahora: number) => pruebaEnCurso && ahora - pruebaDesde > PRUEBA_MAX_MS;
 
 /** ¿Está la base en pausa? El scheduler no corre tareas mientras tanto. */
 export function baseEnPausa(ahora = Date.now()): boolean {
-  return ahora < abiertoHasta || pruebaEnCurso;
+  return ahora < abiertoHasta || (pruebaEnCurso && !pruebaColgada(ahora));
 }
 
 /** Solo para tests. */
@@ -30,6 +36,7 @@ export function reiniciarDisyuntor(): void {
   abiertoHasta = 0;
   pausaMs = PAUSA_MIN_MS;
   pruebaEnCurso = false;
+  pruebaDesde = 0;
 }
 
 /** 504 no lo reintenta postgrest-js (sí el 503): la respuesta llega al instante. */
@@ -74,27 +81,35 @@ export function fetchConDisyuntor(base: typeof fetch = fetch): typeof fetch {
     // Pausa vencida: pasa una sola petición de prueba; las demás esperan su resultado como si siguiera abierto.
     const esPrueba = abiertoHasta !== 0;
     if (esPrueba) {
-      if (pruebaEnCurso) return respuestaCaida();
+      if (pruebaEnCurso && !pruebaColgada(ahora)) return respuestaCaida();
       pruebaEnCurso = true;
+      pruebaDesde = ahora;
     }
+    // La prueba lleva tiempo límite: sin él, una conexión colgada la dejaba «en curso» para siempre.
+    const limite = esPrueba ? new AbortController() : null;
+    const reloj = limite ? setTimeout(() => limite.abort(new Error('la prueba de la base no respondió')), PRUEBA_MAX_MS) : null;
+    // Una prueba vieja que termina después de otra más nueva no decide nada.
+    const vigente = () => !esPrueba || pruebaDesde === ahora;
     try {
-      const res = await base(input, init);
+      const signal = limite ? (init?.signal ? AbortSignal.any([init.signal, limite.signal]) : limite.signal) : init?.signal;
+      const res = await base(input, limite ? { ...init, signal } : init);
       if (await esCaida(res, esRest)) {
-        abrir();
+        if (vigente()) abrir();
         const cuerpo = await res.text().catch(() => '');
         return respuestaCaida(CODIGO_CAIDA.test(cuerpo) ? JSON.parse(cuerpo).message : undefined);
       }
-      if (esPrueba && esRest) cerrar();
+      if (esPrueba && esRest && vigente()) cerrar();
       return res;
     } catch (err) {
       // Sin respuesta (red, DNS, timeout): igual que una caída si era una consulta.
       if (esRest) {
-        abrir();
+        if (vigente()) abrir();
         return respuestaCaida(err instanceof Error ? err.message : undefined);
       }
       throw err;
     } finally {
-      if (esPrueba) pruebaEnCurso = false;
+      if (reloj) clearTimeout(reloj);
+      if (esPrueba && vigente()) pruebaEnCurso = false;
     }
   };
 }

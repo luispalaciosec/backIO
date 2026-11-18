@@ -78,3 +78,35 @@ describe('disyuntor de la base', () => {
     expect(baseEnPausa()).toBe(false);
   });
 });
+
+describe('disyuntor: prueba colgada (18/11)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    reiniciarDisyuntor();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('una prueba que no responde no deja el circuito abierto para siempre', async () => {
+    let modo: 'caida' | 'colgada' | 'ok' = 'caida';
+    const base = vi.fn(
+      (_i: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          if (modo === 'caida') return resolve(sinPool());
+          if (modo === 'ok') return resolve(ok());
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    const f = fetchConDisyuntor(base as unknown as typeof fetch);
+    await f(REST); // abre 15 s
+    modo = 'colgada';
+    vi.advanceTimersByTime(15_001);
+    const colgada = f(REST); // la prueba queda colgada
+    expect((await f(REST)).status).toBe(504); // mientras tanto, las demás no salen
+    modo = 'ok';
+    vi.advanceTimersByTime(15_001); // la prueba vence
+    expect(baseEnPausa()).toBe(false);
+    expect((await f(REST)).status).toBe(200); // una nueva prueba pasa y cierra
+    expect((await colgada).status).toBe(504);
+    expect((await f(REST)).status).toBe(200);
+  });
+});
