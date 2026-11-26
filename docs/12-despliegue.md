@@ -36,10 +36,12 @@ Dependabot (`.github/dependabot.yml`) propone actualizaciones de dependencias un
 2. En Settings → Source del servicio:
    - **Root Directory**: vacío (la raíz del repo). El Dockerfile necesita `shared/` y el lockfile.
      Si Railway lo puso en `backend` al detectar el monorepo, bórralo.
-   - El builder y la ruta del Dockerfile (`backend/Dockerfile`) los toma de `railway.json` en la raíz. Si prefieres
-     forzarlo por variable: `RAILWAY_DOCKERFILE_PATH=backend/Dockerfile`.
-   - `railway.json` también fija el healthcheck en `/health` (espera hasta 120 s) y el reinicio ante fallo
-     (`ON_FAILURE`, hasta 5 intentos).
+   - Todo se configura en el panel del servicio (Settings), no en un archivo del repo. Railway dejó de leer
+     `railway.json` el 1/12/2026 y BackIO lo retiró el 26/11/2026.
+     - **Build:** builder Dockerfile, ruta `/backend/Dockerfile`; Watch Paths `/backend/**` y `/shared/**` (el backend
+       usa `shared/`, así que un cambio solo ahí también debe redesplegar).
+     - **Deploy:** Healthcheck Path `/health` con 120 s de espera (un despliegue que no arranca no reemplaza al que
+       funciona) y Restart Policy «On Failure».
    - La imagen usa Node 22 y la versión de pnpm de `packageManager`, y arranca con `ENABLE_INTERNAL_CRON=1` y
      `NODE_ENV=production`.
 3. Variables (Settings → Variables). La lista completa, con qué hace cada una y cuáles son opcionales, está en
