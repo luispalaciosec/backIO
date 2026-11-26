@@ -2,6 +2,7 @@
  * Consultas del middleware de autenticación (lib/auth/middleware). Reciben el cliente explícito porque cada vía usa
  * el suyo: service role para API keys y OAuth, cliente con el JWT del usuario (RLS) para la sesión de la UI.
  */
+import { log } from '../logger';
 import { lanzarSiBaseCaida, serviceClient, type Db } from './client';
 
 export async function getApiKeyPorHash(db: Db, keyHash: string) {
@@ -31,6 +32,15 @@ export function registrarUsoApiKey(db: Db, apiKeyId: string): void {
 export async function getUsuarioSesion(db: Db, usuarioId: string) {
   const { data, error, status } = await db.from('usuarios').select('tenant_id, rol, nombre, activo').eq('id', usuarioId).maybeSingle();
   lanzarSiBaseCaida(error, status);
+  // 26/11: Auth aceptaba la sesión y la API de datos devolvía 401 con el mismo token; sin esto no quedaba el motivo.
+  if (error)
+    log.warn('[auth] la API de datos rechazó la sesión', {
+      status,
+      codigo: error.code ?? null,
+      mensaje: error.message,
+      detalle: error.details ?? null,
+      pista: error.hint ?? null,
+    });
   return data;
 }
 
