@@ -158,6 +158,17 @@ cada pantalla abierta y cada tarea esperaban hasta un minuto y lo volvían a int
 ocupaba las conexiones que la base necesitaba para recuperarse. Las pestañas de BackIO en segundo plano ya no consultan
 la campana ni el daily hasta que se vuelven a mirar.
 
+### Todos ven «Credenciales inválidas» al mismo tiempo
+
+Si le pasa a todo el equipo a la vez y Supabase está sano, revisa el log del backend: cada rechazo dice el motivo
+(`[auth] sesión rechazada por Auth` o `[auth] la API de datos rechazó la sesión`). El 26/11/2026 fue `PGRST303 · JWT
+issued at future`: el reloj de la API de datos de Supabase iba atrasado respecto del de Auth. Se resolvió reiniciando el
+proyecto, y desde entonces el backend tiene un respaldo: si la API de datos rechaza por ese motivo una sesión que Auth ya
+aceptó, el backend la reemplaza por un token propio de vida corta, con el mismo usuario y rol (RLS aplica igual), durante
+15 minutos. Necesita la variable `SUPABASE_JWT_SECRET` en Railway (la clave anterior del proyecto, en Supabase → JWT
+Keys → Legacy JWT Secret); sin ella no hace nada. Si un día se revoca esa clave en Supabase, hay que borrar también la
+variable. Queda en el log como `[auth] la API de datos rechaza sesiones por reloj desfasado`.
+
 ### No llegan los correos
 
 1. Admin → Servicios: Resend debe estar operativo y con remitente.

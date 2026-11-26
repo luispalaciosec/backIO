@@ -12,6 +12,7 @@ const schema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_JWT_SECRET: z.string().optional(), // plan B ante el reloj desfasado de Supabase (lib/auth/reloj.ts)
   BACKEND_PORT: z.coerce.number().default(4000),
   FRONTEND_URL: z.string().default('http://localhost:3000'), // una o varias URLs separadas por coma
   ANTHROPIC_API_KEY: z.string().optional(),

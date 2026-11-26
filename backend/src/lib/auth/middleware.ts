@@ -12,6 +12,7 @@ import { lanzarSiBaseCaida, serviceClient, userClient, type DbCtx } from '../db/
 import { getApiKeyPorHash, getUsuarioOAuth, getUsuarioSesion, registrarUsoApiKey } from '../db/auth';
 import { resolverAccessToken } from '../oauth';
 import { log } from '../logger';
+import { marcarTokenVerificado } from './reloj';
 
 export type Scope =
   | 'read:backlog'
@@ -129,6 +130,8 @@ async function resolveJwt(jwt: string): Promise<AuthInfo | null> {
     });
     return null;
   }
+  // Auth confirmó esta sesión: si la API de datos la rechaza por reloj desfasado, el plan B puede firmar su respaldo.
+  marcarTokenVerificado(jwt, vencimientoDelToken(jwt));
   const u = await getUsuarioSesion(db, auth.user.id);
   if (!u) {
     log.warn('[auth] sesión válida sin fila visible en usuarios', { usuario: auth.user.id });
