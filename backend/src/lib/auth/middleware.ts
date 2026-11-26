@@ -11,6 +11,7 @@ import { ROLES_INTERNOS_GESTION } from '@backio/shared';
 import { lanzarSiBaseCaida, serviceClient, userClient, type DbCtx } from '../db/client';
 import { getApiKeyPorHash, getUsuarioOAuth, getUsuarioSesion, registrarUsoApiKey } from '../db/auth';
 import { resolverAccessToken } from '../oauth';
+import { log } from '../logger';
 
 export type Scope =
   | 'read:backlog'
@@ -81,6 +82,17 @@ export function olvidarSesiones(): void {
   sesiones.clear();
 }
 
+/** Algoritmo y clave con que se firmó el token (no son secretos): sirve para detectar un cambio de claves de firma. */
+function cabeceraDelToken(jwt: string): { alg?: string; kid?: string; vence?: string } {
+  try {
+    const h = JSON.parse(Buffer.from(jwt.split('.')[0] ?? '', 'base64url').toString()) as { alg?: string; kid?: string };
+    const exp = vencimientoDelToken(jwt);
+    return { alg: h.alg, kid: h.kid, vence: exp ? new Date(exp).toISOString() : undefined };
+  } catch {
+    return {};
+  }
+}
+
 function vencimientoDelToken(jwt: string): number {
   try {
     const exp = (JSON.parse(Buffer.from(jwt.split('.')[1] ?? '', 'base64url').toString()) as { exp?: number }).exp;
@@ -108,9 +120,20 @@ async function resolveJwt(jwt: string): Promise<AuthInfo | null> {
   const { data: auth, error } = await db.auth.getUser(jwt);
   // Si Auth no llega a la base, la sesión puede estar bien: decir «credenciales inválidas» confundió el 9/11/2026.
   lanzarSiBaseCaida(error);
-  if (error || !auth.user) return null;
+  if (error || !auth.user) {
+    // Por qué se rechazó, sin el token: el 26/11 todo el equipo recibía «Credenciales inválidas» sin rastro en el log.
+    log.warn('[auth] sesión rechazada por Auth', {
+      motivo: error?.message ?? 'sin usuario',
+      status: error?.status ?? null,
+      ...cabeceraDelToken(jwt),
+    });
+    return null;
+  }
   const u = await getUsuarioSesion(db, auth.user.id);
-  if (!u) return null;
+  if (!u) {
+    log.warn('[auth] sesión válida sin fila visible en usuarios', { usuario: auth.user.id });
+    return null;
+  }
   const usuario = u as { tenant_id: string; rol: Rol; nombre: string; activo: boolean };
   if (!usuario.activo) return null;
   const hasta = Math.min(ahora + SESION_TTL_MS, vencimientoDelToken(jwt));
