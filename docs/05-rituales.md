@@ -259,6 +259,21 @@ nuevos, vencidas que siguen abiertas, y detalle por persona (cerradas / planific
 La IA recibe `kpis` para el balance del día. Desde el 29/10/2026 estos indicadores son los mismos que guarda la foto
 del evolutivo (`fotoDeDia`): antes se calculaban aparte y el cierre publicado no coincidía con el evolutivo.
 
+**Tareas de varios días: «en curso» (27/11/2026).** Elegir una tarea para hoy no es comprometer su entrega hoy: un guion o
+una gráfica con revisiones internas se trabaja lunes, martes y miércoles y se entrega el miércoles. Por eso el cierre separa
+lo elegido en dos:
+
+| Grupo | Qué entra | Cuenta para el cumplimiento |
+|---|---|---|
+| **Para entregar hoy** | Fecha de entrega hoy o antes, o se cerró hoy aunque se entregara después | Sí: «2 de 3» |
+| **En curso** | Se entrega otro día (o no tiene fecha) | No |
+
+Una tarea en curso lleva **«con avance hoy»** si tuvo horas del timesheet ese día o cambió de estado (por ejemplo, a
+revisión). Antes de armar el cierre, BackIO trae de Basecamp las horas del día. El detalle por persona queda, por ejemplo:
+«2 / 3 · 67% · 7 en curso (5 con avance hoy) · +1 fuera del daily». La regla se aplicó también a toda la historia del
+evolutivo (`recalcularDesde`), sobre la selección que guardó cada foto; los mensajes ya publicados en Basecamp no cambian.
+Código: `metricasDia` en `backend/src/lib/evolutivo.ts`.
+
 **Una publicación por mesa, día y tipo (29/10/2026).** Si la apertura (o el cierre) de la mesa ya salió hoy,
 `POST /semanas/daily/publicar` responde 409 con la hora de la anterior, y la pantalla pregunta antes de publicarla
 otra vez (`repetir: true`). Dos clics simultáneos, dos pestañas o un reintento ya no la duplican: las llamadas de la

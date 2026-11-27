@@ -8,6 +8,9 @@ import { Tarjeta, BarrasDobles, Lineas } from '@/components/informe/Graficas';
 
 interface MetricasDia {
   planificadas: number;
+  para_hoy?: number;
+  en_curso?: number;
+  en_curso_con_avance?: number;
   cerradas_planificadas: number;
   cumplimiento_pct: number | null;
   cerradas_fuera: number;
@@ -24,6 +27,9 @@ interface PersonaDia {
   usuario_id: string;
   nombre: string;
   planificadas: number;
+  para_hoy?: number;
+  en_curso?: number;
+  con_avance?: number;
   cerradas: number;
   fuera: number;
 }
@@ -251,7 +257,7 @@ function EvolutivoVista() {
               <div className="text-xs uppercase tracking-wide text-gray-500">Cumplimiento del plan diario</div>
               <div className="text-2xl font-bold">{r.cumplimiento_pct === null ? '—' : `${r.cumplimiento_pct}%`}</div>
               <div className="text-xs text-gray-500">
-                {r.cerradas_planificadas} de {r.planificadas} tareas elegidas
+                {r.cerradas_planificadas} de {r.planificadas} que se entregaban esos días
               </div>
               <Delta ahora={r.cumplimiento_pct} antes={a?.cumplimiento_pct} mejorSiSube sufijo=" pts" />
             </div>
@@ -287,10 +293,14 @@ function EvolutivoVista() {
 
           {d.dias.length > 0 ? (
             <div className="grid gap-4 xl:grid-cols-2">
-              <Tarjeta titulo="Plan del día: elegidas vs cerradas">
+              <Tarjeta titulo="Plan del día: para entregar vs cerradas">
                 <BarrasDobles
-                  datos={d.dias.map((x) => ({ etiqueta: dm(x.fecha), a: x.metricas.planificadas, b: x.metricas.cerradas_planificadas }))}
-                  a={{ id: 'a', nombre: 'Elegidas para el día', color: '#94a3b8' }}
+                  datos={d.dias.map((x) => ({
+                    etiqueta: dm(x.fecha),
+                    a: x.metricas.para_hoy ?? x.metricas.planificadas,
+                    b: x.metricas.cerradas_planificadas,
+                  }))}
+                  a={{ id: 'a', nombre: 'Para entregar ese día', color: '#94a3b8' }}
                   b={{ id: 'b', nombre: 'Cerradas del plan', color: '#059669' }}
                 />
               </Tarjeta>
@@ -316,7 +326,12 @@ function EvolutivoVista() {
                 <thead>
                   <tr className="text-xs text-gray-500">
                     <th className="th">Día</th>
-                    <th className="th text-center">Plan</th>
+                    <th
+                      className="th text-center"
+                      title="Cerradas de lo que se entregaba ese día; lo que se entrega otro día va como «en curso»"
+                    >
+                      Plan
+                    </th>
                     <th className="th text-center">Cumplimiento</th>
                     <th className="th text-center">Fuera del daily</th>
                     <th className="th text-center">Nuevas</th>
@@ -438,7 +453,8 @@ function FilaDia({ x, abierto, onToggle }: { x: Dia; abierto: boolean; onToggle:
           {x.origen === 'reconstruido' && <span className="ml-1 text-[10px] text-gray-400">reconstruido</span>}
         </td>
         <td className="td text-center tabular-nums">
-          {m.cerradas_planificadas}/{m.planificadas}
+          {m.cerradas_planificadas}/{m.para_hoy ?? m.planificadas}
+          {m.en_curso ? <span className="block text-[11px] text-gray-500">+{m.en_curso} en curso</span> : null}
         </td>
         <td className={`td text-center tabular-nums font-semibold ${tono}`}>
           {m.cumplimiento_pct === null ? '—' : `${m.cumplimiento_pct}%`}
@@ -479,7 +495,12 @@ function FilaDia({ x, abierto, onToggle }: { x: Dia; abierto: boolean; onToggle:
             <div className="flex flex-wrap gap-2">
               {x.por_persona.map((p) => (
                 <span key={p.usuario_id} className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs">
-                  <b>{p.nombre}</b>: {p.cerradas}/{p.planificadas} del plan{p.fuera ? ` · +${p.fuera} fuera` : ''}
+                  <b>{p.nombre}</b>:{' '}
+                  {(p.para_hoy ?? p.planificadas)
+                    ? `${Math.min(p.cerradas, p.para_hoy ?? p.planificadas)}/${p.para_hoy ?? p.planificadas} para hoy`
+                    : 'nada vencía'}
+                  {p.en_curso ? ` · ${p.en_curso} en curso${p.con_avance ? ` (${p.con_avance} con avance)` : ''}` : ''}
+                  {p.fuera ? ` · +${p.fuera} fuera` : ''}
                 </span>
               ))}
             </div>

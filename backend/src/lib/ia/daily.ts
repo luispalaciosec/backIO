@@ -12,9 +12,21 @@ import { seccionesDaily } from '../rituals/daily';
 import { cargarMesa, fotoDeDia } from '../evolutivo';
 import { dailyItemTexto, type DailyItem, type DailyMensaje, type DailyKpis } from '../mcp/publish';
 import { generarTexto } from './index';
+import { sincronizarHoras } from '../horas';
+import { log } from '../logger';
 import { hoyLocal, inicioDiaLocal, sumarDias, nombrePersona, MOTIVOS_REPROGRAMACION } from '@backio/shared';
 
 /** El daily no se arma ni se publica con tareas sin responsable: nadie sabría a quién preguntar. */
+
+let horasSincronizadasAt = 0;
+async function horasDeHoyAlDia(ctx: DbCtx): Promise<void> {
+  if (Date.now() - horasSincronizadasAt < 10 * 60_000) return;
+  horasSincronizadasAt = Date.now();
+  await sincronizarHoras(ctx, { dias: 1 }).catch((e: unknown) =>
+    log.warn('[daily] horas de hoy sin actualizar antes del cierre', e instanceof Error ? e.message : String(e)),
+  );
+}
+
 export class DailySinResponsable extends Error {
   constructor(public tareas: string[]) {
     super(
@@ -81,12 +93,23 @@ export async function armarDailyMensaje(
     );
     completadas = hechas.filter((r) => r.daily_fecha === hoy).map(linea);
     completadasFuera = hechas.filter((r) => r.daily_fecha !== hoy).map(linea);
+    // Horas del timesheet de hoy al día antes de medir: marcan las tareas «en curso» con avance (pedido del 27/11). Una
+    // vez cada 10 minutos como mucho; si Basecamp no responde, el cierre sale igual con las horas que ya había.
+    await horasDeHoyAlDia(ctx);
     // Indicadores del día: los mismos que guarda la foto del evolutivo al publicar el cierre (antes se calculaban aparte
     // y no coincidían; revisión del 29/10/2026).
     const foto = fotoDeDia(await cargarMesa(ctx, mesa, inicioDiaLocal(sumarDias(hoy, -1))), hoy, false);
     kpis = {
       ...foto.metricas,
-      por_persona: foto.por_persona.map(({ nombre, planificadas, cerradas, fuera }) => ({ nombre, planificadas, cerradas, fuera })),
+      por_persona: foto.por_persona.map(({ nombre, planificadas, para_hoy, en_curso, con_avance, cerradas, fuera }) => ({
+        nombre,
+        planificadas,
+        para_hoy,
+        en_curso,
+        con_avance,
+        cerradas,
+        fuera,
+      })),
     };
   }
   return {
@@ -169,7 +192,7 @@ Formato OBLIGATORIO (markdown simple, se convierte a HTML):
 - Fechas como día/mes (22/09), nunca 2026-09-22. Sin títulos propios, sin #, sin tablas, sin emojis, sin saludos ni despedidas.
 Contenido: bloqueos que hay que destrabar (con el nombre de quien puede destrabar si está en los datos).
 No relaciones tareas entre sí ni agregues causas o consecuencias que no estén en los datos.
-En un cierre: kpis trae los indicadores del día (cumplimiento del plan, entradas fuera de planificación, reprocesos, vencidas abiertas); úsalos en el balance con sus números, sin inventar otros. completadas_hoy y completadas_fuera_del_daily son lo que sí se cerró (dilo por persona, reconociendo el trabajo sin exagerar); hoy_se_trabaja es lo que quedó abierto de la selección del día.
+En un cierre: kpis trae los indicadores del día (cumplimiento de lo que se entregaba hoy, tareas en curso, entradas fuera de planificación, reprocesos, vencidas abiertas); úsalos en el balance con sus números, sin inventar otros. Las tareas en curso se entregan otro día: son trabajo de varios días, no incumplimientos; si tuvieron avance hoy, reconócelo. completadas_hoy y completadas_fuera_del_daily son lo que sí se cerró (dilo por persona, reconociendo el trabajo sin exagerar); hoy_se_trabaja es lo que quedó abierto de la selección del día.
 Tono de compañero de mesa, no de jefe.`;
 
 export async function narrarDaily(ctx: DbCtx, mesa: Mesa, m: DailyMensaje): Promise<string> {

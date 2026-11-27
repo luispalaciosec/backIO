@@ -142,7 +142,18 @@ export interface DailyKpis {
   reprogramaciones_24h: number;
   bloqueos_nuevos: number;
   vencidas_abiertas: number;
-  por_persona: { nombre: string; planificadas: number; cerradas: number; fuera: number }[];
+  para_hoy?: number;
+  en_curso?: number;
+  en_curso_con_avance?: number;
+  por_persona: {
+    nombre: string;
+    planificadas: number;
+    para_hoy?: number;
+    en_curso?: number;
+    con_avance?: number;
+    cerradas: number;
+    fuera: number;
+  }[];
 }
 
 /** Bloque de métricas del cierre. Lista, no tabla: Basecamp no admite tablas en mensajes. */
@@ -152,7 +163,18 @@ export function kpisDaily(k: DailyKpis, men?: Menciones): string {
     k.cumplimiento_pct === null ? '#888' : k.cumplimiento_pct >= 80 ? '#1e8449' : k.cumplimiento_pct >= 50 ? '#b9770e' : '#c0392b';
   const fila = (etiqueta: string, valor: string) => `<li>${etiqueta}: <strong>${valor}</strong></li>`;
   const general = `<ul>${[
-    fila('Cumplimiento del plan del día', `${k.cerradas_planificadas} de ${k.planificadas} · <span style="color:${color}">${pct}</span>`),
+    fila(
+      'Cumplimiento de lo que se entregaba hoy',
+      `${k.cerradas_planificadas} de ${k.para_hoy ?? k.planificadas} · <span style="color:${color}">${pct}</span>`,
+    ),
+    ...(k.en_curso
+      ? [
+          fila(
+            'En curso (se entregan otro día)',
+            `${k.en_curso}${k.en_curso_con_avance ? ` · ${k.en_curso_con_avance} con avance hoy` : ''}`,
+          ),
+        ]
+      : []),
     fila('Cerradas fuera del daily', String(k.cerradas_fuera)),
     fila('Total cerradas hoy', String(k.cerradas_total)),
     fila(
@@ -165,10 +187,17 @@ export function kpisDaily(k: DailyKpis, men?: Menciones): string {
     fila('Vencidas que siguen abiertas', String(k.vencidas_abiertas)),
   ].join('')}</ul>`;
   if (!k.por_persona.length) return general;
-  const personas = `<p><em>Por persona · cerradas / planificadas</em></p><ul>${k.por_persona
+  // Pedido de Carolina (27/11): una tarea de varios días no es «0 de 10». Se mide lo que se entregaba hoy y lo demás se
+  // muestra como en curso, con cuántas tuvieron avance (horas o un cambio de estado hoy).
+  const personas = `<p><em>Por persona · cerradas / para entregar hoy</em></p><ul>${k.por_persona
     .map((p) => {
-      const pp = p.planificadas ? ` · ${Math.round((p.cerradas / p.planificadas) * 100)}%` : '';
-      return `<li>${mencion(p.nombre, men)}: <strong>${p.cerradas} / ${p.planificadas}</strong>${pp}${p.fuera ? ` · +${p.fuera} fuera del daily` : ''}</li>`;
+      const base = p.para_hoy ?? p.planificadas;
+      const cerradasHoy = Math.min(p.cerradas, base);
+      const plan = base
+        ? `<strong>${cerradasHoy} / ${base}</strong> · ${Math.round((cerradasHoy / base) * 100)}%`
+        : '<strong>nada vencía hoy</strong>';
+      const curso = p.en_curso ? ` · ${p.en_curso} en curso${p.con_avance ? ` (${p.con_avance} con avance hoy)` : ''}` : '';
+      return `<li>${mencion(p.nombre, men)}: ${plan}${curso}${p.fuera ? ` · +${p.fuera} fuera del daily` : ''}</li>`;
     })
     .join('')}</ul>`;
   return general + personas;

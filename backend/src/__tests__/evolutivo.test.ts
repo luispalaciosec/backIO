@@ -58,7 +58,7 @@ describe('métricas del día', () => {
     const dia = '2026-09-23';
     const tareas = [
       t({ id: 'p1', completado_at: '2026-09-23T20:00:00Z' }), // planificada y cerrada
-      t({ id: 'p2', owner_agencia: ['beto'] }), // planificada, abierta
+      t({ id: 'p2', owner_agencia: ['beto'], fecha_entrega: '2026-09-23' }), // planificada para entregar hoy, abierta
       t({ id: 'f1', completado_at: '2026-09-23T16:00:00Z', owner_agencia: ['beto'] }), // cerrada fuera del daily
       t({ id: 'n1', created_at: '2026-09-23T15:00:00Z', planificacion: 'urgente' }), // nueva urgente
       t({ id: 'v1', fecha_entrega: '2026-09-20' }), // vencida abierta
@@ -96,6 +96,53 @@ describe('métricas del día', () => {
         { metricas, publicado: false },
       ]),
     ).toMatchObject({ planificadas: 4, cerradas_planificadas: 2, cumplimiento_pct: 50, dias_con_cierre: 1 });
+  });
+});
+
+describe('métricas del día: tareas de varios días (pedido de Carolina, 27/11)', () => {
+  it('lo que se entrega otro día queda «en curso», no cuenta como incumplido, y se marca si tuvo avance', () => {
+    const dia = '2026-11-24'; // lunes
+    const fer = { owner_agencia: ['fer'] };
+    const tareas = [
+      t({ id: 'g1', ...fer, fecha_entrega: '2026-11-26' }), // guion, se entrega el miércoles; tuvo horas hoy
+      t({ id: 'g2', ...fer, fecha_entrega: '2026-11-27' }), // gráfica con revisiones; sin señales hoy
+      t({ id: 'h1', ...fer, fecha_entrega: '2026-11-24' }), // vencía hoy y no se cerró
+      t({ id: 'h2', ...fer, fecha_entrega: '2026-11-24', completado_at: '2026-11-24T20:00:00Z' }), // vencía hoy y se cerró
+      t({ id: 'a1', ...fer, fecha_entrega: '2026-11-28', completado_at: '2026-11-24T21:00:00Z' }), // se adelantó: cuenta
+    ];
+    const { metricas, por_persona } = metricasDia({
+      dia,
+      seleccion: new Set(['g1', 'g2', 'h1', 'h2', 'a1']),
+      tareas,
+      reprocesos: [],
+      reprogramaciones: [],
+      bloqueos: 0,
+      nombres: new Map([['fer', 'Fernando']]),
+      avance: new Set(['g1']),
+    });
+    expect(metricas).toMatchObject({
+      planificadas: 5,
+      para_hoy: 3,
+      en_curso: 2,
+      en_curso_con_avance: 1,
+      cerradas_planificadas: 2,
+      cumplimiento_pct: 67,
+    });
+    expect(por_persona[0]).toMatchObject({ nombre: 'Fernando', planificadas: 5, para_hoy: 3, en_curso: 2, con_avance: 1, cerradas: 2 });
+  });
+
+  it('el resumen del mes mide sobre lo que se entregaba cada día', () => {
+    const m = (para_hoy: number, cerradas: number, planificadas: number) =>
+      ({ planificadas, para_hoy, cerradas_planificadas: cerradas }) as unknown as Parameters<typeof resumir>[0][number]['metricas'];
+    expect(
+      resumir([
+        { metricas: m(2, 2, 10), publicado: true },
+        { metricas: m(2, 1, 4), publicado: true },
+      ]),
+    ).toMatchObject({
+      planificadas: 4,
+      cumplimiento_pct: 75,
+    });
   });
 });
 

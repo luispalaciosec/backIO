@@ -88,6 +88,65 @@ export async function listEventosBloqueo(ctx: DbCtx, desdeIso: string) {
   );
 }
 
+/**
+ * Señales de que se trabajó en una tarea un día (pedido de Carolina, 27/11): cambios de estado en la auditoría. Junto con
+ * las horas del timesheet marcan «en curso, con avance» a las tareas elegidas que se entregan otro día.
+ */
+export async function listEventosEstado(ctx: DbCtx, desdeIso: string) {
+  const db = serviceClient();
+  return paginar<{ entidad_id: string; created_at: string }>((a, b) =>
+    db
+      .from('audit_log')
+      .select('entidad_id, created_at')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('entidad', 'requerimiento')
+      .not('detalle->>estado_operativo', 'is', null)
+      .gte('created_at', desdeIso)
+      .order('created_at')
+      .range(a, b),
+  );
+}
+
+/** Horas del timesheet con tarea desde un día (YYYY-MM-DD): qué tarea tuvo horas qué día. */
+export async function listHorasPorTareaDesde(ctx: DbCtx, desde: string) {
+  const db = serviceClient();
+  return paginar<{ requerimiento_id: string; fecha: string }>((a, b) =>
+    db
+      .from('horas')
+      .select('requerimiento_id, fecha')
+      .eq('tenant_id', ctx.tenantId)
+      .not('requerimiento_id', 'is', null)
+      .gt('horas', 0)
+      .gte('fecha', desde)
+      .order('id')
+      .range(a, b),
+  );
+}
+
+/** Fotos de una mesa con su selección guardada: para recalcular las métricas con una regla nueva. */
+export async function listDailySnapshotsParaRecalcular(ctx: DbCtx, mesaId: string, desde: string) {
+  return paginar<{ id: string; fecha: string; seleccion: string[] }>((a, b) =>
+    serviceClient()
+      .from('daily_snapshots')
+      .select('id, fecha, seleccion')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('mesa_id', mesaId)
+      .gte('fecha', desde)
+      .order('fecha')
+      .range(a, b),
+  );
+}
+
+/** Reemplaza solo las métricas de una foto (no toca su origen, su selección ni si se publicó). */
+export async function actualizarMetricasSnapshot(ctx: DbCtx, id: string, metricas: unknown, porPersona: unknown): Promise<void> {
+  const { error } = await serviceClient()
+    .from('daily_snapshots')
+    .update({ metricas: metricas as never, por_persona: porPersona as never })
+    .eq('id', id)
+    .eq('tenant_id', ctx.tenantId);
+  throwIf(error);
+}
+
 /** Aperturas y cierres del daily publicados para la mesa. */
 /** Lo que se sumó como comentario a los dailys publicados desde una fecha («Agregar a la apertura»). */
 export async function listAgregadosDaily(ctx: DbCtx, mesaId: string, desdeIso: string) {

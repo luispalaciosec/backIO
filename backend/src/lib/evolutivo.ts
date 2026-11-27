@@ -29,6 +29,10 @@ import {
   listDailySnapshots,
   listEventosBloqueo,
   listEventosDailyFecha,
+  listEventosEstado,
+  listHorasPorTareaDesde,
+  listDailySnapshotsParaRecalcular,
+  actualizarMetricasSnapshot,
   listPublicacionesDaily,
   listReprocesosDesde,
   listReprogramacionesDesde,
@@ -59,7 +63,14 @@ export interface EventoSeleccion {
   at: string;
 }
 export interface MetricasDia {
+  /** Todo lo elegido para el día (para entregar hoy y en curso). */
   planificadas: number;
+  /** Elegidas que se entregaban ese día (o antes), o que se cerraron ese día: sobre estas se mide el cumplimiento. */
+  para_hoy?: number;
+  /** Elegidas que se entregan otro día (trabajo de varios días): no cuentan contra el cumplimiento. */
+  en_curso?: number;
+  /** De las en curso, las que tuvieron horas del timesheet o un cambio de estado ese día. */
+  en_curso_con_avance?: number;
   cerradas_planificadas: number;
   cumplimiento_pct: number | null;
   cerradas_fuera: number;
@@ -76,6 +87,9 @@ export interface PersonaDia {
   usuario_id: string;
   nombre: string;
   planificadas: number;
+  para_hoy?: number;
+  en_curso?: number;
+  con_avance?: number;
   cerradas: number;
   fuera: number;
 }
@@ -153,6 +167,8 @@ export function metricasDia(p: {
   reprogramaciones: { requerimiento_id: string; created_at: string }[];
   bloqueos: number;
   nombres: Map<string, string>;
+  /** Tareas con horas del timesheet o un cambio de estado ese día. */
+  avance?: Set<string>;
 }): { metricas: MetricasDia; por_persona: PersonaDia[] } {
   const desde = inicioDia(p.dia),
     hasta = finDia(p.dia);
@@ -160,6 +176,13 @@ export function metricasDia(p: {
   const cerradasHoy = p.tareas.filter((t) => enRango(t.completado_at, desde, hasta));
   const planificadas = p.tareas.filter((t) => p.seleccion.has(t.id));
   const cerradasPlan = planificadas.filter((t) => enRango(t.completado_at, desde, hasta));
+  // Pedido de Carolina (27/11): elegir una tarea para hoy no es comprometer su entrega hoy. Un guion o una gráfica con
+  // revisiones se trabaja lunes, martes y miércoles y se entrega el miércoles: lunes y martes está «en curso», no
+  // incumplida. El cumplimiento se mide sobre lo que se entregaba ese día (o antes) y sobre lo que se cerró ese día.
+  const esParaHoy = (t: TareaEvo) => enRango(t.completado_at, desde, hasta) || (!!t.fecha_entrega && t.fecha_entrega <= p.dia);
+  const paraHoy = planificadas.filter(esParaHoy);
+  const enCurso = planificadas.filter((t) => !esParaHoy(t));
+  const conAvance = (t: TareaEvo) => !!p.avance?.has(t.id);
   const fuera = cerradasHoy.filter((t) => !p.seleccion.has(t.id));
   // Nueva = pedida ese día (fecha_pedido); una importación masiva no cuenta como trabajo nuevo.
   const nuevas = p.tareas.filter(
@@ -173,21 +196,38 @@ export function metricasDia(p: {
   const porPersona = new Map<string, PersonaDia>();
   const pp = (id: string) => {
     if (!porPersona.has(id))
-      porPersona.set(id, { usuario_id: id, nombre: p.nombres.get(id) ?? '—', planificadas: 0, cerradas: 0, fuera: 0 });
+      porPersona.set(id, {
+        usuario_id: id,
+        nombre: p.nombres.get(id) ?? '—',
+        planificadas: 0,
+        para_hoy: 0,
+        en_curso: 0,
+        con_avance: 0,
+        cerradas: 0,
+        fuera: 0,
+      });
     return porPersona.get(id)!;
   };
   for (const t of planificadas)
     for (const o of responsablesDe(t)) {
       const x = pp(o);
       x.planificadas += 1;
+      if (esParaHoy(t)) x.para_hoy = (x.para_hoy ?? 0) + 1;
+      else {
+        x.en_curso = (x.en_curso ?? 0) + 1;
+        if (conAvance(t)) x.con_avance = (x.con_avance ?? 0) + 1;
+      }
       if (enRango(t.completado_at, desde, hasta)) x.cerradas += 1;
     }
   for (const t of fuera) for (const o of responsablesDe(t)) pp(o).fuera += 1;
   return {
     metricas: {
       planificadas: planificadas.length,
+      para_hoy: paraHoy.length,
+      en_curso: enCurso.length,
+      en_curso_con_avance: enCurso.filter(conAvance).length,
       cerradas_planificadas: cerradasPlan.length,
-      cumplimiento_pct: porcentaje(cerradasPlan.length, planificadas.length),
+      cumplimiento_pct: porcentaje(cerradasPlan.length, paraHoy.length),
       cerradas_fuera: fuera.length,
       cerradas_total: cerradasHoy.length,
       nuevas_hoy: nuevas.length,
@@ -279,6 +319,8 @@ interface DatosMesa {
   bloqueos: { requerimiento_id: string; at: string }[];
   publicaciones: { tipo: 'apertura' | 'cierre'; at: string; message_id: number | null }[];
   nombres: Map<string, string>;
+  /** Día (Guayaquil) en que cada tarea tuvo horas o un cambio de estado. */
+  avance: { requerimiento_id: string; dia: string }[];
 }
 
 export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Promise<DatosMesa> {
@@ -289,13 +331,15 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
   ];
   const tareas = partes.length ? await listTareasEvolutivo(ctx, partes) : [];
   const ids = new Set(tareas.map((t) => t.id));
-  const [rp, rg, ev, bl, pub, usuarios] = await Promise.all([
+  const [rp, rg, ev, bl, pub, usuarios, est, hs] = await Promise.all([
     listReprocesosDesde(ctx, desdeIso),
     listReprogramacionesDesde(ctx, desdeIso),
     listEventosDailyFecha(ctx, desdeIso),
     listEventosBloqueo(ctx, desdeIso),
     listPublicacionesDaily(ctx, mesa.id, desdeIso),
     listUsuarios(ctx, { incluirInactivos: true }),
+    listEventosEstado(ctx, desdeIso),
+    listHorasPorTareaDesde(ctx, diaLocal(desdeIso)),
   ]);
   return {
     mesa,
@@ -312,6 +356,10 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
       message_id: x.detalle?.message_id ?? null,
     })),
     nombres: new Map(usuarios.map((u) => [u.id, nombrePersona(u)])),
+    avance: [
+      ...est.filter((e) => ids.has(e.entidad_id)).map((e) => ({ requerimiento_id: e.entidad_id, dia: diaLocal(e.created_at) })),
+      ...hs.filter((h) => ids.has(h.requerimiento_id)).map((h) => ({ requerimiento_id: h.requerimiento_id, dia: h.fecha })),
+    ],
   };
 }
 
@@ -335,6 +383,7 @@ export function fotoDeDia(d: DatosMesa, dia: string, reconstruir: boolean) {
     reprogramaciones: d.reprogramaciones,
     bloqueos,
     nombres: d.nombres,
+    avance: new Set(d.avance.filter((a) => a.dia === dia).map((a) => a.requerimiento_id)),
   });
   return {
     metricas,
@@ -473,6 +522,37 @@ export async function reconstruirDesde(ctx: DbCtx, desde: string): Promise<{ dia
   return { dias, semanas };
 }
 
+/**
+ * Recalcula las métricas de todas las fotos diarias desde `desde` con la regla vigente, sobre la selección que cada foto
+ * guardó (no se reconstruye nada). No cambia el origen ni lo publicado en Basecamp. Pedido de gerencia del 27/11/2026:
+ * «en curso» se aplica a toda la historia.
+ */
+export async function recalcularDesde(ctx: DbCtx, desde: string): Promise<{ fotos: number }> {
+  let fotos = 0;
+  for (const mesa of await listMesas(ctx)) {
+    const snaps = await listDailySnapshotsParaRecalcular(ctx, mesa.id, desde);
+    if (!snaps.length) continue;
+    const d = await cargarMesa(ctx, mesa, inicioDia(sumarDias(snaps[0]!.fecha, -7)));
+    for (const sn of snaps) {
+      const desdeD = inicioDia(sn.fecha),
+        hastaD = finDia(sn.fecha);
+      const { metricas, por_persona } = metricasDia({
+        dia: sn.fecha,
+        seleccion: new Set(sn.seleccion ?? []),
+        tareas: d.tareas,
+        reprocesos: d.reprocesos,
+        reprogramaciones: d.reprogramaciones,
+        bloqueos: new Set(d.bloqueos.filter((b) => enRango(b.at, desdeD, hastaD)).map((b) => b.requerimiento_id)).size,
+        nombres: d.nombres,
+        avance: new Set(d.avance.filter((a) => a.dia === sn.fecha).map((a) => a.requerimiento_id)),
+      });
+      await actualizarMetricasSnapshot(ctx, sn.id, metricas, por_persona);
+      fotos += 1;
+    }
+  }
+  return { fotos };
+}
+
 // ---------------------------------------------------------------- lectura para la pantalla
 export interface EvolutivoMes {
   mesa: { id: string; nombre: string };
@@ -506,7 +586,8 @@ export interface ResumenMes {
 
 export function resumir(dias: { metricas: MetricasDia; publicado: boolean }[]): ResumenMes {
   const s = (k: keyof MetricasDia) => dias.reduce((acc, d) => acc + (Number(d.metricas[k]) || 0), 0);
-  const plan = s('planificadas'),
+  // Desde el 27/11 el cumplimiento se mide sobre lo que se entregaba cada día; una foto sin `para_hoy` usa lo elegido.
+  const plan = dias.reduce((acc, d) => acc + (d.metricas.para_hoy ?? d.metricas.planificadas), 0),
     ok = s('cerradas_planificadas');
   return {
     dias: dias.length,
