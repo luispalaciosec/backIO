@@ -107,6 +107,25 @@ export async function listEventosEstado(ctx: DbCtx, desdeIso: string) {
   );
 }
 
+/**
+ * Cierres registrados en la auditoría (desde Basecamp o desde BackIO). Una tarea que se cerró un día y se reabrió después
+ * (ajustes) cambia su `completado_at`; este registro conserva el cierre original para las métricas de aquel día.
+ */
+export async function listEventosCierre(ctx: DbCtx, desdeIso: string) {
+  const db = serviceClient();
+  return paginar<{ entidad_id: string; created_at: string; detalle: { completed_at?: string | null } | null }>((a, b) =>
+    db
+      .from('audit_log')
+      .select('entidad_id, created_at, detalle')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('entidad', 'requerimiento')
+      .in('accion', ['basecamp_completado', 'basecamp_completar_todo'])
+      .gte('created_at', desdeIso)
+      .order('created_at')
+      .range(a, b),
+  );
+}
+
 /** Horas del timesheet con tarea desde un día (YYYY-MM-DD): qué tarea tuvo horas qué día. */
 export async function listHorasPorTareaDesde(ctx: DbCtx, desde: string) {
   const db = serviceClient();

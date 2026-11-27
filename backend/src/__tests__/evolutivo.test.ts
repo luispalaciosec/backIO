@@ -131,6 +131,21 @@ describe('métricas del día: tareas de varios días (pedido de Carolina, 27/11)
     expect(por_persona[0]).toMatchObject({ nombre: 'Fernando', planificadas: 5, para_hoy: 3, en_curso: 2, con_avance: 1, cerradas: 2 });
   });
 
+  it('una tarea que se cerró ese día y después se reabrió (ajustes) sigue contando como cerrada ese día', () => {
+    const tareas = [t({ id: 'r1', owner_agencia: ['fer'], fecha_entrega: '2026-11-23', completado_at: '2026-11-26T22:00:00Z' })];
+    const base = {
+      dia: '2026-11-23',
+      seleccion: new Set(['r1']),
+      tareas,
+      reprocesos: [],
+      reprogramaciones: [],
+      bloqueos: 0,
+      nombres: new Map([['fer', 'Persona']]),
+    };
+    expect(metricasDia(base).metricas.cerradas_planificadas).toBe(0);
+    expect(metricasDia({ ...base, cierres: new Set(['r1']) }).metricas).toMatchObject({ cerradas_planificadas: 1, cumplimiento_pct: 100 });
+  });
+
   it('el resumen del mes mide sobre lo que se entregaba cada día', () => {
     const m = (para_hoy: number, cerradas: number, planificadas: number) =>
       ({ planificadas, para_hoy, cerradas_planificadas: cerradas }) as unknown as Parameters<typeof resumir>[0][number]['metricas'];

@@ -31,6 +31,7 @@ import {
   listEventosDailyFecha,
   listEventosEstado,
   listHorasPorTareaDesde,
+  listEventosCierre,
   listDailySnapshotsParaRecalcular,
   actualizarMetricasSnapshot,
   listPublicacionesDaily,
@@ -169,17 +170,20 @@ export function metricasDia(p: {
   nombres: Map<string, string>;
   /** Tareas con horas del timesheet o un cambio de estado ese día. */
   avance?: Set<string>;
+  /** Tareas con un cierre registrado ese día, aunque después se hayan reabierto. */
+  cierres?: Set<string>;
 }): { metricas: MetricasDia; por_persona: PersonaDia[] } {
   const desde = inicioDia(p.dia),
     hasta = finDia(p.dia);
+  const cerradaEseDia = (t: TareaEvo) => enRango(t.completado_at, desde, hasta) || !!p.cierres?.has(t.id);
   const ids = new Set(p.tareas.map((t) => t.id));
-  const cerradasHoy = p.tareas.filter((t) => enRango(t.completado_at, desde, hasta));
+  const cerradasHoy = p.tareas.filter(cerradaEseDia);
   const planificadas = p.tareas.filter((t) => p.seleccion.has(t.id));
-  const cerradasPlan = planificadas.filter((t) => enRango(t.completado_at, desde, hasta));
+  const cerradasPlan = planificadas.filter(cerradaEseDia);
   // Pedido de Carolina (27/11): elegir una tarea para hoy no es comprometer su entrega hoy. Un guion o una gráfica con
   // revisiones se trabaja lunes, martes y miércoles y se entrega el miércoles: lunes y martes está «en curso», no
   // incumplida. El cumplimiento se mide sobre lo que se entregaba ese día (o antes) y sobre lo que se cerró ese día.
-  const esParaHoy = (t: TareaEvo) => enRango(t.completado_at, desde, hasta) || (!!t.fecha_entrega && t.fecha_entrega <= p.dia);
+  const esParaHoy = (t: TareaEvo) => cerradaEseDia(t) || (!!t.fecha_entrega && t.fecha_entrega <= p.dia);
   const paraHoy = planificadas.filter(esParaHoy);
   const enCurso = planificadas.filter((t) => !esParaHoy(t));
   const conAvance = (t: TareaEvo) => !!p.avance?.has(t.id);
@@ -217,7 +221,7 @@ export function metricasDia(p: {
         x.en_curso = (x.en_curso ?? 0) + 1;
         if (conAvance(t)) x.con_avance = (x.con_avance ?? 0) + 1;
       }
-      if (enRango(t.completado_at, desde, hasta)) x.cerradas += 1;
+      if (cerradaEseDia(t)) x.cerradas += 1;
     }
   for (const t of fuera) for (const o of responsablesDe(t)) pp(o).fuera += 1;
   return {
@@ -321,6 +325,8 @@ interface DatosMesa {
   nombres: Map<string, string>;
   /** Día (Guayaquil) en que cada tarea tuvo horas o un cambio de estado. */
   avance: { requerimiento_id: string; dia: string }[];
+  /** Día (Guayaquil) de cada cierre registrado, aunque la tarea se haya reabierto después. */
+  cierres: { requerimiento_id: string; dia: string }[];
 }
 
 export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Promise<DatosMesa> {
@@ -331,7 +337,7 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
   ];
   const tareas = partes.length ? await listTareasEvolutivo(ctx, partes) : [];
   const ids = new Set(tareas.map((t) => t.id));
-  const [rp, rg, ev, bl, pub, usuarios, est, hs] = await Promise.all([
+  const [rp, rg, ev, bl, pub, usuarios, est, hs, ci] = await Promise.all([
     listReprocesosDesde(ctx, desdeIso),
     listReprogramacionesDesde(ctx, desdeIso),
     listEventosDailyFecha(ctx, desdeIso),
@@ -340,6 +346,7 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
     listUsuarios(ctx, { incluirInactivos: true }),
     listEventosEstado(ctx, desdeIso),
     listHorasPorTareaDesde(ctx, diaLocal(desdeIso)),
+    listEventosCierre(ctx, desdeIso),
   ]);
   return {
     mesa,
@@ -360,6 +367,9 @@ export async function cargarMesa(ctx: DbCtx, mesa: Mesa, desdeIso: string): Prom
       ...est.filter((e) => ids.has(e.entidad_id)).map((e) => ({ requerimiento_id: e.entidad_id, dia: diaLocal(e.created_at) })),
       ...hs.filter((h) => ids.has(h.requerimiento_id)).map((h) => ({ requerimiento_id: h.requerimiento_id, dia: h.fecha })),
     ],
+    cierres: ci
+      .filter((e) => ids.has(e.entidad_id))
+      .map((e) => ({ requerimiento_id: e.entidad_id, dia: diaLocal(e.detalle?.completed_at ?? e.created_at) })),
   };
 }
 
@@ -384,6 +394,7 @@ export function fotoDeDia(d: DatosMesa, dia: string, reconstruir: boolean) {
     bloqueos,
     nombres: d.nombres,
     avance: new Set(d.avance.filter((a) => a.dia === dia).map((a) => a.requerimiento_id)),
+    cierres: new Set(d.cierres.filter((c) => c.dia === dia).map((c) => c.requerimiento_id)),
   });
   return {
     metricas,
@@ -545,6 +556,7 @@ export async function recalcularDesde(ctx: DbCtx, desde: string): Promise<{ foto
         bloqueos: new Set(d.bloqueos.filter((b) => enRango(b.at, desdeD, hastaD)).map((b) => b.requerimiento_id)).size,
         nombres: d.nombres,
         avance: new Set(d.avance.filter((a) => a.dia === sn.fecha).map((a) => a.requerimiento_id)),
+        cierres: new Set(d.cierres.filter((c) => c.dia === sn.fecha).map((c) => c.requerimiento_id)),
       });
       await actualizarMetricasSnapshot(ctx, sn.id, metricas, por_persona);
       fotos += 1;
