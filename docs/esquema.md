@@ -78,6 +78,7 @@ Clientes de la agencia (mismo id que en PrometIO), con su proyecto de Basecamp y
 | `es_prueba` | boolean | sí | por defecto `false` |
 | `ejecutiva_id` | uuid |  | → [usuarios](#usuarios).id |
 | `empresa_id` | uuid |  | → [clientes](#clientes).id |
+| `dominios_correo` | text[] | sí |  |
 
 ### mesas
 
@@ -970,6 +971,28 @@ Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
 | `desde` | date | sí |  |
 | `created_by` | uuid |  | → [usuarios](#usuarios).id |
 | `created_at` | fecha y hora | sí | por defecto `now()` |
+
+### reuniones
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `id` | uuid | sí | clave primaria |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `usuario_id` | uuid | sí | → [usuarios](#usuarios).id |
+| `origen` | texto | sí |  |
+| `externo_id` | texto | sí |  |
+| `inicio` | fecha y hora | sí |  |
+| `fin` | fecha y hora | sí |  |
+| `fecha` | date | sí |  |
+| `horas` | numeric | sí |  |
+| `cliente_id` | uuid |  | → [clientes](#clientes).id |
+| `asignacion` | texto |  |  |
+| `dominios_externos` | text[] | sí |  |
+| `respuesta` | texto | sí | por defecto `aceptada` |
+| `cancelada` | boolean | sí | por defecto `false` |
+| `sincronizado_at` | fecha y hora | sí | por defecto `now()` |
 
 ### requerimiento_responsables
 

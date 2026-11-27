@@ -21,6 +21,7 @@ import { listMesas } from './db/mesas';
 import { procesarRecurrencias } from './recurrencias';
 import { importarBasecampCliente } from './basecamp/importar';
 import { sincronizarHoras } from './horas';
+import { sincronizarReuniones } from './reuniones';
 import { congelarPeriodo, trimestreDe } from './kpis';
 import { fotoDaily, fotoWeekly } from './evolutivo';
 import { vigilar } from './vigia';
@@ -179,6 +180,15 @@ export const JOBS: Job[] = [
     ventana: cada(360),
     intervaloMin: 360,
     ejecutar: () => porTenant((ctx) => sincronizarHoras(ctx)),
+  },
+  {
+    // Reuniones y visitas de los eventos de Basecamp (y de Google en la fase 2): restan capacidad y cuentan en la
+    // rentabilidad. Solo horarios: nunca títulos (docs/23).
+    nombre: 'reuniones',
+    descripcion: 'Reuniones y visitas de los calendarios, cada 2 h',
+    ventana: cada(120),
+    intervaloMin: 120,
+    ejecutar: () => porTenant((ctx) => sincronizarReuniones(ctx)),
   },
   {
     nombre: 'limpieza',

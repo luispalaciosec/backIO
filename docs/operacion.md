@@ -32,6 +32,7 @@ minuto. Cada corrida queda en `cron_runs`. Las de hora fija se recuperan si un d
 | Cada 30 min | Reconcilia con Basecamp: aplica lo completado allá y reenvía las fechas de BackIO que quedaron desfasadas (máximo 25 por corrida) |
 | Cada hora | **Vigía:** revisa que las demás hayan corrido (ver abajo) |
 | Cada 6 h | Trae las horas del timesheet de Basecamp |
+| Cada 2 h | Trae las reuniones y visitas de los eventos de Basecamp ([Reuniones y visitas](./23-reuniones.md)) |
 | Diario 03:30 | Limpia contadores viejos de límites y registros de más de 60 días |
 | Diario 08:05 | Genera los fees recurrentes cuyo día llegó |
 | Lunes a viernes 19:30 | Foto del día de cada mesa (evolutivo) |

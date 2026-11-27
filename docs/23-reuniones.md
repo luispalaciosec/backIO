@@ -1,0 +1,39 @@
+# Reuniones y visitas
+
+Las ejecutivas y parte del equipo operativo pasan horas en reuniones y visitas al cliente. Ese tiempo es trabajo: BackIO lo
+toma de los calendarios para que cuente en la capacidad, en las horas de cada persona y en la rentabilidad de cada cliente.
+Plan aprobado por gerencia el 27/11/2026.
+
+## De dónde salen
+
+| Fuente | Estado | Cómo se asigna el cliente |
+|---|---|---|
+| Eventos del **schedule de Basecamp** de cada proyecto | Desde el 27/11/2026 | El del proyecto donde está el evento |
+| **Google Calendar** de cada persona, que cada quien conecta | Fase 2 | El cliente cuyo dominio de correo coincide con el de algún invitado; si ninguno, la reunión es interna |
+
+La tarea programada `reuniones` corre cada 2 horas. Trae desde 45 días atrás hasta 14 días adelante, porque las reuniones
+que vienen también quitan capacidad. Un evento que se repite da una reunión por cada día que le toca. Lo que desaparece de la
+fuente se marca cancelado; no se borra.
+
+## Qué cuenta
+
+- Todo evento con hora de inicio y fin. Los de todo el día no tienen duración y no cuentan.
+- Por persona y día se suma la **unión** de los horarios: si dos reuniones se pisan, o la misma está en Basecamp y en Google,
+  cuenta una vez.
+- En Basecamp, cuenta para cada participante que tiene usuario en BackIO.
+
+## Qué no entra (regla 1)
+
+De un evento solo entran el horario, los participantes, la repetición y, de Google, los **dominios** de los invitados
+externos. Nunca el título, la descripción, las notas ni los correos: se descartan en el mismo cliente que lee la fuente
+(`scheduleEntriesSafe` en `lib/basecamp/client.ts`).
+
+## Límites conocidos
+
+- Un bloque de trabajo en el calendario cuenta como reunión. Si además se registran horas de esa tarea en el timesheet, ese
+  tiempo cuenta dos veces: el timesheet no tiene hora del día y no se puede cruzar.
+- Los eventos de Basecamp son del proyecto (el cliente), no de una lista: en el weekly las horas de reunión se ven por
+  cliente.
+
+Código: `backend/src/lib/reuniones.ts`, `backend/src/lib/db/reuniones.ts`; tabla `reuniones` y `clientes.dominios_correo`
+(migración 53).

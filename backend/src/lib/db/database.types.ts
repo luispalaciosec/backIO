@@ -664,6 +664,7 @@ export type Database = {
           es_prueba: boolean;
           ejecutiva_id: string | null;
           empresa_id: string | null;
+          dominios_correo: string[];
         };
         Insert: {
           id: string;
@@ -685,6 +686,7 @@ export type Database = {
           es_prueba?: boolean;
           ejecutiva_id?: string | null;
           empresa_id?: string | null;
+          dominios_correo?: string[];
         };
         Update: {
           id?: string;
@@ -706,6 +708,7 @@ export type Database = {
           es_prueba?: boolean;
           ejecutiva_id?: string | null;
           empresa_id?: string | null;
+          dominios_correo?: string[];
         };
         Relationships: [
           {
@@ -2834,6 +2837,82 @@ export type Database = {
             columns: ['entregado_por'];
             isOneToOne: false;
             referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      reuniones: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          usuario_id: string;
+          origen: string;
+          externo_id: string;
+          inicio: string;
+          fin: string;
+          fecha: string;
+          horas: number;
+          cliente_id: string | null;
+          asignacion: string | null;
+          dominios_externos: string[];
+          respuesta: string;
+          cancelada: boolean;
+          sincronizado_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          usuario_id: string;
+          origen: string;
+          externo_id: string;
+          inicio: string;
+          fin: string;
+          fecha: string;
+          horas: number;
+          cliente_id?: string | null;
+          asignacion?: string | null;
+          dominios_externos?: string[];
+          respuesta?: string;
+          cancelada?: boolean;
+          sincronizado_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          usuario_id?: string;
+          origen?: string;
+          externo_id?: string;
+          inicio?: string;
+          fin?: string;
+          fecha?: string;
+          horas?: number;
+          cliente_id?: string | null;
+          asignacion?: string | null;
+          dominios_externos?: string[];
+          respuesta?: string;
+          cancelada?: boolean;
+          sincronizado_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'reuniones_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'reuniones_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'usuarios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'reuniones_cliente_id_fkey';
+            columns: ['cliente_id'];
+            isOneToOne: false;
+            referencedRelation: 'clientes';
             referencedColumns: ['id'];
           },
         ];

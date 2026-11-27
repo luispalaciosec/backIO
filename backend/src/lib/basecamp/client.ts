@@ -18,6 +18,16 @@ export interface BasecampTokens {
   expires_at: string; // ISO
 }
 
+/** Evento del schedule de Basecamp sin ningún texto (regla 1). */
+export interface EventoBasecampSafe {
+  id: number;
+  inicio: string;
+  fin: string;
+  todo_el_dia: boolean;
+  participantes: number[];
+  repeticion: { frecuencia: string; dias: number[]; cada_semanas: number; desde: string | null; hasta: string | null } | null;
+}
+
 export interface BcTodolistRef {
   id: number;
   app_url: string;
@@ -497,6 +507,46 @@ export class BasecampClient {
         parent_id: e.parent?.id ?? null,
         parent_type: e.parent?.type ?? null,
         bucket_id: e.bucket?.id ?? null,
+      }));
+  }
+
+  /**
+   * Eventos del schedule de un proyecto (reuniones y visitas, docs/23). SOLO horario, participantes y repetición:
+   * el título, la descripción y las notas son texto de Basecamp y se descartan aquí mismo (regla 1).
+   */
+  async scheduleEntriesSafe(projectId: number, scheduleId: number): Promise<EventoBasecampSafe[]> {
+    type Raw = {
+      id: number;
+      starts_at?: string;
+      ends_at?: string;
+      all_day?: boolean;
+      participants?: { id: number }[];
+      recurrence_schedule?: {
+        frequency?: string;
+        days?: number[];
+        week_interval?: number;
+        start_date?: string;
+        end_date?: string | null;
+      } | null;
+    };
+    const raw = await this.requestAll<Raw>(`/buckets/${projectId}/schedules/${scheduleId}/entries.json`, 20);
+    return raw
+      .filter((e) => typeof e.id === 'number' && e.starts_at && e.ends_at)
+      .map((e) => ({
+        id: e.id,
+        inicio: String(e.starts_at),
+        fin: String(e.ends_at),
+        todo_el_dia: !!e.all_day,
+        participantes: (e.participants ?? []).map((p) => p.id).filter((x) => typeof x === 'number'),
+        repeticion: e.recurrence_schedule?.frequency
+          ? {
+              frecuencia: String(e.recurrence_schedule.frequency),
+              dias: (e.recurrence_schedule.days ?? []).filter((d) => typeof d === 'number'),
+              cada_semanas: Math.max(1, Number(e.recurrence_schedule.week_interval) || 1),
+              desde: e.recurrence_schedule.start_date ?? null,
+              hasta: e.recurrence_schedule.end_date ?? null,
+            }
+          : null,
       }));
   }
 
