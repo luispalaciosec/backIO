@@ -176,6 +176,18 @@ export async function tareasParaCausas(ctx: DbCtx, ids: string[]) {
   return out;
 }
 
+/** Fecha comprometida y veces reprogramada: para pedir nueva fecha desde el cierre del daily. */
+export async function fechasDeReprogramacion(ctx: DbCtx, ids: string[]) {
+  if (!ids.length) return [];
+  const { data, error } = await ctx.db
+    .from('requerimientos')
+    .select('id, fecha_entrega_original, veces_reprogramado')
+    .eq('tenant_id', ctx.tenantId)
+    .in('id', ids);
+  throwIf(error);
+  return data ?? [];
+}
+
 export async function metricasPorIds(ctx: DbCtx, ids: string[]) {
   if (!ids.length) return [];
   const { data, error } = await ctx.db

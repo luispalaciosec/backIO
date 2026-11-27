@@ -57,7 +57,7 @@ import {
   tituloDaily,
   type DailyMensaje,
 } from '../../lib/mcp/publish';
-import { getMesa } from '../../lib/db';
+import { getMesa, fechasDeReprogramacion } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
 import { fotoDaily } from '../../lib/evolutivo';
@@ -496,6 +496,18 @@ semanas.post(
         estadoDaily(ctx, mesa, b.tipo),
         personasDelProyectoDaily(ctx, mesa),
       ]);
+      // Cierre: lo elegido que vencía hoy (o antes) y no se cerró, para darle nueva fecha con motivo sin salir de aquí
+      // (pedido del 27/11). Lo que se entrega otro día no aparece: va como «en curso».
+      const hoy = hoyLocal();
+      const pendientes = b.tipo === 'cierre' ? m.hoy.filter((i) => i.id && i.fecha && i.fecha <= hoy) : [];
+      const datos = new Map(
+        (
+          await fechasDeReprogramacion(
+            ctx,
+            pendientes.map((i) => i.id!),
+          )
+        ).map((r) => [r.id, r]),
+      );
       return c.json({
         modo: 'publicar',
         asunto: tituloDaily(m, mesa),
@@ -503,6 +515,15 @@ semanas.post(
         nada_nuevo: false,
         avisos: [...avisos, ...faltanEnDaily(estado.personas, ctx.usuarioId)],
         avisados,
+        pendientes_hoy: pendientes.map((i) => ({
+          id: i.id!,
+          titulo: i.titulo,
+          cliente: i.cliente,
+          owner: i.owner,
+          fecha_actual: i.fecha,
+          fecha_original: datos.get(i.id!)?.fecha_entrega_original ?? i.fecha,
+          veces: datos.get(i.id!)?.veces_reprogramado ?? 0,
+        })),
       });
     } catch (err) {
       if (err instanceof DailySinResponsable) return c.json({ error: err.message, tareas: err.tareas }, 422);

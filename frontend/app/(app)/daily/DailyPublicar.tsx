@@ -4,6 +4,7 @@ import { api, ApiError } from '@/lib/api';
 import { horaLocal } from '@backio/shared';
 import { useIA } from '@/lib/useIA';
 import { hrefExterno } from '@/lib/url';
+import { PendientesCierre, type PendienteCierre } from './PendientesCierre';
 
 type Tipo = 'apertura' | 'cierre';
 interface Persona {
@@ -27,6 +28,8 @@ interface Vista {
   avisos: string[];
   avisados: number | null;
   hora_publicada?: string;
+  /** Cierre: lo elegido que vencía hoy y no se cerró. */
+  pendientes_hoy?: PendienteCierre[];
 }
 
 const ETIQUETA: Record<Tipo, { la: string; nombre: string }> = {
@@ -364,6 +367,19 @@ export function DailyPublicar({ mesa, mesaNombre, tieneBoard }: { mesa: string; 
                   <li key={a}>{a}</li>
                 ))}
               </ul>
+            )}
+            {vista.pendientes_hoy && vista.pendientes_hoy.length > 0 && (
+              <PendientesCierre
+                pendientes={vista.pendientes_hoy}
+                onCambio={async () => {
+                  setVista(
+                    await api<Vista>('/semanas/daily/vista-previa', {
+                      method: 'POST',
+                      json: { mesa_id: mesa, tipo, narrativa: borradorValido, notas: yo ? [] : lineas(notas) },
+                    }),
+                  );
+                }}
+              />
             )}
             {vista.nada_nuevo ? (
               <p className="p-5 text-sm text-gray-600 flex-1">No hay nada nuevo que agregar: todo ya salió en el mensaje.</p>

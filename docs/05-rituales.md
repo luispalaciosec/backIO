@@ -270,7 +270,10 @@ lo elegido en dos:
 
 Una tarea en curso lleva **«con avance hoy»** si tuvo horas del timesheet ese día o cambió de estado (por ejemplo, a
 revisión). Antes de armar el cierre, BackIO trae de Basecamp las horas del día. Una tarea que se cerró ese día y después
-se reabrió por ajustes sigue contando como cerrada ese día: el cierre queda en la auditoría (`basecamp_completado`). El detalle por persona queda, por ejemplo:
+se reabrió por ajustes sigue contando como cerrada ese día: el cierre queda en la auditoría (`basecamp_completado`).
+En la vista previa del cierre aparece aparte lo elegido que **vencía hoy y no se cerró**, con «Nueva fecha»: si salió otra
+prioridad, se reprograma ahí mismo con su motivo (queda como reprogramación, a nombre de quien lo hace) y el mensaje se vuelve
+a armar antes de publicar. El detalle por persona queda, por ejemplo:
 «2 / 3 · 67% · 7 en curso (5 con avance hoy) · +1 fuera del daily». La regla se aplicó también a toda la historia del
 evolutivo (`recalcularDesde`), sobre la selección que guardó cada foto; los mensajes ya publicados en Basecamp no cambian.
 Código: `metricasDia` en `backend/src/lib/evolutivo.ts`.
