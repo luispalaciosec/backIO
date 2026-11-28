@@ -35,7 +35,8 @@ Para recibir las menciones del daily, la ejecutiva tiene que ser miembro del pro
 
 **Equipo dentro de la mesa (27/11/2026).** Una mesa puede dividirse en equipos (por ejemplo, un equipo de cadenas y otro
 de eventos). Cada cliente dice a cuál pertenece en Admin → Clientes, campo «Equipo» (con las opciones que ya usa esa mesa).
-Sirve para el weekly acumulado; sin equipo, el cliente sale en «Sin equipo» (migración 54).
+Sirve para el weekly acumulado; sin equipo, el cliente sale con su ejecutiva («Cuentas de …») o, si no tiene, en «Sin equipo»
+(migración 54).
 
 ## Ficha del cliente (`/clientes/:id`)
 

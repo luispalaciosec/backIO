@@ -389,7 +389,9 @@ canceladas no entran. Cada una lleva un estado; se asigna el primero que aplique
 **Piezas realizadas:** las de las tareas terminadas y las entregadas al cliente (en revisión o con ajustes). Se ven por
 tarea, por persona y por equipo, con la participación de cada equipo en el total.
 
-**Equipos:** dentro de una mesa, cada cliente puede pertenecer a un equipo (Admin → Clientes, campo «Equipo»). El acumulado
+**Equipos:** dentro de una mesa, cada cliente puede pertenecer a un equipo (Admin → Clientes, campo «Equipo»). Si un
+cliente no tiene equipo, va en el de su ejecutiva de cuenta («Cuentas de …»), así una mesa sin equipos propios sale
+agrupada por ejecutiva sin configurar nada; sin ejecutiva, va en «Sin equipo». El acumulado
 sale por equipo → persona → tarea. Una tarea con dos responsables aparece en la lista de cada uno (la otra persona como «con
 ayuda de»), pero cuenta una vez en los totales del equipo.
 
