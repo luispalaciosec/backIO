@@ -153,6 +153,8 @@ const patchSchema = z.object({
   mesa_id: z.string().uuid().nullable().optional(),
   /** Ejecutiva de cuenta (migración 37); null la quita. */
   ejecutiva_id: z.string().uuid().nullable().optional(),
+  /** Equipo dentro de la mesa (migración 54, weekly acumulado); vacío o null lo quita. */
+  equipo: z.string().trim().max(60).nullable().optional(),
   activo: z.boolean().optional(),
   /** PIN del portal: 4 a 6 dígitos para fijarlo, null para quitarlo; ausente = sin cambios. Se guarda con hash. */
   portal_pin: z

@@ -49,6 +49,7 @@ import { cargaDelDia, cargaDelEquipo } from '../../lib/carga';
 import { escenariosDelDia, preguntarSiSiguenVivas } from '../../lib/rituals/escenarios';
 import {
   comentarDailyEnBasecamp,
+  cuerpoAcumulado,
   cuerpoAgregado,
   cuerpoDaily,
   personasDelProyectoDaily,
@@ -60,7 +61,10 @@ import {
 import { getMesa, fechasDeReprogramacion } from '../../lib/db';
 import { armarDailyMensaje, DailySinResponsable } from '../../lib/ia/daily';
 import { narrarWeekly, renderWeeklyIA } from '../../lib/ia/weekly';
-import { fotoDaily } from '../../lib/evolutivo';
+import { fotoDaily, semanaDe } from '../../lib/evolutivo';
+import { acumuladoDeMesa } from '../../lib/rituals/acumulado_datos';
+import { mensajeDeEnlace } from '../../lib/rituals/acumulado';
+import { acumuladoPublicado } from '../../lib/db/evolutivo';
 import { listAgregadosDaily, listPublicacionesDaily } from '../../lib/db/evolutivo';
 import { conCandado } from '../../lib/candado';
 import { serviceClient } from '../../lib/db/client';
@@ -70,6 +74,64 @@ import { log } from '../../lib/logger';
 export const semanas = new Hono();
 
 semanas.get('/actual', requireScope('read:senales'), async (c) => c.json(await ensureSemana(ctxOf(c), hoyLocal())));
+
+// ---------------------------------------------------------------- weekly acumulado (27/11/2026, docs/05)
+/** Lunes a domingo de la semana de `dia` (YYYY-MM-DD; por defecto hoy). */
+const semanaPedida = (dia?: string) => semanaDe(dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : hoyLocal());
+
+semanas.get('/acumulado', requireScope('read:senales'), async (c) => {
+  const ctx = ctxOf(c);
+  const mesa = await getMesa(ctx, c.req.query('mesa') ?? '');
+  if (!mesa) return c.json({ error: 'Elige una mesa' }, 400);
+  const semana = semanaPedida(c.req.query('dia'));
+  const [acumulado, publicado] = await Promise.all([acumuladoDeMesa(ctx, mesa, semana), acumuladoPublicado(ctx, mesa.id, semana.inicio)]);
+  return c.json({ ...acumulado, mesa: { id: mesa.id, nombre: mesa.nombre }, publicado });
+});
+
+const CUERPO_ACUMULADO = z.object({
+  mesa_id: z.string().uuid(),
+  dia: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  mensaje_url: z.string().url().max(500),
+  otra_vez: z.boolean().optional(),
+});
+
+async function prepararAcumulado(ctx: DbCtx, b: z.infer<typeof CUERPO_ACUMULADO>) {
+  const mesa = await getMesa(ctx, b.mesa_id);
+  if (!mesa) return { error: 'Mesa no encontrada', status: 404 as const };
+  const destino = mensajeDeEnlace(b.mensaje_url);
+  if (!destino) return { error: 'Pega el enlace de un mensaje de Basecamp (…/buckets/…/messages/…)', status: 422 as const };
+  if (!mesa.basecamp_project_id || destino.proyecto !== Number(mesa.basecamp_project_id))
+    return { error: `Ese mensaje no es del proyecto de Basecamp de ${mesa.nombre}`, status: 422 as const };
+  const semana = semanaPedida(b.dia);
+  return { mesa, destino, semana, acumulado: await acumuladoDeMesa(ctx, mesa, semana) };
+}
+
+semanas.post('/acumulado/vista-previa', requireScope('write:actas'), zValidator('json', CUERPO_ACUMULADO), async (c) => {
+  const ctx = ctxOf(c);
+  const r = await prepararAcumulado(ctx, c.req.valid('json'));
+  if ('error' in r) return c.json({ error: r.error }, r.status);
+  return c.json({ html: cuerpoAcumulado(r.acumulado, r.mesa), publicado: await acumuladoPublicado(ctx, r.mesa.id, r.semana.inicio) });
+});
+
+semanas.post('/acumulado/publicar', requireScope('write:actas'), zValidator('json', CUERPO_ACUMULADO), async (c) => {
+  const ctx = ctxOf(c);
+  const b = c.req.valid('json');
+  const r = await prepararAcumulado(ctx, b);
+  if ('error' in r) return c.json({ error: r.error }, r.status);
+  const previo = await acumuladoPublicado(ctx, r.mesa.id, r.semana.inicio);
+  if (previo && !b.otra_vez) return c.json({ error: 'El acumulado de esta semana ya se publicó', publicado: previo }, 409);
+  const com = await comentarDailyEnBasecamp(ctx, r.mesa, r.destino.mensaje, (men) => cuerpoAcumulado(r.acumulado, r.mesa, men));
+  await audit(ctx, {
+    accion: 'acumulado_publicado',
+    entidad: 'mesa',
+    entidad_id: r.mesa.id,
+    detalle: { semana: r.semana.inicio, message_id: r.destino.mensaje, comment_id: com.id, url: com.url },
+  });
+  return c.json({ ok: true, url: com.url });
+});
 
 semanas.get('/daily', requireScope('read:backlog'), async (c) =>
   c.json(await getDaily(ctxOf(c), { mesaId: c.req.query('mesa') || undefined, ejecutivaId: c.req.query('ejecutiva') || undefined })),

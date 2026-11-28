@@ -81,8 +81,8 @@ describe('fecha comprometida', () => {
 describe('racha', () => {
   it('cuenta desde la última hacia atrás; una semana sin tareas no corta', () => {
     const s = (pct: number | null) => ({ inicio: '', numero: 0, completadas: 0, vigentes: 0, tarde: 0, pct });
-    expect(racha([s(90), s(70), s(85), s(null), s(80)])).toBe(2);
-    expect(racha([s(90), s(79)])).toBe(0);
+    expect(racha([s(95), s(70), s(92), s(null), s(90)])).toBe(2); // meta 90 % (semáforo único, 27/11)
+    expect(racha([s(95), s(89)])).toBe(0);
   });
 });
 
@@ -110,7 +110,7 @@ describe('reconocimiento', () => {
 describe('marcador completo', () => {
   const historia = [
     ...semana('2026-09-30', 9, 10), // semana 40 (tercer trimestre): 90 %
-    ...semana('2026-10-07', 6, 7), // semana 41: 86 %
+    ...semana('2026-10-07', 19, 20), // semana 41: 95 %
     ...semana('2026-10-14', 17, 24), // semana 42: 71 %
   ];
   it('plan: compromiso, semana pasada, racha y mejor semana del trimestre (sin la semana 40)', () => {
@@ -118,11 +118,11 @@ describe('marcador completo', () => {
     // La racha de las semanas 40-41 empezó en el trimestre anterior y llegó a este: cuenta entera (2).
     expect(m).toMatchObject({ compromiso: 22, racha: 0, mejor_racha_trimestre: 2, record: null, reconocidos: [] });
     expect(m.anterior).toMatchObject({ numero: 42, pct: 71 });
-    expect(m.mejor_trimestre).toMatchObject({ numero: 41, pct: 86 });
+    expect(m.mejor_trimestre).toMatchObject({ numero: 41, pct: 95 });
     const md = renderMarcadorPlan(m);
     expect(md).toContain('| Compromiso | **22 tareas** con entrega esta semana |');
     expect(md).toContain('| Semana pasada | 17 de 24 (71 %), bajo la meta |');
-    expect(md).toContain('| Mejor semana del trimestre | 86 % (semana 41) |');
+    expect(md).toContain('| Mejor semana del trimestre | 95 % (semana 41) |');
   });
   it('una semana da el mismo número en su cierre y como «semana pasada» del plan siguiente', () => {
     const s42 = [...semana('2026-10-14', 17, 24), t('2026-10-15', { completado_at: '2026-10-20T15:00:00Z' })];
@@ -134,17 +134,17 @@ describe('marcador completo', () => {
   it('cierre: resultado, meta, diferencia, racha, récord y reconocimiento', () => {
     const actual = [
       ...semana('2026-10-21', 7, 7, { owner_agencia: ['johanna'] }),
-      ...semana('2026-10-22', 12, 15, { owner_agencia: ['grace'] }),
+      ...semana('2026-10-22', 14, 15, { owner_agencia: ['grace'] }),
     ];
     const m = calcularMarcador([...historia, ...actual], '2026-10-19', { cierre: true });
-    expect(m.actual).toMatchObject({ completadas: 19, vigentes: 22, pct: 86 });
+    expect(m.actual).toMatchObject({ completadas: 21, vigentes: 22, pct: 95 });
     expect(m).toMatchObject({ racha: 1, record: 'iguala' });
     const md = renderMarcadorCierre(m, 1, (id) => (id === 'johanna' ? 'Johanna' : id));
-    expect(md).toContain('| Resultado | **19 de 22 completadas en la semana (86 %)**; 1 cancelada no cuenta |');
-    expect(md).toContain('| Meta de la mesa | 80 %: **cumplida** |');
-    expect(md).toContain('| Frente a la semana pasada | +15 puntos (71 % → 86 %) |');
+    expect(md).toContain('| Resultado | **21 de 22 completadas en la semana (95 %)**; 1 cancelada no cuenta |');
+    expect(md).toContain('| Meta de la mesa | 90 %: **cumplida** |');
+    expect(md).toContain('| Frente a la semana pasada | +24 puntos (71 % → 95 %) |');
     expect(md).toContain('| Racha | **1 semana** en la meta |');
-    expect(md).toContain('| Récord | Iguala la mejor semana del trimestre (antes: 86 %, semana 41) |');
+    expect(md).toContain('| Récord | Iguala la mejor semana del trimestre (antes: 95 %, semana 41) |');
     expect(md).toContain('- Johanna: 7 de 7 a tiempo');
     expect(md).not.toContain('grace');
   });

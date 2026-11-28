@@ -665,6 +665,7 @@ export type Database = {
           ejecutiva_id: string | null;
           empresa_id: string | null;
           dominios_correo: string[];
+          equipo: string | null;
         };
         Insert: {
           id: string;
@@ -687,6 +688,7 @@ export type Database = {
           ejecutiva_id?: string | null;
           empresa_id?: string | null;
           dominios_correo?: string[];
+          equipo?: string | null;
         };
         Update: {
           id?: string;
@@ -709,6 +711,7 @@ export type Database = {
           ejecutiva_id?: string | null;
           empresa_id?: string | null;
           dominios_correo?: string[];
+          equipo?: string | null;
         };
         Relationships: [
           {

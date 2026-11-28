@@ -363,6 +363,48 @@ Código: `backend/src/lib/rituals/proyectos_weekly.ts`, `GET /semanas/:id/proyec
 - **Causas pendientes:** con el título real, por mesa y por mis cuentas. Lo cerrado hace más de 15 días y lo cancelado dejan de
   pedirse; no se borra nada (`lib/causas.ts`).
 
+### Weekly acumulado: otra vista, la misma medición (27/11/2026)
+
+El weekly tiene dos vistas, que se eligen arriba: **Reunión** (por proyecto, para decidir la semana) y **Acumulado** (todo lo
+que hizo la mesa en la semana, para el cierre). Cambia la forma, no el fondo: el cumplimiento de las dos sale de la misma
+regla del cierre del daily, sumada por día hábil (entregas cerradas ÷ entregas comprometidas). Lo que se entrega otro día no
+cuenta en contra.
+
+**Tareas de la semana:** las de la mesa que se eligieron en algún daily, se cerraron, se pidieron o vencían esa semana. Las
+canceladas no entran. Cada una lleva un estado; se asigna el primero que aplique:
+
+| Ícono | Estado | Regla |
+|---|---|---|
+| ✅ | Terminada | Tuvo un cierre en la semana (aunque después se reabriera por ajustes) |
+| 🔎 | Revisión del cliente | Abierta y pendiente del cliente |
+| ⚠️ | Ajustes solicitados | Abierta, con reproceso abierto o rechazada |
+| ❌ | No se cumplió | Abierta, vencía en la semana o antes, y no está en manos del cliente |
+| 🎯 | Nueva | Se pidió en la semana, abierta, y vence después |
+| 🛠️ | En curso | Abierta, vence después de la semana o no tiene fecha |
+
+**Piezas realizadas:** las de las tareas terminadas y las entregadas al cliente (en revisión o con ajustes). Se ven por
+tarea, por persona y por equipo, con la participación de cada equipo en el total.
+
+**Equipos:** dentro de una mesa, cada cliente puede pertenecer a un equipo (Admin → Clientes, campo «Equipo»). El acumulado
+sale por equipo → persona → tarea. Una tarea con dos responsables aparece en la lista de cada uno (la otra persona como «con
+ayuda de»), pero cuenta una vez en los totales del equipo.
+
+**Publicar:** se pega el enlace de un mensaje de Basecamp del proyecto de la mesa (por ejemplo, el status de la semana), se
+ve la vista previa y el acumulado se publica como **comentario** en ese mensaje, a nombre de quien lo publica. Si ya se
+publicó esa semana, pide confirmar antes de publicarlo de nuevo. Se puede ver cualquier semana anterior y se puede imprimir.
+
+**Límite conocido:** en una semana pasada, «revisión del cliente» y «ajustes» se leen del estado actual de la tarea, no del
+que tenía al cerrar esa semana. «Terminada», «no se cumplió» y el cumplimiento sí son los de esa semana.
+
+Código: `backend/src/lib/rituals/acumulado.ts` (`armarAcumulado`), `GET /semanas/acumulado`, `POST /semanas/acumulado/publicar`;
+`frontend/app/(app)/weekly/AcumuladoWeekly.tsx`.
+
+### Semáforo único (27/11/2026)
+
+El cumplimiento se pinta igual en todo BackIO: **verde desde 90 %, amarillo desde 70 %, rojo por debajo** (`SEMAFORO` en
+`shared`). Lo usan el cierre del daily, el evolutivo, el marcador (su meta pasó de 80 % a 90 %) y el weekly acumulado. La
+salud del cliente es otra medición y conserva sus umbrales.
+
 ### Marcador (20/10/2026)
 
 Arriba de los documentos de una mesa va un **marcador**, para que el weekly se sienta como avance de equipo sin perder

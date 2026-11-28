@@ -79,6 +79,7 @@ Clientes de la agencia (mismo id que en PrometIO), con su proyecto de Basecamp y
 | `ejecutiva_id` | uuid |  | → [usuarios](#usuarios).id |
 | `empresa_id` | uuid |  | → [clientes](#clientes).id |
 | `dominios_correo` | text[] | sí |  |
+| `equipo` | texto |  |  |
 
 ### mesas
 

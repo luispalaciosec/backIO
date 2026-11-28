@@ -1,3 +1,4 @@
+import { SEMAFORO } from '@backio/shared';
 /**
  * Marcador del weekly (decisión de Luis, 20/10/2026): meta, racha, récord del trimestre y reconocimiento de entregas a
  * tiempo, arriba del plan operativo y del acta de cierre de cada mesa. Todo sale de los datos; nada se escribe a mano y
@@ -6,7 +7,8 @@
 import { cerradaATiempo, entregaReal, diaLocal, MOTIVOS_REPROGRAMACION, responsablesDe, sumarDias } from '@backio/shared';
 
 /** Meta de la semana: % de tareas vigentes completadas. Igual para todas las mesas. */
-export const META_SEMANAL = 80;
+/** La meta de la semana es el verde del semáforo único (90 %, decisión de gerencia del 27/11/2026; antes 80 %). */
+export const META_SEMANAL = SEMAFORO.verde;
 /** Para el reconocimiento: todas a tiempo, con al menos esta cantidad de tareas en la semana. */
 export const RECONOCIMIENTO_MINIMO = 4;
 /** Semanas hacia atrás que se miran para la racha (además del trimestre). */

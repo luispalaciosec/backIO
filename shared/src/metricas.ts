@@ -5,6 +5,18 @@ export function porcentaje(a: number, b: number): number | null {
   return b ? Math.round((a / b) * 100) : null;
 }
 
+/**
+ * Semáforo del cumplimiento, el mismo en todo BackIO (decisión de gerencia del 27/11/2026): verde desde 90 %, amarillo desde
+ * 70 %, rojo por debajo. Lo usan el cierre del daily, el evolutivo, el marcador y el weekly acumulado. La salud del
+ * cliente es otra medición y tiene sus propios umbrales (`UMBRALES_SALUD`).
+ */
+export const SEMAFORO = { verde: 90, amarillo: 70 } as const;
+export type ColorSemaforo = 'verde' | 'amarillo' | 'rojo';
+export function semaforo(pct: number | null | undefined): ColorSemaforo | null {
+  if (pct === null || pct === undefined) return null;
+  return pct >= SEMAFORO.verde ? 'verde' : pct >= SEMAFORO.amarillo ? 'amarillo' : 'rojo';
+}
+
 /** Fracción (0–1) como porcentaje con un decimal: 0.875 → «87.5%». «—» si no hay dato. */
 export function formatoFraccion(v: number | null | undefined): string {
   return v === null || v === undefined ? '—' : `${Math.round(v * 1000) / 10}%`;

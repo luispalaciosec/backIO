@@ -48,6 +48,7 @@ export default function AdminClientesPage() {
           color_primario: String(form.get('color_primario') || '#0073EA'),
           logo_url: String(form.get('logo_url') || '') || null,
           ejecutiva_id: String(form.get('ejecutiva_id') || '') || null,
+          equipo: String(form.get('equipo') ?? '').trim() || null,
           ...(quitarPin ? { portal_pin: null } : pin ? { portal_pin: pin } : {}),
         },
       });
@@ -193,6 +194,32 @@ export default function AdminClientesPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="label" htmlFor={`equipo-${c.id}`}>
+                Equipo dentro de la mesa
+              </label>
+              <input
+                id={`equipo-${c.id}`}
+                name="equipo"
+                className="input"
+                list={`equipos-${c.mesa_id ?? 'sin'}`}
+                placeholder="Ej.: KKAA y Mini-Markets"
+                maxLength={60}
+                defaultValue={c.equipo ?? ''}
+              />
+              <datalist id={`equipos-${c.mesa_id ?? 'sin'}`}>
+                {[
+                  ...new Set(
+                    items
+                      .filter((x) => x.mesa_id === c.mesa_id)
+                      .map((x) => x.equipo)
+                      .filter(Boolean),
+                  ),
+                ].map((e) => (
+                  <option key={e as string} value={e as string} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="label">Basecamp project id</label>

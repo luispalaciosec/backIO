@@ -13,7 +13,7 @@ export async function listTareasEvolutivo(ctx: DbCtx, partes: string[]): Promise
     db
       .from('requerimientos')
       .select(
-        'id, owner_agencia, estado_operativo, completado_at, created_at, planificacion, fecha_entrega, fecha_entrega_original, daily_fecha, fecha_pedido, responsables_cierre, heredada, entregado_el',
+        'id, owner_agencia, estado_operativo, completado_at, created_at, planificacion, fecha_entrega, fecha_entrega_original, daily_fecha, fecha_pedido, responsables_cierre, heredada, entregado_el, piezas, cliente_id, titulo_interno, basecamp_url, estado_aprobacion',
       )
       .eq('tenant_id', ctx.tenantId)
       .is('deleted_at', null)
@@ -34,6 +34,15 @@ export async function listReprocesosDesde(ctx: DbCtx, desdeIso: string) {
       .order('abierto_at')
       .range(a, b),
   );
+}
+
+/** Tareas con un reproceso abierto (ajustes pedidos que aún no se cierran), sin importar cuándo se abrió. */
+export async function listReprocesosAbiertos(ctx: DbCtx): Promise<Set<string>> {
+  const db = serviceClient();
+  const filas = await paginar<{ requerimiento_id: string }>((a, b) =>
+    db.from('reprocesos').select('requerimiento_id').eq('tenant_id', ctx.tenantId).is('cerrado_at', null).order('id').range(a, b),
+  );
+  return new Set(filas.map((f) => f.requerimiento_id));
 }
 
 export async function listReprogramacionesDesde(ctx: DbCtx, desdeIso: string) {
@@ -302,4 +311,24 @@ export async function datosSemanaMesa(ctx: DbCtx, semanaId: string, mesaId: stri
       .maybeSingle(),
   ]);
   return { senales: sen, acuerdos: acu, acta };
+}
+
+/** ¿Ya se publicó el acumulado de esta mesa y semana? Devuelve el mensaje donde se comentó. */
+export async function acumuladoPublicado(
+  ctx: DbCtx,
+  mesaId: string,
+  inicioSemana: string,
+): Promise<{ url: string | null; at: string } | null> {
+  const { data, error } = await serviceClient()
+    .from('audit_log')
+    .select('created_at, detalle')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('accion', 'acumulado_publicado')
+    .eq('entidad_id', mesaId)
+    .eq('detalle->>semana', inicioSemana)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  throwIf(error);
+  const f = data?.[0];
+  return f ? { url: ((f.detalle as { url?: string } | null)?.url ?? null) as string | null, at: f.created_at } : null;
 }

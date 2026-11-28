@@ -51,6 +51,8 @@ export interface Cliente {
    * equipo que produce; la ejecutiva puede tener cuentas en varias mesas.
    */
   ejecutiva_id?: string | null;
+  /** Equipo dentro de la mesa (migración 54): agrupa el weekly acumulado. */
+  equipo?: string | null;
   nombre: string;
   slug: string;
   logo_url: string | null;

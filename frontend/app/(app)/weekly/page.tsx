@@ -9,6 +9,7 @@ import { CompromisosWeekly } from './CompromisosWeekly';
 import { ProyectosWeeklyVista } from './ProyectosWeekly';
 import { PlanSemana } from './PlanSemana';
 import { BloquesWeekly } from './BloquesWeekly';
+import { AcumuladoWeekly } from './AcumuladoWeekly';
 import { meServer, puedeEscribir } from '@/lib/me.server';
 import { hoyLocal, nombrePersona } from '@backio/shared';
 import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
@@ -21,7 +22,11 @@ const BASE_CAPACIDAD = {
   declarada: 'Capacidad declarada (no hay timesheet)',
 } as const;
 
-export default async function WeeklyPage({ searchParams: spP }: { searchParams: Promise<{ mesa?: string }> }) {
+export default async function WeeklyPage({
+  searchParams: spP,
+}: {
+  searchParams: Promise<{ mesa?: string; vista?: string; dia?: string }>;
+}) {
   const searchParams = await spP;
   const [semana, me, { items: mesas }] = await Promise.all([
     apiServer<Semana>('/semanas/actual'),
@@ -35,6 +40,55 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
   const cuentas = searchParams.mesa === 'cuentas';
   const todas = searchParams.mesa === 'todas' || cuentas;
   const mesa = todas ? null : (activas.find((m) => m.id === searchParams.mesa) ?? activas[0] ?? null);
+  // Vistas del weekly (27/11): «Reunión» (por proyecto) y «Acumulado» (todo lo de la semana, con piezas). Cambia la forma,
+  // no la medición: las dos salen de la misma regla del cierre del daily.
+  const acumulado = searchParams.vista === 'acumulado';
+  const vistas = (
+    <nav className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm" aria-label="Vista del weekly">
+      {[
+        { id: 'reunion', nombre: 'Reunión', href: `/weekly?mesa=${searchParams.mesa ?? mesa?.id ?? ''}` },
+        { id: 'acumulado', nombre: 'Acumulado', href: `/weekly?mesa=${mesa?.id ?? activas[0]?.id ?? ''}&vista=acumulado` },
+      ].map((v) => (
+        <a
+          key={v.id}
+          href={v.href}
+          aria-current={(v.id === 'acumulado') === acumulado ? 'page' : undefined}
+          className={`px-3 py-1.5 rounded ${(v.id === 'acumulado') === acumulado ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          {v.nombre}
+        </a>
+      ))}
+    </nav>
+  );
+  if (acumulado) {
+    const m = mesa ?? activas[0] ?? null;
+    return (
+      <div className="space-y-6">
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold">Weekly acumulado · {m?.nombre ?? 'sin mesa'}</h1>
+            {vistas}
+          </div>
+          <nav className="flex flex-wrap gap-1.5 text-xs" aria-label="Mesa">
+            {activas.map((x) => (
+              <a
+                key={x.id}
+                href={`/weekly?mesa=${x.id}&vista=acumulado`}
+                className={`rounded-full px-3 py-1 border ${m?.id === x.id ? 'bg-brand text-white border-brand' : 'border-gray-300 hover:bg-gray-50'}`}
+              >
+                {x.nombre}
+              </a>
+            ))}
+          </nav>
+        </header>
+        {m ? (
+          <AcumuladoWeekly key={`${m.id}-${searchParams.dia ?? ''}`} mesaId={m.id} dia={searchParams.dia ?? null} puedePublicar={escribe} />
+        ) : (
+          <p className="text-sm text-gray-500">No hay mesas activas.</p>
+        )}
+      </div>
+    );
+  }
   const deLaMesa = (a: Acuerdo) => !mesa || a.mesa_id === mesa.id;
   const [agenda, { items: acuerdosTodos }, { items: abiertosTodos }, { items: capacidad }, { items: usuarios }, { items: clientes }] =
     await Promise.all([
@@ -80,6 +134,7 @@ export default async function WeeklyPage({ searchParams: spP }: { searchParams: 
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4">
         <div>
+          <div className="mb-2">{vistas}</div>
           <h1 className="text-2xl font-bold">
             Weekly · Semana {semana.numero_iso} · {cuentas ? 'Mis cuentas' : (mesa?.nombre ?? 'Toda la agencia')}
           </h1>

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError, BACKEND, descargar } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { Alert } from '@/components/ui/Alert';
+import { semaforo } from '@backio/shared';
 import { Tarjeta, BarrasDobles, Lineas } from '@/components/informe/Graficas';
 
 interface MetricasDia {
@@ -436,14 +437,8 @@ function EvolutivoVista() {
 
 function FilaDia({ x, abierto, onToggle }: { x: Dia; abierto: boolean; onToggle: () => void }) {
   const m = x.metricas;
-  const tono =
-    m.cumplimiento_pct === null
-      ? 'text-gray-400'
-      : m.cumplimiento_pct >= 80
-        ? 'text-emerald-700'
-        : m.cumplimiento_pct >= 50
-          ? 'text-amber-600'
-          : 'text-red-600';
+  const tono = { verde: 'text-emerald-700', amarillo: 'text-amber-600', rojo: 'text-red-600' }[semaforo(m.cumplimiento_pct) ?? 'rojo'];
+  const tonoFinal = m.cumplimiento_pct === null ? 'text-gray-400' : tono;
   return (
     <>
       <tr className={`border-t border-gray-100 ${x.en_vivo ? 'bg-sky-50/50' : ''}`}>
@@ -456,7 +451,7 @@ function FilaDia({ x, abierto, onToggle }: { x: Dia; abierto: boolean; onToggle:
           {m.cerradas_planificadas}/{m.para_hoy ?? m.planificadas}
           {m.en_curso ? <span className="block text-[11px] text-gray-500">+{m.en_curso} en curso</span> : null}
         </td>
-        <td className={`td text-center tabular-nums font-semibold ${tono}`}>
+        <td className={`td text-center tabular-nums font-semibold ${tonoFinal}`}>
           {m.cumplimiento_pct === null ? '—' : `${m.cumplimiento_pct}%`}
         </td>
         <td className="td text-center tabular-nums">{m.cerradas_fuera}</td>

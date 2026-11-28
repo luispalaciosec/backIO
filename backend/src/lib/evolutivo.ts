@@ -57,6 +57,12 @@ export interface TareaEvo {
   responsables_cierre?: string[] | null;
   heredada?: boolean;
   entregado_el?: string | null;
+  // Para el weekly acumulado (27/11): piezas y datos para listar la tarea.
+  piezas?: number | null;
+  cliente_id?: string;
+  titulo_interno?: string;
+  basecamp_url?: string | null;
+  estado_aprobacion?: string;
 }
 export interface EventoSeleccion {
   requerimiento_id: string;
@@ -314,7 +320,7 @@ export function metricasSemana(p: {
 }
 
 // ---------------------------------------------------------------- carga por mesa
-interface DatosMesa {
+export interface DatosMesa {
   mesa: Mesa;
   tareas: TareaEvo[];
   reprocesos: { requerimiento_id: string; abierto_at: string }[];

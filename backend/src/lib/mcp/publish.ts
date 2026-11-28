@@ -19,7 +19,8 @@ import { getMesa } from '../db/mesas';
 import { getSemana } from '../db/semanas';
 import { listUsuarios } from '../db/usuarios';
 import { log } from '../logger';
-import { horaLocal } from '@backio/shared';
+import { horaLocal, semaforo } from '@backio/shared';
+import type { AcumuladoSemana } from '../rituals/acumulado';
 
 const fmtFecha = (iso: string) => iso.slice(0, 10);
 const fmtCorta = (iso: string) => {
@@ -160,7 +161,9 @@ export interface DailyKpis {
 export function kpisDaily(k: DailyKpis, men?: Menciones): string {
   const pct = k.cumplimiento_pct === null ? 'sin plan' : `${k.cumplimiento_pct}%`;
   const color =
-    k.cumplimiento_pct === null ? '#888' : k.cumplimiento_pct >= 80 ? '#1e8449' : k.cumplimiento_pct >= 50 ? '#b9770e' : '#c0392b';
+    k.cumplimiento_pct === null
+      ? '#888'
+      : ({ verde: '#1e8449', amarillo: '#b9770e', rojo: '#c0392b' } as const)[semaforo(k.cumplimiento_pct) ?? 'rojo'];
   const fila = (etiqueta: string, valor: string) => `<li>${etiqueta}: <strong>${valor}</strong></li>`;
   const general = `<ul>${[
     fila(
@@ -504,4 +507,58 @@ export function markdownBasico(md: string, opts: { saltos?: boolean } = {}): str
     out.push(`<p>${inline(l)}</p>`);
   }
   return out.join('\n');
+}
+
+/**
+ * Weekly acumulado como comentario de Basecamp (formato de la ejecutiva de Orión, 27/11): leyenda de íconos, resumen con
+ * semáforo, conteo por estado, por equipo y por persona, y el detalle de cada tarea con sus piezas. Listas, no tablas.
+ */
+export function cuerpoAcumulado(a: AcumuladoSemana, mesa: Mesa, men?: Menciones): string {
+  const ESTILO: Record<string, string> = { verde: '#1e8449', amarillo: '#b9770e', rojo: '#c0392b' };
+  const BOLA: Record<string, string> = { verde: '🟢', amarillo: '🟡', rojo: '🔴' };
+  const pct = (c: { cumplimiento_pct: number | null; semaforo: string | null; cerradas_plan: number; para_entregar: number }) =>
+    c.cumplimiento_pct === null
+      ? 'sin entregas comprometidas'
+      : `${BOLA[c.semaforo ?? 'rojo']} <strong style="color:${ESTILO[c.semaforo ?? 'rojo']}">${c.cumplimiento_pct}%</strong> (${c.cerradas_plan} de ${c.para_entregar} entregas comprometidas)`;
+  const icono = new Map(a.estados.map((e) => [e.estado, e.icono]));
+  const conteo = (c: AcumuladoSemana['resumen']) =>
+    a.estados
+      .filter((e) => c.por_estado[e.estado])
+      .map((e) => `${e.icono} ${c.por_estado[e.estado]}`)
+      .join(' · ');
+  const r = a.resumen;
+  const partes: string[] = [];
+  partes.push(`<h1>📌 Resumen semanal · ${esc(mesa.nombre)}</h1>`);
+  partes.push(`<div>Del ${esc(fmtCorta(a.semana.inicio))} al ${esc(fmtCorta(a.semana.fin))}</div>`);
+  partes.push(
+    `<div><strong>Estado de las tareas:</strong> ${a.estados.map((e) => `${e.icono} ${esc(e.etiqueta)}`).join(' · ')}</div>${SALTO}`,
+  );
+  partes.push(
+    `<ul><li>Cumplimiento: ${pct(r)}</li><li>Tareas de la semana: <strong>${r.total}</strong> · ${conteo(r)}</li><li>Piezas realizadas: <strong>${r.piezas}</strong></li></ul>`,
+  );
+  for (const e of a.equipos) {
+    partes.push(`${SALTO}<h2>${esc(e.nombre)}</h2>`);
+    partes.push(
+      `<ul><li>Cumplimiento: ${pct(e)}</li><li>${e.total} tareas · ${conteo(e)}</li><li>Piezas: <strong>${e.piezas}</strong>${e.participacion_piezas_pct !== null ? ` · ${e.participacion_piezas_pct}% del total` : ''}</li></ul>`,
+    );
+    for (const p of e.personas) {
+      partes.push(
+        `<div><strong>${mencion(p.nombre, men)}</strong> · ${p.total} tareas · ${p.piezas} piezas${p.cumplimiento_pct !== null ? ` · ${p.cumplimiento_pct}%` : ''}</div>`,
+      );
+      partes.push(
+        `<ul>${p.tareas
+          .map((t) => {
+            const titulo = t.url ? `<a href="${esc(t.url)}">${esc(t.titulo)}</a>` : esc(t.titulo);
+            const ayuda = t.con_ayuda_de.length ? ` · con ayuda de ${t.con_ayuda_de.map((n) => mencion(n, men)).join(', ')}` : '';
+            const piezas = t.piezas ? ` <span style="color:#c0392b">(${t.piezas} ${t.piezas === 1 ? 'pieza' : 'piezas'})</span>` : '';
+            return `<li>${icono.get(t.estado)} ${titulo} · ${esc(t.cliente)}${t.fecha ? ` · ${esc(fmtCorta(t.fecha))}` : ''}${ayuda}${piezas}</li>`;
+          })
+          .join('')}</ul>`,
+      );
+    }
+  }
+  partes.push(
+    `${SALTO}<div><em>Cumplimiento con la misma regla del cierre del daily: entregas cerradas ÷ entregas comprometidas cada día. Lo que se entrega otro día no cuenta en contra. Verde desde 90 %, amarillo desde 70 %.</em></div>`,
+  );
+  return partes.join('');
 }
