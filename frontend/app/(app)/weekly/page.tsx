@@ -218,8 +218,9 @@ export default async function WeeklyPage({
                     <div className="font-semibold">3. Equipo: capacidad y riesgo de la semana</div>
                     <p className="text-xs text-gray-500 mt-0.5">
                       Horas estimadas con lo que cada persona tarda de verdad en una tarea (timesheet de las últimas 12 semanas), en todas
-                      sus mesas. Disponibles: lo que registra en una semana fuerte, por los días hábiles que quedan (sin timesheet
-                      suficiente, lo del equipo). Lo que no entra, por fecha, queda en riesgo.
+                      sus mesas. Disponibles: lo que registra en una semana fuerte, por los días hábiles que quedan, menos lo que las
+                      reuniones de cada día no dejan de su jornada (sin timesheet suficiente, lo del equipo). Lo que no entra, por fecha,
+                      queda en riesgo.
                     </p>
                   </div>
                   <PlanSemana
