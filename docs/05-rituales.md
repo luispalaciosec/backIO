@@ -366,9 +366,13 @@ Código: `backend/src/lib/rituals/proyectos_weekly.ts`, `GET /semanas/:id/proyec
 ### Weekly acumulado: otra vista, la misma medición (27/11/2026)
 
 El weekly tiene dos vistas, que se eligen arriba: **Reunión** (por proyecto, para decidir la semana) y **Acumulado** (todo lo
-que hizo la mesa en la semana, para el cierre). Cambia la forma, no el fondo: el cumplimiento de las dos sale de la misma
-regla del cierre del daily, sumada por día hábil (entregas cerradas ÷ entregas comprometidas). Lo que se entrega otro día no
-cuenta en contra.
+que hizo la mesa en la semana, para el cierre). Cambia la forma, no el fondo: la regla es la del cierre del daily (entregas ÷
+entregas comprometidas), contada por semana.
+
+**Cumplimiento de la semana:** entregadas (✅ terminadas y 🔎 en revisión del cliente) ÷ todo lo que tocaba entregar (además,
+⚠️ ajustes y ❌ no cumplidas). Cada tarea cuenta **una vez**; las nuevas y las en curso no entran. Al principio se sumaba el
+cierre de cada día, y una tarea que se arrastraba varios días contaba varias veces como incumplida: un equipo con 7 entregadas
+y 1 pendiente salía con 33 %. Desde el 28/11/2026 sale con 88 %. El cierre diario y el evolutivo siguen midiendo día por día.
 
 **Tareas de la semana:** las de la mesa que se eligieron en algún daily, se cerraron, se pidieron o vencían esa semana. Las
 canceladas no entran. Cada una lleva un estado; se asigna el primero que aplique:

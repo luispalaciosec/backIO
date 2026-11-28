@@ -12,7 +12,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex">
       <Sidebar email={data.user.email ?? ''} rol={me.rol} />
-      <main className="flex-1 min-w-0 p-6">
+      {/* pr-16: espacio para la campana fija de arriba a la derecha; sin él tapaba los botones de cada pantalla. */}
+      <main className="flex-1 min-w-0 p-6 pr-16">
         <Campana />
         <AvisoBasecamp />
         {children}

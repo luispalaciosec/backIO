@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { semaforo } from '@backio/shared';
 import { armarAcumulado, estadoEnSemana, mensajeDeEnlace, SIN_EQUIPO } from './acumulado';
-import { metricasDia, type TareaEvo } from '../evolutivo';
+import type { TareaEvo } from '../evolutivo';
 
 const SEMANA = { inicio: '2026-11-09', fin: '2026-11-15' };
 const t = (p: Partial<TareaEvo>): TareaEvo => ({
@@ -96,25 +96,30 @@ describe('acumulado de la semana', () => {
     expect(a.resumen.piezas).toBe(14); // 10 terminada + 4 en revisión; lo no cumplido y en curso no suma
   });
 
-  it('el cumplimiento semanal es la suma del cierre de cada día (la misma medición del daily)', () => {
-    let cerradas = 0,
-      para = 0;
-    for (const [dia, seleccion] of selecciones) {
-      const { metricas } = metricasDia({
-        dia,
-        seleccion,
-        tareas,
-        reprocesos: [],
-        reprogramaciones: [],
-        bloqueos: 0,
-        nombres: datos.nombres,
-      });
-      cerradas += metricas.cerradas_planificadas;
-      para += metricas.para_hoy ?? 0;
-    }
-    expect({ cerradas: a.resumen.cerradas_plan, para: a.resumen.para_entregar }).toEqual({ cerradas, para });
-    expect(a.resumen.cumplimiento_pct).toBe(33); // 1 de 3 (la «en curso» del lunes no cuenta)
+  it('cumplimiento: entregadas (terminadas y en revisión del cliente) ÷ lo que tocaba entregar, cada tarea una vez', () => {
+    // a ✅ y b 🔎 entregadas; c ❌ pendiente; d 🛠️ en curso no entra.
+    expect({ e: a.resumen.cerradas_plan, c: a.resumen.para_entregar }).toEqual({ e: 2, c: 3 });
+    expect(a.resumen.cumplimiento_pct).toBe(67);
     expect(a.resumen.semaforo).toBe('rojo');
+  });
+
+  it('una tarea que se arrastró varios días cuenta una sola vez (caso real: 7 entregadas y 1 pendiente = 88 %)', () => {
+    const ts = [
+      ...Array.from({ length: 7 }, (_, i) => t({ id: `ok${i}`, fecha_entrega: '2026-11-12', completado_at: '2026-11-12T20:00:00Z' })),
+      t({ id: 'pend', fecha_entrega: '2026-11-10' }),
+    ];
+    // La pendiente se eligió los cinco días sin cerrarse: antes contaba 5 veces.
+    const sel = new Map(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13'].map((d) => [d, new Set(['pend'])]));
+    const r = armarAcumulado({
+      datos: { ...datos, tareas: ts },
+      semana: SEMANA,
+      selecciones: sel,
+      hoy: '2026-11-20',
+      reprocesosAbiertos: new Set(),
+      equipoDe: new Map(),
+      clientes: new Map(),
+    });
+    expect(r.resumen).toMatchObject({ cerradas_plan: 7, para_entregar: 8, cumplimiento_pct: 88, semaforo: 'amarillo' });
   });
 
   it('agrupa por equipo y persona; la tarea compartida aparece en las dos personas con «con ayuda de»', () => {

@@ -1,11 +1,12 @@
 /**
  * Weekly acumulado (docs/05-rituales.md, plan aprobado el 27/11/2026): todo lo que hizo la mesa en la semana, por equipo y
- * persona, con el estado de cada tarea y sus piezas. Es otra FORMA del weekly; el FONDO es el del daily: el cumplimiento
- * semanal es la suma de `metricasDia` de los días hábiles (cerradas del plan ÷ lo que había que entregar), igual que el
- * evolutivo. Función pura: los datos llegan cargados.
+ * persona, con el estado de cada tarea y sus piezas. Es otra FORMA del weekly; el FONDO es la regla del daily (entregas
+ * ÷ entregas comprometidas) contada por semana: cada tarea UNA vez (revisión en vivo del 28/11: sumar el cierre de cada
+ * día contaba varias veces la tarea que se arrastraba, y daba 33 % a un equipo con 7 entregadas y 1 pendiente). Función
+ * pura: los datos llegan cargados.
  */
 import { diaLocal, porcentaje, semaforo, type ColorSemaforo } from '@backio/shared';
-import { diasHabiles, metricasDia, type DatosMesa, type TareaEvo } from '../evolutivo';
+import { diasHabiles, type DatosMesa, type TareaEvo } from '../evolutivo';
 
 export type EstadoSemana = 'terminada' | 'revision' | 'ajustes' | 'no_cumplida' | 'nueva' | 'en_curso';
 
@@ -21,6 +22,9 @@ export const ESTADOS_SEMANA: { estado: EstadoSemana; icono: string; etiqueta: st
 const ORDEN = new Map(ESTADOS_SEMANA.map((e, i) => [e.estado, i]));
 /** Piezas que salieron de nuestro lado esta semana: terminadas o entregadas al cliente (en revisión o con ajustes). */
 const REALIZADAS = new Set<EstadoSemana>(['terminada', 'revision', 'ajustes']);
+/** Cumplimiento: entregadas (terminadas o en manos del cliente) ÷ todo lo que tocaba entregar. Nuevas y en curso no entran. */
+const ENTREGADAS = new Set<EstadoSemana>(['terminada', 'revision']);
+const COMPROMETIDAS = new Set<EstadoSemana>(['terminada', 'revision', 'ajustes', 'no_cumplida']);
 
 export interface TareaSemana {
   id: string;
@@ -36,7 +40,7 @@ export interface Conteo {
   total: number;
   piezas: number;
   por_estado: Record<EstadoSemana, number>;
-  /** Cumplimiento con la regla del daily: cerradas del plan ÷ lo que había que entregar, sumado por día hábil. */
+  /** Entregadas (✅ + 🔎) y todo lo que tocaba entregar (✅ + 🔎 + ⚠️ + ❌), cada tarea una vez. */
   cerradas_plan: number;
   para_entregar: number;
   cumplimiento_pct: number | null;
@@ -109,51 +113,25 @@ export function armarAcumulado(p: {
     ]),
   );
 
-  // Cumplimiento con la regla del daily, día por día, sobre el subconjunto que se pida.
-  const medir = (sub: TareaEvo[]) => {
-    let cerradas = 0,
-      paraEntregar = 0;
-    const porPersona = new Map<string, { cerradas: number; para: number }>();
-    for (const dia of dias) {
-      const { metricas, por_persona } = metricasDia({
-        dia,
-        seleccion: p.selecciones.get(dia) ?? new Set(),
-        tareas: sub,
-        reprocesos: datos.reprocesos,
-        reprogramaciones: datos.reprogramaciones,
-        bloqueos: 0,
-        nombres: datos.nombres,
-        avance: new Set(datos.avance.filter((a) => a.dia === dia).map((a) => a.requerimiento_id)),
-        cierres: new Set(datos.cierres.filter((c) => c.dia === dia).map((c) => c.requerimiento_id)),
-      });
-      cerradas += metricas.cerradas_planificadas;
-      paraEntregar += metricas.para_hoy ?? metricas.planificadas;
-      for (const pp of por_persona) {
-        const x = porPersona.get(pp.usuario_id) ?? { cerradas: 0, para: 0 };
-        const para = pp.para_hoy ?? pp.planificadas;
-        x.cerradas += Math.min(pp.cerradas, para);
-        x.para += para;
-        porPersona.set(pp.usuario_id, x);
-      }
-    }
-    return { cerradas, paraEntregar, porPersona };
-  };
-
-  const conteo = (ts: TareaEvo[], m: { cerradas: number; paraEntregar: number }): Conteo => {
+  const conteo = (ts: TareaEvo[]): Conteo => {
     const por_estado = vacio();
-    let piezas = 0;
+    let piezas = 0,
+      entregadas = 0,
+      comprometidas = 0;
     for (const t of ts) {
       const e = estadoDe.get(t.id)!;
       por_estado[e] += 1;
       if (REALIZADAS.has(e)) piezas += Number(t.piezas) || 0;
+      if (ENTREGADAS.has(e)) entregadas += 1;
+      if (COMPROMETIDAS.has(e)) comprometidas += 1;
     }
-    const pct = porcentaje(m.cerradas, m.paraEntregar);
+    const pct = porcentaje(entregadas, comprometidas);
     return {
       total: ts.length,
       piezas,
       por_estado,
-      cerradas_plan: m.cerradas,
-      para_entregar: m.paraEntregar,
+      cerradas_plan: entregadas,
+      para_entregar: comprometidas,
       cumplimiento_pct: pct,
       semaforo: semaforo(pct),
     };
@@ -172,8 +150,7 @@ export function armarAcumulado(p: {
   const ordenar = (a: TareaSemana, b: TareaSemana) =>
     ORDEN.get(a.estado)! - ORDEN.get(b.estado)! || a.cliente.localeCompare(b.cliente, 'es') || a.titulo.localeCompare(b.titulo, 'es');
 
-  const total = medir(tareas);
-  const resumen = conteo(tareas, total);
+  const resumen = conteo(tareas);
   const porEquipo = new Map<string, TareaEvo[]>();
   for (const t of tareas) {
     const e = p.equipoDe.get(t.cliente_id ?? '')?.trim() || SIN_EQUIPO;
@@ -182,8 +159,7 @@ export function armarAcumulado(p: {
   const equipos: EquipoSemana[] = [...porEquipo.entries()]
     .sort(([a], [b]) => (a === SIN_EQUIPO ? 1 : b === SIN_EQUIPO ? -1 : a.localeCompare(b, 'es')))
     .map(([nombre, ts]) => {
-      const m = medir(ts);
-      const c = conteo(ts, m);
+      const c = conteo(ts);
       const personas = new Map<string, TareaEvo[]>();
       for (const t of ts) for (const o of t.owner_agencia) personas.set(o, [...(personas.get(o) ?? []), t]);
       return {
@@ -191,15 +167,12 @@ export function armarAcumulado(p: {
         ...c,
         participacion_piezas_pct: porcentaje(c.piezas, resumen.piezas),
         personas: [...personas.entries()]
-          .map(([uid, pts]) => {
-            const mp = m.porPersona.get(uid) ?? { cerradas: 0, para: 0 };
-            return {
-              usuario_id: uid,
-              nombre: datos.nombres.get(uid) ?? '—',
-              ...conteo(pts, { cerradas: mp.cerradas, paraEntregar: mp.para }),
-              tareas: pts.map((t) => fila(t, uid)).sort(ordenar),
-            };
-          })
+          .map(([uid, pts]) => ({
+            usuario_id: uid,
+            nombre: datos.nombres.get(uid) ?? '—',
+            ...conteo(pts),
+            tareas: pts.map((t) => fila(t, uid)).sort(ordenar),
+          }))
           .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es')),
       };
     });

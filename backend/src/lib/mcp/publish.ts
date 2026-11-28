@@ -519,7 +519,7 @@ export function cuerpoAcumulado(a: AcumuladoSemana, mesa: Mesa, men?: Menciones)
   const pct = (c: { cumplimiento_pct: number | null; semaforo: string | null; cerradas_plan: number; para_entregar: number }) =>
     c.cumplimiento_pct === null
       ? 'sin entregas comprometidas'
-      : `${BOLA[c.semaforo ?? 'rojo']} <strong style="color:${ESTILO[c.semaforo ?? 'rojo']}">${c.cumplimiento_pct}%</strong> (${c.cerradas_plan} de ${c.para_entregar} entregas comprometidas)`;
+      : `${BOLA[c.semaforo ?? 'rojo']} <strong style="color:${ESTILO[c.semaforo ?? 'rojo']}">${c.cumplimiento_pct}%</strong> (${c.cerradas_plan} de ${c.para_entregar} que tocaba entregar)`;
   const icono = new Map(a.estados.map((e) => [e.estado, e.icono]));
   const conteo = (c: AcumuladoSemana['resumen']) =>
     a.estados
@@ -558,7 +558,7 @@ export function cuerpoAcumulado(a: AcumuladoSemana, mesa: Mesa, men?: Menciones)
     }
   }
   partes.push(
-    `${SALTO}<div><em>Cumplimiento con la misma regla del cierre del daily: entregas cerradas ÷ entregas comprometidas cada día. Lo que se entrega otro día no cuenta en contra. Verde desde 90 %, amarillo desde 70 %.</em></div>`,
+    `${SALTO}<div><em>Cumplimiento: entregadas (✅ terminadas y 🔎 en revisión del cliente) ÷ todo lo que tocaba entregar en la semana (además, ⚠️ ajustes y ❌ no cumplidas). Cada tarea cuenta una vez; las nuevas y las en curso no entran. Verde desde 90 %, amarillo desde 70 %.</em></div>`,
   );
   return partes.join('');
 }

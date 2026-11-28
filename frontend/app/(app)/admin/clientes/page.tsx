@@ -179,16 +179,18 @@ export default function AdminClientesPage() {
           <form
             // Con la lista de personas cargada se vuelve a montar: el select de ejecutiva toma su valor solo al montar.
             key={`${c.id}-${usuarios.length}`}
-            className="card p-4 grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_1fr_0.7fr_0.6fr_auto] items-end"
+            // Tres filas (nombre, ejecutiva y equipo · dominios, Basecamp, logo, color y PIN · acciones): con los campos de
+            // reuniones y equipo, una sola fila dejaba cada campo demasiado angosto para leerlo.
+            className="card p-4 grid gap-3 md:grid-cols-2 lg:grid-cols-6 items-end"
             action={(fd) => guardar(c, fd)}
           >
-            <div>
+            <div className="lg:col-span-2 self-center">
               <div className="font-semibold">
                 {c.nombre} {!c.activo && <span className="text-xs text-gray-400">(inactivo)</span>}
               </div>
               <div className="text-xs text-gray-400 font-mono">{c.id}</div>
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label className="label">Ejecutiva de cuenta</label>
               <select name="ejecutiva_id" className="input" defaultValue={c.ejecutiva_id ?? ''}>
                 <option value="">Sin asignar</option>
@@ -199,7 +201,7 @@ export default function AdminClientesPage() {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label className="label" htmlFor={`dominios-${c.id}`}>
                 Dominios de correo
               </label>
@@ -214,7 +216,7 @@ export default function AdminClientesPage() {
                 Una reunión de Google con alguien de estos dominios cuenta para este cliente.
               </p>
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label className="label" htmlFor={`equipo-${c.id}`}>
                 Equipo dentro de la mesa
               </label>
@@ -222,12 +224,12 @@ export default function AdminClientesPage() {
                 id={`equipo-${c.id}`}
                 name="equipo"
                 className="input"
-                list={`equipos-${c.mesa_id ?? 'sin'}`}
+                list={`equipos-${c.id}`}
                 placeholder="Ej.: KKAA y Mini-Markets"
                 maxLength={60}
                 defaultValue={c.equipo ?? ''}
               />
-              <datalist id={`equipos-${c.mesa_id ?? 'sin'}`}>
+              <datalist id={`equipos-${c.id}`}>
                 {[
                   ...new Set(
                     items
@@ -279,7 +281,7 @@ export default function AdminClientesPage() {
                 </label>
               )}
             </div>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1 md:col-span-2 lg:col-span-6">
               <button className="btn-primary">Guardar</button>
               {c.basecamp_project_id && (
                 <button

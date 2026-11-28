@@ -125,7 +125,7 @@ export function AcumuladoWeekly({ mesaId, dia, puedePublicar }: { mesaId: string
             <div className="text-xs uppercase tracking-wide text-gray-500">Cumplimiento</div>
             <Cumplimiento c={r} grande />
             <div className="text-xs text-gray-500 tabular-nums">
-              {r.cerradas_plan} de {r.para_entregar} entregas comprometidas
+              {r.cerradas_plan} de {r.para_entregar} que tocaba entregar
             </div>
           </div>
           <div>
@@ -148,8 +148,8 @@ export function AcumuladoWeekly({ mesaId, dia, puedePublicar }: { mesaId: string
           ))}
         </ul>
         <p className="mt-3 text-xs text-gray-500">
-          Misma medición del cierre del daily: entregas cerradas ÷ entregas comprometidas cada día. Lo que se entrega otro día no cuenta en
-          contra. Verde desde 90 %, amarillo desde 70 %.
+          Cumplimiento: entregadas (✅ terminadas y 🔎 en revisión del cliente) ÷ todo lo que tocaba entregar en la semana (además, ⚠️
+          ajustes y ❌ no cumplidas). Cada tarea cuenta una vez; las nuevas y las en curso no entran. Verde desde 90 %, amarillo desde 70 %.
         </p>
       </section>
 
