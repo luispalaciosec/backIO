@@ -240,23 +240,23 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
         <Indicador
           etiqueta="A tiempo · 90 días"
           valor={pct(i.pct_a_tiempo_90d)}
-          sub={`${i.entregas_medidas_90d} de ${i.entregas_90d} entregas medidas (pedidas desde el 21/09) · fecha vigente ${pct(i.pct_a_tiempo_vigente_90d)}${i.desvio_mediana_dias ? ` · ${i.desvio_mediana_dias} d de desvío` : ''}`}
+          sub={`sobre la fecha original · ${pct(i.pct_a_tiempo_vigente_90d)} sobre la vigente · ${i.entregas_medidas_90d} de ${i.entregas_90d} entregas medidas${i.desvio_mediana_dias ? ` · las tardías, ${i.desvio_mediana_dias} d tarde (mediana)` : ''}`}
         />
         <Indicador
           etiqueta="Atrasadas"
           valor={i.atrasados}
           alerta={i.atrasados > 0}
-          sub={`${i.atrasados_esperando_cliente ? `${i.atrasados_esperando_cliente} esperando al cliente (no cuentan para la salud) · ` : ''}${i.activos} activas · ${i.bloqueadas} bloqueadas${i.respuesta_cliente_mediana_dias_90d !== null ? ` · el cliente responde en ${i.respuesta_cliente_mediana_dias_90d} d (mediana)` : ''}`}
+          sub={`de ${i.activos} activas${i.atrasados_esperando_cliente ? ` · otras ${i.atrasados_esperando_cliente} esperan al cliente y no cuentan` : ''}`}
         />
         <Indicador
           etiqueta="Reprocesos · 90 días"
           valor={i.reprocesos_90d}
-          sub={`${i.reprocesos_equipo_90d} nuestros${i.motivo_reproceso_dominante ? ` · sobre todo ${i.motivo_reproceso_dominante.toLowerCase()}` : ''}`}
+          sub={`${i.reprocesos_equipo_90d} atribuibles al equipo${i.motivo_reproceso_dominante ? ` · sobre todo ${i.motivo_reproceso_dominante.toLowerCase()}` : ''}`}
         />
         <Indicador
-          etiqueta="Horas · 30 días"
-          valor={i.horas_30d}
-          sub={`${i.reprogramaciones_90d} reprogramaciones en 90 d (${i.reprogramaciones_cliente_90d} por el cliente)`}
+          etiqueta="Reprogramaciones · 90 días"
+          valor={i.reprogramaciones_90d}
+          sub={`${i.reprogramaciones_cliente_90d} pedidas por el cliente`}
         />
       </div>
 
@@ -264,7 +264,9 @@ export default async function FichaClientePage({ params: pP }: { params: Promise
         <section className="card p-4 space-y-3">
           <div className="flex items-baseline justify-between">
             <span className="font-semibold">Entregas por mes</span>
-            <span className="text-xs text-gray-500">% a tiempo según la fecha original</span>
+            <span className="text-xs text-gray-500 tabular-nums">
+              % a tiempo según la fecha original · {i.horas_30d} h de timesheet en 30 días
+            </span>
           </div>
           <Mensual serie={f.mensual} />
           <p className="text-xs text-gray-500">

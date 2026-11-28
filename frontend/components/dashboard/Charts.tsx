@@ -59,17 +59,21 @@ export function Kpi({
   valor,
   sub,
   tono = 'neutral',
+  grande = false,
 }: {
   etiqueta: string;
   valor: number | string;
+  /** Solo matiza la misma métrica (de cuántas, sobre qué fecha); nunca otra métrica. */
   sub?: string;
   tono?: 'neutral' | 'ok' | 'warn' | 'bad';
+  /** La métrica principal de la pantalla: ocupa dos columnas y va más grande. */
+  grande?: boolean;
 }) {
   const color = { neutral: 'text-gray-900', ok: 'text-green-600', warn: 'text-amber-600', bad: 'text-red-600' }[tono];
   return (
-    <div className="card p-4">
+    <div className={`card p-4 ${grande ? 'col-span-2' : ''}`}>
       <div className="text-xs uppercase tracking-wide text-gray-500">{etiqueta}</div>
-      <div className={`text-3xl font-bold tabular-nums mt-1 ${color}`}>{valor}</div>
+      <div className={`${grande ? 'text-5xl' : 'text-3xl'} font-bold tabular-nums mt-1 ${color}`}>{valor}</div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
     </div>
   );
