@@ -13,6 +13,10 @@ import { listUsuarios } from './db/usuarios';
 import { cancelarReuniones, listReunionesDeOrigen, upsertReuniones } from './db/reuniones';
 import { BasecampClient, type EventoBasecampSafe } from './basecamp/client';
 import { log } from './logger';
+import { audit } from './db/audit';
+import { borrarGoogle, conectadosGoogle } from './db/google';
+import { eventosGoogleSafe } from './google/calendar';
+import { ErrorGoogle, googleConfigurado } from './google/oauth';
 
 const DIAS_ATRAS = 45;
 const DIAS_ADELANTE = 14; // las reuniones que vienen quitan capacidad a la semana
@@ -180,7 +184,87 @@ export async function sincronizarReunionesBasecamp(ctx: DbCtx): Promise<{
   return { proyectos, eventos, guardadas, canceladas: sobran.length, errores };
 }
 
-/** Tarea programada: todas las fuentes. Google se suma en la fase 2. */
+/** Cliente de una reunión por los dominios de sus invitados externos (`clientes.dominios_correo`). Sin coincidencia: interna. */
+export function clientePorDominio(dominios: string[], porDominio: Map<string, string>): string | null {
+  for (const d of dominios) {
+    const c = porDominio.get(d.toLowerCase());
+    if (c) return c;
+  }
+  return null;
+}
+
+/**
+ * Trae el Google Calendar de cada persona que lo conectó (fase 2, migración 55). Cuenta todo evento con hora que la
+ * persona no rechazó. El cliente sale del dominio de los invitados; el asignado a mano se respeta. Si el permiso de
+ * Google ya no sirve, se borra la conexión y la persona ve «Reconectar» en Mi Google Calendar.
+ */
+export async function sincronizarReunionesGoogle(
+  ctx: DbCtx,
+): Promise<{ personas: number; guardadas: number; canceladas: number; desconectadas: number; errores: number }> {
+  if (!googleConfigurado()) return { personas: 0, guardadas: 0, canceladas: 0, desconectadas: 0, errores: 0 };
+  const conectados = await conectadosGoogle(ctx.tenantId);
+  if (!conectados.length) return { personas: 0, guardadas: 0, canceladas: 0, desconectadas: 0, errores: 0 };
+  const hoy = hoyLocal();
+  const desde = sumarDias(hoy, -DIAS_ATRAS);
+  const hasta = sumarDias(hoy, DIAS_ADELANTE);
+  const porDominio = new Map<string, string>();
+  for (const c of await listClientes(ctx)) for (const d of c.dominios_correo ?? []) porDominio.set(d.trim().toLowerCase(), c.id);
+  const ahora = new Date().toISOString();
+  let guardadas = 0,
+    canceladas = 0,
+    desconectadas = 0,
+    errores = 0;
+  for (const p of conectados) {
+    try {
+      const eventos = await eventosGoogleSafe(p.usuario_id, p.email, `${desde}T05:00:00Z`, `${sumarDias(hasta, 1)}T05:00:00Z`);
+      if (!eventos) continue;
+      const existentes = await listReunionesDeOrigen(ctx.tenantId, 'google', desde, hasta, p.usuario_id);
+      const manual = new Map(existentes.filter((r) => r.asignacion === 'manual').map((r) => [r.externo_id, r.cliente_id]));
+      const vistas = new Set<string>();
+      const filas: FilaInsert<'reuniones'>[] = [];
+      for (const e of eventos) {
+        if (e.todo_el_dia || e.cancelado || e.respuesta === 'rechazada') continue;
+        const horas = Math.round(((Date.parse(e.fin) - Date.parse(e.inicio)) / 3_600_000) * 100) / 100;
+        if (!(horas > 0)) continue;
+        vistas.add(e.id);
+        const aMano = manual.has(e.id);
+        const cliente = aMano ? (manual.get(e.id) ?? null) : clientePorDominio(e.dominios_externos, porDominio);
+        filas.push({
+          tenant_id: ctx.tenantId,
+          usuario_id: p.usuario_id,
+          origen: 'google',
+          externo_id: e.id,
+          inicio: new Date(e.inicio).toISOString(),
+          fin: new Date(e.fin).toISOString(),
+          fecha: diaLocal(e.inicio),
+          horas,
+          cliente_id: cliente,
+          asignacion: aMano ? 'manual' : cliente ? 'dominio' : null,
+          dominios_externos: e.dominios_externos,
+          respuesta: e.respuesta,
+          cancelada: false,
+          sincronizado_at: ahora,
+        });
+      }
+      guardadas += await upsertReuniones(filas);
+      const sobran = existentes.filter((r) => !r.cancelada && !vistas.has(r.externo_id)).map((r) => r.id);
+      await cancelarReuniones(sobran);
+      canceladas += sobran.length;
+    } catch (e) {
+      if (e instanceof ErrorGoogle && e.revocado) {
+        desconectadas += 1;
+        await borrarGoogle(p.usuario_id);
+        await audit(ctx, { accion: 'google_desconectado', entidad: 'usuario', entidad_id: p.usuario_id, detalle: { motivo: e.codigo } });
+      } else {
+        errores += 1;
+        log.warn('[reuniones] calendario de Google sin leer', { usuario: p.usuario_id, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  }
+  return { personas: conectados.length, guardadas, canceladas, desconectadas, errores };
+}
+
+/** Tarea programada: todas las fuentes. */
 export async function sincronizarReuniones(ctx: DbCtx) {
-  return { basecamp: await sincronizarReunionesBasecamp(ctx) };
+  return { basecamp: await sincronizarReunionesBasecamp(ctx), google: await sincronizarReunionesGoogle(ctx) };
 }

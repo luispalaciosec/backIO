@@ -9,11 +9,27 @@ Plan aprobado por gerencia el 27/11/2026.
 | Fuente | Estado | Cómo se asigna el cliente |
 |---|---|---|
 | Eventos del **schedule de Basecamp** de cada proyecto | Desde el 27/11/2026 | El del proyecto donde está el evento |
-| **Google Calendar** de cada persona, que cada quien conecta | Fase 2 | El cliente cuyo dominio de correo coincide con el de algún invitado; si ninguno, la reunión es interna |
+| **Google Calendar** de cada persona, que cada quien conecta en «Mi Google Calendar» | Desde el 28/11/2026 | El cliente cuyo dominio de correo coincide con el de algún invitado; si ninguno, la reunión es interna |
 
 La tarea programada `reuniones` corre cada 2 horas. Trae desde 45 días atrás hasta 14 días adelante, porque las reuniones
 que vienen también quitan capacidad. Un evento que se repite da una reunión por cada día que le toca. Lo que desaparece de la
 fuente se marca cancelado; no se borra.
+
+## Google Calendar
+
+Cada persona lo conecta una vez desde **Mi Calendar** (abajo en el menú). BackIO solo acepta la cuenta de Google con el mismo
+correo de la persona en BackIO, y pide solo lectura de eventos. Si el permiso deja de servir (se revocó o cambió la
+contraseña), la conexión se borra y la persona ve «Volver a conectar».
+
+**Cliente de cada reunión:** en Admin → Clientes, cada cliente tiene sus **dominios de correo** (por ejemplo, `empresa.com`).
+Una reunión con alguien de ese dominio cuenta para ese cliente; sin coincidencia, es interna. Las reuniones que la persona
+rechazó no cuentan.
+
+**Configuración (una vez, administración técnica):** proyecto en Google Cloud con la API de Calendar, pantalla de
+consentimiento **Interna**, permisos `openid`, `email` y `calendar.events.readonly`, y un cliente OAuth web con la URI de
+redirección `https://<backend>/api/google/oauth/callback`. En el servidor: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y
+`GOOGLE_REDIRECT_URI`. Los tokens de cada persona quedan en `google_credenciales_usuario` (migración 55), sin acceso desde
+la sesión de nadie.
 
 ## Qué cuenta
 
@@ -35,5 +51,5 @@ externos. Nunca el título, la descripción, las notas ni los correos: se descar
 - Los eventos de Basecamp son del proyecto (el cliente), no de una lista: en el weekly las horas de reunión se ven por
   cliente.
 
-Código: `backend/src/lib/reuniones.ts`, `backend/src/lib/db/reuniones.ts`; tabla `reuniones` y `clientes.dominios_correo`
+Código: `backend/src/lib/reuniones.ts`, `backend/src/lib/db/reuniones.ts`, `backend/src/lib/google/` (`eventosGoogleSafe` descarta todo texto); tabla `reuniones` y `clientes.dominios_correo`
 (migración 53).

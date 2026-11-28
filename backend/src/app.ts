@@ -13,6 +13,7 @@ import { prometioWebhook } from './routes/webhooks/prometio';
 import { authPublico } from './routes/auth_publico';
 import { cron } from './routes/cron';
 import { basecampOAuth } from './routes/basecamp';
+import { googleOAuth } from './routes/google';
 import { mcp } from './routes/mcp';
 import { oauth, wellKnown } from './routes/oauth';
 import { openapi } from './routes/openapi';
@@ -69,6 +70,7 @@ export function createApp(): Hono {
   app.route('/api/webhooks/basecamp', basecampWebhook);
   app.route('/api/cron', cron);
   app.route('/api/basecamp', basecampOAuth);
+  app.route('/api/google', googleOAuth);
   app.route('/mcp', mcp);
   app.route('/.well-known', wellKnown);
   app.route('/oauth', oauth);

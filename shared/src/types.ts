@@ -53,6 +53,8 @@ export interface Cliente {
   ejecutiva_id?: string | null;
   /** Equipo dentro de la mesa (migración 54): agrupa el weekly acumulado. */
   equipo?: string | null;
+  /** Dominios de correo del cliente (migración 53): asignan las reuniones de Google por sus invitados. */
+  dominios_correo?: string[];
   nombre: string;
   slug: string;
   logo_url: string | null;

@@ -246,6 +246,9 @@ export function Sidebar({ email, rol }: { email: string; rol: Rol | null }) {
         <Link href="/mi-basecamp" className="btn-ghost px-2 py-1" title="Mi Basecamp: lo que haces aquí sale a tu nombre en Basecamp">
           {colapsado ? '⛺' : 'Mi Basecamp'}
         </Link>
+        <Link href="/mi-google" className="btn-ghost px-2 py-1" title="Mi Google Calendar: tus reuniones cuentan como trabajo">
+          {colapsado ? '📅' : 'Mi Calendar'}
+        </Link>
         <SignOutButton />
         <button
           onClick={toggle}

@@ -959,6 +959,19 @@ Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
 | `created_at` | fecha y hora | sí | por defecto `now()` |
 | `updated_at` | fecha y hora | sí | por defecto `now()` |
 
+### google_credenciales_usuario
+
+Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.
+
+| Columna | Tipo | Obligatoria | Notas |
+|---|---|---|---|
+| `usuario_id` | uuid | sí | clave primaria; → [usuarios](#usuarios).id |
+| `tenant_id` | uuid | sí | → [tenants](#tenants).id |
+| `email` | texto | sí |  |
+| `datos` | jsonb | sí |  |
+| `conectado_at` | fecha y hora | sí | por defecto `now()` |
+| `updated_at` | fecha y hora | sí | por defecto `now()` |
+
 ### fees_cliente
 
 Sin descripción: agrégala en `backend/scripts/gen_tipos_db.ts`.

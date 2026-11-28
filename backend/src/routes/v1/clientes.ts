@@ -155,6 +155,17 @@ const patchSchema = z.object({
   ejecutiva_id: z.string().uuid().nullable().optional(),
   /** Equipo dentro de la mesa (migración 54, weekly acumulado); vacío o null lo quita. */
   equipo: z.string().trim().max(60).nullable().optional(),
+  /** Dominios de correo del cliente (reuniones de Google, docs/23): «bancoamazonas.com», sin @ ni http. */
+  dominios_correo: z
+    .array(
+      z
+        .string()
+        .trim()
+        .toLowerCase()
+        .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, 'Dominio inválido: escríbelo como empresa.com'),
+    )
+    .max(10)
+    .optional(),
   activo: z.boolean().optional(),
   /** PIN del portal: 4 a 6 dígitos para fijarlo, null para quitarlo; ausente = sin cambios. Se guarda con hash. */
   portal_pin: z

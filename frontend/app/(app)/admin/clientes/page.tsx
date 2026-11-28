@@ -49,6 +49,10 @@ export default function AdminClientesPage() {
           logo_url: String(form.get('logo_url') || '') || null,
           ejecutiva_id: String(form.get('ejecutiva_id') || '') || null,
           equipo: String(form.get('equipo') ?? '').trim() || null,
+          dominios_correo: String(form.get('dominios_correo') ?? '')
+            .split(/[\s,;]+/)
+            .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+            .filter(Boolean),
           ...(quitarPin ? { portal_pin: null } : pin ? { portal_pin: pin } : {}),
         },
       });
@@ -194,6 +198,21 @@ export default function AdminClientesPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="label" htmlFor={`dominios-${c.id}`}>
+                Dominios de correo
+              </label>
+              <input
+                id={`dominios-${c.id}`}
+                name="dominios_correo"
+                className="input"
+                placeholder="empresa.com, empresa.com.ec"
+                defaultValue={(c.dominios_correo ?? []).join(', ')}
+              />
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                Una reunión de Google con alguien de estos dominios cuenta para este cliente.
+              </p>
             </div>
             <div>
               <label className="label" htmlFor={`equipo-${c.id}`}>

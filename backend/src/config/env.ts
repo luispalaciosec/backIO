@@ -23,6 +23,10 @@ const schema = z.object({
   BASECAMP_USER_AGENT: z.string().default('BackIO Geeks (luis@geeks.ec)'),
   BASECAMP_WEBHOOK_SECRET: z.string().optional(),
   PROMETIO_WEBHOOK_SECRET: z.string().optional(),
+  // Google Calendar de cada persona (reuniones, fase 2, docs/23). Sin estas tres, «Mi Google Calendar» no se ofrece.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().url().optional(),
   SENTRY_DSN: z.string().url().optional(), // sin DSN no se envía nada a Sentry
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
