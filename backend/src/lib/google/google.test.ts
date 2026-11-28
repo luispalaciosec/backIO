@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
+  // En CI no hay .env: valores de prueba para que la configuración sea válida.
+  process.env.SUPABASE_URL ??= 'https://prueba.supabase.co';
+  process.env.SUPABASE_ANON_KEY ??= 'anon-prueba';
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'service-prueba';
   process.env.GOOGLE_CLIENT_ID = 'cliente-prueba';
   process.env.GOOGLE_CLIENT_SECRET = 'secreto-prueba';
   process.env.GOOGLE_REDIRECT_URI = 'https://backend.example.test/api/google/oauth/callback';
