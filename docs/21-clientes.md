@@ -157,8 +157,11 @@ Cada cambio es una fila nueva con su fecha «desde»: vale el último que no pas
 **Cómo se calcula el margen de un cliente en un mes:**
 - **Costo:** el sueldo de cada persona se reparte entre sus clientes según las horas que registró en cada uno ese mes
   (timesheet de Basecamp).
-- **Ejecutivas:** no registran horas; su sueldo se reparte entre sus cuentas según el fee de cada una (sin fees cargados, en
-  partes iguales). Una marca sin fee propio no recibe parte: va a la empresa que cobra por ella (desde el 7/11/2026).
+- **Reuniones y visitas con el cliente** (docs/23, desde el 28/11/2026) se suman a las horas del timesheet de cada persona
+  en ese cliente. Las internas no van a ningún cliente.
+- **Ejecutivas:** no registran horas. La parte de su jornada del mes que pasó en reuniones con clientes va a esos clientes;
+  el resto se reparte entre sus cuentas según el fee de cada una (sin fees cargados, en partes iguales). Una marca sin fee
+  propio no recibe parte: va a la empresa que cobra por ella (desde el 7/11/2026).
 - **Margen:** fee del cliente menos su costo.
 
 No se usa horas × costo por hora: el timesheet recoge unas 13 de las 40 horas semanales, y así quedaban fuera dos

@@ -38,6 +38,31 @@ la sesión de nadie.
   cuenta una vez.
 - En Basecamp, cuenta para cada participante que tiene usuario en BackIO.
 
+## Dónde se usan (fase 3, desde el 28/11/2026)
+
+**Capacidad.** Las horas para tareas de un día son el ritmo diario de la persona (la quinta parte de su semana fuerte en el
+timesheet), salvo que sus reuniones de ese día no le dejen tanto de su jornada declarada:
+
+> disponible del día = mín(ritmo semanal ÷ 5, jornada semanal declarada ÷ 5 − reuniones del día)
+
+Con el ritmo de unas 13 h semanales y una jornada de 40 h, las reuniones solo restan cuando pasan de unas 5,4 h en el día:
+el timesheet ya no recoge el tiempo de reuniones, así que el ritmo ya lo descuenta en una semana normal. Se aplica en
+**Armar el día** (la carga de cada persona dice cuántas horas de reunión tiene hoy) y en el **riesgo de la semana** (suma
+cada día hábil que queda con sus reuniones, también las agendadas).
+
+**Rentabilidad** (docs/21). Las reuniones con un cliente son trabajo para ese cliente:
+- A quien registra horas, se le suman a las del timesheet y su sueldo se reparte con ambas.
+- A la ejecutiva, la parte de su jornada del mes (jornada semanal × 52 ÷ 12) que pasó en reuniones con clientes va a esos
+  clientes por horas; el resto sigue repartido entre sus cuentas por el fee.
+- Las internas no van a ningún cliente. Las de quien no registra horas ni lleva cuentas tampoco: su sueldo sigue sin
+  repartir.
+
+**Personas y dashboard.** Muestran aparte las horas en tareas (timesheet) y las horas en reuniones, por persona, por día y
+por cliente. Las de clientes de prueba no cuentan.
+
+**Weekly.** En la vista «Reunión», debajo de la capacidad, las reuniones y visitas de la semana por cliente y con quién
+(`GET /semanas/:id/reuniones?mesa=`). En «Mis cuentas», solo las de sus clientes.
+
 ## Qué no entra (regla 1)
 
 De un evento solo entran el horario, los participantes, la repetición y, de Google, los **dominios** de los invitados
@@ -50,6 +75,8 @@ externos. Nunca el título, la descripción, las notas ni los correos: se descar
   tiempo cuenta dos veces: el timesheet no tiene hora del día y no se puede cruzar.
 - Los eventos de Basecamp son del proyecto (el cliente), no de una lista: en el weekly las horas de reunión se ven por
   cliente.
+- La misma reunión en Basecamp y en Google con clientes distintos (o una con cliente y la otra interna) cuenta una vez para
+  la persona, pero en la rentabilidad puede aparecer en los dos clientes.
 
 Código: `backend/src/lib/reuniones.ts`, `backend/src/lib/db/reuniones.ts`, `backend/src/lib/google/` (`eventosGoogleSafe` descarta todo texto); tabla `reuniones` y `clientes.dominios_correo`
 (migración 53).

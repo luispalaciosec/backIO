@@ -61,6 +61,7 @@ interface Persona {
   pct_a_tiempo_vigente: number | null;
   desvio_mediana_dias: number | null;
   horas: number;
+  horas_reunion?: number;
   horas_por_entrega: number | null;
   pct_capacidad: number | null;
   reprogramaciones_equipo: number;
@@ -73,7 +74,7 @@ interface Persona {
   dias_con_horas: number;
   dias_sin_horas: string[];
   horas_esperadas: number;
-  dias: { fecha: string; horas: number; esperado: number; entregados: number }[];
+  dias: { fecha: string; horas: number; reunion?: number; esperado: number; entregados: number }[];
 }
 interface Resumen {
   periodo: Periodo;
@@ -153,7 +154,7 @@ function BarrasHoras({ dias }: { dias: Persona['dias'] }) {
             <rect x={x} y={30 - hE} width={w} height={hE} fill="#eef2f7" rx={0.5} />
             <rect x={x} y={30 - hH} width={w} height={hH} fill={color} rx={0.5} />
             <title>
-              {d.fecha}: {d.horas} h de {d.esperado} esperadas · {d.entregados} entregas
+              {d.fecha}: {d.horas} h de {d.esperado} esperadas{d.reunion ? ` · ${d.reunion} h en reuniones` : ''} · {d.entregados} entregas
             </title>
           </g>
         );
@@ -214,6 +215,7 @@ export default function PersonasPage() {
     ? {
         entregados: d.personas.reduce((s, p) => s + p.entregados, 0),
         horas: Math.round(d.personas.reduce((s, p) => s + p.horas, 0)),
+        reuniones: Math.round(d.personas.reduce((s, p) => s + (p.horas_reunion ?? 0), 0)),
         esperadas: Math.round(d.personas.filter((p) => p.basecamp_user_id).reduce((s, p) => s + p.horas_esperadas, 0)),
         atrasados: d.personas.reduce((s, p) => s + p.atrasados, 0),
         reprocesos: d.personas.reduce((s, p) => s + p.reprocesos, 0),
@@ -282,6 +284,7 @@ export default function PersonasPage() {
               {totales.horas}
               <span className="text-sm text-gray-400 font-normal"> / {totales.esperadas} esperadas</span>
             </div>
+            {totales.reuniones > 0 && <div className="text-xs text-gray-500">Más {totales.reuniones} h en reuniones y visitas</div>}
             {totales.sin_timesheet > 0 && (
               <div className="text-xs text-red-700 font-semibold">
                 {totales.sin_timesheet} {totales.sin_timesheet === 1 ? 'persona' : 'personas'} sin ninguna hora
@@ -337,6 +340,11 @@ export default function PersonasPage() {
               <div>
                 <div className="text-lg font-bold">{p.horas}</div>
                 <div className="text-[10px] uppercase text-gray-500">Horas{p.pct_capacidad !== null ? ` · ${p.pct_capacidad}%` : ''}</div>
+                {!!p.horas_reunion && (
+                  <div className="text-[10px] text-gray-500" title="Reuniones y visitas de los calendarios, aparte del timesheet">
+                    + {p.horas_reunion} en reuniones
+                  </div>
+                )}
               </div>
               <div>
                 <div className={`text-lg font-bold ${p.atrasados ? 'text-red-700' : 'text-gray-700'}`}>
@@ -445,6 +453,7 @@ export default function PersonasPage() {
                     ['A tiempo (vigente)', pct(abierta.pct_a_tiempo_vigente)],
                     ['Desvío mediano', abierta.desvio_mediana_dias ? `${abierta.desvio_mediana_dias} d` : '—'],
                     ['Horas', `${abierta.horas}${abierta.pct_capacidad !== null ? ` · ${abierta.pct_capacidad}% cap.` : ''}`],
+                    ['En reuniones', abierta.horas_reunion ? `${abierta.horas_reunion} h` : '—'],
                     ['Horas por entrega', abierta.horas_por_entrega ?? '—'],
                     ['Reprocesos', `${abierta.reprocesos} (${abierta.horas_reproceso} h)`],
                     ['Reprog. del equipo', abierta.reprogramaciones_equipo],
@@ -474,6 +483,7 @@ export default function PersonasPage() {
                         <tr>
                           <th className="th">Día</th>
                           <th className="th text-right">Horas</th>
+                          <th className="th text-right">Reuniones</th>
                           <th className="th text-right">Esperadas</th>
                           <th className="th text-right">Entregas</th>
                           <th className="th"></th>
@@ -494,6 +504,7 @@ export default function PersonasPage() {
                               <td className={`td text-right tabular-nums ${falta ? 'text-red-700 font-semibold' : ''}`}>
                                 {x.horas || (x.esperado ? '0' : '—')}
                               </td>
+                              <td className="td text-right tabular-nums text-gray-500">{x.reunion || ''}</td>
                               <td className="td text-right tabular-nums text-gray-500">{x.esperado || '—'}</td>
                               <td className="td text-right tabular-nums text-green-700">{x.entregados || ''}</td>
                               <td className="td text-xs">

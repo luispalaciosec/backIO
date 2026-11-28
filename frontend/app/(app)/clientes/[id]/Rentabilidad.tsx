@@ -4,7 +4,15 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { dinero } from '@/lib/format';
 
-type Mes = { mes: string; fee: number | null; costo: number; margen: number | null; margen_pct: number | null; horas: number };
+type Mes = {
+  mes: string;
+  fee: number | null;
+  costo: number;
+  margen: number | null;
+  margen_pct: number | null;
+  horas: number;
+  horas_reunion?: number;
+};
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 /** Rentabilidad del cliente en los últimos 6 meses (docs/21). La ficha solo la monta para gerencia y admin. */
@@ -22,7 +30,9 @@ export function RentabilidadCliente({ clienteId }: { clienteId: string }) {
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
         <div>
           <div className="font-semibold">Rentabilidad</div>
-          <p className="text-xs text-gray-500 mt-0.5">Fee menos sueldos repartidos por horas registradas. Solo gerencia y admin.</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Fee menos sueldos repartidos por horas registradas y reuniones con el cliente. Solo gerencia y admin.
+          </p>
         </div>
         <Link href="/rentabilidad/costos" className="btn-secondary text-xs">
           Sueldos y fees
@@ -41,6 +51,7 @@ export function RentabilidadCliente({ clienteId }: { clienteId: string }) {
                 <th className="th text-right">Margen</th>
                 <th className="th text-right">%</th>
                 <th className="th text-right">Horas</th>
+                <th className="th text-right">En reuniones</th>
               </tr>
             </thead>
             <tbody>
@@ -58,6 +69,7 @@ export function RentabilidadCliente({ clienteId }: { clienteId: string }) {
                   </td>
                   <td className="td text-right tabular-nums">{m.margen_pct === null ? '—' : `${m.margen_pct} %`}</td>
                   <td className="td text-right tabular-nums">{Math.round(m.horas)}</td>
+                  <td className="td text-right tabular-nums">{m.horas_reunion ? Math.round(m.horas_reunion) : '—'}</td>
                 </tr>
               ))}
             </tbody>

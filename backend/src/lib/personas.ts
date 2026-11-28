@@ -11,6 +11,8 @@ import { listClientes, idsClientesDePrueba } from './db/clientes';
 import { listBacklog } from './db/requerimientos';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento } from './cumplimiento';
+import { listReunionesEntre } from './db/reuniones';
+import { horasDeReunion } from './reuniones';
 import { diaLocal, finDiaLocal, hoyLocal, inicioDiaLocal, sumarDias, responsablesDe, responsablesEn, nombrePersona } from '@backio/shared';
 
 export type Periodo = 'dia' | 'semana' | 'mes';
@@ -35,7 +37,10 @@ export interface PersonaResumen {
   pct_a_tiempo_original: number | null;
   pct_a_tiempo_vigente: number | null;
   desvio_mediana_dias: number | null;
+  /** Horas del timesheet (en tareas). */
   horas: number;
+  /** Horas en reuniones y visitas del periodo hasta hoy (calendarios, docs/23), aparte del timesheet. */
+  horas_reunion: number;
   horas_por_entrega: number | null;
   pct_capacidad: number | null;
   reprogramaciones_equipo: number;
@@ -48,7 +53,7 @@ export interface PersonaResumen {
   dias_con_horas: number;
   dias_sin_horas: string[];
   horas_esperadas: number;
-  dias: { fecha: string; horas: number; esperado: number; entregados: number }[];
+  dias: { fecha: string; horas: number; reunion: number; esperado: number; entregados: number }[];
   puntaje: number; // 0-100 orientativo
 }
 
@@ -89,6 +94,10 @@ export async function resumenPersonas(
   );
   const hrs = await listHorasDesde(ctx, desde30 < desde ? desde30 : desde);
   const horas = hrs as { usuario_id: string | null; fecha: string; horas: number }[];
+  // Reuniones de cada persona por día, sin las de clientes de prueba.
+  const reuniones = horasDeReunion(
+    (await listReunionesEntre(ctx, desde, hasta < hoy ? hasta : hoy)).filter((x) => !(x.cliente_id && prueba.has(x.cliente_id))),
+  );
   const nombreC = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? '—';
   const reqPorId = new Map([...activos, ...completados].map((r) => [r.id, r]));
   // Reprogramaciones y reprocesos cuentan para quien tenía la tarea en ese momento (historial, migración 30).
@@ -130,13 +139,14 @@ export async function resumenPersonas(
       });
       // Timesheet día a día dentro del periodo (solo hasta hoy, lunes a viernes).
       const esperadoDia = u.capacidad_semanal / 5;
-      const diasPeriodo: { fecha: string; horas: number; esperado: number; entregados: number }[] = [];
+      const diasPeriodo: { fecha: string; horas: number; reunion: number; esperado: number; entregados: number }[] = [];
       for (let f = desde; f <= (hasta < hoy ? hasta : hoy); f = sumarDias(f, 1)) {
         const dow = new Date(`${f}T12:00:00Z`).getUTCDay();
         const laborable = dow >= 1 && dow <= 5;
         diasPeriodo.push({
           fecha: f,
           horas: Math.round(hMias.filter((h) => h.fecha === f).reduce((s2, h) => s2 + Number(h.horas), 0) * 10) / 10,
+          reunion: Math.round((reuniones.get(`${u.id}|${f}`) ?? 0) * 10) / 10,
           esperado: laborable ? Math.round(esperadoDia * 10) / 10 : 0,
           entregados: completados.filter((r) => deU(r) && diaLocal(r.completado_at ?? '') === f).length,
         });
@@ -182,6 +192,7 @@ export async function resumenPersonas(
         pct_a_tiempo_vigente: cu.pct_vigente,
         desvio_mediana_dias: cu.desvio_mediana_dias,
         horas: Math.round(hPeriodo * 10) / 10,
+        horas_reunion: Math.round(diasPeriodo.reduce((s2, d) => s2 + d.reunion, 0) * 10) / 10,
         horas_por_entrega: entregados.length && hPeriodo ? Math.round((hPeriodo / entregados.length) * 10) / 10 : null,
         pct_capacidad: cap ? Math.round((hPeriodo / cap) * 100) : null,
         reprogramaciones_equipo: cu.reprogramaciones_equipo,
@@ -200,7 +211,7 @@ export async function resumenPersonas(
         puntaje,
       };
     })
-    .filter((p) => p.activos > 0 || p.entregados > 0 || p.horas > 0 || p.rol === 'colaborador' || p.rol === 'lider')
+    .filter((p) => p.activos > 0 || p.entregados > 0 || p.horas > 0 || p.horas_reunion > 0 || p.rol === 'colaborador' || p.rol === 'lider')
     .sort((a, b) => b.activos - a.activos);
   return { periodo, desde, hasta, etiqueta, personas };
 }

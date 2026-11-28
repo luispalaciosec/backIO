@@ -18,7 +18,12 @@ const sumarMeses = (mes: string, n: number) => {
 const quien = (personas: RentabilidadMes['clientes'][number]['personas']) =>
   personas
     .slice(0, 3)
-    .map((p) => (p.reparto === 'cuenta' ? `${p.nombre.split(' ')[0]} (ejecutiva)` : `${p.nombre.split(' ')[0]} ${Math.round(p.horas)} h`))
+    .map((p) => {
+      const n = p.nombre.split(' ')[0];
+      if (p.reparto === 'cuenta') return `${n} (ejecutiva)`;
+      if (p.reparto === 'reuniones') return `${n} ${Math.round(p.horas_reunion ?? 0)} h en reuniones`;
+      return `${n} ${Math.round(p.horas)} h${p.horas_reunion ? ` + ${Math.round(p.horas_reunion)} h en reuniones` : ''}`;
+    })
     .join(' · ') + (personas.length > 3 ? ` y ${personas.length - 3} más` : '');
 
 /** Rentabilidad por cliente (docs/21): solo gerencia y admin. */
@@ -38,8 +43,9 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
         <div>
           <h1 className="text-2xl font-bold">Rentabilidad · {nombreMes(mes)}</h1>
           <p className="text-sm text-gray-500">
-            Fee del cliente menos el sueldo de cada persona repartido según las horas que registró en ese cliente durante el mes. El sueldo
-            de cada ejecutiva se reparte entre sus cuentas según el fee de cada una.
+            Fee del cliente menos el sueldo de cada persona repartido según las horas que registró en ese cliente durante el mes, más sus
+            reuniones y visitas con él. El sueldo de cada ejecutiva va a los clientes con los que se reunió, por la parte de su jornada que
+            pasó en reuniones; el resto, entre sus cuentas según el fee de cada una.
           </p>
         </div>
         <nav className="flex items-center gap-2 text-sm">
@@ -102,6 +108,9 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
               <th className="th text-right">Margen</th>
               <th className="th text-right">%</th>
               <th className="th text-right">Horas</th>
+              <th className="th text-right" title="Reuniones y visitas con el cliente (calendarios)">
+                En reuniones
+              </th>
               <th className="th">Quién</th>
             </tr>
           </thead>
@@ -126,6 +135,7 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
                     {c.margen_pct === null ? '—' : `${c.margen_pct} %`}
                   </td>
                   <td className="td text-right tabular-nums">{Math.round(c.horas)}</td>
+                  <td className="td text-right tabular-nums">{c.horas_reunion ? Math.round(c.horas_reunion) : '—'}</td>
                   <td className="td text-xs text-gray-500">{quien(c.personas)}</td>
                 </tr>
                 {/* Las marcas, debajo de su empresa: cuánto cuesta y cuánto trabajo se lleva cada una. */}
@@ -141,6 +151,7 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
                     <td className="td text-right text-gray-400">—</td>
                     <td className="td text-right text-gray-400">—</td>
                     <td className="td text-right tabular-nums">{Math.round(m.horas)}</td>
+                    <td className="td text-right tabular-nums">{m.horas_reunion ? Math.round(m.horas_reunion) : '—'}</td>
                     <td className="td text-xs text-gray-500">{quien(m.personas)}</td>
                   </tr>
                 ))}
@@ -148,7 +159,7 @@ export default async function RentabilidadPage({ searchParams: spP }: { searchPa
             ))}
             {r.clientes.length === 0 && (
               <tr>
-                <td className="td text-gray-400" colSpan={7}>
+                <td className="td text-gray-400" colSpan={8}>
                   Sin fees ni sueldos cargados para este mes. Cárgalos en «Sueldos y fees».
                 </td>
               </tr>

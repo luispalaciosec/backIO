@@ -15,6 +15,7 @@ interface CargaDia {
   horas: Record<string, Record<string, number>>;
   capacidad_dia: Record<string, number>;
   otras_mesas: Record<string, number>;
+  reuniones?: Record<string, number>;
 }
 interface Filtros {
   q: string;
@@ -233,7 +234,13 @@ export function ArmarDia({
       if (r.daily_fecha === hoy) for (const o of r.owner_agencia) h.set(o, (h.get(o) ?? 0) + (carga.horas[r.id]?.[o] ?? 0));
     return [...h.entries()]
       .filter(([, x]) => x > 0)
-      .map(([id, horas]) => ({ id, nombre: npersona(id) || 'Sin nombre', horas, capacidad: carga.capacidad_dia[id] ?? null }))
+      .map(([id, horas]) => ({
+        id,
+        nombre: npersona(id) || 'Sin nombre',
+        horas,
+        capacidad: carga.capacidad_dia[id] ?? null,
+        reunion: carga.reuniones?.[id] ?? 0,
+      }))
       .sort((a, b) => (b.capacidad ? b.horas / b.capacidad : 0) - (a.capacidad ? a.horas / a.capacidad : 0));
   }, [carga, items, hoy, npersona]);
 
@@ -434,11 +441,12 @@ export function ArmarDia({
                       <button
                         key={p.id}
                         onClick={() => cambiar({ persona: f.persona === p.id ? '' : p.id })}
-                        title="Horas elegidas para hoy, en todas sus mesas, contra lo que registra en un día de una semana fuerte"
+                        title={`Horas elegidas para hoy, en todas sus mesas, contra lo que registra en un día de una semana fuerte${p.reunion ? ` (ya sin ${horasTxt(p.reunion)} de reuniones de hoy)` : ''}`}
                         className={`rounded-md px-2 py-0.5 tabular-nums ${pasa ? 'bg-red-50 text-red-700 font-semibold' : 'bg-gray-100 text-gray-700'} ${f.persona === p.id ? 'ring-1 ring-brand' : ''}`}
                       >
                         {p.nombre.split(' ')[0]} {horasTxt(p.horas)}
                         {p.capacidad !== null ? ` de ${horasTxt(p.capacidad)}` : ''}
+                        {p.reunion > 0 ? ` · ${horasTxt(p.reunion)} en reuniones` : ''}
                       </button>
                     );
                   })}

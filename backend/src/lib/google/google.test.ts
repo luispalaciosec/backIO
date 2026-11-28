@@ -86,3 +86,34 @@ describe('cliente por dominio', () => {
     expect(clientePorDominio([], m)).toBeNull();
   });
 });
+
+describe('resumen de reuniones', async () => {
+  const { resumirReuniones, horasDeReunionPorCliente } = await import('../reuniones');
+  const f = (usuario_id: string, cliente_id: string | null, ini: string, fin: string) => ({
+    usuario_id,
+    cliente_id,
+    inicio: `2026-11-24T${ini}:00-05:00`,
+    fin: `2026-11-24T${fin}:00-05:00`,
+  });
+  const filas = [
+    f('ana', 'c1', '09:00', '10:00'),
+    f('ana', 'c1', '09:30', '11:00'), // se pisa con la anterior: 2 h con c1
+    f('ana', null, '14:00', '15:00'), // interna
+    f('beto', 'c2', '10:00', '10:30'),
+    f('beto', 'prueba', '11:00', '12:00'),
+  ];
+  it('por persona suma la unión del día; por cliente, sin internas', () => {
+    expect(horasDeReunionPorCliente(filas)).toEqual(
+      new Map([
+        ['ana|c1', 2],
+        ['beto|c2', 0.5],
+        ['beto|prueba', 1],
+      ]),
+    );
+    const r = resumirReuniones(filas, { excluir: new Set(['prueba']) });
+    expect(r).toEqual({ total: 3.5, por_usuario: { ana: 3, beto: 0.5 }, por_cliente: { c1: 2, c2: 0.5 } });
+  });
+  it('con una mesa, solo sus clientes (sin internas)', () => {
+    expect(resumirReuniones(filas, { clienteIds: ['c1'] })).toEqual({ total: 2, por_usuario: { ana: 2 }, por_cliente: { c1: 2 } });
+  });
+});

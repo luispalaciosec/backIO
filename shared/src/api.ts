@@ -124,6 +124,8 @@ export interface CapacidadPersona {
   horas_estimadas?: number;
   /** Capacidad de los días hábiles que quedan, en horas de timesheet. */
   capacidad_restante?: number;
+  /** Horas de reunión en los días que quedan (ya descontadas de `capacidad_restante`; docs/23). */
+  reuniones_restantes?: number;
   /** De dónde sale: su ritmo del timesheet, el del equipo o la declarada. */
   capacidad_base?: 'ritmo' | 'equipo' | 'declarada';
   /** Tareas que no entran en la capacidad que queda, por fecha. */

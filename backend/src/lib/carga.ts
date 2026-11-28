@@ -22,6 +22,8 @@ import { listMesas } from './db/mesas';
 import { listProyectos } from './db/proyectos';
 import { ensureSemana } from './db/semanas';
 import { notificar } from './notificaciones';
+import { listReunionesEntre } from './db/reuniones';
+import { horasDeReunion } from './reuniones';
 import type { CorreoRico } from './notificaciones/email';
 
 /** Tareas completadas con horas que hacen falta para confiar en una mediana. */
@@ -67,8 +69,10 @@ export interface CargaPersona {
   /** Horas de una semana completa: su ritmo del timesheet, el del equipo o la declarada. */
   capacidad_semanal: number;
   capacidad_base: BaseCapacidad;
-  /** Capacidad de los días hábiles que quedan de la semana (desde hoy). */
+  /** Capacidad para tareas de los días hábiles que quedan de la semana (desde hoy), ya sin sus reuniones. */
   capacidad_restante: number;
+  /** Horas de reunión en esos días (docs/23). */
+  reuniones_restantes: number;
   horas: number;
   tareas: TareaCarga[];
   /** Las que no entran en la capacidad que queda, de la fecha más lejana hacia atrás. */
@@ -159,14 +163,28 @@ export function crearCapacidades(filas: Pick<FilaHorasTarea, 'usuario_id' | 'fec
   };
 }
 
-/** Días hábiles (lunes a viernes) desde hoy, o desde el inicio si la semana no empezó, hasta el fin de la semana. */
-export function diasHabilesRestantes(hoy: string, semana: { fecha_inicio: string; fecha_fin: string }): number {
-  let n = 0;
+/**
+ * Horas para tareas que le quedan a una persona en un día (docs/23, fase 3): su ritmo de un día (la quinta parte del
+ * semanal), salvo que las reuniones de ese día no dejen tanto de su jornada declarada.
+ */
+export function capacidadDelDia(ritmoSemanal: number, declaradaSemanal: number, horasReunion: number): number {
+  const jornada = declaradaSemanal > 0 ? declaradaSemanal / 5 - horasReunion : Infinity;
+  return r1(Math.max(Math.min(ritmoSemanal / 5, jornada), 0));
+}
+
+/** Días hábiles de la semana desde hoy (o desde el inicio si no empezó), en orden. */
+export function diasHabilesDesde(hoy: string, semana: { fecha_inicio: string; fecha_fin: string }): string[] {
+  const out: string[] = [];
   for (let d = hoy > semana.fecha_inicio ? hoy : semana.fecha_inicio; d <= semana.fecha_fin; d = sumarDias(d, 1)) {
     const dia = new Date(`${d}T12:00:00Z`).getUTCDay();
-    if (dia >= 1 && dia <= 5) n += 1;
+    if (dia >= 1 && dia <= 5) out.push(d);
   }
-  return n;
+  return out;
+}
+
+/** Días hábiles (lunes a viernes) desde hoy, o desde el inicio si la semana no empezó, hasta el fin de la semana. */
+export function diasHabilesRestantes(hoy: string, semana: { fecha_inicio: string; fecha_fin: string }): number {
+  return diasHabilesDesde(hoy, semana).length;
 }
 
 /**
@@ -200,8 +218,11 @@ export function calcularCarga(e: {
   capacidades: Capacidades;
   /** Horas ya registradas por persona y tarea («usuario|tarea»). */
   registradas: Map<string, number>;
+  /** Horas de reunión por persona y día («usuario|fecha»), de `horasDeReunion`. */
+  reuniones?: Map<string, number>;
 }): CargaPersona[] {
-  const dias = diasHabilesRestantes(e.hoy, e.semana);
+  const habiles = diasHabilesDesde(e.hoy, e.semana);
+  const dias = habiles.length;
   const semana = e.activos.filter((r) => cuentaEnLaCarga(r, e.hoy, e.semana.fecha_fin));
   return e.usuarios
     .filter((u) => u.activo && u.capacidad_semanal > 0)
@@ -222,7 +243,9 @@ export function calcularCarga(e: {
         })
         .sort((a, b) => a.fecha_entrega.localeCompare(b.fecha_entrega) || a.id.localeCompare(b.id));
       const semanal = e.capacidades(u);
-      const capacidad = r1((semanal.horas * dias) / 5);
+      const capacidad = r1(
+        habiles.reduce((s, d) => s + capacidadDelDia(semanal.horas, u.capacidad_semanal, e.reuniones?.get(`${u.id}|${d}`) ?? 0), 0),
+      );
       const horas = r1(tareas.reduce((s, t) => s + t.horas, 0));
       // Se hacen en orden de fecha: lo que ya no entra en la capacidad que queda está en riesgo.
       let acumulado = 0;
@@ -233,6 +256,7 @@ export function calcularCarga(e: {
         capacidad_semanal: semanal.horas,
         capacidad_base: semanal.base,
         capacidad_restante: capacidad,
+        reuniones_restantes: r1(habiles.reduce((s, d) => s + (e.reuniones?.get(`${u.id}|${d}`) ?? 0), 0)),
         horas,
         tareas,
         en_riesgo,
@@ -249,12 +273,13 @@ export async function cargaDelEquipo(
   semana: { fecha_inicio: string; fecha_fin: string },
   hoy = hoyLocal(),
 ): Promise<CargaPersona[]> {
-  const [activos, usuarios, horas, tipos, prueba] = await Promise.all([
+  const [activos, usuarios, horas, tipos, prueba, reuniones] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, hasta: semana.fecha_fin }),
     listUsuarios(ctx),
     listHorasConTarea(ctx, sumarDias(semana.fecha_inicio < hoy ? semana.fecha_inicio : hoy, -7 * SEMANAS_RITMO)),
     listTiposPieza(ctx, true),
     idsClientesDePrueba(ctx),
+    listReunionesEntre(ctx, hoy > semana.fecha_inicio ? hoy : semana.fecha_inicio, semana.fecha_fin),
   ]);
   const { muestras, registradas } = agruparHoras(horas);
   return calcularCarga({
@@ -265,6 +290,7 @@ export async function cargaDelEquipo(
     estimar: crearEstimador(muestras, tipos),
     capacidades: crearCapacidades(horas, semana.fecha_inicio),
     registradas,
+    reuniones: horasDeReunion(reuniones),
   });
 }
 
@@ -273,6 +299,8 @@ export interface CargaDia {
   horas: Record<string, Record<string, number>>;
   capacidad_dia: Record<string, number>;
   otras_mesas: Record<string, number>;
+  /** Horas de reunión de hoy por persona (ya descontadas de `capacidad_dia`). */
+  reuniones: Record<string, number>;
 }
 
 /** Calcula la carga de un día a partir de lo ya cargado. `deLaMesa` es el alcance que se está armando. Pura. */
@@ -284,9 +312,15 @@ export function calcularCargaDia(e: {
   estimar: Estimador;
   capacidades: Capacidades;
   registradas: Map<string, number>;
+  reuniones?: Map<string, number>;
 }): CargaDia {
-  const out: CargaDia = { horas: {}, capacidad_dia: {}, otras_mesas: {} };
-  for (const u of e.usuarios) if (u.activo) out.capacidad_dia[u.id] = r1(e.capacidades(u).horas / 5);
+  const out: CargaDia = { horas: {}, capacidad_dia: {}, otras_mesas: {}, reuniones: {} };
+  for (const u of e.usuarios) {
+    if (!u.activo) continue;
+    const reunion = e.reuniones?.get(`${u.id}|${e.hoy}`) ?? 0;
+    out.capacidad_dia[u.id] = capacidadDelDia(e.capacidades(u).horas, u.capacidad_semanal, reunion);
+    if (reunion > 0) out.reuniones[u.id] = r1(reunion);
+  }
   for (const r of e.activos) {
     const propia = e.deLaMesa.has(r.id);
     if (!propia && r.daily_fecha !== e.hoy) continue;
@@ -305,13 +339,14 @@ export async function cargaDelDia(
   hoy = hoyLocal(),
 ): Promise<CargaDia> {
   const lunes = lunesDe(hoy);
-  const [activos, usuarios, horas, tipos, prueba, deLaMesa] = await Promise.all([
+  const [activos, usuarios, horas, tipos, prueba, deLaMesa, reuniones] = await Promise.all([
     listBacklog(ctx, { solo_activos: true }),
     listUsuarios(ctx),
     listHorasConTarea(ctx, sumarDias(lunes, -7 * SEMANAS_RITMO)),
     listTiposPieza(ctx, true),
     idsClientesDePrueba(ctx),
     mesa ? listBacklog(ctx, { solo_activos: true, mesa }) : Promise.resolve(null),
+    listReunionesEntre(ctx, hoy, hoy),
   ]);
   const reales = activos.filter((r) => !prueba.has(r.cliente_id));
   const { muestras, registradas } = agruparHoras(horas);
@@ -323,6 +358,7 @@ export async function cargaDelDia(
     estimar: crearEstimador(muestras, tipos),
     capacidades: crearCapacidades(horas, lunes),
     registradas,
+    reuniones: horasDeReunion(reuniones),
   });
 }
 

@@ -54,6 +54,7 @@ rentabilidad.get('/rentabilidad/clientes/:id', requireScope('read:proyectos'), a
         margen: x?.margen ?? null,
         margen_pct: x?.margen_pct ?? null,
         horas: x?.horas ?? 0,
+        horas_reunion: x?.horas_reunion ?? 0,
         personas: x?.personas ?? [],
       };
     }),

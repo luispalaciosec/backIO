@@ -8,6 +8,13 @@
  * Las ejecutivas no registran horas: su sueldo se reparte entre sus cuentas (`clientes.ejecutiva_id`) según el fee de cada
  * una. Antes quedaba sin repartir y sus cuentas parecían más rentables de lo que son (Luis, 7/11/2026). Los sueldos de quien
  * no registró horas ni lleva cuentas (gerencia, administración) no se pueden repartir y se muestran aparte.
+ *
+ * Reuniones y visitas con un cliente (docs/23, fase 3) son trabajo para ese cliente:
+ * - A quien registra horas se le suman a las del timesheet de ese cliente, y el sueldo se reparte con ambas.
+ * - A la ejecutiva, la parte de su jornada del mes que pasó en reuniones con clientes va a esos clientes por horas; el resto
+ *   sigue repartido entre sus cuentas por el fee.
+ * - Las internas (sin cliente) no van a ningún cliente. Las de quien no registra horas ni lleva cuentas tampoco: su sueldo
+ *   sigue sin repartir (decisión pendiente de gerencia).
  */
 import type { CostoPersonal, FeeCliente, RentabilidadCliente, RentabilidadMes, Usuario } from '@backio/shared';
 import { nombrePersona } from '@backio/shared';
@@ -16,6 +23,11 @@ import { listCostosPersonal, listFeesCliente } from './db/costos';
 import { listHorasEntre } from './db/horas';
 import { listUsuarios } from './db/usuarios';
 import { idsClientesDePrueba, listClientes } from './db/clientes';
+import { listReunionesEntre } from './db/reuniones';
+import { horasDeReunionPorCliente } from './reuniones';
+
+/** Semanas por mes, para pasar la jornada semanal declarada a la del mes. */
+const SEMANAS_MES = 52 / 12;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -36,7 +48,9 @@ export function calcularRentabilidad(e: {
   costos: Pick<CostoPersonal, 'usuario_id' | 'sueldo_mensual' | 'desde'>[];
   fees: Pick<FeeCliente, 'cliente_id' | 'fee_mensual' | 'desde'>[];
   horas: { cliente_id: string | null; usuario_id: string | null; horas: number }[];
-  usuarios: Pick<Usuario, 'id' | 'nombre' | 'activo' | 'fecha_salida'>[];
+  usuarios: (Pick<Usuario, 'id' | 'nombre' | 'activo' | 'fecha_salida'> & { capacidad_semanal?: number })[];
+  /** Horas de reunión del mes por persona y cliente («usuario|cliente»), de `horasDeReunionPorCliente`. */
+  reuniones?: Map<string, number>;
   clientes: { id: string; nombre: string; empresa_id?: string | null; ejecutiva_id?: string | null; activo?: boolean }[];
   /** Clientes que no cuentan (de prueba). */
   excluir?: Set<string>;
@@ -59,6 +73,15 @@ export function calcularRentabilidad(e: {
     const m = porPersona.get(h.usuario_id) ?? new Map<string, number>();
     m.set(h.cliente_id, (m.get(h.cliente_id) ?? 0) + n);
     porPersona.set(h.usuario_id, m);
+  }
+  // Reuniones por persona y cliente (sin clientes de prueba).
+  const reunionesDe = new Map<string, Map<string, number>>();
+  for (const [k, h] of e.reuniones ?? []) {
+    const [usuarioId, clienteId] = k.split('|') as [string, string];
+    if (e.excluir?.has(clienteId) || h <= 0) continue;
+    const m = reunionesDe.get(usuarioId) ?? new Map<string, number>();
+    m.set(clienteId, h);
+    reunionesDe.set(usuarioId, m);
   }
 
   const porCliente = new Map<string, RentabilidadCliente>();
@@ -98,6 +121,7 @@ export function calcularRentabilidad(e: {
             hasta,
           );
     const horas = porPersona.get(usuarioId);
+    const reuniones = reunionesDe.get(usuarioId);
     const total = horas ? [...horas.values()].reduce((s, h) => s + h, 0) : 0;
     if (!costo) {
       if (total > 0) sinSueldo.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), horas: r2(total) });
@@ -106,10 +130,53 @@ export function calcularRentabilidad(e: {
       continue;
     }
     const sueldo = Number(costo.sueldo_mensual);
+    // Quien registra horas: sus reuniones con clientes se suman a las del timesheet.
+    if (total > 0 && reuniones) {
+      const conReuniones = new Map(horas!);
+      for (const [clienteId, h] of reuniones) conReuniones.set(clienteId, (conReuniones.get(clienteId) ?? 0) + h);
+      const totalCon = [...conReuniones.values()].reduce((s, h) => s + h, 0);
+      for (const [clienteId, h] of conReuniones) {
+        const c = fila(clienteId);
+        const parte = (sueldo * h) / totalCon;
+        const enReunion = reuniones.get(clienteId) ?? 0;
+        c.costo += parte;
+        c.horas += h - enReunion;
+        c.horas_reunion = (c.horas_reunion ?? 0) + enReunion;
+        c.personas.push({
+          usuario_id: usuarioId,
+          nombre: nombre(usuarioId),
+          horas: r2(h - enReunion),
+          costo: r2(parte),
+          ...(enReunion ? { horas_reunion: r2(enReunion) } : {}),
+        });
+      }
+      continue;
+    }
     if (total <= 0) {
       // Sin horas: si es ejecutiva de alguna cuenta, su sueldo va a sus cuentas según el fee de cada una (sin fees, en partes
       // iguales). Una marca sin fee propio no recibe parte: su empresa ya cobra por ella.
       const cuentas = e.clientes.filter((c) => c.ejecutiva_id === usuarioId && c.activo !== false && !e.excluir?.has(c.id));
+      // La parte de su jornada del mes en reuniones con clientes va a esos clientes; el resto, por el fee de sus cuentas.
+      const jornadaMes = (e.usuarios.find((u) => u.id === usuarioId)?.capacidad_semanal ?? 0) * SEMANAS_MES;
+      const enReuniones = reuniones && cuentas.length ? [...reuniones.values()].reduce((s, h) => s + h, 0) : 0;
+      const fraccion = jornadaMes > 0 ? Math.min(enReuniones / jornadaMes, 1) : 0;
+      if (fraccion > 0) {
+        for (const [clienteId, h] of reuniones!) {
+          const parte = (sueldo * fraccion * h) / enReuniones;
+          const c = fila(clienteId);
+          c.costo += parte;
+          c.horas_reunion = (c.horas_reunion ?? 0) + h;
+          c.personas.push({
+            usuario_id: usuarioId,
+            nombre: nombre(usuarioId),
+            horas: 0,
+            costo: r2(parte),
+            reparto: 'reuniones',
+            horas_reunion: r2(h),
+          });
+        }
+      }
+      const restoSueldo = sueldo * (1 - fraccion);
       const pesos = cuentas.map((c) => {
         const f = vigente(
           e.fees.filter((x) => x.cliente_id === c.id),
@@ -121,11 +188,11 @@ export function calcularRentabilidad(e: {
       const repartir = suma > 0 ? pesos.filter((x) => x.peso > 0) : pesos.map((x) => ({ ...x, peso: 1 }));
       const base = suma > 0 ? suma : repartir.length;
       if (!repartir.length) {
-        sinRepartir.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), sueldo });
+        if (fraccion === 0) sinRepartir.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), sueldo });
         continue;
       }
       for (const x of repartir) {
-        const parte = (sueldo * x.peso) / base;
+        const parte = (restoSueldo * x.peso) / base;
         const c = fila(x.id);
         c.costo += parte;
         c.personas.push({ usuario_id: usuarioId, nombre: nombre(usuarioId), horas: 0, costo: r2(parte), reparto: 'cuenta' });
@@ -150,6 +217,7 @@ export function calcularRentabilidad(e: {
       ...c,
       costo,
       horas: r2(c.horas),
+      ...(c.horas_reunion ? { horas_reunion: r2(c.horas_reunion) } : {}),
       margen,
       margen_pct: c.fee && margen !== null ? Math.round((margen / c.fee) * 100) : null,
       personas: c.personas.sort((a, b) => b.costo - a.costo),
@@ -168,19 +236,31 @@ export function calcularRentabilidad(e: {
     const personas = new Map<string, RentabilidadCliente['personas'][number]>();
     for (const x of [...p.personas, ...marcas.flatMap((m) => m.personas)]) {
       const y = personas.get(x.usuario_id);
-      personas.set(x.usuario_id, y ? { ...y, horas: r2(y.horas + x.horas), costo: r2(y.costo + x.costo) } : { ...x });
+      personas.set(
+        x.usuario_id,
+        y
+          ? {
+              ...y,
+              horas: r2(y.horas + x.horas),
+              costo: r2(y.costo + x.costo),
+              ...(y.horas_reunion || x.horas_reunion ? { horas_reunion: r2((y.horas_reunion ?? 0) + (x.horas_reunion ?? 0)) } : {}),
+            }
+          : { ...x },
+      );
     }
     const fees = [p.fee, ...marcas.map((m) => m.fee)].filter((f): f is number => f !== null);
     p.fee = fees.length ? fees.reduce((s, f) => s + f, 0) : null;
     p.costo += marcas.reduce((s, m) => s + m.costo, 0);
     p.horas += marcas.reduce((s, m) => s + m.horas, 0);
+    const reunionMarcas = marcas.reduce((s, m) => s + (m.horas_reunion ?? 0), 0);
+    if (reunionMarcas) p.horas_reunion = (p.horas_reunion ?? 0) + reunionMarcas;
     p.personas = [...personas.values()];
     p.marcas = marcas.map(cerrar).sort((a, b) => b.costo - a.costo);
     for (const m of marcas) porCliente.delete(m.cliente_id);
   }
   const clientes = [...porCliente.values()]
     .map(cerrar)
-    .filter((c) => c.fee !== null || c.costo > 0 || c.horas > 0)
+    .filter((c) => c.fee !== null || c.costo > 0 || c.horas > 0 || (c.horas_reunion ?? 0) > 0)
     .sort((a, b) => (a.margen ?? Infinity) - (b.margen ?? Infinity) || b.costo - a.costo);
 
   const fee = r2(clientes.reduce((s, c) => s + (c.fee ?? 0), 0));
@@ -203,13 +283,23 @@ export function buscarCliente(r: RentabilidadMes, id: string): RentabilidadClien
 /** Rentabilidad del mes con el cliente de la persona: la RLS de la migración 41 vuelve a exigir gerencia o admin. */
 export async function rentabilidadMes(ctx: DbCtx, mes: string): Promise<RentabilidadMes> {
   const { desde, hasta } = rangoMes(mes);
-  const [costos, fees, horas, usuarios, clientes, prueba] = await Promise.all([
+  const [costos, fees, horas, usuarios, clientes, prueba, reuniones] = await Promise.all([
     listCostosPersonal(ctx),
     listFeesCliente(ctx),
     listHorasEntre(ctx, desde, hasta),
     listUsuarios(ctx, { incluirInactivos: true }),
     listClientes(ctx, { incluirInactivos: true }),
     idsClientesDePrueba(ctx),
+    listReunionesEntre(ctx, desde, hasta),
   ]);
-  return calcularRentabilidad({ mes, costos, fees, horas, usuarios, clientes, excluir: prueba });
+  return calcularRentabilidad({
+    mes,
+    costos,
+    fees,
+    horas,
+    usuarios,
+    clientes,
+    excluir: prueba,
+    reuniones: horasDeReunionPorCliente(reuniones),
+  });
 }

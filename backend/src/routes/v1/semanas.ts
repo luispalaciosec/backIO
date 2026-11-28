@@ -70,6 +70,7 @@ import { conCandado } from '../../lib/candado';
 import { serviceClient } from '../../lib/db/client';
 import { hoyLocal, inicioDiaLocal, horaLocal, sumarDias } from '@backio/shared';
 import { log } from '../../lib/logger';
+import { reunionesDeSemana } from '../../lib/reuniones';
 
 export const semanas = new Hono();
 
@@ -265,6 +266,16 @@ semanas.get('/:id/proyectos', requireScope('read:senales'), async (c) => {
 semanas.get('/:id/capacidad', requireScope('read:capacidad'), async (c) =>
   c.json({ items: await capacidadSemana(ctxOf(c), c.req.param('id'), c.req.query('mesa') || null) }),
 );
+
+// Reuniones y visitas de la semana por cliente (docs/23, fase 3); con mesa, solo con sus clientes.
+semanas.get('/:id/reuniones', requireScope('read:capacidad'), async (c) => {
+  const ctx = ctxOf(c);
+  const s = await getSemana(ctx, c.req.param('id'));
+  if (!s) return c.json({ error: 'not_found' }, 404);
+  const mesa = c.req.query('mesa');
+  const alcance = mesa ? await alcanceMesa(ctx, mesa, { sinPrueba: true }) : undefined;
+  return c.json(await reunionesDeSemana(ctx, s, alcance?.clienteIds));
+});
 
 semanas.get('/:id/acuerdos', requireScope('read:senales'), async (c) =>
   c.json({ items: await listAcuerdosSemana(ctxOf(c), c.req.param('id')) }),

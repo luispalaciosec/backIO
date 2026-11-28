@@ -8,9 +8,9 @@
  */
 import { diaLocal, hoyLocal, sumarDias } from '@backio/shared';
 import type { DbCtx, FilaInsert } from './db/client';
-import { listClientes } from './db/clientes';
+import { idsClientesDePrueba, listClientes } from './db/clientes';
 import { listUsuarios } from './db/usuarios';
-import { cancelarReuniones, listReunionesDeOrigen, upsertReuniones } from './db/reuniones';
+import { cancelarReuniones, listReunionesDeOrigen, listReunionesEntre, upsertReuniones } from './db/reuniones';
 import { BasecampClient, type EventoBasecampSafe } from './basecamp/client';
 import { log } from './logger';
 import { audit } from './db/audit';
@@ -79,6 +79,22 @@ export function ocurrencias(ev: EventoBasecampSafe, desde: string, hasta: string
  * Horas de reunión por persona y día: la UNIÓN de sus intervalos (lo que se pisa cuenta una vez). Clave `persona|día`,
  * con el día del inicio de cada tramo en Guayaquil.
  */
+/**
+ * Horas de reunión por persona y cliente («usuario|cliente») en el período de las filas: la misma unión de horarios que
+ * `horasDeReunion`, por cliente. Las internas (sin cliente) no entran.
+ */
+export function horasDeReunionPorCliente(
+  filas: { usuario_id: string; cliente_id: string | null; inicio: string; fin: string }[],
+): Map<string, number> {
+  const porDia = horasDeReunion(filas.filter((f) => f.cliente_id).map((f) => ({ ...f, usuario_id: `${f.usuario_id}|${f.cliente_id}` })));
+  const out = new Map<string, number>();
+  for (const [k, h] of porDia) {
+    const clave = k.slice(0, k.lastIndexOf('|'));
+    out.set(clave, Math.round(((out.get(clave) ?? 0) + h) * 100) / 100);
+  }
+  return out;
+}
+
 export function horasDeReunion(filas: { usuario_id: string; inicio: string; fin: string }[]): Map<string, number> {
   const porPersona = new Map<string, [number, number][]>();
   for (const f of filas) {
@@ -262,6 +278,63 @@ export async function sincronizarReunionesGoogle(
     }
   }
   return { personas: conectados.length, guardadas, canceladas, desconectadas, errores };
+}
+
+/** Horas de reunión de un período: total, por persona (unión de horarios por día) y por cliente. Pura. */
+export function resumirReuniones(
+  filas: { usuario_id: string; cliente_id: string | null; inicio: string; fin: string }[],
+  opciones: { excluir?: Set<string>; clienteIds?: string[] } = {},
+): { total: number; por_usuario: Record<string, number>; por_cliente: Record<string, number> } {
+  const alcance = opciones.clienteIds ? new Set(opciones.clienteIds) : null;
+  // Con alcance (una mesa) solo cuentan las reuniones con sus clientes; sin alcance, también las internas.
+  const validas = filas.filter(
+    (f) => !(f.cliente_id && opciones.excluir?.has(f.cliente_id)) && (!alcance || (f.cliente_id && alcance.has(f.cliente_id))),
+  );
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const por_usuario: Record<string, number> = {};
+  for (const [k, h] of horasDeReunion(validas)) {
+    const u = k.slice(0, k.indexOf('|'));
+    por_usuario[u] = r2((por_usuario[u] ?? 0) + h);
+  }
+  const por_cliente: Record<string, number> = {};
+  for (const [k, h] of horasDeReunionPorCliente(validas)) {
+    const c = k.slice(k.indexOf('|') + 1);
+    por_cliente[c] = r2((por_cliente[c] ?? 0) + h);
+  }
+  return { total: r2(Object.values(por_usuario).reduce((s, h) => s + h, 0)), por_usuario, por_cliente };
+}
+
+/** Reuniones de una semana por cliente, con quién estuvo, para el weekly (docs/23, fase 3). */
+export async function reunionesDeSemana(
+  ctx: DbCtx,
+  semana: { fecha_inicio: string; fecha_fin: string },
+  clienteIds?: string[],
+): Promise<{
+  total: number;
+  internas: number;
+  clientes: { cliente_id: string; horas: number; personas: { usuario_id: string; horas: number }[] }[];
+}> {
+  const [filas, prueba] = await Promise.all([listReunionesEntre(ctx, semana.fecha_inicio, semana.fecha_fin), idsClientesDePrueba(ctx)]);
+  const validas = filas.filter((f) => !(f.cliente_id && prueba.has(f.cliente_id)));
+  const conClientes = resumirReuniones(validas, { clienteIds });
+  const porCliente = new Map<string, { usuario_id: string; horas: number }[]>();
+  for (const [k, h] of horasDeReunionPorCliente(validas)) {
+    const [usuario_id, cliente_id] = k.split('|') as [string, string];
+    if (clienteIds && !clienteIds.includes(cliente_id)) continue;
+    porCliente.set(cliente_id, [...(porCliente.get(cliente_id) ?? []), { usuario_id, horas: h }]);
+  }
+  const internas = clienteIds ? 0 : resumirReuniones(validas.filter((f) => !f.cliente_id)).total;
+  return {
+    total: Math.round(Object.values(conClientes.por_cliente).reduce((s, h) => s + h, 0) * 100) / 100,
+    internas,
+    clientes: [...porCliente.entries()]
+      .map(([cliente_id, personas]) => ({
+        cliente_id,
+        horas: conClientes.por_cliente[cliente_id] ?? 0,
+        personas: personas.sort((a, b) => b.horas - a.horas),
+      }))
+      .sort((a, b) => b.horas - a.horas),
+  };
 }
 
 /** Tarea programada: todas las fuentes. */

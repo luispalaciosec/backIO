@@ -16,6 +16,13 @@ import { USUARIOS_CON_INACTIVOS } from '@/lib/personas';
 
 export const dynamic = 'force-dynamic';
 
+interface ReunionesSemana {
+  total: number;
+  internas: number;
+  clientes: { cliente_id: string; horas: number; personas: { usuario_id: string; horas: number }[] }[];
+}
+const h1 = (n: number) => `${n.toLocaleString('es-EC', { maximumFractionDigits: 1 })} h`;
+
 const BASE_CAPACIDAD = {
   ritmo: 'Su semana fuerte en el timesheet (12 semanas)',
   equipo: 'Sin timesheet suficiente: la semana fuerte del equipo',
@@ -101,6 +108,8 @@ export default async function WeeklyPage({
       apiServer<{ items: Usuario[] }>(USUARIOS_CON_INACTIVOS),
       apiServer<{ items: Pick<Cliente, 'id' | 'nombre' | 'ejecutiva_id' | 'mesa_id'>[] }>('/clientes'),
     ]);
+  // Reuniones y visitas de la semana (docs/23): si falla, el weekly sigue sin esa sección.
+  const reuniones = await apiServer<ReunionesSemana>(`/semanas/${semana.id}/reuniones${mesa ? `?mesa=${mesa.id}` : ''}`).catch(() => null);
   const misClientes = clientes.filter((c) => !!me.usuario_id && c.ejecutiva_id === me.usuario_id);
   const misClientesIds = misClientes.map((c) => c.id);
   const tieneCuentas = misClientes.length > 0;
@@ -127,6 +136,7 @@ export default async function WeeklyPage({
         .map((c) => ({ ...c, en_riesgo: c.en_riesgo?.filter((t) => misClientesIds.includes(t.cliente_id)) }))
     : capacidad;
   const nombre = (id: string) => nombres[id] ?? '—';
+  const reunionesVista = reuniones?.clientes.filter((r) => !cuentas || misClientesIds.includes(r.cliente_id));
   const hoy = hoyLocal();
   const vencidos = abiertos.filter((a) => a.fecha_compromiso < hoy);
 
@@ -256,6 +266,14 @@ export default async function WeeklyPage({
                                   {c.capacidad_restante !== undefined
                                     ? `${Math.round(c.capacidad_restante)} h`
                                     : `${c.capacidad_semanal} h`}
+                                  {!!c.reuniones_restantes && (
+                                    <span
+                                      className="block text-[11px] text-gray-500"
+                                      title="Horas en reuniones los días que quedan, ya descontadas de lo disponible"
+                                    >
+                                      {Math.round(c.reuniones_restantes)} h en reuniones
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                               {!!c.en_riesgo?.length && (
@@ -291,6 +309,29 @@ export default async function WeeklyPage({
                     </table>
                   </div>
                 </section>
+                {reunionesVista && reunionesVista.length > 0 && (
+                  <section className="card">
+                    <div className="px-4 py-3 border-b border-gray-200">
+                      <div className="font-semibold">Reuniones y visitas con clientes</div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        De los calendarios de Basecamp y Google, incluidas las que faltan esta semana. Ya se descuentan de lo disponible de
+                        cada persona.
+                        {!cuentas && !!reuniones?.internas && ` Además, ${h1(reuniones.internas)} en reuniones internas.`}
+                      </p>
+                    </div>
+                    <ul className="divide-y divide-gray-100 text-sm">
+                      {reunionesVista.map((r) => (
+                        <li key={r.cliente_id} className="px-4 py-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+                          <span className="font-medium">{nombreCliente[r.cliente_id] ?? 'Cliente'}</span>
+                          <span className="text-xs text-gray-500">
+                            {r.personas.map((p) => `${nombre(p.usuario_id).split(' ')[0]} ${h1(p.horas)}`).join(' · ')}
+                          </span>
+                          <span className="tabular-nums font-semibold ml-auto">{h1(r.horas)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
                 <SenalesWeekly
                   titulo="Otras señales: personas y cuentas"
                   senales={agenda.otras_senales}

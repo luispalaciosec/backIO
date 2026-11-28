@@ -14,6 +14,8 @@ import { listMesas, alcanceMesa } from './db/mesas';
 import { listCumplimientoDesde } from './db/historial';
 import { resumirCumplimiento, labelMotivoReprogramacion, labelMotivoReproceso, aTiempoOriginal, aTiempoVigente } from './cumplimiento';
 import { resumenHoras } from './horas';
+import { listReunionesEntre } from './db/reuniones';
+import { resumirReuniones } from './reuniones';
 import {
   diaLocal,
   hoyLocal,
@@ -42,6 +44,8 @@ export interface DashboardKpis {
   proyectos_activos: number;
   avance_promedio: number;
   horas_30d: number;
+  /** Horas en reuniones y visitas (calendarios, docs/23), aparte del timesheet. */
+  horas_reunion_30d: number;
   huerfanos_pendientes: number;
   /** Cumplimiento 30d sobre la fecha ORIGINAL (dato real) y sobre la vigente. */
   pct_a_tiempo_original_30d: number | null;
@@ -71,6 +75,7 @@ export interface FilaCliente {
   /** Por qué no está en verde (saludCliente). */
   salud_motivos: string[];
   horas_30d: number;
+  horas_reunion_30d: number;
   valor_cotizado_activo: number;
   pct_a_tiempo_original_30d: number | null;
   reprocesos_30d: number;
@@ -86,6 +91,7 @@ export interface FilaPersona {
   capacidad_semanal: number;
   pct_semana: number;
   horas_30d: number;
+  horas_reunion_30d: number;
   entregados_30d: number;
   pct_a_tiempo_original_30d: number | null;
   pct_a_tiempo_vigente_30d: number | null;
@@ -149,13 +155,15 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
   ]);
   const mesa = mesaId ? (mesas.find((m) => m.id === mesaId) ?? null) : null;
   const alcance = mesa ? await alcanceMesa(ctx, mesa.id) : undefined;
-  const [activosTodos, completadosTodos, horas, cumpl, prueba] = await Promise.all([
+  const [activosTodos, completadosTodos, horas, cumpl, prueba, filasReunion] = await Promise.all([
     listBacklog(ctx, { solo_activos: true, mesa: alcance }),
     listCompletadosDesde(ctx, hace90, alcance),
     resumenHoras(ctx, hace30, alcance ? { clienteIds: alcance.clienteIds } : {}),
     listCumplimientoDesde(ctx, hace90),
     idsClientesDePrueba(ctx),
+    listReunionesEntre(ctx, diaLocal(hace30), hoy),
   ]);
+  const reuniones = resumirReuniones(filasReunion, { excluir: prueba, clienteIds: alcance?.clienteIds });
   // Los clientes de prueba (migración 34) no cuentan en el dashboard.
   const activos = activosTodos.filter((r) => !prueba.has(r.cliente_id));
   const completados90 = completadosTodos.filter((r) => !prueba.has(r.cliente_id));
@@ -192,6 +200,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
     proyectos_activos: proyectosActivos.length,
     avance_promedio: proyectosActivos.length ? Math.round(proyectosActivos.reduce((s, p) => s + p.avance, 0) / proyectosActivos.length) : 0,
     horas_30d: horas.total,
+    horas_reunion_30d: reuniones.total,
     huerfanos_pendientes: huerfanosPend ?? 0,
     pct_a_tiempo_original_30d: cumplTotal.pct_original,
     pct_a_tiempo_vigente_30d: cumplTotal.pct_vigente,
@@ -248,6 +257,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
         salud,
         salud_motivos,
         horas_30d: horas.por_cliente[id] ?? 0,
+        horas_reunion_30d: reuniones.por_cliente[id] ?? 0,
         valor_cotizado_activo: proys.reduce((s, p) => s + (Number(p.valor_cotizado) || 0), 0),
         pct_a_tiempo_original_30d: resumirCumplimiento(comp, [], []).pct_original,
         reprocesos_30d: reprocs30.filter((x) => reqPorId.get(x.requerimiento_id)?.cliente_id === id).length,
@@ -295,6 +305,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
         capacidad_semanal: u.capacidad_semanal,
         pct_semana: Math.round((semana.length / totalSemana) * 100),
         horas_30d: horas.por_usuario[u.id] ?? 0,
+        horas_reunion_30d: reuniones.por_usuario[u.id] ?? 0,
         entregados_30d: entregados.length,
         pct_a_tiempo_original_30d: cu.pct_original,
         pct_a_tiempo_vigente_30d: cu.pct_vigente,
@@ -307,7 +318,7 @@ export async function buildDashboard(ctx: DbCtx, mesaId?: string | null): Promis
         motivo_reproceso_dominante: cu.motivo_reproceso_dominante ? labelMotivoReproceso(cu.motivo_reproceso_dominante as never) : null,
       };
     })
-    .filter((p) => p.activos > 0 || p.horas_30d > 0 || p.entregados_30d > 0)
+    .filter((p) => p.activos > 0 || p.horas_30d > 0 || p.horas_reunion_30d > 0 || p.entregados_30d > 0)
     .sort((a, b) => b.activos - a.activos);
 
   const por_estado = ['backlog', 'priorizado', 'en_ejecucion', 'en_revision', 'bloqueado', 'reprogramado'].map((estado) => ({

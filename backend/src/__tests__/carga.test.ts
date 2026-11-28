@@ -3,6 +3,8 @@ import type { RequerimientoMetricas, Usuario } from '@backio/shared';
 import {
   agruparHoras,
   calcularCarga,
+  calcularCargaDia,
+  capacidadDelDia,
   crearCapacidades,
   crearEstimador,
   type Capacidades,
@@ -206,5 +208,49 @@ describe('Carga de la semana', () => {
     expect(diaCorto('2026-11-03')).toBe('mar 3/11');
     expect(t.titulo).toBe('1 tarea en riesgo esta semana');
     expect(t.cuerpo).toContain('• Reel Halloween (Foligain): vence el mar 3/11; Oscar tiene ~52 h para 40 h disponibles.');
+  });
+});
+
+// docs/23 · Reuniones, fase 3: las reuniones quitan capacidad para tareas.
+describe('reuniones en la capacidad', () => {
+  it('un día: su ritmo diario, salvo que las reuniones no dejen tanto de la jornada declarada', () => {
+    expect(capacidadDelDia(15, 40, 0)).toBe(3); // ritmo de 15 h: 3 h al día
+    expect(capacidadDelDia(15, 40, 4)).toBe(3); // 8 − 4 = 4 h de jornada: el ritmo sigue mandando
+    expect(capacidadDelDia(15, 40, 6.5)).toBe(1.5); // 8 − 6,5
+    expect(capacidadDelDia(15, 40, 9)).toBe(0); // nunca negativa
+    expect(capacidadDelDia(15, 0, 3)).toBe(3); // sin jornada declarada, no hay contra qué descontar
+  });
+
+  it('la semana suma la capacidad de cada día que queda, con sus reuniones', () => {
+    const [c] = calcularCarga({
+      activos: [r({ id: 't', fecha_entrega: '2026-11-06' })],
+      usuarios: [u('oscar', 40)],
+      semana,
+      hoy: '2026-11-05', // quedan jueves y viernes
+      estimar: () => ({ horas: 2, base: 'persona' }),
+      capacidades: () => ({ horas: 40, base: 'ritmo' }),
+      registradas: new Map(),
+      reuniones: new Map([
+        ['oscar|2026-11-05', 5], // jueves: 8 − 5 = 3
+        ['oscar|2026-11-04', 8], // ayer: ya no cuenta
+      ]),
+    });
+    expect(c!.capacidad_restante).toBe(11); // 3 + 8
+    expect(c!.reuniones_restantes).toBe(5);
+  });
+
+  it('el día descuenta las reuniones de hoy y las informa', () => {
+    const c = calcularCargaDia({
+      activos: [],
+      deLaMesa: new Set(),
+      usuarios: [u('oscar', 40), u('ana', 40)],
+      hoy: '2026-11-04',
+      estimar: () => ({ horas: 2, base: 'persona' }),
+      capacidades: () => ({ horas: 40, base: 'ritmo' }),
+      registradas: new Map(),
+      reuniones: new Map([['oscar|2026-11-04', 6]]),
+    });
+    expect(c.capacidad_dia).toEqual({ oscar: 2, ana: 8 });
+    expect(c.reuniones).toEqual({ oscar: 6 });
   });
 });

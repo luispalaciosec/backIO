@@ -515,7 +515,8 @@ abierta tiene tipo de pieza, así que se usa la mediana de cada persona.
 
 **Capacidad.** Se mide en la misma unidad: lo que la persona registra en una semana fuerte, el percentil 75 de sus
 últimas 12 semanas con horas. Con menos de 6 semanas, la mediana de las del equipo. Sin ningún dato, la capacidad
-declarada. Se multiplica por los días hábiles que quedan de la semana.
+declarada. Se suma cada día hábil que queda de la semana: un día vale la quinta parte, salvo que las reuniones de ese día
+no dejen tanto de la jornada declarada (docs/23).
 
 Contra las 40 h declaradas el riesgo nunca saltaba: el timesheet recoge unas 13 h por persona y semana, porque no
 todo el trabajo se registra. Comparar horas de timesheet con horas de timesheet sí detecta a quien tiene más que una

@@ -767,9 +767,21 @@ export interface RentabilidadCliente {
   /** Margen sobre el fee (0-100); null sin fee o con fee 0. */
   margen_pct: number | null;
   horas: number;
+  /** Horas de reuniones y visitas con este cliente en el mes (docs/23); no están en `horas`, que es timesheet. */
+  horas_reunion?: number;
   /** Costo por persona en este cliente. */
-  /** `cuenta`: sueldo de la ejecutiva repartido entre sus cuentas por el tamaño de su fee, no por horas. */
-  personas: { usuario_id: string; nombre: string; horas: number; costo: number; reparto?: 'cuenta' }[];
+  /**
+   * `cuenta`: sueldo de la ejecutiva repartido entre sus cuentas por el tamaño de su fee, no por horas. `reuniones`: la parte
+   * de su jornada que pasó en reuniones con este cliente.
+   */
+  personas: {
+    usuario_id: string;
+    nombre: string;
+    horas: number;
+    costo: number;
+    reparto?: 'cuenta' | 'reuniones';
+    horas_reunion?: number;
+  }[];
   /**
    * Si es una empresa con varios fees (`clientes.empresa_id`, migración 36): sus marcas, con su costo y sus horas. La fila de
    * la empresa ya las suma; el margen se calcula una sola vez, porque el fee es uno solo por todas.

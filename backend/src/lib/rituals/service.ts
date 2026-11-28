@@ -98,6 +98,7 @@ export async function capacidadSemana(ctx: DbCtx, semanaId: string, mesaId?: str
           ...c,
           horas_estimadas: k.horas,
           capacidad_restante: k.capacidad_restante,
+          reuniones_restantes: k.reuniones_restantes,
           capacidad_base: k.capacidad_base,
           en_riesgo: k.en_riesgo.map(({ id, titulo, cliente_id, fecha_entrega, horas }) => ({
             id,

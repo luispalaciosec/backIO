@@ -29,6 +29,7 @@ interface Dashboard {
     salud: 'verde' | 'amarillo' | 'rojo';
     salud_motivos?: string[];
     horas_30d: number;
+    horas_reunion_30d?: number;
     valor_cotizado_activo: number;
     pct_a_tiempo_original_30d: number | null;
     reprocesos_30d: number;
@@ -43,6 +44,7 @@ interface Dashboard {
     capacidad_semanal: number;
     pct_semana: number;
     horas_30d: number;
+    horas_reunion_30d?: number;
     entregados_30d: number;
     pct_a_tiempo_original_30d: number | null;
     pct_a_tiempo_vigente_30d: number | null;
@@ -132,7 +134,11 @@ export default function DashboardPage() {
             tono="ok"
             sub={`${k.piezas_completadas_30d} piezas · ${k.piezas_activas} en curso`}
           />
-          <Kpi etiqueta="Horas 30d" valor={k.horas_30d!} sub="timesheet de Basecamp" />
+          <Kpi
+            etiqueta="Horas 30d"
+            valor={k.horas_30d!}
+            sub={`timesheet de Basecamp${k.horas_reunion_30d ? ` · + ${Math.round(k.horas_reunion_30d)} h en reuniones` : ''}`}
+          />
           <Kpi
             etiqueta="A tiempo 30d"
             valor={
@@ -229,7 +235,14 @@ export default function DashboardPage() {
                     </td>
                     <td className="td text-right tabular-nums text-green-700">{c.completados_30d}</td>
                     <td className="td text-right tabular-nums">{c.piezas_activas}</td>
-                    <td className="td text-right tabular-nums">{c.horas_30d ? c.horas_30d.toFixed(1) : ''}</td>
+                    <td className="td text-right tabular-nums">
+                      {c.horas_30d ? c.horas_30d.toFixed(1) : ''}
+                      {c.horas_reunion_30d ? (
+                        <div className="text-[10px] text-gray-500" title="Reuniones y visitas con el cliente">
+                          + {c.horas_reunion_30d.toFixed(1)} en reuniones
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="td text-right tabular-nums">
                       {c.valor_cotizado_activo ? `$${c.valor_cotizado_activo.toLocaleString('es-EC')}` : ''}
                       {c.valor_cotizado_activo && c.horas_30d ? (
@@ -286,7 +299,14 @@ export default function DashboardPage() {
                       {p.semana_actual ? `${p.pct_semana}%` : ''}
                     </td>
                     <td className={`td text-right tabular-nums ${p.atrasados ? 'text-red-600' : ''}`}>{p.atrasados || ''}</td>
-                    <td className="td text-right tabular-nums">{p.horas_30d ? p.horas_30d.toFixed(1) : ''}</td>
+                    <td className="td text-right tabular-nums">
+                      {p.horas_30d ? p.horas_30d.toFixed(1) : ''}
+                      {p.horas_reunion_30d ? (
+                        <div className="text-[10px] text-gray-500" title="Reuniones y visitas de los calendarios">
+                          + {p.horas_reunion_30d.toFixed(1)} en reuniones
+                        </div>
+                      ) : null}
+                    </td>
                     <td
                       className={`td text-right tabular-nums ${(p.pct_a_tiempo_original_30d ?? 100) < 70 ? 'text-red-700' : ''}`}
                       title={

@@ -194,6 +194,69 @@ describe('sueldo de las ejecutivas', () => {
   });
 });
 
+// docs/23 · Reuniones, fase 3: las reuniones con un cliente son trabajo para ese cliente.
+describe('reuniones en la rentabilidad', () => {
+  const clientesR = [
+    { id: 'a', nombre: 'A', ejecutiva_id: 'caro' },
+    { id: 'b', nombre: 'B', ejecutiva_id: 'caro' },
+  ];
+  const fees = [
+    { cliente_id: 'a', fee_mensual: 3000, desde: '2026-01-01' },
+    { cliente_id: 'b', fee_mensual: 1000, desde: '2026-01-01' },
+  ];
+  it('a quien registra horas, sus reuniones con un cliente se suman a las del timesheet', () => {
+    const r = calcularRentabilidad({
+      mes: '2026-10',
+      costos: [{ usuario_id: 'beto', sueldo_mensual: 900, desde: '2026-01-01' }],
+      fees,
+      horas: [
+        { cliente_id: 'a', usuario_id: 'beto', horas: 10 },
+        { cliente_id: 'b', usuario_id: 'beto', horas: 10 },
+      ],
+      usuarios,
+      clientes: clientesR,
+      reuniones: new Map([['beto|b', 10]]),
+    });
+    const a = r.clientes.find((c) => c.cliente_id === 'a')!;
+    const b = r.clientes.find((c) => c.cliente_id === 'b')!;
+    expect([a.costo, b.costo]).toEqual([300, 600]); // 10 h de 30 y 20 h de 30
+    expect(b).toMatchObject({ horas: 10, horas_reunion: 10 });
+    expect(b.personas[0]).toMatchObject({ horas: 10, horas_reunion: 10, costo: 600 });
+  });
+  it('la ejecutiva: la parte de su jornada en reuniones va a esos clientes; el resto, por el fee', () => {
+    const r = calcularRentabilidad({
+      mes: '2026-10',
+      costos: [{ usuario_id: 'caro', sueldo_mensual: 1300, desde: '2026-01-01' }],
+      fees,
+      horas: [],
+      // 30 h semanales × 52/12 = 130 h al mes; 13 h de reuniones con B = 10 % de su jornada.
+      usuarios: [...usuarios, { id: 'caro', nombre: 'Carolina', activo: true, capacidad_semanal: 30 }],
+      clientes: clientesR,
+      reuniones: new Map([['caro|b', 13]]),
+    });
+    const a = r.clientes.find((c) => c.cliente_id === 'a')!;
+    const b = r.clientes.find((c) => c.cliente_id === 'b')!;
+    // 130 por reuniones a B; los 1170 restantes, 3/4 a A y 1/4 a B.
+    expect(a.costo).toBe(877.5);
+    expect(b.costo).toBe(130 + 292.5);
+    expect(b.personas.find((p) => p.reparto === 'reuniones')).toMatchObject({ costo: 130, horas_reunion: 13 });
+    expect(r.totales.costo).toBe(1300);
+  });
+  it('las internas y las de quien no registra horas ni lleva cuentas no van a ningún cliente', () => {
+    const r = calcularRentabilidad({
+      mes: '2026-10',
+      costos: [{ usuario_id: 'ana', sueldo_mensual: 2000, desde: '2026-01-01' }],
+      fees,
+      horas: [],
+      usuarios,
+      clientes: clientesR,
+      reuniones: new Map([['ana|a', 20]]),
+    });
+    expect(r.sin_repartir.personas.map((p) => p.usuario_id)).toEqual(['ana']);
+    expect(r.totales.costo).toBe(0);
+  });
+});
+
 describe('Permisos de rentabilidad, sueldos y fees', () => {
   const app = (auth: Partial<AuthInfo>) => {
     const a = new Hono();
